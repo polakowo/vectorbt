@@ -38,7 +38,6 @@ def setup_module():
     vbt.settings.caching.enabled = False
     vbt.settings.caching.whitelist = []
     vbt.settings.caching.blacklist = []
-    vbt.settings.returns['year_freq'] = '252 days'  # same as empyrical
 
 
 def teardown_module():

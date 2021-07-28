@@ -24,9 +24,11 @@ array([nan, 1.5, 2.5, 3.5])
     
     All functions passed as argument should be Numba-compiled."""
 
-from numba import njit
-from numba.typed import Dict
 import numpy as np
+from numba import njit, generated_jit
+from numba.np.numpy_support import as_dtype
+from numba.typed import Dict
+from numba.core.types import Omitted
 
 from vectorbt import _typing as tp
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
@@ -54,107 +56,229 @@ def shuffle_nb(a: tp.Array2d, seed: tp.Optional[int] = None) -> tp.Array2d:
     return out
 
 
-@njit(cache=True)
-def set_by_mask_1d_nb(a: tp.Array1d, mask: tp.Array1d, value: float,
-                      dtype: tp.DTypeLike = np.float_) -> tp.Array1d:
+@generated_jit(nopython=True, cache=True)
+def set_by_mask_1d_nb(a: tp.Array1d, mask: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
     """Set each element to a value by boolean mask."""
-    out = a.astype(dtype)
-    out[mask] = value
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        value_dtype = as_dtype(value)
+    else:
+        a_dtype = a.dtype
+        value_dtype = np.array(value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _set_by_mask_1d_nb(a, mask, value):
+        out = a.astype(dtype)
+        out[mask] = value
+        return out
+
+    if not nb_enabled:
+        return _set_by_mask_1d_nb(a, mask, value)
+
+    return _set_by_mask_1d_nb
 
 
-@njit(cache=True)
-def set_by_mask_nb(a: tp.Array2d, mask: tp.Array2d, value: float,
-                   dtype: tp.DTypeLike = np.float_) -> tp.Array2d:
+@generated_jit(nopython=True, cache=True)
+def set_by_mask_nb(a: tp.Array2d, mask: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
     """2-dim version of `set_by_mask_1d_nb`."""
-    out = a.astype(dtype)
-    for col in range(a.shape[1]):
-        out[mask[:, col], col] = value
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        value_dtype = as_dtype(value)
+    else:
+        a_dtype = a.dtype
+        value_dtype = np.array(value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _set_by_mask_nb(a, mask, value):
+        out = a.astype(dtype)
+        for col in range(a.shape[1]):
+            out[mask[:, col], col] = value
+        return out
+
+    if not nb_enabled:
+        return _set_by_mask_nb(a, mask, value)
+
+    return _set_by_mask_nb
 
 
-@njit(cache=True)
-def set_by_mask_mult_1d_nb(a: tp.Array1d, mask: tp.Array1d, values: tp.Array1d,
-                           dtype: tp.DTypeLike = np.float_) -> tp.Array1d:
+@generated_jit(nopython=True, cache=True)
+def set_by_mask_mult_1d_nb(a: tp.Array1d, mask: tp.Array1d, values: tp.Array1d) -> tp.Array1d:
     """Set each element in one array to the corresponding element in another by boolean mask.
 
     `values` should be of the same shape as in `a`."""
-    out = a.astype(dtype)
-    out[mask] = values[mask]
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        value_dtype = as_dtype(values.dtype)
+    else:
+        a_dtype = a.dtype
+        value_dtype = values.dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _set_by_mask_mult_1d_nb(a, mask, values):
+        out = a.astype(dtype)
+        out[mask] = values[mask]
+        return out
+
+    if not nb_enabled:
+        return _set_by_mask_mult_1d_nb(a, mask, values)
+
+    return _set_by_mask_mult_1d_nb
 
 
-@njit(cache=True)
-def set_by_mask_mult_nb(a: tp.Array2d, mask: tp.Array2d, values: tp.Array2d,
-                        dtype: tp.DTypeLike = np.float_) -> tp.Array2d:
+@generated_jit(nopython=True, cache=True)
+def set_by_mask_mult_nb(a: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -> tp.Array2d:
     """2-dim version of `set_by_mask_mult_1d_nb`."""
-    out = a.astype(dtype)
-    for col in range(a.shape[1]):
-        out[mask[:, col], col] = values[mask[:, col], col]
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        value_dtype = as_dtype(values.dtype)
+    else:
+        a_dtype = a.dtype
+        value_dtype = values.dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _set_by_mask_mult_nb(a, mask, values):
+        out = a.astype(dtype)
+        for col in range(a.shape[1]):
+            out[mask[:, col], col] = values[mask[:, col], col]
+        return out
+
+    if not nb_enabled:
+        return _set_by_mask_mult_nb(a, mask, values)
+
+    return _set_by_mask_mult_nb
 
 
 @njit(cache=True)
-def fillna_1d_nb(a: tp.Array1d, value: float,
-                 dtype: tp.DTypeLike = np.float_) -> tp.Array1d:
+def fillna_1d_nb(a: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
     """Replace NaNs with value.
 
     Numba equivalent to `pd.Series(a).fillna(value)`."""
-    return set_by_mask_1d_nb(a, np.isnan(a), value, dtype=dtype)
+    return set_by_mask_1d_nb(a, np.isnan(a), value)
 
 
 @njit(cache=True)
-def fillna_nb(a: tp.Array2d, value: float,
-              dtype: tp.DTypeLike = np.float_) -> tp.Array2d:
+def fillna_nb(a: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
     """2-dim version of `fillna_1d_nb`."""
-    return set_by_mask_nb(a, np.isnan(a), value, dtype=dtype)
+    return set_by_mask_nb(a, np.isnan(a), value)
 
 
-@njit(cache=True)
-def bshift_1d_nb(a: tp.Array, n: int = 1, dtype: tp.DTypeLike = np.float_,
-                 fill_value: tp.Scalar = np.nan) -> tp.Array:
+@generated_jit(nopython=True, cache=True)
+def bshift_1d_nb(a: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
     """Shift backward by `n` positions.
 
     Numba equivalent to `pd.Series(a).shift(n)`.
 
     !!! warning
         Shift backward means looking ahead."""
-    out = np.empty_like(a, dtype=dtype)
-    out[-n:] = fill_value
-    out[:-n] = a[n:]
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        if isinstance(fill_value, Omitted):
+            fill_value_dtype = np.asarray(fill_value.value).dtype
+        else:
+            fill_value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = a.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, fill_value_dtype)
+
+    def _bshift_1d_nb(a, n, fill_value):
+        out = np.empty_like(a, dtype=dtype)
+        out[-n:] = fill_value
+        out[:-n] = a[n:]
+        return out
+
+    if not nb_enabled:
+        return _bshift_1d_nb(a, n, fill_value)
+
+    return _bshift_1d_nb
 
 
-@njit(cache=True)
-def bshift_nb(a: tp.Array2d, n: int = 1, dtype: tp.DTypeLike = np.float_,
-              fill_value: tp.Scalar = np.nan) -> tp.Array2d:
+@generated_jit(nopython=True, cache=True)
+def bshift_nb(a: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
     """2-dim version of `bshift_1d_nb`."""
-    out = np.empty_like(a, dtype=dtype)
-    for col in range(a.shape[1]):
-        out[:, col] = bshift_1d_nb(a[:, col], n=n, dtype=dtype, fill_value=fill_value)
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        if isinstance(fill_value, Omitted):
+            fill_value_dtype = np.asarray(fill_value.value).dtype
+        else:
+            fill_value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = a.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, fill_value_dtype)
+
+    def _bshift_nb(a, n, fill_value):
+        out = np.empty_like(a, dtype=dtype)
+        for col in range(a.shape[1]):
+            out[:, col] = bshift_1d_nb(a[:, col], n=n, fill_value=fill_value)
+        return out
+
+    if not nb_enabled:
+        return _bshift_nb(a, n, fill_value)
+
+    return _bshift_nb
 
 
-@njit(cache=True)
-def fshift_1d_nb(a: tp.Array1d, n: int = 1, dtype: tp.DTypeLike = np.float_,
-                 fill_value: tp.Scalar = np.nan) -> tp.Array1d:
+@generated_jit(nopython=True, cache=True)
+def fshift_1d_nb(a: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
     """Shift forward by `n` positions.
 
     Numba equivalent to `pd.Series(a).shift(n)`."""
-    out = np.empty_like(a, dtype=dtype)
-    out[:n] = fill_value
-    out[n:] = a[:-n]
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        if isinstance(fill_value, Omitted):
+            fill_value_dtype = np.asarray(fill_value.value).dtype
+        else:
+            fill_value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = a.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, fill_value_dtype)
+
+    def _fshift_1d_nb(a, n, fill_value):
+        out = np.empty_like(a, dtype=dtype)
+        out[:n] = fill_value
+        out[n:] = a[:-n]
+        return out
+
+    if not nb_enabled:
+        return _fshift_1d_nb(a, n, fill_value)
+
+    return _fshift_1d_nb
 
 
-@njit(cache=True)
-def fshift_nb(a: tp.Array2d, n: int = 1, dtype: tp.DTypeLike = np.float_,
-              fill_value: tp.Scalar = np.nan) -> tp.Array2d:
+@generated_jit(nopython=True, cache=True)
+def fshift_nb(a: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
     """2-dim version of `fshift_1d_nb`."""
-    out = np.empty_like(a, dtype=dtype)
-    for col in range(a.shape[1]):
-        out[:, col] = fshift_1d_nb(a[:, col], n=n, dtype=dtype, fill_value=fill_value)
-    return out
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+        if isinstance(fill_value, Omitted):
+            fill_value_dtype = np.asarray(fill_value.value).dtype
+        else:
+            fill_value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = a.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, fill_value_dtype)
+
+    def _fshift_nb(a, n, fill_value):
+        out = np.empty_like(a, dtype=dtype)
+        for col in range(a.shape[1]):
+            out[:, col] = fshift_1d_nb(a[:, col], n=n, fill_value=fill_value)
+        return out
+
+    if not nb_enabled:
+        return _fshift_nb(a, n, fill_value)
+
+    return _fshift_nb
 
 
 @njit(cache=True)
@@ -221,34 +345,70 @@ def ffill_nb(a: tp.Array2d) -> tp.Array2d:
     return out
 
 
-@njit(cache=True)
-def nanprod_nb(a: tp.Array2d) -> tp.Array1d:
-    """2-dim version of `np.nanprod`."""
-    dtype = np.asarray(np.nanprod(a[:1, 0])).dtype
-    out = np.empty(a.shape[1], dtype=dtype)
-    for col in range(a.shape[1]):
-        out[col] = np.nanprod(a[:, col])
-    return out
+@generated_jit(nopython=True, cache=True)
+def nanprod_nb(a):
+    """Numba-equivalent of `np.nanprod` along axis 0."""
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+    else:
+        a_dtype = a.dtype
+    dtype = np.promote_types(a_dtype, int)
+
+    def _nanprod_nb(a):
+        out = np.empty(a.shape[1], dtype=dtype)
+        for col in range(a.shape[1]):
+            out[col] = np.nanprod(a[:, col])
+        return out
+
+    if not nb_enabled:
+        return _nanprod_nb(a)
+
+    return _nanprod_nb
 
 
-@njit(cache=True)
-def nancumsum_nb(a: tp.Array2d) -> tp.Array2d:
-    """2-dim version of `np.nancumsum`."""
-    dtype = np.asarray(np.nancumsum(a[:1, 0])).dtype
-    out = np.empty_like(a, dtype=dtype)
-    for col in range(a.shape[1]):
-        out[:, col] = np.nancumsum(a[:, col])
-    return out
+@generated_jit(nopython=True, cache=True)
+def nancumsum_nb(a):
+    """Numba-equivalent of `np.nancumsum` along axis 0."""
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+    else:
+        a_dtype = a.dtype
+    dtype = np.promote_types(a_dtype, int)
+
+    def _nancumsum_nb(a):
+        out = np.empty(a.shape, dtype=dtype)
+        for col in range(a.shape[1]):
+            out[:, col] = np.nancumsum(a[:, col])
+        return out
+
+    if not nb_enabled:
+        return _nancumsum_nb(a)
+
+    return _nancumsum_nb
 
 
-@njit(cache=True)
-def nancumprod_nb(a: tp.Array2d) -> tp.Array2d:
-    """2-dim version of `np.nancumprod`."""
-    dtype = np.asarray(np.nancumprod(a[:1, 0])).dtype
-    out = np.empty_like(a, dtype=dtype)
-    for col in range(a.shape[1]):
-        out[:, col] = np.nancumprod(a[:, col])
-    return out
+@generated_jit(nopython=True, cache=True)
+def nancumprod_nb(a):
+    """Numba-equivalent of `np.nancumprod` along axis 0."""
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+    else:
+        a_dtype = a.dtype
+    dtype = np.promote_types(a_dtype, int)
+
+    def _nancumprod_nb(a):
+        out = np.empty(a.shape, dtype=dtype)
+        for col in range(a.shape[1]):
+            out[:, col] = np.nancumprod(a[:, col])
+        return out
+
+    if not nb_enabled:
+        return _nancumprod_nb(a)
+
+    return _nancumprod_nb
 
 
 @njit(cache=True)
@@ -260,21 +420,32 @@ def nancnt_nb(a: tp.Array2d) -> tp.Array1d:
     return out
 
 
-@njit(cache=True)
-def nansum_nb(a: tp.Array2d) -> tp.Array1d:
-    """Compute sum while ignoring NaNs."""
-    dtype = np.asarray(np.nansum(a[:1, 0])).dtype
-    out = np.empty(a.shape[1], dtype=dtype)
-    for col in range(a.shape[1]):
-        out[col] = np.nansum(a[:, col])
-    return out
+@generated_jit(nopython=True, cache=True)
+def nansum_nb(a):
+    """Numba-equivalent of `np.nansum` along axis 0."""
+    nb_enabled = not isinstance(a, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(a.dtype)
+    else:
+        a_dtype = a.dtype
+    dtype = np.promote_types(a_dtype, int)
+
+    def _nansum_nb(a):
+        out = np.empty(a.shape[1], dtype=dtype)
+        for col in range(a.shape[1]):
+            out[col] = np.nansum(a[:, col])
+        return out
+
+    if not nb_enabled:
+        return _nansum_nb(a)
+
+    return _nansum_nb
 
 
 @njit(cache=True)
 def nanmin_nb(a: tp.Array2d) -> tp.Array1d:
-    """Compute minimum while ignoring NaNs."""
-    dtype = np.asarray(np.nanmin(a[:1, 0])).dtype
-    out = np.empty(a.shape[1], dtype=dtype)
+    """Numba-equivalent of `np.nanmin` along axis 0."""
+    out = np.empty(a.shape[1], dtype=a.dtype)
     for col in range(a.shape[1]):
         out[col] = np.nanmin(a[:, col])
     return out
@@ -282,9 +453,8 @@ def nanmin_nb(a: tp.Array2d) -> tp.Array1d:
 
 @njit(cache=True)
 def nanmax_nb(a: tp.Array2d) -> tp.Array1d:
-    """Compute maximum while ignoring NaNs."""
-    dtype = np.asarray(np.nanmax(a[:1, 0])).dtype
-    out = np.empty(a.shape[1], dtype=dtype)
+    """Numba-equivalent of `np.nanmax` along axis 0."""
+    out = np.empty(a.shape[1], dtype=a.dtype)
     for col in range(a.shape[1]):
         out[col] = np.nanmax(a[:, col])
     return out
@@ -292,7 +462,7 @@ def nanmax_nb(a: tp.Array2d) -> tp.Array1d:
 
 @njit(cache=True)
 def nanmean_nb(a: tp.Array2d) -> tp.Array1d:
-    """Compute mean while ignoring NaNs."""
+    """Numba-equivalent of `np.nanmean` along axis 0."""
     out = np.empty(a.shape[1], dtype=np.float_)
     for col in range(a.shape[1]):
         out[col] = np.nanmean(a[:, col])
@@ -301,7 +471,7 @@ def nanmean_nb(a: tp.Array2d) -> tp.Array1d:
 
 @njit(cache=True)
 def nanmedian_nb(a: tp.Array2d) -> tp.Array1d:
-    """Compute median while ignoring NaNs."""
+    """Numba-equivalent of `np.nanmedian` along axis 0."""
     out = np.empty(a.shape[1], dtype=np.float_)
     for col in range(a.shape[1]):
         out[col] = np.nanmedian(a[:, col])
@@ -310,7 +480,7 @@ def nanmedian_nb(a: tp.Array2d) -> tp.Array1d:
 
 @njit(cache=True)
 def nanstd_1d_nb(a: tp.Array1d, ddof: int = 0) -> float:
-    """Compute the standard deviation while ignoring NaNs."""
+    """Numba-equivalent of `np.nanstd`."""
     cnt = a.shape[0] - np.count_nonzero(np.isnan(a))
     rcount = max(cnt - ddof, 0)
     if rcount == 0:

@@ -10,7 +10,6 @@ vbt.base.accessors.BaseSR/DFAccessor           -> pd.Series/DataFrame.vbt.*
 vbt.generic.accessors.GenericSR/DFAccessor     -> pd.Series/DataFrame.vbt.*
 vbt.signals.accessors.SignalsSR/DFAccessor     -> pd.Series/DataFrame.vbt.signals.*
 vbt.returns.accessors.ReturnsSR/DFAccessor     -> pd.Series/DataFrame.vbt.returns.*
-vbt.cat_accessors.CatSR/DFAccessor             -> pd.Series/DataFrame.vbt.cat.*
 vbt.ohlcv.accessors.OHLCVDFAccessor            -> pd.DataFrame.vbt.ohlc.* and pd.DataFrame.vbt.ohlcv.*
 vbt.px_accessors.PXAccessor                    -> pd.DataFrame.vbt.px.*
 ```
@@ -31,9 +30,11 @@ So, for example, the method `pd.Series.vbt.to_2d_array` is also available as
 `pd.Series.vbt.returns.to_2d_array`."""
 
 import pandas as pd
-from pandas.core.accessor import _register_accessor, DirNamesMixin
+from pandas.core.accessor import DirNamesMixin
+import warnings
 
 from vectorbt import _typing as tp
+from vectorbt.utils.config import Configured
 from vectorbt.generic.accessors import GenericSRAccessor, GenericDFAccessor
 
 
@@ -60,11 +61,58 @@ class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
         GenericDFAccessor.__init__(self, obj, **kwargs)
 
 
+ParentAccessorT = tp.TypeVar("ParentAccessorT", bound=object)
+AccessorT = tp.TypeVar("AccessorT", bound=object)
+
+
+class CachedAccessor:
+    """Custom property-like object.
+
+    A descriptor for caching accessors."""
+
+    def __init__(self, name: str, accessor: tp.Type[AccessorT]) -> None:
+        self._name = name
+        self._accessor = accessor
+
+    def __get__(self, obj: ParentAccessorT, cls: DirNamesMixin) -> AccessorT:
+        if obj is None:
+            return self._accessor
+        if isinstance(obj, (pd.Series, pd.DataFrame)):
+            accessor_obj = self._accessor(obj)
+        elif isinstance(obj, Configured):
+            accessor_obj = obj.copy(_class=self._accessor)
+        else:
+            accessor_obj = self._accessor(obj.obj)
+        object.__setattr__(obj, self._name, accessor_obj)
+        return accessor_obj
+
+
+def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
+    """Register a custom accessor.
+
+    `cls` should subclass `pandas.core.accessor.DirNamesMixin`."""
+
+    def decorator(accessor: tp.Type[AccessorT]) -> tp.Type[AccessorT]:
+        if hasattr(cls, name):
+            warnings.warn(
+                f"registration of accessor {repr(accessor)} under name "
+                f"{repr(name)} for type {repr(cls)} is overriding a preexisting "
+                f"attribute with the same name.",
+                UserWarning,
+                stacklevel=2,
+            )
+        setattr(cls, name, CachedAccessor(name, accessor))
+        cls._accessors.add(name)
+        return accessor
+
+    return decorator
+
+
 def register_series_accessor(name: str) -> tp.Callable:
     """Decorator to register a custom `pd.Series` accessor on top of the `vbt` accessor."""
-    return _register_accessor(name, Vbt_SRAccessor)
+    return register_accessor(name, Vbt_SRAccessor)
 
 
 def register_dataframe_accessor(name: str) -> tp.Callable:
     """Decorator to register a custom `pd.DataFrame` accessor on top of the `vbt` accessor."""
-    return _register_accessor(name, Vbt_DFAccessor)
+    return register_accessor(name, Vbt_DFAccessor)

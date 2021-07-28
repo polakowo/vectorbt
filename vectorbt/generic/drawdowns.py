@@ -10,15 +10,15 @@ Moreover, all time series accessors have a method `drawdowns`:
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
->>> # vectorbt.generic.accessors.GenericAccessor.drawdowns.current_drawdown
->>> pd.Series([5, 4, 3, 4]).vbt.drawdowns.current_drawdown()
+>>> # vectorbt.generic.accessors.GenericAccessor.drawdowns.active_drawdown
+>>> pd.Series([5, 4, 3, 4]).vbt.drawdowns.active_drawdown()
 -0.2
 ```
 
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Drawdowns.metrics`.
 
 ```python-repl
 >>> df = pd.DataFrame({
@@ -30,12 +30,14 @@ Moreover, all time series accessors have a method `drawdowns`:
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Count                                        2
-Current Drawdown [%]                 33.333333
-Current Duration               1 days 00:00:00
-Current Recovery [%]                       0.0
-Current Recovery Return [%]                0.0
-Current Recovery Duration      0 days 00:00:00
+Total Records                                2
+Total Recovered Drawdowns                    1
+Total Active Drawdowns                       1
+Active Drawdown [%]                  33.333333
+Active Duration                1 days 00:00:00
+Active Recovery [%]                        0.0
+Active Recovery Return [%]                 0.0
+Active Recovery Duration       0 days 00:00:00
 Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
 Max Drawdown Duration          2 days 00:00:00
@@ -56,16 +58,18 @@ not include active drawdowns. To change that, pass `incl_active=True`:
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Count                                        2
-Current Drawdown [%]                 33.333333
-Current Duration               1 days 00:00:00
-Current Recovery [%]                       0.0
-Current Recovery Return [%]                0.0
-Current Recovery Duration      0 days 00:00:00
-Max Drawdown [%]                          50.0  << here
-Avg Drawdown [%]                     41.666667  << here
-Max Drawdown Duration          2 days 00:00:00  << here
-Avg Drawdown Duration          1 days 12:00:00  << here
+Total Records                                2
+Total Recovered Drawdowns                    1
+Total Active Drawdowns                       1
+Active Drawdown [%]                  33.333333
+Active Duration                1 days 00:00:00
+Active Recovery [%]                        0.0
+Active Recovery Return [%]                 0.0
+Active Recovery Duration       0 days 00:00:00
+Max Drawdown [%]                          50.0
+Avg Drawdown [%]                     41.666667
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          1 days 12:00:00
 Max Recovery Return [%]                  200.0
 Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
@@ -74,14 +78,16 @@ Avg Recovery Duration Ratio                0.5
 Name: a, dtype: object
 ```
 
-`Drawdowns.stats` also supports grouping:
+`Drawdowns.stats` also supports (re-)grouping:
 
 ```python-repl
 >>> df.vbt(freq='d', group_by=True).drawdowns.stats()
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Count                                        3
+Total Records                                3
+Total Recovered Drawdowns                    1
+Total Active Drawdowns                       2
 Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
 Max Drawdown Duration          2 days 00:00:00
@@ -114,10 +120,32 @@ from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
 from vectorbt.records.mapped_array import MappedArray
+from vectorbt.records.decorators import add_mapped_fields
+
+__pdoc__ = {}
+
+drawdowns_mf_config = Config(
+    dict(
+        status=dict(defaults=dict(mapping=DrawdownStatus))
+    ),
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['drawdowns_mf_config'] = f"""Config of `vectorbt.generic.enums.drawdown_dt` 
+mapped fields to be overridden in `Drawdowns`.
+
+```json
+{drawdowns_mf_config.to_doc()}
+```
+"""
 
 DrawdownsT = tp.TypeVar("DrawdownsT", bound="Drawdowns")
 
 
+@add_mapped_fields(drawdown_dt, drawdowns_mf_config)
 class Drawdowns(Records):
     """Extends `Records` for working with drawdown records.
 
@@ -204,15 +232,21 @@ class Drawdowns(Records):
     @property  # no need for cached
     def records_readable(self) -> tp.Frame:
         """Records in readable format."""
-        records_df = self.records
-        out = pd.DataFrame()
-        out['Drawdown Id'] = records_df['id']
-        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
-        out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
-        out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
-        out['End Date'] = records_df['end_idx'].map(lambda x: self.wrapper.index[x])
-        out['Status'] = map_enum_values(records_df['status'], DrawdownStatus)
-        return out
+        df = self.records.copy()
+        df.columns = [
+            'Drawdown Id',
+            'Column',
+            'Start Date',
+            'Valley Date',
+            'End Date',
+            'Status'
+        ]
+        df['Column'] = df['Column'].map(lambda x: self.wrapper.columns[x])
+        df['Start Date'] = df['Start Date'].map(lambda x: self.wrapper.index[x])
+        df['Valley Date'] = df['Valley Date'].map(lambda x: self.wrapper.index[x])
+        df['End Date'] = df['End Date'].map(lambda x: self.wrapper.index[x])
+        df['Status'] = map_enum_values(df['Status'], DrawdownStatus)
+        return df
 
     @cached_property
     def start_value(self) -> MappedArray:
@@ -235,16 +269,18 @@ class Drawdowns(Records):
         return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_method
-    def avg_drawdown(self, **kwargs) -> tp.MaybeSeries:
+    def avg_drawdown(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Average drawdown (ADD)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='avg_drawdown')), kwargs)
-        return self.drawdown.mean(**kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='avg_drawdown'), wrap_kwargs)
+        return self.drawdown.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def max_drawdown(self, **kwargs) -> tp.MaybeSeries:
+    def max_drawdown(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown (MDD)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max_drawdown')), kwargs)
-        return self.drawdown.min(**kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
+        return self.drawdown.min(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_property
     def duration(self) -> MappedArray:
@@ -252,19 +288,22 @@ class Drawdowns(Records):
         return self.map(nb.dd_duration_map_nb)
 
     @cached_method
-    def avg_duration(self, **kwargs) -> tp.MaybeSeries:
+    def avg_duration(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Average drawdown duration (in time units)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='avg_duration')), kwargs)
-        return self.duration.mean(**kwargs)
+        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='avg_duration'), wrap_kwargs)
+        return self.duration.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def max_duration(self, **kwargs) -> tp.MaybeSeries:
+    def max_duration(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown duration (in time units)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='max_duration')), kwargs)
-        return self.duration.max(**kwargs)
+        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='max_duration'), wrap_kwargs)
+        return self.duration.max(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def coverage(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def coverage(self, group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
@@ -296,18 +335,14 @@ class Drawdowns(Records):
     # ############# DrawdownStatus ############# #
 
     @cached_property
-    def status(self) -> MappedArray:
-        """See `vectorbt.generic.enums.DrawdownStatus`."""
-        return self.map_field('status')
-
-    @cached_property
     def active(self: DrawdownsT) -> DrawdownsT:
         """Active drawdowns."""
         filter_mask = self.values['status'] == DrawdownStatus.Active
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def active_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def active_rate(self, group_by: tp.GroupByLike = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
         active_count = to_1d(self.active.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -321,18 +356,20 @@ class Drawdowns(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def recovered_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def recovered_rate(self, group_by: tp.GroupByLike = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
         wrap_kwargs = merge_dicts(dict(name_or_index='recovered_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **wrap_kwargs)
 
-    # ############# Current drawdown ############# #
+    # ############# Active drawdown ############# #
 
     @cached_method
-    def current_drawdown(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Current drawdown from peak.
+    def active_drawdown(self, group_by: tp.GroupByLike = None,
+                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Active drawdown from peak.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -340,22 +377,24 @@ class Drawdowns(Records):
         curr_end_val = self.active.end_value.nth(-1, group_by=group_by)
         curr_start_val = self.active.start_value.nth(-1, group_by=group_by)
         curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
-        wrap_kwargs = merge_dicts(dict(name_or_index='current_drawdown'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='active_drawdown'), wrap_kwargs)
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def current_duration(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
-        """Current duration from peak.
+    def active_duration(self, group_by: tp.GroupByLike = None,
+                        wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Active duration from peak.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='current_duration')), kwargs)
-        return self.active.duration.nth(-1, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='active_duration'), wrap_kwargs)
+        return self.active.duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def current_recovery(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Current recovery.
+    def active_recovery(self, group_by: tp.GroupByLike = None,
+                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Active recovery.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -364,37 +403,36 @@ class Drawdowns(Records):
         curr_end_val = self.active.end_value.nth(-1, group_by=group_by)
         curr_valley_val = self.active.valley_value.nth(-1, group_by=group_by)
         curr_recovery = (curr_end_val - curr_valley_val) / (curr_start_val - curr_valley_val)
-        wrap_kwargs = merge_dicts(dict(name_or_index='current_recovery'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='active_recovery'), wrap_kwargs)
         return self.wrapper.wrap_reduced(curr_recovery, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def current_recovery_return(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
-        """Current recovery return from valley.
+    def active_recovery_return(self, group_by: tp.GroupByLike = None,
+                               wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Active recovery return from valley.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='current_recovery_return')), kwargs)
-        return self.active.recovery_return.nth(-1, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='active_recovery_return'), wrap_kwargs)
+        return self.active.recovery_return.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def current_recovery_duration(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
-        """Current recovery duration from valley.
+    def active_recovery_duration(self, group_by: tp.GroupByLike = None,
+                                 wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Active recovery duration from valley.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(
-            to_duration=True,
-            name_or_index='current_recovery_duration')
-        ), kwargs)
-        return self.active.recovery_duration.nth(-1, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='active_recovery_duration'), wrap_kwargs)
+        return self.active.recovery_duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Stats ############# #
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
-        """Defaults for `MappedArray.stats`.
+        """Defaults for `Drawdowns.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `drawdowns.stats` in `vectorbt._settings.settings`."""
@@ -412,57 +450,67 @@ class Drawdowns(Records):
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
-                tags="wrapper"
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
-                tags="wrapper"
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_duration=True,
                 agg_func=None,
-                tags="wrapper"
+                tags='wrapper'
             ),
-            count=dict(
-                title='Count',
+            total_records=dict(
+                title='Total Records',
                 calc_func='count',
-                tags="records"
+                tags='records'
             ),
-            current_dd=dict(
-                title='Current Drawdown [%]',
-                calc_func='current_drawdown',
+            total_recovered=dict(
+                title='Total Recovered Drawdowns',
+                calc_func='recovered.count',
+                tags='drawdowns'
+            ),
+            total_active=dict(
+                title='Total Active Drawdowns',
+                calc_func='active.count',
+                tags='drawdowns'
+            ),
+            active_dd=dict(
+                title='Active Drawdown [%]',
+                calc_func='active_drawdown',
                 post_calc_func=lambda self, out, settings: -out * 100,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active']
             ),
-            current_duration=dict(
-                title='Current Duration',
-                calc_func='current_duration',
+            active_duration=dict(
+                title='Active Duration',
+                calc_func='active_duration',
                 pass_wrap_to_duration=True,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active', 'duration']
             ),
-            current_recovery=dict(
-                title='Current Recovery [%]',
-                calc_func='current_recovery',
+            active_recovery=dict(
+                title='Active Recovery [%]',
+                calc_func='active_recovery',
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active']
             ),
-            current_recovery_return=dict(
-                title='Current Recovery Return [%]',
-                calc_func='current_recovery_return',
+            active_recovery_return=dict(
+                title='Active Recovery Return [%]',
+                calc_func='active_recovery_return',
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active']
             ),
-            current_recovery_duration=dict(
-                title='Current Recovery Duration',
-                calc_func='current_recovery_duration',
+            active_recovery_duration=dict(
+                title='Active Recovery Duration',
+                calc_func='active_recovery_duration',
                 pass_wrap_to_duration=True,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active', 'duration']
@@ -470,63 +518,54 @@ class Drawdowns(Records):
             max_dd=dict(
                 title='Max Drawdown [%]',
                 calc_func=RepEval("'max_drawdown' if incl_active else 'recovered.max_drawdown'"),
-                pass_group_by=True,
                 post_calc_func=lambda self, out, settings: -out * 100,
                 tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']")
             ),
             avg_dd=dict(
                 title='Avg Drawdown [%]',
                 calc_func=RepEval("'avg_drawdown' if incl_active else 'recovered.avg_drawdown'"),
-                pass_group_by=True,
                 post_calc_func=lambda self, out, settings: -out * 100,
                 tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']")
             ),
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
                 calc_func=RepEval("'max_duration' if incl_active else 'recovered.max_duration'"),
-                pass_group_by=True,
                 pass_wrap_to_duration=True,
                 tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
             ),
             avg_dd_duration=dict(
                 title='Avg Drawdown Duration',
                 calc_func=RepEval("'avg_duration' if incl_active else 'recovered.avg_duration'"),
-                pass_group_by=True,
                 pass_wrap_to_duration=True,
                 tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
             ),
             max_return=dict(
                 title='Max Recovery Return [%]',
                 calc_func='recovered.recovery_return.max',
-                pass_group_by=True,
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=['drawdowns', 'recovered']
             ),
             avg_return=dict(
                 title='Avg Recovery Return [%]',
                 calc_func='recovered.recovery_return.mean',
-                pass_group_by=True,
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=['drawdowns', 'recovered']
             ),
             max_recovery_duration=dict(
                 title='Max Recovery Duration',
                 calc_func='recovered.recovery_duration.max',
-                pass_group_by=True,
                 apply_to_duration=True,
                 tags=['drawdowns', 'recovered', 'duration']
             ),
             avg_recovery_duration=dict(
                 title='Avg Recovery Duration',
                 calc_func='recovered.recovery_duration.mean',
-                pass_group_by=True,
                 apply_to_duration=True,
                 tags=['drawdowns', 'recovered', 'duration']
             ),
             recovery_duration_ratio=dict(
                 title='Avg Recovery Duration Ratio',
                 calc_func='recovered.recovery_duration_ratio.mean',
-                pass_group_by=True,
                 tags=['drawdowns', 'recovered']
             )
         ),
@@ -819,5 +858,4 @@ class Drawdowns(Records):
         return fig
 
 
-__pdoc__ = dict()
-MappedArray.override_metrics_doc(__pdoc__)
+Drawdowns.override_metrics_doc(__pdoc__)

@@ -141,9 +141,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `pass_{arg}`: Whether to pass any optional argument (see below). Defaults to True if this argument
                     was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
+                * `resolve_path_{arg}`: Whether to resolve an argument that is meant to be an attribute of
+                    this object and is part of the path of `calc_func`. Defaults to True.
+                    See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
-                    this object (see `vectorbt.utils.attr.AttrResolver.resolve_attr`). Defaults to True
-                    if this argument was found in the function's signature. Set to False to not resolve.
+                    this object and is present in the function's signature. Defaults to False.
+                    See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
                 * `description`: Description of the metric. Usually, it's a reference to the calculation function.
                     Defaults to None.
                 * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
@@ -248,9 +251,10 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Replace templates globally
         if len(template_mapping) > 0:
-            settings = deep_substitute(settings, mapping=template_mapping)
-            filters = deep_substitute(filters, mapping=template_mapping)
-            metric_kwargs = deep_substitute(metric_kwargs, mapping=template_mapping)
+            # Some metric-level mappings are not available yet -> use safe
+            settings = deep_substitute(settings, mapping=template_mapping, safe=True)
+            filters = deep_substitute(filters, mapping=template_mapping, safe=True)
+            metric_kwargs = deep_substitute(metric_kwargs, mapping=template_mapping, safe=True)
 
         # Resolve self
         reself = self.resolve_self(
@@ -419,7 +423,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                 args = ()
                             if kwargs is None:
                                 kwargs = {}
-                            if obj is custom_reself and _final_kwargs.pop('resolve_' + attr, True):
+                            if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
                                 if call_attr:
                                     return custom_reself.resolve_attr(
                                         attr,
@@ -453,7 +457,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     func_arg_names = get_func_arg_names(calc_func)
                     for k in func_arg_names:
                         if k not in final_kwargs:
-                            if final_kwargs.pop('resolve_' + k, True):
+                            if final_kwargs.pop('resolve_' + k, False):
                                 try:
                                     arg_out = custom_reself.resolve_attr(
                                         k,
@@ -473,7 +477,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             elif k not in func_arg_names:  # second priority
                                 final_kwargs.pop(k, None)
                     for k in list(final_kwargs.keys()):
-                        if k.startswith('pass_'):
+                        if k.startswith('pass_') or k.startswith('resolve_'):
                             if k == 'pass_wrap_to_duration':
                                 final_kwargs['wrap_kwargs'] = merge_dicts(
                                     dict(to_duration=to_duration),

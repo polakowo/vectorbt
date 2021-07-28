@@ -10,7 +10,148 @@ provided by `vectorbt.portfolio.base.Portfolio` as `vectorbt.portfolio.base.Port
 
 !!! warning
     Both record types return both closed AND open trades, which may skew your performance results.
-    To only consider closed trades, you should explicitly query `closed` attribute."""
+    To only consider closed trades, you should explicitly query `closed` attribute.
+
+## Stats
+
+!!! hint
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Trades.metrics`.
+
+```python-repl
+>>> import pandas as pd
+>>> import numpy as np
+>>> from datetime import datetime, timedelta
+>>> import vectorbt as vbt
+
+>>> np.random.seed(42)
+>>> price = pd.DataFrame({
+...     'a': np.random.uniform(1, 2, size=100),
+...     'b': np.random.uniform(1, 2, size=100)
+... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+>>> size = pd.DataFrame({
+...     'a': np.random.uniform(-1, 1, size=100),
+...     'b': np.random.uniform(-1, 1, size=100),
+... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+>>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d')
+
+>>> pf.trades.stats(column='a')
+Start                                2020-01-01 00:00:00
+End                                  2020-04-09 00:00:00
+Period                                 100 days 00:00:00
+First Trade Start                    2020-01-01 00:00:00
+Last Trade End                       2020-04-09 00:00:00
+Total Records                                         48
+Total Long Trades                                     22
+Total Short Trades                                    26
+Total Closed Trades                                   47
+Total Open Trades                                      1
+Open Trade P&L                                 -1.290981
+Win Rate [%]                                    51.06383
+Max Win Streak                                         3
+Max Loss Streak                                        3
+Best Trade [%]                                 43.326077
+Worst Trade [%]                               -59.478304
+Avg Winning Trade [%]                          21.418522
+Avg Losing Trade [%]                          -18.856792
+Avg Winning Trade Duration              22 days 22:00:00
+Avg Losing Trade Duration     29 days 01:02:36.521739130
+Profit Factor                                   0.976634
+Expectancy                                     -0.001569
+SQN                                            -0.064929
+Name: a, dtype: object
+```
+
+Positions share almost identical metrics with trades:
+
+```python-repl
+>>> pf.positions.stats(column='a')
+Start                            2020-01-01 00:00:00
+End                              2020-04-09 00:00:00
+Period                             100 days 00:00:00
+First Position Start             2020-01-01 00:00:00
+Last Position End                2020-04-09 00:00:00
+Total Records                                      3
+Total Long Positions                               2
+Total Short Positions                              1
+Total Closed Positions                             2
+Total Open Positions                               1
+Open Position P&L                          -0.929746
+Win Rate [%]                                    50.0
+Max Win Streak                                     1
+Max Loss Streak                                    1
+Best Position [%]                          39.498421
+Worst Position [%]                          -3.32533
+Avg Winning Position [%]                   39.498421
+Avg Losing Position [%]                     -3.32533
+Avg Winning Position Duration        1 days 00:00:00
+Avg Losing Position Duration        47 days 00:00:00
+Profit Factor                               0.261748
+Expectancy                                 -0.217492
+SQN                                        -0.585103
+Coverage [%]                                    99.0
+Name: a, dtype: object
+```
+
+To also include open trades/positions when calculating metrics such as win rate, pass `incl_open=True`:
+
+```python-repl
+>>> pf.trades.stats(column='a', settings=dict(incl_open=True))
+Start                         2020-01-01 00:00:00
+End                           2020-04-09 00:00:00
+Period                          100 days 00:00:00
+First Trade Start             2020-01-01 00:00:00
+Last Trade End                2020-04-09 00:00:00
+Total Records                                  48
+Total Long Trades                              22
+Total Short Trades                             26
+Total Closed Trades                            47
+Total Open Trades                               1
+Open Trade P&L                          -1.290981
+Win Rate [%]                                 50.0
+Max Win Streak                                  3
+Max Loss Streak                                 3
+Best Trade [%]                          43.326077
+Worst Trade [%]                        -59.478304
+Avg Winning Trade [%]                   21.418522
+Avg Losing Trade [%]                   -19.117677
+Avg Winning Trade Duration       22 days 22:00:00
+Avg Losing Trade Duration        29 days 23:00:00
+Profit Factor                            0.693135
+Expectancy                              -0.028432
+SQN                                     -0.794284
+Name: a, dtype: object
+```
+
+`Trades.stats` also supports (re-)grouping:
+
+```python-repl
+>>> pf.trades.stats(group_by=True)
+Start                                2020-01-01 00:00:00
+End                                  2020-04-09 00:00:00
+Period                                 100 days 00:00:00
+First Trade Start                    2020-01-01 00:00:00
+Last Trade End                       2020-04-09 00:00:00
+Total Records                                        104
+Total Long Trades                                     32
+Total Short Trades                                    72
+Total Closed Trades                                  102
+Total Open Trades                                      2
+Open Trade P&L                                 -1.790938
+Win Rate [%]                                   46.078431
+Max Win Streak                                         5
+Max Loss Streak                                        5
+Best Trade [%]                                 43.326077
+Worst Trade [%]                               -87.793448
+Avg Winning Trade [%]                          19.023926
+Avg Losing Trade [%]                          -20.605892
+Avg Winning Trade Duration    24 days 08:40:51.063829787
+Avg Losing Trade Duration     25 days 11:20:43.636363636
+Profit Factor                                   0.909581
+Expectancy                                     -0.006035
+SQN                                            -0.365593
+Name: group, dtype: object
+```
+"""
 
 import numpy as np
 import pandas as pd
@@ -19,24 +160,50 @@ import plotly.graph_objects as go
 from vectorbt import _typing as tp
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
+from vectorbt.utils.template import RepEval
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
 from vectorbt.records.mapped_array import MappedArray
+from vectorbt.records.decorators import add_mapped_fields
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, position_dt, TradeType
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 
 # ############# Trades ############# #
 
+__pdoc__ = {}
+
+trades_mf_config = Config(
+    {
+        'return': dict(target_name='returns'),
+        'direction': dict(defaults=dict(mapping=TradeDirection)),
+        'status': dict(defaults=dict(mapping=TradeStatus))
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['trades_mf_config'] = f"""Config of `vectorbt.portfolio.enums.trade_dt` 
+mapped fields to be overridden in `Trades`.
+
+```json
+{trades_mf_config.to_doc()}
+```
+"""
+
 TradesT = tp.TypeVar("TradesT", bound="Trades")
 
 
+@add_mapped_fields(trade_dt, trades_mf_config)
 class Trades(Records):
     """Extends `Records` for working with trade records.
 
@@ -134,13 +301,13 @@ class Trades(Records):
     -3.0
     ```
     """
+    trade_type: tp.ClassVar[int] = TradeType.Trade
 
     def __init__(self,
                  wrapper: ArrayWrapper,
                  records_arr: tp.RecordArray,
                  close: tp.ArrayLike,
                  idx_field: str = 'exit_idx',
-                 trade_type: int = TradeType.Trade,
                  **kwargs) -> None:
         Records.__init__(
             self,
@@ -148,13 +315,11 @@ class Trades(Records):
             records_arr,
             idx_field=idx_field,
             close=close,
-            trade_type=trade_type,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
-        self._trade_type = trade_type
 
-        if trade_type == TradeType.Trade:
+        if self.trade_type == TradeType.Trade:
             if not all(field in records_arr.dtype.names for field in trade_dt.names):
                 raise TypeError("Records array must match trade_dt")
         else:
@@ -181,11 +346,6 @@ class Trades(Records):
     def close(self) -> tp.SeriesFrame:
         """Reference price such as close."""
         return self._close
-
-    @property
-    def trade_type(self) -> int:
-        """Trade type."""
-        return self._trade_type
 
     @classmethod
     def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
@@ -225,16 +385,6 @@ class Trades(Records):
         """Duration of each trade (in raw format)."""
         return self.map(nb.trade_duration_map_nb)
 
-    @cached_property
-    def pnl(self) -> MappedArray:
-        """PnL of each trade."""
-        return self.map_field('pnl')
-
-    @cached_property
-    def returns(self) -> MappedArray:
-        """Return of each trade."""
-        return self.map_field('return')
-
     # ############# PnL ############# #
 
     @cached_property
@@ -244,7 +394,8 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def win_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def win_rate(self, group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of winning trades."""
         win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -258,7 +409,8 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def loss_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def loss_rate(self, group_by: tp.GroupByLike = None,
+                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of losing trades."""
         loss_count = to_1d(self.losing.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -266,17 +418,18 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(loss_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def win_streak(self) -> MappedArray:
+    def winning_streak(self) -> MappedArray:
         """Winning streak at each trade in the current column."""
-        return self.apply(nb.trade_win_streak_nb, dtype=np.int_)
+        return self.apply(nb.trade_winning_streak_nb, dtype=np.int_)
 
     @cached_property
-    def loss_streak(self) -> MappedArray:
+    def losing_streak(self) -> MappedArray:
         """Losing streak at each trade in the current column."""
-        return self.apply(nb.trade_loss_streak_nb, dtype=np.int_)
+        return self.apply(nb.trade_losing_streak_nb, dtype=np.int_)
 
     @cached_method
-    def profit_factor(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def profit_factor(self, group_by: tp.GroupByLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Profit factor."""
         total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
         total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
@@ -291,7 +444,8 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def expectancy(self, group_by: tp.GroupByLike = None,
+                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability."""
         win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
         avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
@@ -307,7 +461,8 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def sqn(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def sqn(self, group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """System Quality Number (SQN)."""
         count = to_1d(self.count(group_by=group_by), raw=True)
         pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
@@ -319,18 +474,14 @@ class Trades(Records):
     # ############# TradeDirection ############# #
 
     @cached_property
-    def direction(self) -> MappedArray:
-        """See `vectorbt.portfolio.enums.TradeDirection`."""
-        return self.map_field('direction')
-
-    @cached_property
     def long(self: TradesT) -> TradesT:
         """Long trades."""
         filter_mask = self.values['direction'] == TradeDirection.Long
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def long_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def long_rate(self, group_by: tp.GroupByLike = None,
+                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of long trades."""
         long_count = to_1d(self.long.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -344,7 +495,8 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def short_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def short_rate(self, group_by: tp.GroupByLike = None,
+                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of short trades."""
         short_count = to_1d(self.short.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -354,18 +506,14 @@ class Trades(Records):
     # ############# TradeStatus ############# #
 
     @cached_property
-    def status(self) -> MappedArray:
-        """See `vectorbt.portfolio.enums.TradeStatus`."""
-        return self.map_field('status')
-
-    @cached_property
     def open(self: TradesT) -> TradesT:
         """Open trades."""
         filter_mask = self.values['status'] == TradeStatus.Open
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def open_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def open_rate(self, group_by: tp.GroupByLike = None,
+                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of open trades."""
         open_count = to_1d(self.open.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -379,12 +527,185 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def closed_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def closed_rate(self, group_by: tp.GroupByLike = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of closed trades."""
         closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
         wrap_kwargs = merge_dicts(dict(name_or_index='closed_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(closed_count / total_count, group_by=group_by, **wrap_kwargs)
+
+    # ############# Stats ############# #
+
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `Orders.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
+        `trades.stats` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        trades_stats_cfg = settings['trades']['stats']
+
+        is_positions = self.trade_type == TradeType.Position
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            dict(
+                settings=dict(is_positions=is_positions),
+                template_mapping=dict(trades_tag='positions' if is_positions else 'trades')
+            ),
+            trades_stats_cfg
+        )
+
+    _metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self: len(self.wrapper.index),
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
+            ),
+            first_trade_start=dict(
+                title=RepEval("'First Position Start' if is_positions else 'First Trade Start'"),
+                calc_func='entry_idx.nth',
+                n=0,
+                wrap_kwargs=dict(to_index=True),
+                tags=RepEval("[trades_tag, 'index']")
+            ),
+            last_trade_end=dict(
+                title=RepEval("'Last Position End' if is_positions else 'Last Trade End'"),
+                calc_func='exit_idx.nth',
+                n=-1,
+                wrap_kwargs=dict(to_index=True),
+                tags=RepEval("[trades_tag, 'index']")
+            ),
+            total_records=dict(
+                title='Total Records',
+                calc_func='count',
+                tags='records'
+            ),
+            total_long_trades=dict(
+                title=RepEval("'Total Long Positions' if is_positions else 'Total Long Trades'"),
+                calc_func='long.count',
+                tags=RepEval("[trades_tag, 'long']")
+            ),
+            total_short_trades=dict(
+                title=RepEval("'Total Short Positions' if is_positions else 'Total Short Trades'"),
+                calc_func='short.count',
+                tags=RepEval("[trades_tag, 'short']")
+            ),
+            total_closed_trades=dict(
+                title=RepEval("'Total Closed Positions' if is_positions else 'Total Closed Trades'"),
+                calc_func='closed.count',
+                tags=RepEval("[trades_tag, 'closed']")
+            ),
+            total_open_trades=dict(
+                title=RepEval("'Total Open Positions' if is_positions else 'Total Open Trades'"),
+                calc_func='open.count',
+                tags=RepEval("[trades_tag, 'open']")
+            ),
+            open_trade_pnl=dict(
+                title=RepEval("'Open Position P&L' if is_positions else 'Open Trade P&L'"),
+                calc_func='open.pnl.sum',
+                tags=RepEval("[trades_tag, 'open']")
+            ),
+            win_rate=dict(
+                title='Win Rate [%]',
+                calc_func=RepEval("'win_rate' if incl_open else 'closed.win_rate'"),
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+            ),
+            winning_streak=dict(
+                title='Max Win Streak',
+                calc_func=RepEval("'winning_streak.max' if incl_open else 'closed.winning_streak.max'"),
+                wrap_kwargs=dict(dtype=pd.Int64Dtype()),
+                tags=RepEval("[trades_tag, 'streak'] if incl_open else [trades_tag, 'closed', 'streak']")
+            ),
+            losing_streak=dict(
+                title='Max Loss Streak',
+                calc_func=RepEval("'losing_streak.max' if incl_open else 'closed.losing_streak.max'"),
+                wrap_kwargs=dict(dtype=pd.Int64Dtype()),
+                tags=RepEval("[trades_tag, 'streak'] if incl_open else [trades_tag, 'closed', 'streak']")
+            ),
+            best_trade=dict(
+                title=RepEval("'Best Position [%]' if is_positions else 'Best Trade [%]'"),
+                calc_func=RepEval("'returns.max' if incl_open else 'closed.returns.max'"),
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+            ),
+            worst_trade=dict(
+                title=RepEval("'Worst Position [%]' if is_positions else 'Worst Trade [%]'"),
+                calc_func=RepEval("'returns.min' if incl_open else 'closed.returns.min'"),
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+            ),
+            avg_winning_trade=dict(
+                title=RepEval("'Avg Winning Position [%]' if is_positions else 'Avg Winning Trade [%]'"),
+                calc_func=RepEval("'winning.returns.mean' if incl_open else 'closed.winning.returns.mean'"),
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=RepEval("[trades_tag, 'winning'] if incl_open else [trades_tag, 'closed', 'winning']")
+            ),
+            avg_losing_trade=dict(
+                title=RepEval("'Avg Losing Position [%]' if is_positions else 'Avg Losing Trade [%]'"),
+                calc_func=RepEval("'losing.returns.mean' if incl_open else 'closed.losing.returns.mean'"),
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=RepEval("[trades_tag, 'losing'] if incl_open else [trades_tag, 'closed', 'losing']")
+            ),
+            avg_winning_trade_duration=dict(
+                title=RepEval("'Avg Winning Position Duration' if is_positions else 'Avg Winning Trade Duration'"),
+                calc_func=RepEval("'winning.duration.mean' if incl_open else 'closed.winning.duration.mean'"),
+                apply_to_duration=True,
+                tags=RepEval("[trades_tag, 'duration', 'winning'] if incl_open else "
+                             "[trades_tag, 'closed', 'winning', 'duration']")
+            ),
+            avg_losing_trade_duration=dict(
+                title=RepEval("'Avg Losing Position Duration' if is_positions else 'Avg Losing Trade Duration'"),
+                calc_func=RepEval("'losing.duration.mean' if incl_open else 'closed.losing.duration.mean'"),
+                apply_to_duration=True,
+                tags=RepEval("[trades_tag, 'losing', 'duration'] if incl_open else "
+                             "[trades_tag, 'closed', 'losing', 'duration']")
+            ),
+            profit_factor=dict(
+                title='Profit Factor',
+                calc_func=RepEval("'profit_factor' if incl_open else 'closed.profit_factor'"),
+                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+            ),
+            expectancy=dict(
+                title='Expectancy',
+                calc_func=RepEval("'expectancy' if incl_open else 'closed.expectancy'"),
+                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+            ),
+            sqn=dict(
+                title='SQN',
+                calc_func=RepEval("'sqn' if incl_open else 'closed.sqn'"),
+                tags=RepEval("trades_tag if incl_open else [trades_tag, 'closed']")
+            ),
+            coverage=dict(
+                title='Coverage [%]',
+                calc_func='coverage',
+                post_calc_func=lambda self, out, settings: out * 100,
+                check_is_positions=True,
+                tags='positions'
+            ),
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
 
     # ############# Plotting ############# #
 
@@ -833,10 +1154,10 @@ class Trades(Records):
 
 # ############# Positions ############# #
 
+PositionsT = tp.TypeVar("Positions", bound="PositionsT")
 
-PositionsT = tp.TypeVar("PositionsT", bound="Positions")
 
-
+@add_mapped_fields(position_dt, trades_mf_config, on_conflict='ignore')
 class Positions(Trades):
     """Extends `Trades` for working with position records.
 
@@ -893,11 +1214,10 @@ class Positions(Trades):
     3        1.0 -2.5  -0.625          1       1
     ```
     """
+    trade_type: tp.ClassVar[int] = TradeType.Position
 
-    def __init__(self, *args, trade_type: int = TradeType.Position, **kwargs) -> None:
-        if trade_type != TradeType.Position:
-            raise ValueError("Trade type must be TradeType.Position")
-        Trades.__init__(self, *args, trade_type=trade_type, **kwargs)
+    def __init__(self, *args, **kwargs) -> None:
+        Trades.__init__(self, *args, **kwargs)
 
     @classmethod
     def from_orders(cls: tp.Type[PositionsT], orders: Orders, **kwargs) -> PositionsT:
@@ -910,9 +1230,13 @@ class Positions(Trades):
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
 
     @cached_method
-    def coverage(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def coverage(self, group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
+
+
+Trades.override_metrics_doc(__pdoc__)

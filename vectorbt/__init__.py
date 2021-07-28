@@ -548,13 +548,14 @@ Note: you must run the notebook to play with the widgets.
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
-## Where to get help
+## Getting Help
 
-- [Start a new GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
-- [Ask a question on Gitter](https://gitter.im/vectorbt/community)
-- [Join a private chat](https://www.patreon.com/vectorbt)
-
-For other inquiries, contact the author: [olegpolakow@gmail.com](mailto:olegpolakow@gmail.com)
+- If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
+- For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
+- If you have general questions, start a new [GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
+  - Alternatively, you can ask on [Gitter](https://gitter.im/vectorbt/community)
+- If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
+- For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
 
 ## How to contribute
 

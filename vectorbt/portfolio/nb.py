@@ -3578,8 +3578,8 @@ def trade_duration_map_nb(record: tp.Record) -> int:
 
 
 @njit(cache=True)
-def trade_win_streak_nb(records: tp.RecordArray) -> tp.Array1d:
-    """Return the current win streak of each trade."""
+def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current winning streak of each trade."""
     out = np.full(len(records), 0, dtype=np.int_)
     curr_rank = 0
     for i in range(len(records)):
@@ -3592,8 +3592,8 @@ def trade_win_streak_nb(records: tp.RecordArray) -> tp.Array1d:
 
 
 @njit(cache=True)
-def trade_loss_streak_nb(records: tp.RecordArray) -> tp.Array1d:
-    """Return the current loss streak of each trade."""
+def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current losing streak of each trade."""
     out = np.full(len(records), 0, dtype=np.int_)
     curr_rank = 0
     for i in range(len(records)):

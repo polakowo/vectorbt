@@ -95,7 +95,7 @@ def apply_mapping(obj: tp.Any,
     def _same_type(x: tp.Any) -> bool:
         if type(x) == type(key):
             return True
-        if np.issubdtype(type(x), type(key)):
+        if np.dtype(type(x)) == np.dtype(type(key)):
             return True
         return False
 

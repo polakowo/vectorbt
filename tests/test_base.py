@@ -6,11 +6,9 @@ from datetime import datetime
 
 import vectorbt as vbt
 from vectorbt.base import (
-    accessors,
     array_wrapper,
     column_grouper,
     combine_fns,
-    class_helpers,
     index_fns,
     indexing,
     reshape_fns
@@ -2588,83 +2586,6 @@ class TestCombineFns:
         )
 
 
-# ############# common.py ############# #
-
-class TestCommon:
-    def test_add_nb_methods_1d(self):
-        @njit
-        def same_shape_1d_nb(a): return a ** 2
-
-        @njit
-        def wkw_1d_nb(a, b=10): return a ** 3 + b
-
-        @njit
-        def reduced_dim0_1d_nb(a): return 0
-
-        @njit
-        def reduced_dim1_one_1d_nb(a): return np.zeros(1)
-
-        @njit
-        def reduced_dim1_1d_nb(a): return np.zeros(a.shape[0] - 1)
-
-        @class_helpers.add_nb_methods([
-            ('same_shape', same_shape_1d_nb, False),
-            ('wkw', wkw_1d_nb, False),
-            ('reduced_dim0', reduced_dim0_1d_nb, True),
-            ('reduced_dim1_one', reduced_dim1_one_1d_nb, True),
-            ('reduced_dim1', reduced_dim1_1d_nb, True)
-        ])
-        class H_1d(accessors.BaseAccessor):
-            def __init__(self, sr):
-                super().__init__(sr)
-
-        pd.testing.assert_series_equal(H_1d(sr2).same_shape(), sr2 ** 2)
-        pd.testing.assert_series_equal(H_1d(sr2).wkw(), sr2 ** 3 + 10)
-        pd.testing.assert_series_equal(H_1d(sr2).wkw(b=20), sr2 ** 3 + 20)
-        assert H_1d(sr2).reduced_dim0() == 0
-        assert H_1d(sr2).reduced_dim1_one() == 0
-        pd.testing.assert_series_equal(H_1d(sr2).reduced_dim1(), pd.Series(np.zeros(sr2.shape[0] - 1), name=sr2.name))
-
-    def test_add_nb_methods_2d(self):
-        @njit
-        def same_shape_nb(a): return a ** 2
-
-        @njit
-        def wkw_nb(a, b=10): return a ** 3 + b
-
-        @njit
-        def reduced_dim0_nb(a): return 0
-
-        @njit
-        def reduced_dim1_nb(a): return np.zeros(a.shape[1])
-
-        @njit
-        def reduced_dim2_nb(a): return np.zeros((a.shape[0] - 1, a.shape[1]))
-
-        @class_helpers.add_nb_methods([
-            ('same_shape', same_shape_nb, False),
-            ('wkw', wkw_nb, False),
-            ('reduced_dim0', reduced_dim0_nb, True),
-            ('reduced_dim1', reduced_dim1_nb, True),
-            ('reduced_dim2', reduced_dim2_nb, True),
-        ])
-        class H(accessors.BaseAccessor):
-            pass
-
-        pd.testing.assert_frame_equal(H(df3).same_shape(), df3 ** 2)
-        pd.testing.assert_frame_equal(H(df3).wkw(), df3 ** 3 + 10)
-        pd.testing.assert_frame_equal(H(df3).wkw(b=20), df3 ** 3 + 20)
-        assert H(df3).reduced_dim0() == 0
-        pd.testing.assert_series_equal(
-            H(df3).reduced_dim1(),
-            pd.Series(np.zeros(df3.shape[1]), index=df3.columns, name='reduced_dim1')
-        )
-        pd.testing.assert_frame_equal(
-            H(df3).reduced_dim2(),
-            pd.DataFrame(np.zeros((df3.shape[0] - 1, df3.shape[1])), columns=df3.columns)
-        )
-
-
 # ############# accessors.py ############# #
 
 class TestAccessors:
@@ -3294,49 +3215,3 @@ class TestAccessors:
                 ], names=[None, 'c6'])
             )
         )
-
-    @pytest.mark.parametrize(
-        "test_input",
-        [sr2, df5],
-    )
-    def test_magic(self, test_input):
-        a = test_input
-        b = test_input.copy()
-        np.random.shuffle(b.values)
-        assert_func = pd.testing.assert_series_equal if isinstance(a, pd.Series) else pd.testing.assert_frame_equal
-
-        # binary ops
-        # comparison ops
-        assert_func(a.vbt == b, a == b)
-        assert_func(a.vbt != b, a != b)
-        assert_func(a.vbt < b, a < b)
-        assert_func(a.vbt > b, a > b)
-        assert_func(a.vbt <= b, a <= b)
-        assert_func(a.vbt >= b, a >= b)
-        # arithmetic ops
-        assert_func(a.vbt + b, a + b)
-        assert_func(a.vbt - b, a - b)
-        assert_func(a.vbt * b, a * b)
-        assert_func(a.vbt ** b, a ** b)
-        assert_func(a.vbt % b, a % b)
-        assert_func(a.vbt // b, a // b)
-        assert_func(a.vbt / b, a / b)
-        # __r*__ is only called if the left object does not have an __*__ method
-        assert_func(10 + a.vbt, 10 + a)
-        assert_func(10 - a.vbt, 10 - a)
-        assert_func(10 * a.vbt, 10 * a)
-        assert_func(10 ** a.vbt, 10 ** a)
-        assert_func(10 % a.vbt, 10 % a)
-        assert_func(10 // a.vbt, 10 // a)
-        assert_func(10 / a.vbt, 10 / a)
-        # mask ops
-        assert_func(a.vbt & b, a & b)
-        assert_func(a.vbt | b, a | b)
-        assert_func(a.vbt ^ b, a ^ b)
-        assert_func(10 & a.vbt, 10 & a)
-        assert_func(10 | a.vbt, 10 | a)
-        assert_func(10 ^ a.vbt, 10 ^ a)
-        # unary ops
-        assert_func(-a.vbt, -a.vbt)
-        assert_func(+a.vbt, +a.vbt)
-        assert_func(abs((-a).vbt), abs((-a).vbt))

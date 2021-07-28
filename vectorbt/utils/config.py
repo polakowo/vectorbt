@@ -432,7 +432,7 @@ class Config(PickleableDict, Documented):
         if as_attrs:
             for k, v in self.items():
                 if k in self.__dir__():
-                    raise ValueError(f"Cannot set key '{k}' as attribute of the config. Disable set_attrs.")
+                    raise ValueError(f"Cannot set key '{k}' as attribute of the config. Disable as_attrs.")
                 self.__dict__[k] = v
 
     @property

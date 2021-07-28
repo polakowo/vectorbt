@@ -262,7 +262,7 @@ instance to the disk with `Records.save` and load it with `Records.load`.
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Records.metrics`.
 
 ```python-repl
 >>> records.stats(column='a')
@@ -273,7 +273,7 @@ Total Records                  3
 Name: a, dtype: object
 ```
 
-`Records.stats` also supports grouping:
+`Records.stats` also supports (re-)grouping:
 
 ```python-repl
 >>> grouped_records.stats(column='first')
@@ -284,6 +284,7 @@ Total Records                  6
 Name: first, dtype: object
 ```
 """
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -322,7 +323,6 @@ class Records(Wrapping, StatsBuilderMixin):
 
             Useful if any subclass wants to extend the config.
     """
-
     def __init__(self,
                  wrapper: ArrayWrapper,
                  records_arr: tp.RecordArray,
@@ -553,7 +553,7 @@ class Records(Wrapping, StatsBuilderMixin):
             count=dict(
                 title='Count',
                 calc_func='count',
-                tags="records"
+                tags='records'
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

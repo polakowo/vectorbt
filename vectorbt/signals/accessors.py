@@ -60,7 +60,7 @@ Run for the examples below:
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `SignalsAccessor.metrics`.
 
 ```python-repl
 >>> mask.vbt.signals.stats(column='a')
@@ -149,7 +149,7 @@ Partition Distance: Std                     NaN
 Name: a, dtype: object
 ```
 
-`SignalsAccessor.stats` also supports grouping:
+`SignalsAccessor.stats` also supports (re-)grouping:
 
 ```python-repl
 >>> mask.vbt.signals.stats(column=0, group_by=[0, 0, 1])
@@ -208,9 +208,6 @@ class SignalsAccessor(GenericAccessor):
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
 
     def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         checks.assert_dtype(obj, np.bool_)
 
         GenericAccessor.__init__(self, obj, **kwargs)
@@ -228,12 +225,12 @@ class SignalsAccessor(GenericAccessor):
     # ############# Overriding ############# #
 
     def bshift(self, *args, fill_value: bool = False, **kwargs):
-        """`vectorbt.generic.accessors.GenericAccessor.bshift` with `dtype=bool` and `fill_value=False`."""
-        return GenericAccessor.bshift(self, *args, dtype=np.bool_, fill_value=fill_value, **kwargs)
+        """`vectorbt.generic.accessors.GenericAccessor.bshift` with `fill_value=False`."""
+        return GenericAccessor.bshift(self, *args, fill_value=fill_value, **kwargs)
 
     def fshift(self, *args, fill_value: bool = False, **kwargs):
-        """`vectorbt.generic.accessors.GenericAccessor.fshift` with `dtype=bool` and `fill_value=False`."""
-        return GenericAccessor.fshift(self, *args, dtype=np.bool_, fill_value=fill_value, **kwargs)
+        """`vectorbt.generic.accessors.GenericAccessor.fshift` with `fill_value=False`."""
+        return GenericAccessor.fshift(self, *args, fill_value=fill_value, **kwargs)
 
     @classmethod
     def empty(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
@@ -868,7 +865,7 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04   NaN  10.8  10.8
         2020-01-05   NaN   NaN   NaN
 
-        >>> out_dict['stop_type'].vbt.cat(mapping=StopType).map()
+        >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
                              a           b          c
         2020-01-01        None        None       None
         2020-01-02  TakeProfit  TakeProfit       None
@@ -902,7 +899,7 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04   NaN  10.8  10.8
         2020-01-05   NaN   NaN   NaN
 
-        >>> out_dict['stop_type'].vbt.cat(mapping=StopType).map()
+        >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
                              a           b           c
         2020-01-01        None        None        None
         2020-01-02  TakeProfit  TakeProfit  TakeProfit
@@ -1989,9 +1986,6 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
     Accessible through `pd.Series.vbt.signals`."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         GenericSRAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
 
@@ -2090,9 +2084,6 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     Accessible through `pd.DataFrame.vbt.signals`."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         GenericDFAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
 

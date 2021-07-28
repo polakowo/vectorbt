@@ -79,9 +79,6 @@ class PXAccessor(BaseAccessor):
     """
 
     def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         BaseAccessor.__init__(self, obj, **kwargs)
 
 
@@ -92,9 +89,6 @@ class PXSRAccessor(PXAccessor, BaseSRAccessor):
     Accessible through `pd.Series.vbt.px`."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         BaseSRAccessor.__init__(self, obj, **kwargs)
         PXAccessor.__init__(self, obj, **kwargs)
 
@@ -106,8 +100,5 @@ class PXDFAccessor(PXAccessor, BaseDFAccessor):
     Accessible through `pd.DataFrame.vbt.px`."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         BaseDFAccessor.__init__(self, obj, **kwargs)
         PXAccessor.__init__(self, obj, **kwargs)

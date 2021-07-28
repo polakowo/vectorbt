@@ -2426,7 +2426,7 @@ class IndicatorFactory:
                 def attr_readable(self,
                                   _attr_name: str = attr_name,
                                   _mapping: tp.MappingLike = dtype) -> tp.SeriesFrame:
-                    return getattr(self, _attr_name).vbt.cat(mapping=_mapping).map()
+                    return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping()
 
                 attr_readable.__qualname__ = f'{Indicator.__name__}.{attr_name}_readable'
                 attr_readable.__doc__ = inspect.cleandoc(
@@ -2445,7 +2445,7 @@ class IndicatorFactory:
                                _attr_name: str = attr_name,
                                _mapping: tp.MappingLike = dtype,
                                **kwargs) -> tp.SeriesFrame:
-                    return getattr(self, _attr_name).vbt.cat(mapping=_mapping).stats(*args, **kwargs)
+                    return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
                 attr_stats.__qualname__ = f'{Indicator.__name__}.{attr_name}_stats'
                 attr_stats.__doc__ = inspect.cleandoc(

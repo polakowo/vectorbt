@@ -45,7 +45,7 @@ import plotly.graph_objects as go
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
-from vectorbt.utils.template import Sub
+from vectorbt.utils.template import Sub, RepEval
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.column_grouper import ColumnGrouper
 from vectorbt.records.col_mapper import ColumnMapper
@@ -276,7 +276,19 @@ settings = SettingsConfig(
             )
         ),
         generic=dict(
-            stats=Config()  # flex
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        has_mapping=dict(
+                            filter_func=lambda self, metric_settings:
+                            metric_settings.get('mapping', self.mapping) is not None
+                        )
+                    ),
+                    settings=dict(
+                        incl_all_keys=False
+                    )
+                )
+            )
         ),
         drawdowns=dict(
             stats=Config(  # flex
@@ -297,18 +309,6 @@ settings = SettingsConfig(
                 volume='Volume'
             ),
             stats=Config()  # flex
-        ),
-        cat=dict(
-            stats=Config(  # flex
-                dict(
-                    filters=dict(
-                        has_mapping=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings.get('mapping', self.mapping) is not None
-                        )
-                    )
-                )
-            )
         ),
         signals=dict(
             stats=Config(
@@ -372,6 +372,29 @@ settings = SettingsConfig(
                             filter_func=lambda self, metric_settings:
                             metric_settings.get('mapping', self.mapping) is not None
                         )
+                    ),
+                    settings=dict(
+                        incl_all_keys=False
+                    )
+                )
+            )
+        ),
+        orders=dict(
+            stats=Config()  # flex
+        ),
+        logs=dict(
+            stats=Config()  # flex
+        ),
+        trades=dict(
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        is_positions=dict(
+                            filter_func=lambda self, metric_settings: metric_settings['is_positions']
+                        )
+                    ),
+                    settings=dict(
+                        incl_open=False
                     )
                 )
             )
@@ -598,14 +621,6 @@ Settings applied across `vectorbt.ohlcv_accessors`.
 {settings['ohlcv'].to_doc()}
 ```
 
-## settings.cat
-
-Settings applied across `vectorbt.cat_accessors`.
-
-```json
-{settings['cat'].to_doc()}
-```
-
 ## settings.signals
 
 Settings applied across `vectorbt.signals`.
@@ -636,6 +651,14 @@ Settings applied across `vectorbt.records.mapped_array`.
 
 ```json
 {settings['mapped_array'].to_doc()}
+```
+
+## settings.portfolio.orders
+
+Settings applied across `vectorbt.portfolio.orders`.
+
+```json
+{settings['orders'].to_doc()}
 ```
 
 ## settings.portfolio

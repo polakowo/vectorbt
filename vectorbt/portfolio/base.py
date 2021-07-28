@@ -339,7 +339,7 @@ Name: sharpe_ratio, dtype: float64
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Portfolio.metrics`.
 
 Let's simulate a portfolio with two columns:
 
@@ -400,7 +400,7 @@ We can provide the frequency as part of the settings dict:
 ```python-repl
 >>> pf.stats(column=10, settings=dict(freq='d'))
 UserWarning: Changing the frequency will create a copy of this object.
-Consider setting the frequency upon the creation to re-use cache.
+Consider setting the frequency upon object creation to re-use existing cache.
 
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
@@ -587,26 +587,26 @@ To calculate a custom metric, we need to provide at least two things: short name
 dict with the title and calculation function (see arguments in `vectorbt.generic.stats_builder.StatsBuilderMixin`):
 
 ```python-repl
->>> max_win_streak = (
-...     'max_win_streak',
+>>> max_winning_streak = (
+...     'max_winning_streak',
 ...     dict(
 ...         title='Max Winning Streak',
-...         calc_func=lambda trades, group_by: trades.win_streak.max(group_by=group_by)
+...         calc_func=lambda trades, group_by: trades.winning_streak.max(group_by=group_by)
 ...     )
 ... )
->>> pf.stats(metrics=max_win_streak, column=10)
+>>> pf.stats(metrics=max_winning_streak, column=10)
 Max Winning Streak    3.0
 Name: 10, dtype: float64
 ```
 
-Since `max_win_streak` method can be expressed as a path from this portfolio, we can simply write:
+Since `max_winning_streak` method can be expressed as a path from this portfolio, we can simply write:
 
 ```python-repl
->>> max_win_streak = (
-...     'max_win_streak',
+>>> max_winning_streak = (
+...     'max_winning_streak',
 ...     dict(
 ...         title='Max Winning Streak',
-...         calc_func='trades.win_streak.max'
+...         calc_func='trades.winning_streak.max'
 ...     )
 ... )
 ```
@@ -778,7 +778,7 @@ To add a custom metric to the list of all metrics, we have three options.
 First, we can change the `Portfolio.metrics` dict in-place (this will append to the end):
 
 ```python-repl
->>> pf.metrics['max_win_streak'] = max_win_streak[1]
+>>> pf.metrics['max_winning_streak'] = max_winning_streak[1]
 >>> pf.stats(column=10)
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
@@ -822,7 +822,7 @@ to get default metrics:
 The second option is to copy `Portfolio.metrics`, append our metric, and pass as `metrics` argument:
 
 ```python-repl
->>> my_metrics = list(pf.metrics.items()) + [max_win_streak]
+>>> my_metrics = list(pf.metrics.items()) + [max_winning_streak]
 >>> pf.stats(metrics=my_metrics, column=10)
 ```
 
@@ -876,7 +876,7 @@ To create a new subplot, a preferred way is to pass a plotting function:
 ...     size.rename('Order Size').vbt.barplot(
 ...         add_trace_kwargs=add_trace_kwargs, fig=fig)
 
->>> order_size = pf.orders.size.to_pd(default_val=0.)
+>>> order_size = pf.orders.size.to_pd(fill_value=0.)
 >>> pf.plot(subplots=[
 ...     'orders',
 ...     ('order_size', dict(
@@ -3496,7 +3496,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
                 incl_unrealized=True,
                 tags=['portfolio', 'trades']
             ),
-            open_trade_return=dict(
+            open_trade_pnl=dict(
                 title=RepEval("'Open Position P&L' if use_positions else 'Open Trade P&L'"),
                 calc_func='trades.open.pnl.sum',
                 incl_unrealized=True,

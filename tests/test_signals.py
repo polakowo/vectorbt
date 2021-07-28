@@ -71,7 +71,7 @@ class TestAccessors:
         pd.testing.assert_series_equal(mask['a'].vbt.signals.fshift(test_n), mask['a'].shift(test_n, fill_value=False))
         np.testing.assert_array_equal(
             mask['a'].vbt.signals.fshift(test_n).values,
-            generic_nb.fshift_1d_nb(mask['a'].values, test_n, dtype=np.bool_, fill_value=False)
+            generic_nb.fshift_1d_nb(mask['a'].values, test_n, fill_value=False)
         )
         pd.testing.assert_frame_equal(mask.vbt.signals.fshift(test_n), mask.shift(test_n, fill_value=False))
 
@@ -85,7 +85,7 @@ class TestAccessors:
             mask['a'].shift(-test_n, fill_value=False))
         np.testing.assert_array_equal(
             mask['a'].vbt.signals.bshift(test_n).values,
-            generic_nb.bshift_1d_nb(mask['a'].values, test_n, dtype=np.bool_, fill_value=False)
+            generic_nb.bshift_1d_nb(mask['a'].values, test_n, fill_value=False)
         )
         pd.testing.assert_frame_equal(mask.vbt.signals.bshift(test_n), mask.shift(-test_n, fill_value=False))
 
@@ -2115,7 +2115,7 @@ class TestAccessors:
         )
 
     def test_stats(self):
-        stat_index = pd.Index([
+        stats_index = pd.Index([
             'Start', 'End', 'Period', 'Total', 'Rate [%]', 'First Index',
             'Last Index', 'Norm Avg Index [-1, 1]', 'Distance: Min',
             'Distance: Max', 'Distance: Mean', 'Distance: Std', 'Total Partitions',
@@ -2150,7 +2150,7 @@ class TestAccessors:
                 pd.Timedelta('3 days 00:00:00'),
                 np.nan
             ],
-                index=stat_index,
+                index=stats_index,
                 name='agg_func_mean'
             )
         )
@@ -2180,7 +2180,7 @@ class TestAccessors:
                 pd.Timedelta('3 days 00:00:00'),
                 np.nan
             ],
-                index=stat_index,
+                index=stats_index,
                 name='a'
             )
         )
@@ -2191,7 +2191,7 @@ class TestAccessors:
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'), -0.25, 3.0,
                 3.0, 3.0, np.nan, 2, 100.0, 1.0, 1.0, 1.0, 0.0, 3.0, 3.0, 3.0, np.nan
             ],
-                index=stat_index,
+                index=stats_index,
                 name='a'
             )
         )
@@ -2263,7 +2263,7 @@ class TestAccessors:
                 pd.Timedelta('3 days 00:00:00'),
                 pd.Timedelta('0 days 00:00:00')
             ],
-                index=stat_index,
+                index=stats_index,
                 name='g1'
             )
         )
@@ -2286,7 +2286,7 @@ class TestAccessors:
         stats_df = mask.vbt.signals.stats(agg_func=None)
         assert stats_df.shape == (3, 22)
         pd.testing.assert_index_equal(stats_df.index, mask.vbt.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stat_index)
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
     @pytest.mark.parametrize(
         "test_func,test_func_pd",

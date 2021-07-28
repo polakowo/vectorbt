@@ -65,30 +65,18 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import class_or_instancemethod
+from vectorbt.utils.decorators import class_or_instancemethod, add_binary_magic_methods, add_unary_magic_methods
 from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.column_grouper import ColumnGrouper
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_2d
-from vectorbt.base.class_helpers import (
-    add_binary_magic_methods,
-    add_unary_magic_methods,
-    binary_magic_methods,
-    unary_magic_methods
-)
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
-@add_binary_magic_methods(
-    binary_magic_methods,
-    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func)
-)
-@add_unary_magic_methods(
-    unary_magic_methods,
-    lambda self, np_func: self.apply(apply_func=np_func)
-)
+@add_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
+@add_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
 class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
 
@@ -101,8 +89,6 @@ class BaseAccessor(Wrapping):
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
         checks.assert_type(obj, (pd.Series, pd.DataFrame))
 
         self._obj = obj
@@ -110,17 +96,19 @@ class BaseAccessor(Wrapping):
         wrapper_arg_names = get_func_arg_names(ArrayWrapper.__init__)
         grouper_arg_names = get_func_arg_names(ColumnGrouper.__init__)
         wrapping_kwargs = dict()
-        for k, v in kwargs.items():
+        for k in list(kwargs.keys()):
             if k in wrapper_arg_names or k in grouper_arg_names:
-                wrapping_kwargs[k] = v
+                wrapping_kwargs[k] = kwargs.pop(k)
         if wrapper is None:
             wrapper = ArrayWrapper.from_obj(obj, **wrapping_kwargs)
+        else:
+            wrapper = wrapper.copy(**wrapping_kwargs)
         Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 
-    def __call__(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
+    def __call__(self: BaseAccessorT, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""
 
-        return self.__class__(self.obj, *args, **kwargs)
+        return self.copy(**kwargs)
 
     @property
     def sr_accessor_cls(self):
@@ -720,8 +708,6 @@ class BaseSRAccessor(BaseAccessor):
     Accessible through `pd.Series.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
         BaseAccessor.__init__(self, obj, **kwargs)
@@ -741,8 +727,6 @@ class BaseDFAccessor(BaseAccessor):
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
         BaseAccessor.__init__(self, obj, **kwargs)

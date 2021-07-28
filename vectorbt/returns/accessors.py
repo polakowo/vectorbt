@@ -61,7 +61,7 @@ defaults for arguments used throughout the accessor, such as
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `ReturnsAccessor.metrics`.
 
 ```python-repl
 >>> ret_acc.stats()
@@ -133,7 +133,6 @@ from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
-from vectorbt.utils.attr import AttrResolverT
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
 from vectorbt.base.array_wrapper import Wrapping
 from vectorbt.generic.drawdowns import Drawdowns
@@ -164,9 +163,6 @@ class ReturnsAccessor(GenericAccessor):
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
         # Set defaults
         self._year_freq = year_freq
         self._defaults = defaults
@@ -260,7 +256,7 @@ class ReturnsAccessor(GenericAccessor):
     def cumulative(self,
                    start_value: tp.Optional[float] = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Cumulative returns."""
+        """See `vectorbt.returns.nb.cum_returns_nb`."""
         if start_value is None:
             start_value = self.defaults['start_value']
         cumulative = nb.cum_returns_nb(self.to_2d_array(), start_value)
@@ -268,7 +264,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(cumulative, group_by=False, **wrap_kwargs)
 
     def total(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Total return."""
+        """See `vectorbt.returns.nb.cum_returns_final_nb`."""
         result = nb.cum_returns_final_nb(self.to_2d_array(), 0.)
         wrap_kwargs = merge_dicts(dict(name_or_index='total_return'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -287,9 +283,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def annualized(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Mean annual growth rate of returns.
-
-        This is equivalent to the compound annual growth rate."""
+        """See `vectorbt.returns.nb.annualized_return_nb`."""
         result = nb.annualized_return_nb(self.to_2d_array(), self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='annualized_return'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -311,7 +305,7 @@ class ReturnsAccessor(GenericAccessor):
                               levy_alpha: tp.Optional[float] = None,
                               ddof: tp.Optional[int] = None,
                               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Annualized volatility of a strategy."""
+        """See `vectorbt.returns.nb.annualized_volatility_nb`."""
         if levy_alpha is None:
             levy_alpha = self.defaults['levy_alpha']
         if ddof is None:
@@ -341,7 +335,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def calmar_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Calmar ratio, or drawdown ratio, of a strategy."""
+        """See `vectorbt.returns.nb.calmar_ratio_nb`."""
         result = nb.calmar_ratio_nb(self.to_2d_array(), self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='calmar_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -363,7 +357,7 @@ class ReturnsAccessor(GenericAccessor):
                     risk_free: tp.Optional[float] = None,
                     required_return: tp.Optional[float] = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Omega ratio of a strategy."""
+        """See `vectorbt.returns.nb.omega_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         if required_return is None:
@@ -396,7 +390,7 @@ class ReturnsAccessor(GenericAccessor):
                      risk_free: tp.Optional[float] = None,
                      ddof: tp.Optional[int] = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Sharpe ratio of a strategy."""
+        """See `vectorbt.returns.nb.sharpe_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         if ddof is None:
@@ -465,7 +459,7 @@ class ReturnsAccessor(GenericAccessor):
     def downside_risk(self,
                       required_return: tp.Optional[float] = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Downside deviation below a threshold."""
+        """See `vectorbt.returns.nb.downside_risk_nb`."""
         if required_return is None:
             required_return = self.defaults['required_return']
         result = nb.downside_risk_nb(self.to_2d_array(), self.ann_factor, required_return)
@@ -491,7 +485,7 @@ class ReturnsAccessor(GenericAccessor):
     def sortino_ratio(self,
                       required_return: tp.Optional[float] = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Sortino ratio of a strategy."""
+        """See `vectorbt.returns.nb.sortino_ratio_nb`."""
         if required_return is None:
             required_return = self.defaults['required_return']
         result = nb.sortino_ratio_nb(self.to_2d_array(), self.ann_factor, required_return)
@@ -518,7 +512,7 @@ class ReturnsAccessor(GenericAccessor):
                           benchmark_rets: tp.ArrayLike,
                           ddof: tp.Optional[int] = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Information ratio of a strategy."""
+        """See `vectorbt.returns.nb.information_ratio_nb`."""
         if ddof is None:
             ddof = self.defaults['ddof']
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
@@ -545,7 +539,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def beta(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Beta."""
+        """See `vectorbt.returns.nb.beta_nb`."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
         result = nb.beta_nb(self.to_2d_array(), benchmark_rets)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
@@ -570,7 +564,7 @@ class ReturnsAccessor(GenericAccessor):
               benchmark_rets: tp.ArrayLike,
               risk_free: tp.Optional[float] = None,
               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Annualized alpha."""
+        """See `vectorbt.returns.nb.alpha_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
@@ -597,7 +591,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def tail_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Ratio between the right (95%) and left tail (5%)."""
+        """See `vectorbt.returns.nb.tail_ratio_nb`."""
         result = nb.tail_ratio_nb(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='tail_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -639,7 +633,7 @@ class ReturnsAccessor(GenericAccessor):
     def value_at_risk(self,
                       cutoff: tp.Optional[float] = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Value at risk (VaR) of a returns stream."""
+        """See `vectorbt.returns.nb.value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults['cutoff']
         result = nb.value_at_risk_nb(self.to_2d_array(), cutoff)
@@ -665,7 +659,7 @@ class ReturnsAccessor(GenericAccessor):
     def cond_value_at_risk(self,
                            cutoff: tp.Optional[float] = None,
                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Conditional value at risk (CVaR) of a returns stream."""
+        """See `vectorbt.returns.nb.cond_value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults['cutoff']
         result = nb.cond_value_at_risk_nb(self.to_2d_array(), cutoff)
@@ -689,7 +683,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Capture ratio."""
+        """See `vectorbt.returns.nb.capture_nb`."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
         result = nb.capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='capture'), wrap_kwargs)
@@ -711,7 +705,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def up_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Capture ratio for periods when the benchmark return is positive."""
+        """See `vectorbt.returns.nb.up_capture_nb`."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
         result = nb.up_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='up_capture'), wrap_kwargs)
@@ -733,7 +727,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def down_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Capture ratio for periods when the benchmark return is negative."""
+        """See `vectorbt.returns.nb.down_capture_nb`."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
         result = nb.down_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='down_capture'), wrap_kwargs)
@@ -761,7 +755,9 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def max_drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Total maximum drawdown (MDD)."""
+        """See `vectorbt.returns.nb.max_drawdown_nb`.
+
+        Yields the same result as `ReturnsAccessor.drawdowns.max_drawdown`."""
         result = nb.max_drawdown_nb(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -792,14 +788,16 @@ class ReturnsAccessor(GenericAccessor):
             group_by = self.wrapper.grouper.group_by
         return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
 
-    def resolve_self(self: AttrResolverT,
+    def resolve_self(self: ReturnsAccessorT,
                      cond_kwargs: tp.KwargsLike = None,
                      custom_arg_names: tp.Optional[tp.Set[str]] = None,
                      impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> AttrResolverT:
+                     silence_warnings: bool = False) -> ReturnsAccessorT:
         """Resolve self.
 
-        Creates a copy of this instance if a different `year` or `year_freq` can be found in `cond_kwargs`."""
+        See `vectorbt.array_wrapper.Wrapping.resolve_self`.
+
+        Creates a copy of this instance `year_freq` is different in `cond_kwargs`."""
         if cond_kwargs is None:
             cond_kwargs = {}
         if custom_arg_names is None:
@@ -818,7 +816,7 @@ class ReturnsAccessor(GenericAccessor):
             if self_copy.year_freq != reself.year_freq:
                 if not silence_warnings:
                     warnings.warn(f"Changing the year frequency will create a copy of this object. "
-                                  f"Consider setting it upon the creation to re-use cache.", stacklevel=2)
+                                  f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
                 for alias in reself.self_aliases:
                     if alias not in custom_arg_names:
                         cond_kwargs[alias] = self_copy
@@ -993,12 +991,13 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
     Accessible through `pd.Series.vbt.returns`."""
 
-    def __init__(self, obj: tp.Series, year_freq: tp.Optional[tp.FrequencyLike] = None, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
+    def __init__(self,
+                 obj: tp.Series,
+                 year_freq: tp.Optional[tp.FrequencyLike] = None,
+                 defaults: tp.KwargsLike = None,
+                 **kwargs) -> None:
         GenericSRAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, **kwargs)
+        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
 
     def plot_cumulative(self,
                         benchmark_rets: tp.Optional[tp.ArrayLike] = None,
@@ -1112,12 +1111,13 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
 
     Accessible through `pd.DataFrame.vbt.returns`."""
 
-    def __init__(self, obj: tp.Frame, year_freq: tp.Optional[tp.FrequencyLike] = None, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
+    def __init__(self,
+                 obj: tp.Frame,
+                 year_freq: tp.Optional[tp.FrequencyLike] = None,
+                 defaults: tp.KwargsLike = None,
+                 **kwargs) -> None:
         GenericDFAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, **kwargs)
+        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
 
 
 __pdoc__ = dict()

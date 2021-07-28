@@ -71,7 +71,7 @@ dtype: int64
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `GenericAccessor.metrics`.
 
 ```python-repl
 >>> df2 = pd.DataFrame({
@@ -79,36 +79,106 @@ dtype: int64
 ...     'b': [4, np.nan, 5],
 ...     'c': [6, 7, np.nan]
 ... }, index=['x', 'y', 'z'])
->>> df2.vbt.stats(column='a')
-Start               x
-End                 z
-Duration            3
-Count               2
-Mean              2.5
-Std          0.707107
-Min                 2
-Median            2.5
-Max                 3
-Min Index           y
-Max Index           z
+
+>>> df2.vbt(freq='d').stats(column='a')
+Start                      x
+End                        z
+Period       3 days 00:00:00
+Count                      2
+Mean                     2.5
+Std                 0.707107
+Min                      2.0
+Median                   2.5
+Max                      3.0
+Min Index                  y
+Max Index                  z
 Name: a, dtype: object
 ```
 
-`GenericAccessor.stats` also supports grouping:
+### Mapping
+
+Mapping can be set both in `GenericAccessor` (preferred) and `GenericAccessor.stats`:
 
 ```python-repl
->>> df2.vbt.stats(column=0, group_by=[0, 0, 1])
-Start              x
-End                z
-Duration           3
-Count              4
-Mean             3.5
-Std          1.29099
-Min                2
-Median           3.5
-Max                5
-Min Index          y
-Max Index          z
+>>> mapping = {x: 'test_' + str(x) for x in pd.unique(df2.values.flatten())}
+>>> df2.vbt(freq='d', mapping=mapping).stats(column='a')
+Start                                   x
+End                                     z
+Period                    3 days 00:00:00
+Count                                   2
+Value Counts: test_2.0                  1
+Value Counts: test_3.0                  1
+Value Counts: test_4.0                  0
+Value Counts: test_5.0                  0
+Value Counts: test_6.0                  0
+Value Counts: test_7.0                  0
+Value Counts: test_nan                  1
+Name: a, dtype: object
+
+>>> df2.vbt(freq='d').stats(column='a', settings=dict(mapping=mapping))
+UserWarning: Changing the mapping will create a copy of this object.
+Consider setting it upon object creation to re-use existing cache.
+
+Start                                   x
+End                                     z
+Period                    3 days 00:00:00
+Count                                   2
+Value Counts: test_2.0                  1
+Value Counts: test_3.0                  1
+Value Counts: test_4.0                  0
+Value Counts: test_5.0                  0
+Value Counts: test_6.0                  0
+Value Counts: test_7.0                  0
+Value Counts: test_nan                  1
+Name: a, dtype: object
+```
+
+Selecting a column before calling `stats` will consider uniques from this column only:
+
+```python-repl
+>>> df2['a'].vbt(freq='d', mapping=mapping).stats()
+Start                                   x
+End                                     z
+Period                    3 days 00:00:00
+Count                                   2
+Value Counts: test_2.0                  1
+Value Counts: test_3.0                  1
+Value Counts: test_nan                  1
+Name: a, dtype: object
+```
+
+To include all keys from `mapping`, pass `incl_all_keys=True`:
+
+>>> df2['a'].vbt(freq='d', mapping=mapping).stats(settings=dict(incl_all_keys=True))
+Start                                   x
+End                                     z
+Period                    3 days 00:00:00
+Count                                   2
+Value Counts: test_2.0                  1
+Value Counts: test_3.0                  1
+Value Counts: test_4.0                  0
+Value Counts: test_5.0                  0
+Value Counts: test_6.0                  0
+Value Counts: test_7.0                  0
+Value Counts: test_nan                  1
+Name: a, dtype: object
+```
+
+`GenericAccessor.stats` also supports (re-)grouping:
+
+```python-repl
+>>> df2.vbt(freq='d').stats(column=0, group_by=[0, 0, 1])
+Start                      x
+End                        z
+Period       3 days 00:00:00
+Count                      4
+Mean                     3.5
+Std                 1.290994
+Min                      2.0
+Median                   3.5
+Max                      5.0
+Min Index                  y
+Max Index                  z
 Name: 0, dtype: object
 ```
 """
@@ -136,10 +206,11 @@ from vectorbt.utils import checks
 from vectorbt.utils.config import Config, merge_dicts, resolve_dict
 from vectorbt.utils.figure import make_figure, make_subplots
 from vectorbt.utils.decorators import cached_property
-from vectorbt.utils.mapping import apply_mapping
+from vectorbt.utils.mapping import apply_mapping, to_mapping
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
-from vectorbt.base.class_helpers import add_nb_methods
+from vectorbt.base.decorators import add_methods_to_wrapping
+from vectorbt.base.array_wrapper import Wrapping
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
@@ -147,7 +218,6 @@ from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
-    # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
     import bottleneck as bn
 
     nanmean = bn.nanmean
@@ -181,6 +251,7 @@ class TransformerT(tp.Protocol):
         ...
 
 
+GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 TransformFuncInfoT = tp.Tuple[str, tp.Type[TransformerT]]
 SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
@@ -202,24 +273,42 @@ def add_transform_methods(transformers: tp.Iterable[TransformFuncInfoT]) -> Wrap
     return wrapper
 
 
-@add_nb_methods([
-    ('shuffle', nb.shuffle_nb, False),
-    ('fillna', nb.fillna_nb, False),
-    ('bshift', nb.bshift_nb, False),
-    ('fshift', nb.fshift_nb, False),
-    ('diff', nb.diff_nb, False),
-    ('pct_change', nb.pct_change_nb, False),
-    ('ffill', nb.ffill_nb, False),
-    ('cumsum', nb.nancumsum_nb, False),
-    ('cumprod', nb.nancumprod_nb, False),
-    ('rolling_min', nb.rolling_min_nb, False),
-    ('rolling_max', nb.rolling_max_nb, False),
-    ('rolling_mean', nb.rolling_mean_nb, False),
-    ('expanding_min', nb.expanding_min_nb, False),
-    ('expanding_max', nb.expanding_max_nb, False),
-    ('expanding_mean', nb.expanding_mean_nb, False),
-    ('product', nb.nanprod_nb, True)
-], module_name='vectorbt.generic.nb')
+__pdoc__ = {}
+
+nb_func_config = Config(
+    {
+        'shuffle': dict(func=nb.shuffle_nb, path='vectorbt.generic.nb.shuffle_nb'),
+        'fillna': dict(func=nb.fillna_nb, path='vectorbt.generic.nb.fillna_nb'),
+        'bshift': dict(func=nb.bshift_nb, path='vectorbt.generic.nb.bshift_nb'),
+        'fshift': dict(func=nb.fshift_nb, path='vectorbt.generic.nb.fshift_nb'),
+        'diff': dict(func=nb.diff_nb, path='vectorbt.generic.nb.diff_nb'),
+        'pct_change': dict(func=nb.pct_change_nb, path='vectorbt.generic.nb.pct_change_nb'),
+        'ffill': dict(func=nb.ffill_nb, path='vectorbt.generic.nb.ffill_nb'),
+        'cumsum': dict(func=nb.nancumsum_nb, path='vectorbt.generic.nb.nancumsum_nb'),
+        'cumprod': dict(func=nb.nancumprod_nb, path='vectorbt.generic.nb.nancumprod_nb'),
+        'rolling_min': dict(func=nb.rolling_min_nb, path='vectorbt.generic.nb.rolling_min_nb'),
+        'rolling_max': dict(func=nb.rolling_max_nb, path='vectorbt.generic.nb.rolling_max_nb'),
+        'rolling_mean': dict(func=nb.rolling_mean_nb, path='vectorbt.generic.nb.rolling_mean_nb'),
+        'expanding_min': dict(func=nb.expanding_min_nb, path='vectorbt.generic.nb.expanding_min_nb'),
+        'expanding_max': dict(func=nb.expanding_max_nb, path='vectorbt.generic.nb.expanding_max_nb'),
+        'expanding_mean': dict(func=nb.expanding_mean_nb, path='vectorbt.generic.nb.expanding_mean_nb'),
+        'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['nb_func_config'] = f"""Config of Numba functions to be added to `GenericAccessor`.
+
+```json
+{nb_func_config.to_doc()}
+```
+"""
+
+
+@add_methods_to_wrapping(nb_func_config)
 @add_transform_methods([
     ('binarize', Binarizer),
     ('minmax_scale', MinMaxScaler),
@@ -235,11 +324,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
+    def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
+        if mapping is not None:
+            mapping = to_mapping(mapping)
+        self._mapping = mapping
 
-        BaseAccessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)
 
     @property
@@ -251,6 +341,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def df_accessor_cls(self):
         """Accessor class for `pd.DataFrame`."""
         return GenericDFAccessor
+
+    @property
+    def mapping(self) -> tp.Optional[tp.Mapping]:
+        """Mapping."""
+        return self._mapping
+
+    def apply_mapping(self, **kwargs) -> tp.SeriesFrame:
+        """See `vectorbt.utils.mapping.apply_mapping`."""
+        return apply_mapping(self.obj, self.mapping, **kwargs)
 
     def rolling_std(self, window: int, minp: tp.Optional[int] = None, ddof: int = 1,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
@@ -531,24 +630,24 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                    tp.ReduceArrayFunc
                ],
                *args,
-               to_array: bool = False,
-               to_idx: bool = False,
+               returns_array: bool = False,
+               returns_idx: bool = False,
                flatten: bool = False,
                order: str = 'C',
-               idx_labeled: bool = True,
+               to_index: bool = True,
                group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame[float]:
         """Reduce by column.
 
-        See `vectorbt.generic.nb.flat_reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is True.
-        See `vectorbt.generic.nb.flat_reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is True.
-        See `vectorbt.generic.nb.reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is False.
-        See `vectorbt.generic.nb.reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is False.
-        See `vectorbt.generic.nb.reduce_to_array_nb` if not grouped and `to_array` is True.
-        See `vectorbt.generic.nb.reduce_nb` if not grouped and `to_array` is False.
+        See `vectorbt.generic.nb.flat_reduce_grouped_to_array_nb` if grouped, `returns_array` is True and `flatten` is True.
+        See `vectorbt.generic.nb.flat_reduce_grouped_nb` if grouped, `returns_array` is False and `flatten` is True.
+        See `vectorbt.generic.nb.reduce_grouped_to_array_nb` if grouped, `returns_array` is True and `flatten` is False.
+        See `vectorbt.generic.nb.reduce_grouped_nb` if grouped, `returns_array` is False and `flatten` is False.
+        See `vectorbt.generic.nb.reduce_to_array_nb` if not grouped and `returns_array` is True.
+        See `vectorbt.generic.nb.reduce_nb` if not grouped and `returns_array` is False.
 
-        Set `to_idx` to True if values returned by `reduce_func_nb` are indices/positions.
-        Set `idx_labeled` to False to return raw positions instead of labels.
+        Set `returns_idx` to True if values returned by `reduce_func_nb` are indices/positions.
+        Set `to_index` to False to return raw positions instead of labels.
 
         ## Example
 
@@ -561,21 +660,21 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         dtype: float64
 
         >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-        >>> df.vbt.reduce(argmax_nb, to_idx=True)
+        >>> df.vbt.reduce(argmax_nb, returns_idx=True)
         a   2020-01-05
         b   2020-01-01
         c   2020-01-03
         dtype: datetime64[ns]
 
         >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-        >>> df.vbt.reduce(argmax_nb, to_idx=True, idx_labeled=False)
+        >>> df.vbt.reduce(argmax_nb, returns_idx=True, to_index=False)
         a    4
         b    0
         c    2
         dtype: int64
 
         >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-        >>> df.vbt.reduce(min_max_nb, to_array=True, wrap_kwargs=dict(name_or_index=['min', 'max']))
+        >>> df.vbt.reduce(min_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=['min', 'max']))
                a    b    c
         min  1.0  1.0  1.0
         max  5.0  5.0  3.0
@@ -588,7 +687,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         dtype: float64
 
         >>> df.vbt.reduce(min_max_nb, name_or_index=['min', 'max'],
-        ...     to_array=True, group_by=group_by)
+        ...     returns_array=True, group_by=group_by)
         group  first  second
         min      1.0     1.0
         max      5.0     3.0
@@ -601,26 +700,26 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             if flatten:
                 checks.assert_in(order.upper(), ['C', 'F'])
                 in_c_order = order.upper() == 'C'
-                if to_array:
+                if returns_array:
                     out = nb.flat_reduce_grouped_to_array_nb(
                         self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
                 else:
                     out = nb.flat_reduce_grouped_nb(
                         self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
-                if to_idx:
+                if returns_idx:
                     if in_c_order:
                         out //= group_lens  # flattened in C order
                     else:
                         out %= self.wrapper.shape[0]  # flattened in F order
             else:
-                if to_array:
+                if returns_array:
                     out = nb.reduce_grouped_to_array_nb(
                         self.to_2d_array(), group_lens, reduce_func_nb, *args)
                 else:
                     out = nb.reduce_grouped_nb(
                         self.to_2d_array(), group_lens, reduce_func_nb, *args)
         else:
-            if to_array:
+            if returns_array:
                 out = nb.reduce_to_array_nb(
                     self.to_2d_array(), reduce_func_nb, *args)
             else:
@@ -628,15 +727,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                     self.to_2d_array(), reduce_func_nb, *args)
 
         # Perform post-processing
-        if to_idx:
-            nan_mask = np.isnan(out)
-            if idx_labeled:
-                out = out.astype(object)
-                out[~nan_mask] = self.wrapper.index[out[~nan_mask].astype(np.int_)]
-            else:
-                out[nan_mask] = -1
-                out = out.astype(np.int_)
-        wrap_kwargs = merge_dicts(dict(name_or_index='reduce' if not to_array else None), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(
+            name_or_index='reduce' if not returns_array else None,
+            to_index=returns_idx and to_index,
+            fillna=-1 if returns_idx else None,
+            dtype=np.int_ if returns_idx else None
+        ), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     def min(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
@@ -742,7 +838,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                 nb.argmin_reduce_nb,
                 group_by=group_by,
                 flatten=True,
-                to_idx=True,
+                returns_idx=True,
                 order=order,
                 wrap_kwargs=wrap_kwargs
             )
@@ -762,7 +858,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                 nb.argmax_reduce_nb,
                 group_by=group_by,
                 flatten=True,
-                to_idx=True,
+                returns_idx=True,
                 order=order,
                 wrap_kwargs=wrap_kwargs
             )
@@ -808,43 +904,56 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 nb.describe_reduce_nb, percentiles, ddof,
-                group_by=group_by, flatten=True, to_array=True,
+                group_by=group_by, flatten=True, returns_array=True,
                 wrap_kwargs=wrap_kwargs)
         return self.reduce(
             nb.describe_reduce_nb, percentiles, ddof,
-            to_array=True, wrap_kwargs=wrap_kwargs)
+            returns_array=True, wrap_kwargs=wrap_kwargs)
 
     def value_counts(self,
                      normalize: bool = False,
-                     sort_labels: bool = True,
+                     sort_uniques: bool = True,
                      sort: bool = False,
                      ascending: bool = False,
                      dropna: bool = False,
                      group_by: tp.GroupByLike = None,
                      mapping: tp.Optional[tp.MappingLike] = None,
+                     incl_all_keys: bool = False,
                      wrap_kwargs: tp.KwargsLike = None,
                      **kwargs) -> tp.SeriesFrame:
         """Return a Series/DataFrame containing counts of unique values.
 
         * Enable `normalize` flag to return the relative frequencies of the unique values.
-        * Enable `sort_labels` flag to sort labels.
+        * Enable `sort_uniques` flag to sort uniques.
         * Enable `sort` flag to sort by frequencies.
         * Enable `ascending` flag to sort in ascending order.
         * Enable `dropna` flag to exclude counts of NaN.
+        * Enable `incl_all_keys` to include all mapping keys, no only those that are present in the array.
 
         Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
-        codes, mapped_uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
+        if mapping is None:
+            mapping = self.mapping
+        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        value_counts = nb.value_counts_nb(codes, len(mapped_uniques), group_lens)
-        nan_mask = np.isnan(mapped_uniques)
+        value_counts = nb.value_counts_nb(codes, len(uniques), group_lens)
+        if incl_all_keys and mapping is not None:
+            missing_keys = []
+            for x in mapping:
+                if pd.isnull(x) and pd.isnull(uniques).any():
+                    continue
+                if x not in uniques:
+                    missing_keys.append(x)
+            value_counts = np.vstack((value_counts, np.full((len(missing_keys), value_counts.shape[1]), 0)))
+            uniques = np.concatenate((uniques, np.array(missing_keys)))
+        nan_mask = np.isnan(uniques)
         if dropna:
             value_counts = value_counts[~nan_mask]
-            mapped_uniques = mapped_uniques[~nan_mask]
-        if sort_labels:
-            new_indices = mapped_uniques.argsort()
+            uniques = uniques[~nan_mask]
+        if sort_uniques:
+            new_indices = uniques.argsort()
             value_counts = value_counts[new_indices]
-            mapped_uniques = mapped_uniques[new_indices]
+            uniques = uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)
         if normalize:
             value_counts = value_counts / value_counts_sum.sum()
@@ -854,10 +963,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             else:
                 new_indices = (-value_counts_sum).argsort()
             value_counts = value_counts[new_indices]
-            mapped_uniques = mapped_uniques[new_indices]
+            uniques = uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(
             value_counts,
-            index=mapped_uniques,
+            index=uniques,
             group_by=group_by,
             **merge_dicts({}, wrap_kwargs)
         )
@@ -866,6 +975,44 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         return value_counts_pd
 
     # ############# Stats ############# #
+
+    def resolve_self(self: GenericAccessorT,
+                     cond_kwargs: tp.KwargsLike = None,
+                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
+                     impacts_caching: bool = True,
+                     silence_warnings: bool = False) -> GenericAccessorT:
+        """Resolve self.
+
+        See `vectorbt.base.array_wrapper.Wrapping.resolve_self`.
+
+        Creates a copy of this instance `mapping` is different in `cond_kwargs`."""
+        if cond_kwargs is None:
+            cond_kwargs = {}
+        if custom_arg_names is None:
+            custom_arg_names = set()
+
+        reself = Wrapping.resolve_self(
+            self,
+            cond_kwargs=cond_kwargs,
+            custom_arg_names=custom_arg_names,
+            impacts_caching=impacts_caching,
+            silence_warnings=silence_warnings
+        )
+        if 'mapping' in cond_kwargs:
+            self_copy = reself.copy(mapping=cond_kwargs['mapping'])
+
+            if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
+                if not silence_warnings:
+                    warnings.warn(f"Changing the mapping will create a copy of this object. "
+                                  f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
+                for alias in reself.self_aliases:
+                    if alias not in custom_arg_names:
+                        cond_kwargs[alias] = self_copy
+                cond_kwargs['mapping'] = self_copy.mapping
+                if impacts_caching:
+                    cond_kwargs['use_caching'] = False
+                return self_copy
+        return reself
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -905,44 +1052,59 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             count=dict(
                 title='Count',
                 calc_func='count',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             mean=dict(
                 title='Mean',
                 calc_func='mean',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             std=dict(
                 title='Std',
                 calc_func='std',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             min=dict(
                 title='Min',
                 calc_func='min',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             median=dict(
                 title='Median',
                 calc_func='median',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             max=dict(
                 title='Max',
                 calc_func='max',
+                inv_check_has_mapping=True,
                 tags=['generic', 'describe']
             ),
             idx_min=dict(
                 title='Min Index',
                 calc_func='idxmin',
                 agg_func=None,
+                inv_check_has_mapping=True,
                 tags=['generic', 'index']
             ),
             idx_max=dict(
                 title='Max Index',
                 calc_func='idxmax',
                 agg_func=None,
+                inv_check_has_mapping=True,
                 tags=['generic', 'index']
+            ),
+            value_counts=dict(
+                title='Value Counts',
+                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
+                resolve_value_counts=True,
+                check_has_mapping=True,
+                tags=['generic', 'value_counts']
             )
         ),
         copy_kwargs=dict(copy_mode='deep')
@@ -1479,12 +1641,9 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     Accessible through `pd.Series.vbt`."""
 
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
+    def __init__(self, obj: tp.Series, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
         BaseSRAccessor.__init__(self, obj, **kwargs)
-        GenericAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
     def squeeze_grouped(self,
                         squeeze_func_nb: tp.GroupSqueezeFunc, *args,
@@ -2067,12 +2226,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
     Accessible through `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-
+    def __init__(self, obj: tp.Frame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
         BaseDFAccessor.__init__(self, obj, **kwargs)
-        GenericAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
     def squeeze_grouped(self,
                         squeeze_func_nb: tp.GroupSqueezeFunc, *args,
@@ -2206,5 +2362,4 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
 
 
-__pdoc__ = dict()
 GenericAccessor.override_metrics_doc(__pdoc__)

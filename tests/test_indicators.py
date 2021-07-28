@@ -2984,7 +2984,7 @@ class TestBasic:
         pd.testing.assert_series_equal(
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(
-                np.array([4., 7., 9., 10., 8., 5., 1.]),
+                np.array([4, 7, 9, 10, 8, 5, 1]),
                 index=close_ts.index,
                 name=close_ts.name
             )

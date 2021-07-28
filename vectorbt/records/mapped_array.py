@@ -57,7 +57,7 @@ dtype: float64
 ... def min_max_reduce_nb(col, a):
 ...     return np.array([np.min(a), np.max(a)])
 
->>> ma.reduce(min_max_reduce_nb, to_array=True, index=['min', 'max'])
+>>> ma.reduce(min_max_reduce_nb, returns_array=True, index=['min', 'max'])
         a     b     c
 min  10.0  13.0  16.0
 max  12.0  15.0  18.0
@@ -66,8 +66,8 @@ max  12.0  15.0  18.0
 ... def idxmin_idxmax_reduce_nb(col, a):
 ...     return np.array([np.argmin(a), np.argmax(a)])
 
->>> ma.reduce(idxmin_idxmax_reduce_nb, to_array=True,
-...     to_idx=True, index=['idxmin', 'idxmax'])
+>>> ma.reduce(idxmin_idxmax_reduce_nb, returns_array=True,
+...     returns_idx=True, index=['idxmin', 'idxmax'])
         a  b  c
 idxmin  x  x  x
 idxmax  z  z  z
@@ -272,7 +272,7 @@ instance to the disk with `MappedArray.save` and load it with `MappedArray.load`
 ## Stats
 
 !!! hint
-    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `MappedArray.metrics`.
 
 Metric for mapped arrays are similar to that for `vectorbt.generic.accessors.GenericAccessor`.
 
@@ -314,7 +314,7 @@ Value Counts: test_17.0                  0
 Value Counts: test_18.0                  0
 Name: a, dtype: object
 
-`MappedArray.stats` also supports grouping:
+`MappedArray.stats` also supports (re-)grouping:
 
 ```python-repl
 >>> grouped_ma.stats(column='first')
@@ -338,16 +338,10 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.decorators import cached_method, add_binary_magic_methods, add_unary_magic_methods
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_1d
-from vectorbt.base.class_helpers import (
-    add_binary_magic_methods,
-    add_unary_magic_methods,
-    binary_magic_methods,
-    unary_magic_methods
-)
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.stats_builder import StatsBuilderMixin
@@ -378,14 +372,8 @@ def combine_mapped_with_other(self: MappedArrayT, other: tp.Union["MappedArray",
     return self.copy(mapped_arr=np_func(self.values, other))
 
 
-@add_binary_magic_methods(
-    binary_magic_methods,
-    combine_mapped_with_other
-)
-@add_unary_magic_methods(
-    unary_magic_methods,
-    lambda self, np_func: self.copy(mapped_arr=np_func(self.values))
-)
+@add_binary_magic_methods(combine_mapped_with_other)
+@add_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
 class MappedArray(Wrapping, StatsBuilderMixin):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
@@ -574,22 +562,22 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
     @cached_method
     def top_n_mask(self, n: int, **kwargs) -> tp.Array1d:
-        """Return mask of top N elements in each column."""
+        """Return mask of top N elements in each column/group."""
         return self.map_to_mask(nb.top_n_inout_map_nb, n, **kwargs)
 
     @cached_method
     def bottom_n_mask(self, n: int, **kwargs) -> tp.Array1d:
-        """Return mask of bottom N elements in each column."""
+        """Return mask of bottom N elements in each column/group."""
         return self.map_to_mask(nb.bottom_n_inout_map_nb, n, **kwargs)
 
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
-        """Filter top N elements from each column."""
+        """Filter top N elements from each column/group."""
         return self.filter_by_mask(self.top_n_mask(n), **kwargs)
 
     @cached_method
     def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
-        """Filter bottom N elements from each column."""
+        """Filter bottom N elements from each column/group."""
         return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
@@ -606,12 +594,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     def to_pd(self,
               idx_arr: tp.Optional[tp.Array1d] = None,
               ignore_index: bool = False,
-              default_val: float = np.nan,
+              fill_value: float = np.nan,
               group_by: tp.GroupByLike = None,
               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Expand mapped array to a Series/DataFrame.
 
-        If `ignore_index`, will ignore the index and stack data points on top of each other in every column
+        If `ignore_index`, will ignore the index and stack data points on top of each other in every column/group
         (see `vectorbt.records.nb.stack_expand_mapped_nb`). Otherwise, see `vectorbt.records.nb.expand_mapped_nb`.
 
         !!! note
@@ -630,7 +618,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                     **merge_dicts({}, wrap_kwargs)
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
-            out = nb.stack_expand_mapped_nb(self.values, col_map, default_val)
+            out = nb.stack_expand_mapped_nb(self.values, col_map, fill_value)
             return self.wrapper.wrap(
                 out, index=np.arange(out.shape[0]),
                 group_by=group_by, **merge_dicts({}, wrap_kwargs))
@@ -642,7 +630,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             raise ValueError("Multiple values are pointing to the same position. Use ignore_index.")
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        out = nb.expand_mapped_nb(self.values, col_arr, idx_arr, target_shape, default_val)
+        out = nb.expand_mapped_nb(self.values, col_arr, idx_arr, target_shape, fill_value)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def apply(self: MappedArrayT,
@@ -670,38 +658,38 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     def reduce(self,
                reduce_func_nb: tp.ReduceFunc, *args,
                idx_arr: tp.Optional[tp.Array1d] = None,
-               to_array: bool = False,
-               to_idx: bool = False,
-               idx_labeled: bool = True,
-               default_val: float = np.nan,
+               returns_array: bool = False,
+               returns_idx: bool = False,
+               to_index: bool = True,
+               fill_value: float = np.nan,
                group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
-        """Reduce mapped array by column.
+        """Reduce mapped array by column/group.
 
-        If `to_array` is False and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_nb`.
-        If `to_array` is False and `to_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_nb`.
-        If `to_array` is True and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_to_array_nb`.
-        If `to_array` is True and `to_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_array_nb`.
+        If `returns_array` is False and `returns_idx` is False, see `vectorbt.records.nb.reduce_mapped_nb`.
+        If `returns_array` is False and `returns_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_nb`.
+        If `returns_array` is True and `returns_idx` is False, see `vectorbt.records.nb.reduce_mapped_to_array_nb`.
+        If `returns_array` is True and `returns_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_array_nb`.
 
-        If `to_idx` is True, must pass `idx_arr`. Set `idx_labeled` to False to return raw positions instead
-        of labels. Use `default_val` to set the default value. Set `group_by` to False to disable grouping.
+        If `returns_idx` is True, must pass `idx_arr`. Set `to_index` to False to return raw positions instead
+        of labels. Use `fill_value` to set the default value. Set `group_by` to False to disable grouping.
         """
         # Perform checks
         checks.assert_numba_func(reduce_func_nb)
         if idx_arr is None:
             if self.idx_arr is None:
-                if to_idx:
+                if returns_idx:
                     raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
 
         # Perform main computation
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        if not to_array:
-            if not to_idx:
+        if not returns_array:
+            if not returns_idx:
                 out = nb.reduce_mapped_nb(
                     self.values,
                     col_map,
-                    default_val,
+                    fill_value,
                     reduce_func_nb,
                     *args
                 )
@@ -710,16 +698,16 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                     self.values,
                     col_map,
                     idx_arr,
-                    default_val,
+                    fill_value,
                     reduce_func_nb,
                     *args
                 )
         else:
-            if not to_idx:
+            if not returns_idx:
                 out = nb.reduce_mapped_to_array_nb(
                     self.values,
                     col_map,
-                    default_val,
+                    fill_value,
                     reduce_func_nb,
                     *args
                 )
@@ -728,92 +716,165 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                     self.values,
                     col_map,
                     idx_arr,
-                    default_val,
+                    fill_value,
                     reduce_func_nb,
                     *args
                 )
 
         # Perform post-processing
-        if to_idx:
-            nan_mask = np.isnan(out)
-            if idx_labeled:
-                out = out.astype(object)
-                out[~nan_mask] = self.wrapper.index[out[~nan_mask].astype(np.int_)]
-            else:
-                out[nan_mask] = -1
-                out = out.astype(np.int_)
-        wrap_kwargs = merge_dicts(dict(name_or_index='reduce' if not to_array else None), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(
+            name_or_index='reduce' if not returns_array else None,
+            to_index=returns_idx and to_index,
+            fillna=-1 if returns_idx else None,
+            dtype=np.int_ if returns_idx else None
+        ), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def nth(self, n: int, **kwargs) -> tp.MaybeSeries:
-        """Return n-th element of each column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nth')), kwargs)
-        return self.reduce(generic_nb.nth_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def nth_index(self, n: int, **kwargs) -> tp.MaybeSeries:
-        """Return index of n-th element of each column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nth_index')), kwargs)
-        return self.reduce(generic_nb.nth_index_reduce_nb, n, to_array=False, to_idx=True, **kwargs)
-
-    @cached_method
-    def min(self, **kwargs) -> tp.MaybeSeries:
-        """Return min by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='min')), kwargs)
-        return self.reduce(generic_nb.min_reduce_nb, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def max(self, **kwargs) -> tp.MaybeSeries:
-        """Return max by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max')), kwargs)
-        return self.reduce(generic_nb.max_reduce_nb, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def mean(self, **kwargs) -> tp.MaybeSeries:
-        """Return mean by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='mean')), kwargs)
-        return self.reduce(generic_nb.mean_reduce_nb, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def median(self, **kwargs) -> tp.MaybeSeries:
-        """Return median by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='median')), kwargs)
-        return self.reduce(generic_nb.median_reduce_nb, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def std(self, ddof: int = 1, **kwargs) -> tp.MaybeSeries:
-        """Return std by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='std')), kwargs)
-        return self.reduce(generic_nb.std_reduce_nb, ddof, to_array=False, to_idx=False, **kwargs)
-
-    @cached_method
-    def sum(self, default_val: float = 0., **kwargs) -> tp.MaybeSeries:
-        """Return sum by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='sum')), kwargs)
+    def nth(self, n: int, group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return n-th element of each column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='nth'), wrap_kwargs)
         return self.reduce(
-            generic_nb.sum_reduce_nb,
-            to_array=False,
-            to_idx=False,
-            default_val=default_val,
+            generic_nb.nth_reduce_nb, n,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
             **kwargs
         )
 
     @cached_method
-    def idxmin(self, **kwargs) -> tp.MaybeSeries:
-        """Return index of min by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmin')), kwargs)
-        return self.reduce(generic_nb.argmin_reduce_nb, to_array=False, to_idx=True, **kwargs)
+    def nth_index(self, n: int, group_by: tp.GroupByLike = None,
+                  wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return index of n-th element of each column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='nth_index'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.nth_index_reduce_nb, n,
+            returns_array=False,
+            returns_idx=True,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
     @cached_method
-    def idxmax(self, **kwargs) -> tp.MaybeSeries:
-        """Return index of max by column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmax')), kwargs)
-        return self.reduce(generic_nb.argmax_reduce_nb, to_array=False, to_idx=True, **kwargs)
+    def min(self, group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return min by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.min_reduce_nb,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
     @cached_method
-    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1, **kwargs) -> tp.SeriesFrame:
-        """Return statistics by column."""
+    def max(self, group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return max by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.max_reduce_nb,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def mean(self, group_by: tp.GroupByLike = None,
+             wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return mean by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.mean_reduce_nb,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def median(self, group_by: tp.GroupByLike = None,
+               wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return median by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.median_reduce_nb,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def std(self, ddof: int = 1, group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return std by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='std'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.std_reduce_nb, ddof,
+            returns_array=False,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def sum(self, fill_value: float = 0., group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return sum by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.sum_reduce_nb,
+            returns_array=False,
+            returns_idx=False,
+            fill_value=fill_value,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def idxmin(self, group_by: tp.GroupByLike = None,
+               wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return index of min by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.argmin_reduce_nb,
+            returns_array=False,
+            returns_idx=True,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def idxmax(self, group_by: tp.GroupByLike = None,
+               wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+        """Return index of max by column/group."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
+        return self.reduce(
+            generic_nb.argmax_reduce_nb,
+            returns_array=False,
+            returns_idx=True,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
+
+    @cached_method
+    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1,
+                 group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        """Return statistics by column/group."""
         if percentiles is not None:
             percentiles = to_1d(percentiles, raw=True)
         else:
@@ -824,13 +885,15 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index=index)), kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index=index), wrap_kwargs)
         out = self.reduce(
             generic_nb.describe_reduce_nb,
             percentiles,
             ddof,
-            to_array=True,
-            to_idx=False,
+            returns_array=True,
+            returns_idx=False,
+            group_by=group_by,
+            wrap_kwargs=wrap_kwargs,
             **kwargs
         )
         if isinstance(out, pd.DataFrame):
@@ -842,7 +905,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
     @cached_method
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Return number of values by column."""
+        """Return number of values by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
@@ -851,26 +914,38 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     @cached_method
     def value_counts(self,
                      normalize: bool = False,
-                     sort_labels: bool = True,
+                     sort_uniques: bool = True,
                      sort: bool = False,
                      ascending: bool = False,
                      dropna: bool = False,
                      group_by: tp.GroupByLike = None,
                      mapping: tp.Optional[tp.MappingLike] = None,
+                     incl_all_keys: bool = False,
                      wrap_kwargs: tp.KwargsLike = None,
                      **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.generic.accessors.GenericAccessor.value_counts`.
 
         !!! note
             Does not take into account missing values."""
+        if mapping is None:
+            mapping = self.mapping
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
+        if incl_all_keys and mapping is not None:
+            missing_keys = []
+            for x in mapping:
+                if pd.isnull(x) and pd.isnull(mapped_uniques).any():
+                    continue
+                if x not in mapped_uniques:
+                    missing_keys.append(x)
+            value_counts = np.vstack((value_counts, np.full((len(missing_keys), value_counts.shape[1]), 0)))
+            mapped_uniques = np.concatenate((mapped_uniques, np.array(missing_keys)))
         nan_mask = np.isnan(mapped_uniques)
         if dropna:
             value_counts = value_counts[~nan_mask]
             mapped_uniques = mapped_uniques[~nan_mask]
-        if sort_labels:
+        if sort_uniques:
             new_indices = mapped_uniques.argsort()
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
@@ -890,8 +965,6 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             group_by=group_by,
             **merge_dicts({}, wrap_kwargs)
         )
-        if mapping is None:
-            mapping = self.mapping
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
@@ -939,42 +1012,36 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             mean=dict(
                 title='Mean',
                 calc_func='mean',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 tags=['mapped_array', 'describe']
             ),
             std=dict(
                 title='Std',
                 calc_func='std',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 tags=['mapped_array', 'describe']
             ),
             min=dict(
                 title='Min',
                 calc_func='min',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 tags=['mapped_array', 'describe']
             ),
             median=dict(
                 title='Median',
                 calc_func='median',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 tags=['mapped_array', 'describe']
             ),
             max=dict(
                 title='Max',
                 calc_func='max',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 tags=['mapped_array', 'describe']
             ),
             idx_min=dict(
                 title='Min Index',
                 calc_func='idxmin',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 agg_func=None,
                 tags=['mapped_array', 'index']
@@ -982,7 +1049,6 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             idx_max=dict(
                 title='Max Index',
                 calc_func='idxmax',
-                pass_group_by=True,
                 inv_check_has_mapping=True,
                 agg_func=None,
                 tags=['mapped_array', 'index']
@@ -990,6 +1056,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             value_counts=dict(
                 title='Value Counts',
                 calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
+                resolve_value_counts=True,
                 check_has_mapping=True,
                 tags=['mapped_array', 'value_counts']
             )
@@ -1002,11 +1069,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         return self._metrics
 
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
-        """Plot histogram by column."""
+        """Plot histogram by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.histplot(**kwargs)
 
     def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
-        """Plot box plot by column."""
+        """Plot box plot by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)
 
 

@@ -556,13 +556,13 @@ class TestAccessors:
             a[np.isnan(a)] = -np.inf
             return np.argmax(a)
 
-        assert df['a'].vbt.reduce(argmax_nb, to_idx=True) == df['a'].idxmax()
+        assert df['a'].vbt.reduce(argmax_nb, returns_idx=True) == df['a'].idxmax()
         pd.testing.assert_series_equal(
-            df.vbt.reduce(argmax_nb, to_idx=True),
+            df.vbt.reduce(argmax_nb, returns_idx=True),
             df.idxmax().rename('reduce')
         )
         pd.testing.assert_series_equal(
-            df.vbt.reduce(argmax_nb, to_idx=True, flatten=True, group_by=group_by),
+            df.vbt.reduce(argmax_nb, returns_idx=True, flatten=True, group_by=group_by),
             pd.Series(['2018-01-02', '2018-01-02'], dtype='datetime64[ns]', index=['g1', 'g2']).rename('reduce')
         )
 
@@ -575,19 +575,19 @@ class TestAccessors:
 
         pd.testing.assert_series_equal(
             df['a'].vbt.reduce(
-                min_and_max_nb, to_array=True,
+                min_and_max_nb, returns_array=True,
                 wrap_kwargs=dict(name_or_index=['min', 'max'])),
             pd.Series([np.nanmin(df['a']), np.nanmax(df['a'])], index=['min', 'max'], name='a')
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(
-                min_and_max_nb, to_array=True,
+                min_and_max_nb, returns_array=True,
                 wrap_kwargs=dict(name_or_index=['min', 'max'])),
             df.apply(lambda x: pd.Series(np.asarray([np.nanmin(x), np.nanmax(x)]), index=['min', 'max']), axis=0)
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(
-                min_and_max_nb, to_array=True, group_by=group_by,
+                min_and_max_nb, returns_array=True, group_by=group_by,
                 wrap_kwargs=dict(name_or_index=['min', 'max'])),
             pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=['min', 'max'], columns=['g1', 'g2'])
         )
@@ -606,25 +606,25 @@ class TestAccessors:
 
         pd.testing.assert_series_equal(
             df['a'].vbt.reduce(
-                argmin_and_argmax_nb, to_idx=True, to_array=True,
+                argmin_and_argmax_nb, returns_idx=True, returns_array=True,
                 wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.Series([df['a'].idxmin(), df['a'].idxmax()], index=['idxmin', 'idxmax'], name='a')
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(
-                argmin_and_argmax_nb, to_idx=True, to_array=True,
+                argmin_and_argmax_nb, returns_idx=True, returns_array=True,
                 wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             df.apply(lambda x: pd.Series(np.asarray([x.idxmin(), x.idxmax()]), index=['idxmin', 'idxmax']), axis=0)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
+            df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True,
                           flatten=True, order='C', group_by=group_by,
                           wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-02', '2018-01-02']],
                          dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['g1', 'g2'])
         )
         pd.testing.assert_frame_equal(
-            df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
+            df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True,
                           flatten=True, order='F', group_by=group_by,
                           wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-04', '2018-01-02']],
@@ -812,7 +812,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            df.vbt.value_counts(sort_labels=False),
+            df.vbt.value_counts(sort_uniques=False),
             pd.DataFrame(
                 np.array([
                     [1, 1, 2],
@@ -1564,7 +1564,7 @@ class TestAccessors:
             df.vbt.expanding_split(n=10)
 
     def test_stats(self):
-        stat_index = pd.Index([
+        stats_index = pd.Index([
             'Start', 'End', 'Period', 'Count', 'Mean', 'Std', 'Min', 'Median', 'Max', 'Min Index', 'Max Index'
         ], dtype='object')
         pd.testing.assert_series_equal(
@@ -1575,7 +1575,7 @@ class TestAccessors:
                 pd.Timedelta('5 days 00:00:00'),
                 4.0, 2.1666666666666665, 1.0531130555537456, 1.0, 2.1666666666666665, 3.3333333333333335
             ],
-                index=stat_index[:-2],
+                index=stats_index[:-2],
                 name='agg_func_mean'
             )
         )
@@ -1589,7 +1589,7 @@ class TestAccessors:
                 pd.Timestamp('2018-01-01 00:00:00'),
                 pd.Timestamp('2018-01-04 00:00:00')
             ],
-                index=stat_index,
+                index=stats_index,
                 name='a'
             )
         )
@@ -1603,7 +1603,7 @@ class TestAccessors:
                 pd.Timestamp('2018-01-01 00:00:00'),
                 pd.Timestamp('2018-01-02 00:00:00')
             ],
-                index=stat_index,
+                index=stats_index,
                 name='g1'
             )
         )
@@ -1626,4 +1626,72 @@ class TestAccessors:
         stats_df = df.vbt.stats(agg_func=None)
         assert stats_df.shape == (3, 11)
         pd.testing.assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stat_index)
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+    def test_stats_mapping(self):
+        mapping = {x: 'test_' + str(x) for x in pd.unique(df.values.flatten())}
+        stats_index = pd.Index([
+            'Start', 'End', 'Period', 'Value Counts: test_1.0',
+            'Value Counts: test_2.0', 'Value Counts: test_3.0',
+            'Value Counts: test_4.0', 'Value Counts: test_nan'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping).stats(),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                1.3333333333333333, 1.3333333333333333, 0.6666666666666666, 0.6666666666666666, 1.0
+            ],
+                index=stats_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping).stats(column='a'),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                1, 1, 1, 1, 1
+            ],
+                index=stats_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping).stats(column='g1', group_by=group_by),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                2, 2, 2, 2, 2
+            ],
+                index=stats_index,
+                name='g1'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping).stats(),
+            df.vbt.stats(settings=dict(mapping=mapping))
+        )
+        pd.testing.assert_series_equal(
+            df['c'].vbt(mapping=mapping).stats(settings=dict(incl_all_keys=True)),
+            df.vbt(mapping=mapping).stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            df['c'].vbt(mapping=mapping).stats(settings=dict(incl_all_keys=True)),
+            df.vbt(mapping=mapping).stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping, group_by=group_by)['g2'].stats(settings=dict(incl_all_keys=True)),
+            df.vbt(mapping=mapping, group_by=group_by).stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(mapping=mapping, group_by=group_by)['g2'].stats(settings=dict(incl_all_keys=True)),
+            df.vbt(mapping=mapping).stats(column='g2', group_by=group_by)
+        )
+        stats_df = df.vbt(mapping=mapping).stats(agg_func=None)
+        assert stats_df.shape == (3, 8)
+        pd.testing.assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
