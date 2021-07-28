@@ -1,19 +1,20 @@
-[![Build Status](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)](https://travis-ci.com/github/polakowo/vectorbt)
-[![Code Coverage](https://img.shields.io/codecov/c/github/polakowo/vectorbt?style=for-the-badge)](https://codecov.io/gh/polakowo/vectorbt)
-[![Website](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
-[![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)](https://pypi.org/project/vectorbt)
-[![Downloads](https://img.shields.io/pypi/dm/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
-[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
-[![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
-[![Binder](https://img.shields.io/badge/launch-binder-d6604a?style=for-the-badge)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
-[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
+[![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
+[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
+[![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
+[![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
+[![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
+[![Downloads](https://pepy.tech/badge/vectorbt)](https://pepy.tech/project/vectorbt)
+[![Binder](https://img.shields.io/badge/launch-binder-d6604a)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
+[![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-# vectorbt
+# vectorbt :boom:
 
 ![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-100x100-dark.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
-accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale :fire:
+accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
 In contrast to conventional libraries, vectorbt represents any data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
