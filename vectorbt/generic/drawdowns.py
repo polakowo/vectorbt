@@ -291,14 +291,14 @@ class Drawdowns(Records):
     def avg_duration(self, group_by: tp.GroupByLike = None,
                      wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Average drawdown duration (in time units)."""
-        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='avg_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='avg_duration'), wrap_kwargs)
         return self.duration.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
     def max_duration(self, group_by: tp.GroupByLike = None,
                      wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown duration (in time units)."""
-        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='max_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='max_duration'), wrap_kwargs)
         return self.duration.max(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
@@ -388,7 +388,7 @@ class Drawdowns(Records):
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='active_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='active_duration'), wrap_kwargs)
         return self.active.duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
@@ -425,7 +425,7 @@ class Drawdowns(Records):
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(to_duration=True, name_or_index='active_recovery_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='active_recovery_duration'), wrap_kwargs)
         return self.active.recovery_duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Stats ############# #
@@ -461,7 +461,7 @@ class Drawdowns(Records):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),
@@ -490,7 +490,7 @@ class Drawdowns(Records):
             active_duration=dict(
                 title='Active Duration',
                 calc_func='active_duration',
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active', 'duration']
             ),
@@ -511,7 +511,7 @@ class Drawdowns(Records):
             active_recovery_duration=dict(
                 title='Active Recovery Duration',
                 calc_func='active_recovery_duration',
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 check_is_not_grouped=True,
                 tags=['drawdowns', 'active', 'duration']
             ),
@@ -530,13 +530,13 @@ class Drawdowns(Records):
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
                 calc_func=RepEval("'max_duration' if incl_active else 'recovered.max_duration'"),
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
             ),
             avg_dd_duration=dict(
                 title='Avg Drawdown Duration',
                 calc_func=RepEval("'avg_duration' if incl_active else 'recovered.avg_duration'"),
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
             ),
             max_return=dict(
@@ -554,13 +554,13 @@ class Drawdowns(Records):
             max_recovery_duration=dict(
                 title='Max Recovery Duration',
                 calc_func='recovered.recovery_duration.max',
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 tags=['drawdowns', 'recovered', 'duration']
             ),
             avg_recovery_duration=dict(
                 title='Avg Recovery Duration',
                 calc_func='recovered.recovery_duration.mean',
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 tags=['drawdowns', 'recovered', 'duration']
             ),
             recovery_duration_ratio=dict(
@@ -685,7 +685,7 @@ class Drawdowns(Records):
                 if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
-                    duration = self_col.wrapper.to_duration(to_idx - from_idx)
+                    duration = self_col.wrapper.to_timedelta(to_idx - from_idx)
                 else:
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)

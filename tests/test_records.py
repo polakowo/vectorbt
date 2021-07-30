@@ -413,7 +413,7 @@ class TestMappedArray:
             pd.Series(np.array([11., 13.333333333333334, 11., 0.]), index=wrapper.columns).rename('reduce')
         )
         pd.testing.assert_series_equal(
-            mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(to_duration=True)),
+            mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(to_timedelta=True)),
             pd.Series(np.array([11., 13.333333333333334, 11., np.nan]), index=wrapper.columns).rename('reduce') * day_dt
         )
         pd.testing.assert_series_equal(
@@ -459,7 +459,8 @@ class TestMappedArray:
             return np.array([np.min(a), np.max(a)])
 
         pd.testing.assert_series_equal(
-            mapped_array['a'].reduce(min_max_reduce_nb, returns_array=True, wrap_kwargs=dict(name_or_index=['min', 'max'])),
+            mapped_array['a'].reduce(min_max_reduce_nb, returns_array=True,
+                                     wrap_kwargs=dict(name_or_index=['min', 'max'])),
             pd.Series([10., 12.], index=pd.Index(['min', 'max'], dtype='object'), name='a')
         )
         pd.testing.assert_frame_equal(
@@ -484,7 +485,7 @@ class TestMappedArray:
             )
         )
         pd.testing.assert_frame_equal(
-            mapped_array.reduce(min_max_reduce_nb, returns_array=True, wrap_kwargs=dict(to_duration=True)),
+            mapped_array.reduce(min_max_reduce_nb, returns_array=True, wrap_kwargs=dict(to_timedelta=True)),
             pd.DataFrame(
                 np.array([
                     [10., 13., 10., np.nan],
@@ -2186,7 +2187,7 @@ class TestOrders:
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('sell_rate')
         )
-        
+
     def test_stats(self):
         stats_index = pd.Index([
             'Start', 'End', 'Period', 'Total Records', 'Total Buy Orders', 'Total Sell Orders',
@@ -2841,6 +2842,18 @@ class TestTrades:
         pd.testing.assert_index_equal(stats_df.index, trades.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+        pd.testing.assert_index_equal(
+            trades.stats(tags='trades').index,
+            pd.Index([
+                'First Trade Start', 'Last Trade End', 'Total Long Trades',
+                'Total Short Trades', 'Total Closed Trades', 'Total Open Trades',
+                'Open Trade P&L', 'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
+                'Best Trade [%]', 'Worst Trade [%]', 'Avg Winning Trade [%]',
+                'Avg Losing Trade [%]', 'Avg Winning Trade Duration',
+                'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy', 'SQN'
+            ], dtype='object')
+        )
+
 
 positions = vbt.Positions.from_trades(trades)
 positions_grouped = vbt.Positions.from_trades(trades_grouped)
@@ -3083,6 +3096,20 @@ class TestPositions:
         assert stats_df.shape == (4, 24)
         pd.testing.assert_index_equal(stats_df.index, positions.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+        pd.testing.assert_index_equal(
+            positions.stats(tags='positions').index,
+            pd.Index([
+                'First Position Start', 'Last Position End', 'Total Long Positions',
+                'Total Short Positions', 'Total Closed Positions',
+                'Total Open Positions', 'Open Position P&L', 'Win Rate [%]',
+                'Max Win Streak', 'Max Loss Streak', 'Best Position [%]',
+                'Worst Position [%]', 'Avg Winning Position [%]',
+                'Avg Losing Position [%]', 'Avg Winning Position Duration',
+                'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN',
+                'Coverage [%]'
+            ], dtype='object')
+        )
 
 
 # ############# logs.py ############# #

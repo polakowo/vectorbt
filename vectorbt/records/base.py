@@ -515,6 +515,8 @@ class Records(Wrapping, StatsBuilderMixin):
             self.col_mapper.get_col_map(group_by=group_by)[1],
             group_by=group_by, **wrap_kwargs)
 
+    # ############# Stats ############# #
+
     @property
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Records.stats`.
@@ -546,7 +548,7 @@ class Records(Wrapping, StatsBuilderMixin):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),

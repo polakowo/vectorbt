@@ -422,20 +422,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             return freq_to_timedelta(freq)
         if isinstance(self.index, DatetimeIndexes):
             if self.index.freq is not None:
-                try:
-                    return freq_to_timedelta(self.index.freq)
-                except ValueError as e:
-                    if not array_wrapper_cfg['silence_warnings']:
-                        warnings.warn(repr(e), stacklevel=2)
+                return freq_to_timedelta(self.index.freq)
             if self.index.inferred_freq is not None:
-                try:
-                    return freq_to_timedelta(self.index.inferred_freq)
-                except ValueError as e:
-                    if not array_wrapper_cfg['silence_warnings']:
-                        warnings.warn(repr(e), stacklevel=2)
+                return freq_to_timedelta(self.index.inferred_freq)
         return freq
 
-    def to_duration(self, a: tp.MaybeArray[float],
+    def to_timedelta(self, a: tp.MaybeArray[float],
                     silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, tp.Array]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbt._settings import settings
@@ -510,7 +502,7 @@ class ArrayWrapper(Configured, PandasIndexer):
              fillna: tp.Optional[tp.Scalar] = None,
              dtype: tp.Optional[tp.PandasDTypeLike] = None,
              group_by: tp.GroupByLike = None,
-             to_duration: bool = False,
+             to_timedelta: bool = False,
              to_index: bool = False,
              silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
@@ -564,9 +556,9 @@ class ArrayWrapper(Configured, PandasIndexer):
                 out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
             else:
                 out = out.applymap(lambda x: self.index[x] if x != -1 else np.nan)
-        if to_duration:
+        if to_timedelta:
             # Convert to timedelta
-            out = self.to_duration(out, silence_warnings=silence_warnings)
+            out = self.to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
     def wrap_reduced(self,
@@ -576,7 +568,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                      fillna: tp.Optional[tp.Scalar] = None,
                      dtype: tp.Optional[tp.PandasDTypeLike] = None,
                      group_by: tp.GroupByLike = None,
-                     to_duration: bool = False,
+                     to_timedelta: bool = False,
                      to_index: bool = False,
                      silence_warnings: tp.Optional[bool] = False) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
@@ -585,7 +577,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
-        If `to_duration` is set, calls `ArrayWrapper.to_duration`."""
+        If `to_timedelta` is set, calls `ArrayWrapper.to_timedelta`."""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
 
@@ -654,9 +646,9 @@ class ArrayWrapper(Configured, PandasIndexer):
                 out = out.applymap(lambda x: self.index[x] if x != -1 else np.nan)
             else:
                 out = self.index[out] if out != -1 else np.nan
-        if to_duration:
+        if to_timedelta:
             # Convert to timedelta
-            out = self.to_duration(out, silence_warnings=silence_warnings)
+            out = self.to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
     def dummy(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:

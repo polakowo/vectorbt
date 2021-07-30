@@ -123,7 +123,7 @@ Name: a, dtype: object
 We can also return duration in absolute units rather than in time units:
 
 ```python-repl
->>> mask.vbt.signals.stats(column='a', settings=dict(to_duration=False))
+>>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))
 Start                       2020-01-01 00:00:00
 End                         2020-01-05 00:00:00
 Period                                        5
@@ -1240,23 +1240,23 @@ class SignalsAccessor(GenericAccessor):
             **kwargs
         ).regroup(group_by)
 
-    def distance_mapped(self, **kwargs) -> MappedArray:
+    def distance_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of distance between signals.
 
         See `SignalsAccessor.map_between`."""
-        return self.map_between(nb.range_len_map_nb, **kwargs)
+        return self.map_between(nb.range_len_map_nb, group_by=group_by, **kwargs)
 
-    def partition_len_mapped(self, **kwargs) -> MappedArray:
+    def partition_len_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of length of partitions.
 
         See `SignalsAccessor.map_partitions`."""
-        return self.map_partitions(nb.range_len_map_nb, **kwargs)
+        return self.map_partitions(nb.range_len_map_nb, group_by=group_by, **kwargs)
 
-    def partition_distance_mapped(self, **kwargs) -> MappedArray:
+    def partition_distance_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of distance between partitions.
 
         See `SignalsAccessor.map_between_partitions`."""
-        return self.map_between_partitions(nb.range_len_map_nb, **kwargs)
+        return self.map_between_partitions(nb.range_len_map_nb, group_by=group_by, **kwargs)
 
     def map_reduce(self,
                    other: tp.Optional[tp.ArrayLike] = None,
@@ -1613,17 +1613,17 @@ class SignalsAccessor(GenericAccessor):
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def pos_rank_mapped(self, **kwargs):
+    def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of signal position ranks.
 
         See `SignalsAccessor.pos_rank`."""
-        return self.pos_rank(as_mapped=True, **kwargs)
+        return self.pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
-    def partition_pos_rank_mapped(self, **kwargs):
+    def partition_pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of partition position ranks.
 
         See `SignalsAccessor.partition_pos_rank`."""
-        return self.partition_pos_rank(as_mapped=True, **kwargs)
+        return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
     # ############# Index ############# #
 
@@ -1711,7 +1711,7 @@ class SignalsAccessor(GenericAccessor):
             norm_avg_index /= group_total
         return norm_avg_index
 
-    def index_mapped(self, **kwargs) -> MappedArray:
+    def index_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of indices.
 
         See `vectorbt.generic.accessors.GenericAccessor.to_mapped`.
@@ -1724,6 +1724,7 @@ class SignalsAccessor(GenericAccessor):
         return self.wrapper.wrap(indices).vbt.to_mapped(
             dropna=True,
             dtype=np.int_,
+            group_by=group_by,
             **kwargs
         )
 
@@ -1803,7 +1804,7 @@ class SignalsAccessor(GenericAccessor):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),
@@ -1857,16 +1858,15 @@ class SignalsAccessor(GenericAccessor):
                 title=RepEval("f'Distance {\"<-\" if from_other else \"->\"} {other_name}' "
                               "if other is not None else 'Distance'"),
                 calc_func='distance_mapped',
+                pass_other=True,
+                pass_from_other=True,
                 post_calc_func=lambda self, out, settings: {
                     'Min': out.min(),
                     'Max': out.max(),
                     'Mean': out.mean(),
                     'Std': out.std(ddof=settings.get('ddof', 1))
                 },
-                pass_group_by=True,  # hidden behind **kwargs
-                pass_other=True,  # hidden behind **kwargs
-                pass_from_other=True,  # hidden behind **kwargs
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']")
             ),
             total_partitions=dict(
@@ -1889,8 +1889,7 @@ class SignalsAccessor(GenericAccessor):
                     'Mean': out.mean(),
                     'Std': out.std(ddof=settings.get('ddof', 1))
                 },
-                pass_group_by=True,  # hidden behind **kwargs
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 tags=['signals', 'partitions', 'distance']
             ),
             partition_distance=dict(
@@ -1902,8 +1901,7 @@ class SignalsAccessor(GenericAccessor):
                     'Mean': out.mean(),
                     'Std': out.std(ddof=settings.get('ddof', 1))
                 },
-                pass_group_by=True,  # hidden behind **kwargs
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 tags=['signals', 'partitions', 'distance']
             ),
         ),

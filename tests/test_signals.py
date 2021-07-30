@@ -2185,7 +2185,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            mask.vbt.signals.stats(column='a', settings=dict(to_duration=False)),
+            mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False)),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'), 5, 2, 40.0,
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'), -0.25, 3.0,

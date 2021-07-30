@@ -757,7 +757,7 @@ class ReturnsAccessor(GenericAccessor):
     def max_drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.max_drawdown_nb`.
 
-        Yields the same result as `ReturnsAccessor.drawdowns.max_drawdown`."""
+        Yields the same result as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
         result = nb.max_drawdown_nb(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -788,6 +788,8 @@ class ReturnsAccessor(GenericAccessor):
             group_by = self.wrapper.grouper.group_by
         return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
 
+    # ############# Resolution ############# #
+
     def resolve_self(self: ReturnsAccessorT,
                      cond_kwargs: tp.KwargsLike = None,
                      custom_arg_names: tp.Optional[tp.Set[str]] = None,
@@ -795,7 +797,7 @@ class ReturnsAccessor(GenericAccessor):
                      silence_warnings: bool = False) -> ReturnsAccessorT:
         """Resolve self.
 
-        See `vectorbt.array_wrapper.Wrapping.resolve_self`.
+        See `vectorbt.base.array_wrapper.Wrapping.resolve_self`.
 
         Creates a copy of this instance `year_freq` is different in `cond_kwargs`."""
         if cond_kwargs is None:
@@ -825,6 +827,8 @@ class ReturnsAccessor(GenericAccessor):
                     cond_kwargs['use_caching'] = False
                 return self_copy
         return reself
+
+    # ############# Stats ############# #
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -862,7 +866,7 @@ class ReturnsAccessor(GenericAccessor):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 check_is_not_grouped=False,
                 tags='wrapper'
@@ -904,7 +908,7 @@ class ReturnsAccessor(GenericAccessor):
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
                 calc_func='drawdowns.max_duration',
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 tags=['returns', 'drawdowns', 'duration']
             ),
             sharpe_ratio=dict(

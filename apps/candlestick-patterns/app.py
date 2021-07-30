@@ -181,7 +181,7 @@ default_direction = directions[0]
 default_conflict_mode = conflict_modes[0]
 default_sim_options = ['allow_accumulate']
 default_n_random_strat = 50
-default_stats_options = ['incl_unrealized']
+default_stats_options = ['incl_open']
 default_layout = dict(
     autosize=True,
     margin=dict(b=40, t=20),
@@ -895,8 +895,8 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="stats_checklist",
                                             options=[{
-                                                "label": "Include unrealized P&L in stats",
-                                                "value": "incl_unrealized"
+                                                "label": "Include open trades in stats",
+                                                "value": "incl_open"
                                             }],
                                             value=default_stats_options,
                                             style={
@@ -1401,10 +1401,10 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
             return str(_chop_microseconds(x))
         return str(x)
 
-    incl_unrealized = 'incl_unrealized' in stats_options
-    main_stats = main_portfolio.stats(incl_unrealized=incl_unrealized)
-    hold_stats = hold_portfolio.stats(incl_unrealized=True)
-    rand_stats = rand_portfolio.stats(incl_unrealized=incl_unrealized, agg_func=None)
+    incl_open = 'incl_open' in stats_options
+    main_stats = main_portfolio.stats(incl_open=incl_open)
+    hold_stats = hold_portfolio.stats(incl_open=True)
+    rand_stats = rand_portfolio.stats(incl_open=incl_open, agg_func=None)
     rand_stats_median = rand_stats.iloc[:, 3:].median(axis=0)
     rand_stats_mean = rand_stats.iloc[:, 3:].mean(axis=0)
     rand_stats_std = rand_stats.iloc[:, 3:].std(axis=0, ddof=0)

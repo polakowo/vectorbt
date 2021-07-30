@@ -527,7 +527,7 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             df.vbt.apply_and_reduce(
                 every_nth_nb, sum_nb, apply_args=(2,),
-                reduce_args=(3,), wrap_kwargs=dict(to_duration=True)),
+                reduce_args=(3,), wrap_kwargs=dict(to_timedelta=True)),
             (df.iloc[::2].sum().rename('apply_and_reduce') + 3) * day_dt
         )
 
@@ -542,7 +542,7 @@ class TestAccessors:
             df.sum().rename('reduce')
         )
         pd.testing.assert_series_equal(
-            df.vbt.reduce(sum_nb, wrap_kwargs=dict(to_duration=True)),
+            df.vbt.reduce(sum_nb, wrap_kwargs=dict(to_timedelta=True)),
             df.sum().rename('reduce') * day_dt
         )
         pd.testing.assert_series_equal(
@@ -703,7 +703,7 @@ class TestAccessors:
         )
         np.testing.assert_array_equal(test_func(df).values, test_func_nb(df.values))
         pd.testing.assert_series_equal(
-            test_func(df.vbt, wrap_kwargs=dict(to_duration=True)),
+            test_func(df.vbt, wrap_kwargs=dict(to_timedelta=True)),
             test_func(df).rename(test_name) * day_dt
         )
         # boolean
@@ -714,7 +714,7 @@ class TestAccessors:
             test_func(bool_ts).rename(test_name)
         )
         pd.testing.assert_series_equal(
-            test_func(bool_ts.vbt, wrap_kwargs=dict(to_duration=True)),
+            test_func(bool_ts.vbt, wrap_kwargs=dict(to_timedelta=True)),
             test_func(bool_ts).rename(test_name) * day_dt
         )
 

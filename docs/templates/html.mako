@@ -109,7 +109,7 @@
             params = ', '.join(f.params(annotate=show_type_annotations, link=link))
             return_type = get_annotation(f.return_annotation, '\N{non-breaking hyphen}>')
         %>
-        <span>${f.funcdef()} ${ident(f.name, css_class)}</span>(<span class="params">${params}</span>)<span class="return_type">${return_type}</span>
+        <span>${f.funcdef()} ${ident(f.name, css_class)}</span>(<span class="params">${params})</span><span class="return_type">${return_type}</span>
     </code></dt>
     <dd>${show_desc(f)}</dd>
   </%def>

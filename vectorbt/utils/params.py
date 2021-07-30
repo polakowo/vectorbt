@@ -87,13 +87,3 @@ def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int
 def create_param_product(param_list: tp.Sequence[tp.Sequence]) -> tp.List[tp.List]:
     """Make Cartesian product out of all params in `param_list`."""
     return list(map(list, zip(*list(itertools.product(*param_list)))))
-
-
-class DefaultParam:
-    """Class for wrapping default values."""
-
-    def __repr__(self) -> str:
-        return self.value.__repr__()
-
-    def __init__(self, value: tp.Any) -> None:
-        self.value = value

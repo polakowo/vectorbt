@@ -4525,13 +4525,13 @@ def asset_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array
 
 
 @njit(cache=True)
-def market_value_nb(close: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
+def benchmark_value_nb(close: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
     """Get market value per column."""
     return close / close[0] * init_cash
 
 
 @njit(cache=True)
-def market_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d) -> tp.Array2d:
+def benchmark_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d) -> tp.Array2d:
     """Get market value per group."""
     check_group_lens(group_lens, close.shape[1])
 
@@ -4548,11 +4548,11 @@ def market_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash
 
 
 @njit(cache=True)
-def total_market_return_nb(market_value: tp.Array2d) -> tp.Array1d:
+def total_benchmark_return_nb(benchmark_value: tp.Array2d) -> tp.Array1d:
     """Get total market return per column/group."""
-    out = np.empty(market_value.shape[1], dtype=np.float_)
-    for col in range(market_value.shape[1]):
-        out[col] = returns_nb.get_return_nb(market_value[0, col], market_value[-1, col])
+    out = np.empty(benchmark_value.shape[1], dtype=np.float_)
+    for col in range(benchmark_value.shape[1]):
+        out[col] = returns_nb.get_return_nb(benchmark_value[0, col], benchmark_value[-1, col])
     return out
 
 

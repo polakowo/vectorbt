@@ -804,6 +804,14 @@ class TestAccessors:
             ret['c'].vbt.returns.stats(),
             ret.vbt.returns.stats(column='c', group_by=False)
         )
+        pd.testing.assert_series_equal(
+            ret.vbt.returns(freq='10d').stats(),
+            ret.vbt.returns.stats(settings=dict(freq='10d'))
+        )
+        pd.testing.assert_series_equal(
+            ret.vbt.returns(freq='d', year_freq='400d').stats(),
+            ret.vbt.returns.stats(settings=dict(freq='d', year_freq='400d'))
+        )
         stats_df = ret.vbt.returns.stats(agg_func=None)
         assert stats_df.shape == (3, 17)
         pd.testing.assert_index_equal(stats_df.index, ret.vbt.returns.wrapper.columns)

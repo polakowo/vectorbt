@@ -686,10 +686,10 @@ class TestArrayWrapper:
             datetime(2020, 1, 3)
         ])).freq == day_dt
 
-    def test_to_duration(self):
+    def test_to_timedelta(self):
         sr = pd.Series([1, 2, np.nan], index=['x', 'y', 'z'], name='name')
         pd.testing.assert_series_equal(
-            array_wrapper.ArrayWrapper.from_obj(sr, freq='1 days').to_duration(sr),
+            array_wrapper.ArrayWrapper.from_obj(sr, freq='1 days').to_timedelta(sr),
             pd.Series(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=sr.index,
@@ -698,7 +698,7 @@ class TestArrayWrapper:
         )
         df = sr.to_frame()
         pd.testing.assert_frame_equal(
-            array_wrapper.ArrayWrapper.from_obj(df, freq='1 days').to_duration(df),
+            array_wrapper.ArrayWrapper.from_obj(df, freq='1 days').to_timedelta(df),
             pd.DataFrame(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=df.index,

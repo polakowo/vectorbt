@@ -247,7 +247,7 @@ settings = SettingsConfig(
             ),
             settings=Config(  # flex
                 dict(
-                    to_duration=True,
+                    to_timedelta=None,
                     use_caching=True
                 )
             ),
@@ -390,11 +390,15 @@ settings = SettingsConfig(
                 dict(
                     filters=dict(
                         is_positions=dict(
-                            filter_func=lambda self, metric_settings: metric_settings['is_positions']
+                            filter_func=lambda self, metric_settings: self.is_positions
                         )
                     ),
                     settings=dict(
                         incl_open=False
+                    ),
+                    template_mapping=dict(
+                        trades_tag=RepEval("'positions' if self.is_positions else 'trades'"),
+                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
             )
@@ -452,7 +456,11 @@ settings = SettingsConfig(
                     settings=dict(
                         use_asset_returns=False,
                         use_positions=False,
-                        incl_unrealized=False
+                        incl_open=False
+                    ),
+                    template_mapping=dict(
+                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
+                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
             ),
@@ -460,7 +468,7 @@ settings = SettingsConfig(
                 subplots=['orders', 'trade_returns', 'cum_returns'],
                 use_asset_returns=False,
                 use_positions=False,
-                incl_unrealized=True
+                incl_open=True
             )
         ),
         messaging=dict(

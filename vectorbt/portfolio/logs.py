@@ -209,7 +209,7 @@ class Logs(Records):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),

@@ -969,6 +969,8 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
 
+    # ############# Stats ############# #
+
     @property
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `MappedArray.stats`.
@@ -1000,7 +1002,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),

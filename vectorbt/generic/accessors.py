@@ -209,12 +209,12 @@ from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.mapping import apply_mapping, to_mapping
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
-from vectorbt.base.decorators import add_methods_to_wrapping
 from vectorbt.base.array_wrapper import Wrapping
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.decorators import add_nb_methods, add_transform_methods
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
@@ -239,6 +239,9 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
+GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
+SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
+
 
 class TransformerT(tp.Protocol):
     def __init__(self, **kwargs) -> None:
@@ -251,31 +254,9 @@ class TransformerT(tp.Protocol):
         ...
 
 
-GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
-WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
-TransformFuncInfoT = tp.Tuple[str, tp.Type[TransformerT]]
-SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
-
-
-def add_transform_methods(transformers: tp.Iterable[TransformFuncInfoT]) -> WrapperFuncT:
-    """Class decorator to add scikit-learn transformers as transform methods."""
-
-    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for fname, transformer in transformers:
-            def transform(self, wrap_kwargs: tp.KwargsLike = None,
-                          _transformer: tp.Type[TransformerT] = transformer, **kwargs) -> tp.SeriesFrame:
-                return self.transform(_transformer(**kwargs), wrap_kwargs=wrap_kwargs)
-
-            transform.__doc__ = f"Transform using `sklearn.preprocessing.{transformer.__name__}`."
-            setattr(cls, fname, transform)
-        return cls
-
-    return wrapper
-
-
 __pdoc__ = {}
 
-nb_func_config = Config(
+nb_config = Config(
     {
         'shuffle': dict(func=nb.shuffle_nb, path='vectorbt.generic.nb.shuffle_nb'),
         'fillna': dict(func=nb.fillna_nb, path='vectorbt.generic.nb.fillna_nb'),
@@ -300,25 +281,64 @@ nb_func_config = Config(
 )
 """_"""
 
-__pdoc__['nb_func_config'] = f"""Config of Numba functions to be added to `GenericAccessor`.
+__pdoc__['nb_config'] = f"""Config of Numba methods to be added to `GenericAccessor`.
 
 ```json
-{nb_func_config.to_doc()}
+{nb_config.to_doc()}
+```
+"""
+
+transform_config = Config(
+    {
+        'binarize': dict(
+            transformer=Binarizer,
+            docstring="See `sklearn.preprocessing.Binarizer`."
+        ),
+        'minmax_scale': dict(
+            transformer=MinMaxScaler,
+            docstring="See `sklearn.preprocessing.MinMaxScaler`."
+        ),
+        'maxabs_scale': dict(
+            transformer=MaxAbsScaler,
+            docstring="See `sklearn.preprocessing.MaxAbsScaler`."
+        ),
+        'normalize': dict(
+            transformer=Normalizer,
+            docstring="See `sklearn.preprocessing.Normalizer`."
+        ),
+        'robust_scale': dict(
+            transformer=RobustScaler,
+            docstring="See `sklearn.preprocessing.RobustScaler`."
+        ),
+        'scale': dict(
+            transformer=StandardScaler,
+            docstring="See `sklearn.preprocessing.StandardScaler`."
+        ),
+        'quantile_transform': dict(
+            transformer=QuantileTransformer,
+            docstring="See `sklearn.preprocessing.QuantileTransformer`."
+        ),
+        'power_transform': dict(
+            transformer=PowerTransformer,
+            docstring="See `sklearn.preprocessing.PowerTransformer`."
+        )
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['transform_config'] = f"""Config of transform methods to be added to `GenericAccessor`.
+
+```json
+{transform_config.to_doc()}
 ```
 """
 
 
-@add_methods_to_wrapping(nb_func_config)
-@add_transform_methods([
-    ('binarize', Binarizer),
-    ('minmax_scale', MinMaxScaler),
-    ('maxabs_scale', MaxAbsScaler),
-    ('normalize', Normalizer),
-    ('robust_scale', RobustScaler),
-    ('scale', StandardScaler),
-    ('quantile_transform', QuantileTransformer),
-    ('power_transform', PowerTransformer)
-])
+@add_nb_methods(nb_config)
+@add_transform_methods(transform_config)
 class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
@@ -974,7 +994,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
 
-    # ############# Stats ############# #
+    # ############# Resolution ############# #
 
     def resolve_self(self: GenericAccessorT,
                      cond_kwargs: tp.KwargsLike = None,
@@ -1014,6 +1034,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                 return self_copy
         return reself
 
+    # ############# Stats ############# #
+
     @property
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `GenericAccessor.stats`.
@@ -1045,7 +1067,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),

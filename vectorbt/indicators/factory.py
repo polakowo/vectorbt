@@ -1106,14 +1106,9 @@ from collections import Counter
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
-from vectorbt.utils.config import merge_dicts, resolve_dict, Config
+from vectorbt.utils.config import merge_dicts, resolve_dict, Config, Default
 from vectorbt.utils.random import set_seed
-from vectorbt.utils.params import (
-    to_typed_list,
-    broadcast_params,
-    create_param_product,
-    DefaultParam
-)
+from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
 from vectorbt.utils.enum import map_enum_fields
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.docs import to_doc
@@ -2674,14 +2669,14 @@ class IndicatorFactory:
             for i in range(len(all_inputs)):
                 input = all_inputs[i]
                 is_default = False
-                if isinstance(input, DefaultParam):
+                if isinstance(input, Default):
                     input = input.value
                     is_default = True
                 if isinstance(input, str):
                     if input in all_input_names:
                         new_input = all_inputs[all_input_names.index(input)]
                         if is_default:
-                            new_input = DefaultParam(new_input)
+                            new_input = Default(new_input)
                         all_inputs[i] = new_input
             input_list = all_inputs[:len(input_list)]
             all_inputs = all_inputs[len(input_list):]
@@ -2710,8 +2705,8 @@ class IndicatorFactory:
             return input_list, param_list, in_output_list, args
 
         for k, v in pipeline_kwargs.items():
-            if k in param_names and not isinstance(v, DefaultParam):
-                pipeline_kwargs[k] = DefaultParam(v)  # track default params
+            if k in param_names and not isinstance(v, Default):
+                pipeline_kwargs[k] = Default(v)  # track default params
         pipeline_kwargs = merge_dicts({k: None for k in in_output_names}, pipeline_kwargs)
 
         # Display default parameters and in-place outputs in the signature
@@ -2760,9 +2755,9 @@ class IndicatorFactory:
             for i, pname in enumerate(param_names):
                 level_name = _short_name + '_' + pname if prepend_name else pname
                 level_names.append(level_name)
-                if pname in _hide_params or (_hide_default and isinstance(param_list[i], DefaultParam)):
+                if pname in _hide_params or (_hide_default and isinstance(param_list[i], Default)):
                     hide_levels.append(i)
-            param_list = [params.value if isinstance(params, DefaultParam) else params for params in param_list]
+            param_list = [params.value if isinstance(params, Default) else params for params in param_list]
 
             # Run the pipeline
             results = run_pipeline(
@@ -2855,7 +2850,7 @@ class IndicatorFactory:
                        "    return cls._{0}({6}{3}{7}**kwargs)".format(
                 _0, _1, _2, _3, _4, _5, _6, _7
             )
-            scope = {**dict(DefaultParam=DefaultParam), **_default_kwargs}
+            scope = {**dict(Default=Default), **_default_kwargs}
             filename = inspect.getfile(lambda: None)
             code = compile(func_str, filename, 'single')
             exec(code, scope)
@@ -2920,7 +2915,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
 
                 # Hide params
                 for i, pname in enumerate(param_names):
-                    if _hide_default and isinstance(param_list[i], DefaultParam):
+                    if _hide_default and isinstance(param_list[i], Default):
                         if pname not in _hide_params:
                             _hide_params.append(pname)
                         param_list[i] = param_list[i].value

@@ -165,7 +165,7 @@ from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
-from vectorbt.utils.template import RepEval
+from vectorbt.utils.template import RepEval, Rep
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.stats_builder import StatsBuilderMixin
@@ -346,6 +346,11 @@ class Trades(Records):
     def close(self) -> tp.SeriesFrame:
         """Reference price such as close."""
         return self._close
+
+    @property
+    def is_positions(self) -> bool:
+        """Whether this object stores positions."""
+        return self.trade_type == TradeType.Position
 
     @classmethod
     def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
@@ -546,13 +551,8 @@ class Trades(Records):
         from vectorbt._settings import settings
         trades_stats_cfg = settings['trades']['stats']
 
-        is_positions = self.trade_type == TradeType.Position
         return merge_dicts(
             StatsBuilderMixin.stats_defaults.__get__(self),
-            dict(
-                settings=dict(is_positions=is_positions),
-                template_mapping=dict(trades_tag='positions' if is_positions else 'trades')
-            ),
             trades_stats_cfg
         )
 
@@ -573,23 +573,23 @@ class Trades(Records):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),
             first_trade_start=dict(
-                title=RepEval("'First Position Start' if is_positions else 'First Trade Start'"),
+                title=RepEval("'First Position Start' if self.is_positions else 'First Trade Start'"),
                 calc_func='entry_idx.nth',
                 n=0,
                 wrap_kwargs=dict(to_index=True),
-                tags=RepEval("[trades_tag, 'index']")
+                tags=[Rep("trades_tag"), 'index']
             ),
             last_trade_end=dict(
-                title=RepEval("'Last Position End' if is_positions else 'Last Trade End'"),
+                title=RepEval("'Last Position End' if self.is_positions else 'Last Trade End'"),
                 calc_func='exit_idx.nth',
                 n=-1,
                 wrap_kwargs=dict(to_index=True),
-                tags=RepEval("[trades_tag, 'index']")
+                tags=[Rep("trades_tag"), 'index']
             ),
             total_records=dict(
                 title='Total Records',
@@ -597,100 +597,98 @@ class Trades(Records):
                 tags='records'
             ),
             total_long_trades=dict(
-                title=RepEval("'Total Long Positions' if is_positions else 'Total Long Trades'"),
+                title=RepEval("'Total Long Positions' if self.is_positions else 'Total Long Trades'"),
                 calc_func='long.count',
-                tags=RepEval("[trades_tag, 'long']")
+                tags=[Rep("trades_tag"), 'long']
             ),
             total_short_trades=dict(
-                title=RepEval("'Total Short Positions' if is_positions else 'Total Short Trades'"),
+                title=RepEval("'Total Short Positions' if self.is_positions else 'Total Short Trades'"),
                 calc_func='short.count',
-                tags=RepEval("[trades_tag, 'short']")
+                tags=[Rep("trades_tag"), 'short']
             ),
             total_closed_trades=dict(
-                title=RepEval("'Total Closed Positions' if is_positions else 'Total Closed Trades'"),
+                title=RepEval("'Total Closed Positions' if self.is_positions else 'Total Closed Trades'"),
                 calc_func='closed.count',
-                tags=RepEval("[trades_tag, 'closed']")
+                tags=[Rep("trades_tag"), 'closed']
             ),
             total_open_trades=dict(
-                title=RepEval("'Total Open Positions' if is_positions else 'Total Open Trades'"),
+                title=RepEval("'Total Open Positions' if self.is_positions else 'Total Open Trades'"),
                 calc_func='open.count',
-                tags=RepEval("[trades_tag, 'open']")
+                tags=[Rep("trades_tag"), 'open']
             ),
             open_trade_pnl=dict(
-                title=RepEval("'Open Position P&L' if is_positions else 'Open Trade P&L'"),
+                title=RepEval("'Open Position P&L' if self.is_positions else 'Open Trade P&L'"),
                 calc_func='open.pnl.sum',
-                tags=RepEval("[trades_tag, 'open']")
+                tags=[Rep("trades_tag"), 'open']
             ),
             win_rate=dict(
                 title='Win Rate [%]',
                 calc_func=RepEval("'win_rate' if incl_open else 'closed.win_rate'"),
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             winning_streak=dict(
                 title='Max Win Streak',
                 calc_func=RepEval("'winning_streak.max' if incl_open else 'closed.winning_streak.max'"),
                 wrap_kwargs=dict(dtype=pd.Int64Dtype()),
-                tags=RepEval("[trades_tag, 'streak'] if incl_open else [trades_tag, 'closed', 'streak']")
+                tags=RepEval("[trades_tag, *incl_open_tags, 'streak']")
             ),
             losing_streak=dict(
                 title='Max Loss Streak',
                 calc_func=RepEval("'losing_streak.max' if incl_open else 'closed.losing_streak.max'"),
                 wrap_kwargs=dict(dtype=pd.Int64Dtype()),
-                tags=RepEval("[trades_tag, 'streak'] if incl_open else [trades_tag, 'closed', 'streak']")
+                tags=RepEval("[trades_tag, *incl_open_tags, 'streak']")
             ),
             best_trade=dict(
-                title=RepEval("'Best Position [%]' if is_positions else 'Best Trade [%]'"),
+                title=RepEval("'Best Position [%]' if self.is_positions else 'Best Trade [%]'"),
                 calc_func=RepEval("'returns.max' if incl_open else 'closed.returns.max'"),
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             worst_trade=dict(
-                title=RepEval("'Worst Position [%]' if is_positions else 'Worst Trade [%]'"),
+                title=RepEval("'Worst Position [%]' if self.is_positions else 'Worst Trade [%]'"),
                 calc_func=RepEval("'returns.min' if incl_open else 'closed.returns.min'"),
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             avg_winning_trade=dict(
-                title=RepEval("'Avg Winning Position [%]' if is_positions else 'Avg Winning Trade [%]'"),
+                title=RepEval("'Avg Winning Position [%]' if self.is_positions else 'Avg Winning Trade [%]'"),
                 calc_func=RepEval("'winning.returns.mean' if incl_open else 'closed.winning.returns.mean'"),
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("[trades_tag, 'winning'] if incl_open else [trades_tag, 'closed', 'winning']")
+                tags=RepEval("[trades_tag, *incl_open_tags, 'winning']")
             ),
             avg_losing_trade=dict(
-                title=RepEval("'Avg Losing Position [%]' if is_positions else 'Avg Losing Trade [%]'"),
+                title=RepEval("'Avg Losing Position [%]' if self.is_positions else 'Avg Losing Trade [%]'"),
                 calc_func=RepEval("'losing.returns.mean' if incl_open else 'closed.losing.returns.mean'"),
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("[trades_tag, 'losing'] if incl_open else [trades_tag, 'closed', 'losing']")
+                tags=RepEval("[trades_tag, *incl_open_tags, 'losing']")
             ),
             avg_winning_trade_duration=dict(
-                title=RepEval("'Avg Winning Position Duration' if is_positions else 'Avg Winning Trade Duration'"),
+                title=RepEval("'Avg Winning Position Duration' if self.is_positions else 'Avg Winning Trade Duration'"),
                 calc_func=RepEval("'winning.duration.mean' if incl_open else 'closed.winning.duration.mean'"),
-                apply_to_duration=True,
-                tags=RepEval("[trades_tag, 'duration', 'winning'] if incl_open else "
-                             "[trades_tag, 'closed', 'winning', 'duration']")
+                apply_to_timedelta=True,
+                tags=RepEval("[trades_tag, *incl_open_tags, 'winning', 'duration']")
             ),
             avg_losing_trade_duration=dict(
-                title=RepEval("'Avg Losing Position Duration' if is_positions else 'Avg Losing Trade Duration'"),
+                title=RepEval("'Avg Losing Position Duration' if self.is_positions else 'Avg Losing Trade Duration'"),
                 calc_func=RepEval("'losing.duration.mean' if incl_open else 'closed.losing.duration.mean'"),
-                apply_to_duration=True,
-                tags=RepEval("[trades_tag, 'losing', 'duration'] if incl_open else "
-                             "[trades_tag, 'closed', 'losing', 'duration']")
+                apply_to_timedelta=True,
+                tags=RepEval("[trades_tag, *incl_open_tags, 'losing', 'duration']")
             ),
             profit_factor=dict(
                 title='Profit Factor',
                 calc_func=RepEval("'profit_factor' if incl_open else 'closed.profit_factor'"),
-                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             expectancy=dict(
                 title='Expectancy',
                 calc_func=RepEval("'expectancy' if incl_open else 'closed.expectancy'"),
-                tags=RepEval("[trades_tag] if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             sqn=dict(
                 title='SQN',
                 calc_func=RepEval("'sqn' if incl_open else 'closed.sqn'"),
-                tags=RepEval("trades_tag if incl_open else [trades_tag, 'closed']")
+                tags=RepEval("[trades_tag, *incl_open_tags]")
             ),
             coverage=dict(
                 title='Coverage [%]',
@@ -992,7 +990,7 @@ class Trades(Records):
                 if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
-                    duration = self_col.wrapper.to_duration(to_idx - from_idx)
+                    duration = self_col.wrapper.to_timedelta(to_idx - from_idx)
                 else:
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)

@@ -11,6 +11,19 @@ from vectorbt.utils import checks
 from vectorbt.utils.docs import Documented, to_doc
 
 
+class Default:
+    """Class for wrapping default values."""
+
+    def __init__(self, value: tp.Any) -> None:
+        self.value = value
+
+    def __repr__(self) -> str:
+        return "Default(" + self.value.__repr__() + ")"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
     """Select keyword arguments."""
     if dct is None:

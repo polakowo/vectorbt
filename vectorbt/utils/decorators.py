@@ -468,7 +468,7 @@ WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
 __pdoc__ = {}
 
-binary_func_config = Config(
+binary_magic_config = Config(
     {
         '__eq__': dict(func=np.equal),
         '__ne__': dict(func=np.not_equal),
@@ -505,10 +505,10 @@ binary_func_config = Config(
 )
 """_"""
 
-__pdoc__['binary_func_config'] = f"""Config of binary functions to be added to a class.
+__pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added to a class.
 
 ```json
-{binary_func_config.to_doc()}
+{binary_magic_config.to_doc()}
 ```
 """
 
@@ -525,16 +525,16 @@ def add_binary_magic_methods(translate_func: BinaryTranslateFuncT,
     * perform computation, and
     * return the result.
 
-    `config` defaults to `binary_func_config` and should contain target method names (keys)
+    `config` defaults to `binary_magic_config` and should contain target method names (keys)
     and dictionaries (values) with the following keys:
 
     * `func`: Function that combines two array-like objects.
     """
     if config is None:
-        config = binary_func_config
+        config = binary_magic_config
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for fname, settings in config.items():
+        for target_name, settings in config.items():
             func = settings['func']
 
             def new_method(self,
@@ -543,14 +543,15 @@ def add_binary_magic_methods(translate_func: BinaryTranslateFuncT,
                            _func: tp.Callable = func) -> tp.SeriesFrame:
                 return _translate_func(self, other, _func)
 
-            new_method.__name__ = fname
-            setattr(cls, fname, new_method)
+            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_method.__name__ = target_name
+            setattr(cls, target_name, new_method)
         return cls
 
     return wrapper
 
 
-unary_func_config = Config(
+unary_magic_config = Config(
     {
         '__neg__': dict(func=np.negative),
         '__pos__': dict(func=np.positive),
@@ -563,10 +564,10 @@ unary_func_config = Config(
 )
 """_"""
 
-__pdoc__['unary_func_config'] = f"""Config of unary functions to be added to a class.
+__pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added to a class.
 
 ```json
-{unary_func_config.to_doc()}
+{unary_magic_config.to_doc()}
 ```
 """
 
@@ -583,16 +584,16 @@ def add_unary_magic_methods(translate_func: UnaryTranslateFuncT,
     * perform computation, and
     * return the result.
 
-    `config` defaults to `unary_func_config` and should contain target method names (keys)
+    `config` defaults to `unary_magic_config` and should contain target method names (keys)
     and dictionaries (values) with the following keys:
 
     * `func`: Function that transforms one array-like object.
     """
     if config is None:
-        config = unary_func_config
+        config = unary_magic_config
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for fname, settings in config.items():
+        for target_name, settings in config.items():
             func = settings['func']
 
             def new_method(self,
@@ -600,8 +601,9 @@ def add_unary_magic_methods(translate_func: UnaryTranslateFuncT,
                            _func: tp.Callable = func) -> tp.SeriesFrame:
                 return _translate_func(self, _func)
 
-            new_method.__name__ = fname
-            setattr(cls, fname, new_method)
+            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_method.__name__ = target_name
+            setattr(cls, target_name, new_method)
         return cls
 
     return wrapper

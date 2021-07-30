@@ -446,12 +446,14 @@ sma_timeperiod    2    3
 Start                                        0
 End                                          7
 Period                         8 days 00:00:00
-Count                                        2
-Current Drawdown [%]                 33.333333
-Current Duration               3 days 00:00:00
-Current Recovery [%]                      50.0
-Current Recovery Return [%]              100.0
-Current Recovery Duration      1 days 00:00:00
+Total Records                                2
+Total Recovered Drawdowns                    1
+Total Active Drawdowns                       1
+Active Drawdown [%]                  33.333333
+Active Duration                3 days 00:00:00
+Active Recovery [%]                       50.0
+Active Recovery Return [%]               100.0
+Active Recovery Duration       1 days 00:00:00
 Max Drawdown [%]                     33.333333
 Avg Drawdown [%]                     33.333333
 Max Drawdown Duration          2 days 00:00:00

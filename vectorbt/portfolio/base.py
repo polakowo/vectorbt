@@ -369,32 +369,36 @@ UserWarning: Metric 'sortino_ratio' requires frequency to be set
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                              244
-Start Value                                         100
-End Value                                       106.722
-Total Return [%]                                6.72158
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                22.1909
-Max Drawdown Duration                               101
+Start Value                                       100.0
+End Value                                    106.721585
+Total Return [%]                               6.721585
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                              22.190944
+Max Drawdown Duration                             101.0
 Total Trades                                         10
+Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                         60
-Best Trade [%]                                  15.3196
-Worst Trade [%]                                -9.90422
-Avg Winning Trade [%]                           4.67196
-Avg Winning Trade Duration                      11.3333
-Avg Losing Trade [%]                            -4.8512
+Open Trade P&L                                      0.0
+Win Rate [%]                                       60.0
+Best Trade [%]                                 15.31962
+Worst Trade [%]                               -9.904223
+Avg Winning Trade [%]                          4.671959
+Avg Losing Trade [%]                          -4.851205
+Avg Winning Trade Duration                    11.333333
 Avg Losing Trade Duration                         14.25
-Profit Factor                                   1.34746
+Profit Factor                                  1.347457
 Expectancy                                     0.672158
 Name: 10, dtype: object
 ```
 
-If vectorbt couldn't parse the frequency of our `close`, it 1) won't return any duration in
-time units and 2) won't return any metric that requires annualization.
+If vectorbt couldn't parse the frequency of `close`:
+
+1) it won't return any duration in time units,
+2) it won't return any metric that requires annualization, and
+3) it will throw a bunch of warnings (you can silence those by passing `silence_warnings=True`)
+
 We can provide the frequency as part of the settings dict:
 
 ```python-repl
@@ -405,30 +409,30 @@ Consider setting the frequency upon object creation to re-use existing cache.
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                244 days 00:00:00
-Start Value                                         100
-End Value                                       106.722
-Total Return [%]                                6.72158
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                22.1909
+Start Value                                       100.0
+End Value                                    106.721585
+Total Return [%]                               6.721585
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                              22.190944
 Max Drawdown Duration                 101 days 00:00:00
 Total Trades                                         10
+Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                         60
-Best Trade [%]                                  15.3196
-Worst Trade [%]                                -9.90422
-Avg Winning Trade [%]                           4.67196
+Open Trade P&L                                      0.0
+Win Rate [%]                                       60.0
+Best Trade [%]                                 15.31962
+Worst Trade [%]                               -9.904223
+Avg Winning Trade [%]                          4.671959
+Avg Losing Trade [%]                          -4.851205
 Avg Winning Trade Duration             11 days 08:00:00
-Avg Losing Trade [%]                            -4.8512
 Avg Losing Trade Duration              14 days 06:00:00
-Profit Factor                                   1.34746
+Profit Factor                                  1.347457
 Expectancy                                     0.672158
 Sharpe Ratio                                   0.445231
 Calmar Ratio                                   0.460573
-Omega Ratio                                     1.09919
+Omega Ratio                                    1.099192
 Sortino Ratio                                  0.706986
 Name: 10, dtype: object
 ```
@@ -447,30 +451,30 @@ We can change the grouping of the portfolio on the fly. Let's form a single grou
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                244 days 00:00:00
-Start Value                                         200
-End Value                                       277.493
-Total Return [%]                                38.7465
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                14.2193
+Start Value                                       200.0
+End Value                                     277.49299
+Total Return [%]                              38.746495
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                              14.219327
 Max Drawdown Duration                  86 days 00:00:00
 Total Trades                                         30
+Total Closed Trades                                  30
 Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                    66.6667
-Best Trade [%]                                  18.3326
-Worst Trade [%]                                -9.90422
-Avg Winning Trade [%]                           5.75479
+Open Trade P&L                                      0.0
+Win Rate [%]                                  66.666667
+Best Trade [%]                                18.332559
+Worst Trade [%]                               -9.904223
+Avg Winning Trade [%]                          5.754788
+Avg Losing Trade [%]                          -4.718907
 Avg Winning Trade Duration              7 days 19:12:00
-Avg Losing Trade [%]                           -4.71891
 Avg Losing Trade Duration               8 days 07:12:00
-Profit Factor                                   2.42795
+Profit Factor                                  2.427948
 Expectancy                                       2.5831
 Sharpe Ratio                                    1.57907
-Calmar Ratio                                    4.44545
-Omega Ratio                                     1.33403
+Calmar Ratio                                   4.445448
+Omega Ratio                                    1.334032
 Sortino Ratio                                   2.59669
 Name: group, dtype: object
 ```
@@ -481,40 +485,41 @@ contribute to the performance.
 ### Aggregation
 
 If the portfolio consists of multiple columns/groups and no column/group has been selected,
-each metric is aggregated across all columns/groups based on `agg_func`, which is mean by default.
+each metric is aggregated across all columns/groups based on `agg_func`, which is `np.mean` by default.
 
 ```python-repl
 >>> pf.stats()
-UserWarning: Object has multiple columns. Aggregating using <function mean at 0x7fbf4836d400>.
+UserWarning: Object has multiple columns. Aggregating using <function mean at 0x7fc77152bb70>.
+Pass column to select a single column/group.
 
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                244 days 00:00:00
-Start Value                                         100
-End Value                                       138.746
-Total Return [%]                                38.7465
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                20.3587
+Start Value                                       100.0
+End Value                                    138.746495
+Total Return [%]                              38.746495
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                               20.35869
 Max Drawdown Duration                  93 days 00:00:00
-Total Trades                                         15
-Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                         65
-Best Trade [%]                                  16.8261
-Worst Trade [%]                                -9.70127
-Avg Winning Trade [%]                           5.44541
+Total Trades                                       15.0
+Total Closed Trades                                15.0
+Total Open Trades                                   0.0
+Open Trade P&L                                      0.0
+Win Rate [%]                                       65.0
+Best Trade [%]                                 16.82609
+Worst Trade [%]                               -9.701273
+Avg Winning Trade [%]                          5.445408
+Avg Losing Trade [%]                          -4.740956
 Avg Winning Trade Duration    8 days 19:25:42.857142857
-Avg Losing Trade [%]                           -4.74096
 Avg Losing Trade Duration               9 days 07:00:00
-Profit Factor                                   2.18696
-Expectancy                                      2.10536
-Sharpe Ratio                                    1.16569
-Calmar Ratio                                    3.54108
-Omega Ratio                                     1.33162
-Sortino Ratio                                   2.08457
+Profit Factor                                  2.186957
+Expectancy                                     2.105364
+Sharpe Ratio                                   1.165695
+Calmar Ratio                                   3.541079
+Omega Ratio                                    1.331624
+Sortino Ratio                                  2.084565
 Name: agg_func_mean, dtype: object
 ```
 
@@ -566,20 +571,15 @@ Name: 10, dtype: object
 Or provide a boolean expression:
 
 ```python-repl
->>> pf.stats(column=10, tags='trades and not duration')
-Total Trades              10.000000
-Total Open Trades          0.000000
-Open Trade P&L             0.000000
-Long Trades [%]          100.000000
-Win Rate [%]              60.000000
-Best Trade [%]            15.319620
-Worst Trade [%]           -9.904223
-Avg Winning Trade [%]      4.671959
-Avg Losing Trade [%]      -4.851205
-Profit Factor              1.347457
-Expectancy                 0.672158
+>>> pf.stats(column=10, tags='trades and open and not closed')
+Total Open Trades    0.0
+Open Trade P&L       0.0
 Name: 10, dtype: float64
 ```
+
+The reason why we included "not closed" along with "open" is because some metrics such as the win rate
+have both tags attached since they are based upon both open and closed trades/positions
+(to see this, pass `settings=dict(incl_open=True)` and `tags='trades and open'`).
 
 ### Custom metrics
 
@@ -591,7 +591,33 @@ dict with the title and calculation function (see arguments in `vectorbt.generic
 ...     'max_winning_streak',
 ...     dict(
 ...         title='Max Winning Streak',
-...         calc_func=lambda trades, group_by: trades.winning_streak.max(group_by=group_by)
+...         calc_func=lambda trades: trades.winning_streak.max(),
+...         resolve_trades=True
+...     )
+... )
+>>> pf.stats(metrics=max_winning_streak, column=10)
+Max Winning Streak    3.0
+Name: 10, dtype: float64
+```
+
+You might wonder how vectorbt knows which arguments to pass to `calc_func`?
+In the example above, the calculation function expects two arguments: `trades` and `group_by`.
+To automatically pass any of the them, vectorbt searches for each in the current settings.
+As `trades` cannot be found, it either throws an error or tries to resolve this argument if
+`resolve_{arg}=True` was passed. Argument resolution is the process of searching for property/method with
+the same name (also with prefix `get_`) in the attributes of the current portfolio, automatically passing the
+current settings such as `group_by` if they are present in the method's signature
+(a similar resolution procedure), and calling the method/property. The result of the resolution
+process is then passed as `arg` (or `trades` in our example).
+
+Here's an example without argument resolution:
+
+```python-repl
+>>> max_winning_streak = (
+...     'max_winning_streak',
+...     dict(
+...         title='Max Winning Streak',
+...         calc_func=lambda self, group_by: self.get_trades(group_by=group_by).winning_streak.max()
 ...     )
 ... )
 >>> pf.stats(metrics=max_winning_streak, column=10)
@@ -611,50 +637,46 @@ Since `max_winning_streak` method can be expressed as a path from this portfolio
 ... )
 ```
 
-In both cases, `trades` argument is an attribute of this portfolio and vectorbt automatically "resolves" it
-by passing any resolution argument that was found in its signature, such as `group_by`.
-If we want to stop `trades` (or any other attribute) from being resolved, just pass `resolve_trades=False`.
-In this case, vectorbt would simply call `portfolio.get_trades()` and give it to us.
+In this case, we don't have to pass `resolve_trades=True` anymore as vectorbt does it automatically.
 
 Since `trades` and `positions` are very similar concepts (positions are aggregations of trades),
 you can substitute a trade with a position by passing `use_positions=True`.
-Additionally, you can pass `incl_unrealized=True` to also include open trades/positions.
-For all resolution arguments, see `Portfolio.resolve_attr`.
+Additionally, you can pass `incl_open=True` to also include open trades/positions.
 
 ```python-repl
->>> pf.stats(column=10, settings=dict(use_positions=True, incl_unrealized=True))
+>>> pf.stats(column=10, settings=dict(use_positions=True, incl_open=True))
 Start                            2020-01-01 00:00:00+00:00
 End                              2020-09-01 00:00:00+00:00
 Period                                   244 days 00:00:00
-Start Value                                            100
-End Value                                          106.722
-Total Return [%]                                   6.72158
-Benchmark Return [%]                               66.2526
-Max Gross Exposure [%]                                 100
-Total Fees Paid                                          0
-Max Drawdown [%]                                   22.1909
+Start Value                                          100.0
+End Value                                       106.721585
+Total Return [%]                                  6.721585
+Benchmark Return [%]                             66.252621
+Max Gross Exposure [%]                               100.0
+Total Fees Paid                                        0.0
+Max Drawdown [%]                                 22.190944
 Max Drawdown Duration                    101 days 00:00:00
 Total Positions                                         10
+Total Closed Positions                                  10
 Total Open Positions                                     0
-Open Position P&L                                        0
-Long Positions [%]                                     100
-Win Rate [%]                                            60
-Best Position [%]                                  15.3196
-Worst Position [%]                                -9.90422
-Avg Winning Position [%]                           4.67196
+Open Position P&L                                      0.0
+Win Rate [%]                                          60.0
+Best Position [%]                                 15.31962
+Worst Position [%]                               -9.904223
+Avg Winning Position [%]                          4.671959
+Avg Losing Position [%]                          -4.851205
 Avg Winning Position Duration             11 days 08:00:00
-Avg Losing Position [%]                            -4.8512
 Avg Losing Position Duration              14 days 06:00:00
-Profit Factor                                      1.34746
+Profit Factor                                     1.347457
 Expectancy                                        0.672158
 Sharpe Ratio                                      0.445231
 Calmar Ratio                                      0.460573
-Omega Ratio                                        1.09919
+Omega Ratio                                       1.099192
 Sortino Ratio                                     0.706986
 Name: 10, dtype: object
 ```
 
-Notice how vectorbt changed each 'Trade' to 'Position', thanks to evaluation templates
+Notice how vectorbt changed each 'Trade' to 'Position' thanks to evaluation templates
 defined in `Portfolio.metrics`. We can use the same feature in any custom metric.
 
 Any default metric setting or even global setting can be overridden by the user using metric-specific
@@ -667,35 +689,36 @@ keyword arguments. Here, we override the global aggregation function for `max_dd
 ...     )
 ... )
 UserWarning: Object has multiple columns. Aggregating using <function <lambda> at 0x7fbf6e77b268>.
+Pass column to select a single column/group.
 
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                244 days 00:00:00
-Start Value                                         100
-End Value                                       138.746
-Total Return [%]                                38.7465
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                20.3587
+Start Value                                       100.0
+End Value                                    138.746495
+Total Return [%]                              38.746495
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                               20.35869
 Max Drawdown Duration                 101 days 00:00:00  << here
-Total Trades                                         15
-Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                         65
-Best Trade [%]                                  16.8261
-Worst Trade [%]                                -9.70127
-Avg Winning Trade [%]                           5.44541
+Total Trades                                       15.0
+Total Closed Trades                                15.0
+Total Open Trades                                   0.0
+Open Trade P&L                                      0.0
+Win Rate [%]                                       65.0
+Best Trade [%]                                 16.82609
+Worst Trade [%]                               -9.701273
+Avg Winning Trade [%]                          5.445408
+Avg Losing Trade [%]                          -4.740956
 Avg Winning Trade Duration    8 days 19:25:42.857142857
-Avg Losing Trade [%]                           -4.74096
 Avg Losing Trade Duration               9 days 07:00:00
-Profit Factor                                   2.18696
-Expectancy                                      2.10536
-Sharpe Ratio                                    1.16569
-Calmar Ratio                                    3.54108
-Omega Ratio                                     1.33162
-Sortino Ratio                                   2.08457
+Profit Factor                                  2.186957
+Expectancy                                     2.105364
+Sharpe Ratio                                   1.165695
+Calmar Ratio                                   3.541079
+Omega Ratio                                    1.331624
+Sortino Ratio                                  2.084565
 Name: agg_func_<lambda>, dtype: object
 ```
 
@@ -737,6 +760,7 @@ Here's an example of a parametrized metric. Let's get the number of trades with 
 ...         title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
 ...         calc_func=lambda trades, min_pnl: trades.filter_by_mask(
 ...             trades.pnl.values >= min_pnl).count()
+...         resolve_trades=True,
 ...     )
 ... )
 >>> pf.stats(
@@ -775,7 +799,8 @@ Name: stats, dtype: int64
 ```
 
 To add a custom metric to the list of all metrics, we have three options.
-First, we can change the `Portfolio.metrics` dict in-place (this will append to the end):
+
+The first option is to change the `Portfolio.metrics` dict in-place (this will append to the end):
 
 ```python-repl
 >>> pf.metrics['max_winning_streak'] = max_winning_streak[1]
@@ -783,32 +808,32 @@ First, we can change the `Portfolio.metrics` dict in-place (this will append to 
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
 Period                                244 days 00:00:00
-Start Value                                         100
-End Value                                       106.722
-Total Return [%]                                6.72158
-Benchmark Return [%]                            66.2526
-Max Gross Exposure [%]                              100
-Total Fees Paid                                       0
-Max Drawdown [%]                                22.1909
+Start Value                                       100.0
+End Value                                    106.721585
+Total Return [%]                               6.721585
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                              22.190944
 Max Drawdown Duration                 101 days 00:00:00
 Total Trades                                         10
+Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                        0
-Long Trades [%]                                     100
-Win Rate [%]                                         60
-Best Trade [%]                                  15.3196
-Worst Trade [%]                                -9.90422
-Avg Winning Trade [%]                           4.67196
+Open Trade P&L                                      0.0
+Win Rate [%]                                       60.0
+Best Trade [%]                                 15.31962
+Worst Trade [%]                               -9.904223
+Avg Winning Trade [%]                          4.671959
+Avg Losing Trade [%]                          -4.851205
 Avg Winning Trade Duration             11 days 08:00:00
-Avg Losing Trade [%]                            -4.8512
 Avg Losing Trade Duration              14 days 06:00:00
-Profit Factor                                   1.34746
+Profit Factor                                  1.347457
 Expectancy                                     0.672158
 Sharpe Ratio                                   0.445231
 Calmar Ratio                                   0.460573
-Omega Ratio                                     1.09919
+Omega Ratio                                    1.099192
 Sortino Ratio                                  0.706986
-Max Winning Streak                                    3  << here
+Max Winning Streak                                  3.0  << here
 Name: 10, dtype: object
 ```
 
@@ -826,10 +851,12 @@ The second option is to copy `Portfolio.metrics`, append our metric, and pass as
 >>> pf.stats(metrics=my_metrics, column=10)
 ```
 
-The last option is to set `metrics` globally under `portfolio.stats` in `vectorbt._settings.settings`.
+The third option is to set `metrics` globally under `portfolio.stats` in `vectorbt._settings.settings`.
 
+```python-repl
 >>> vbt.settings.portfolio['stats']['metrics'] = my_metrics
 >>> pf.stats(column=10)
+```
 
 ## Plotting
 
@@ -950,8 +977,8 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import map_enum_fields
-from vectorbt.utils.config import merge_dicts, get_func_arg_names, Config
-from vectorbt.utils.template import RepEval
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.template import RepEval, Rep
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import get_domain
@@ -968,81 +995,52 @@ from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
+from vectorbt.portfolio.decorators import add_returns_acc_methods
 
-WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
+__pdoc__ = {}
+
+returns_acc_config = Config(
+    {
+        'daily_returns': dict(source_name='daily'),
+        'annual_returns': dict(source_name='annual'),
+        'cumulative_returns': dict(source_name='cumulative'),
+        'annualized_return': dict(source_name='annualized'),
+        'annualized_volatility': dict(),
+        'calmar_ratio': dict(),
+        'omega_ratio': dict(),
+        'sharpe_ratio': dict(),
+        'deflated_sharpe_ratio': dict(),
+        'downside_risk': dict(),
+        'sortino_ratio': dict(),
+        'information_ratio': dict(),
+        'beta': dict(),
+        'alpha': dict(),
+        'tail_ratio': dict(),
+        'value_at_risk': dict(),
+        'cond_value_at_risk': dict(),
+        'capture': dict(),
+        'up_capture': dict(),
+        'down_capture': dict(),
+        'drawdown': dict(),
+        'max_drawdown': dict()
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be added to `Portfolio`.
+
+```json
+{returns_acc_config.to_doc()}
+```
+"""
+
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
 
 
-def add_returns_methods(func_names: tp.Iterable[tp.Union[str, tp.Tuple[str, str]]]) -> WrapperFuncT:
-    """Class decorator to add `vectorbt.returns.accessors.ReturnsAccessor` methods to `Portfolio`."""
-
-    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for func_name in func_names:
-            if isinstance(func_name, tuple):
-                ret_func_name = func_name[0]
-            else:
-                ret_func_name = func_name
-
-            def returns_method(
-                    self: "Portfolio",
-                    *args,
-                    group_by: tp.GroupByLike = None,
-                    freq: tp.Optional[tp.FrequencyLike] = None,
-                    year_freq: tp.Optional[tp.FrequencyLike] = None,
-                    _ret_func_name: str = ret_func_name,
-                    use_asset_returns: bool = False,
-                    **ret_func_kwargs) -> tp.Any:
-                returns_acc = self.returns_acc(
-                    group_by=group_by,
-                    freq=freq,
-                    year_freq=year_freq,
-                    use_asset_returns=use_asset_returns
-                )
-                # Select only those arguments in kwargs that are also in the method's signature
-                # This is done for Portfolio.stats which passes the same kwargs to multiple methods
-                method = getattr(returns_acc, _ret_func_name)
-                arg_names = get_func_arg_names(method)
-                new_kwargs = {}
-                for arg_name in arg_names:
-                    if arg_name in ret_func_kwargs:
-                        new_kwargs[arg_name] = ret_func_kwargs[arg_name]
-                return method(*args, **new_kwargs)
-
-            if isinstance(func_name, tuple):
-                func_name = func_name[1]
-            returns_method.__name__ = func_name
-            returns_method.__qualname__ = f"{cls.__name__}.{func_name}"
-            returns_method.__doc__ = f"See `vectorbt.returns.accessors.ReturnsAccessor.{ret_func_name}`."
-            setattr(cls, func_name, cached_method(returns_method))
-        return cls
-
-    return wrapper
-
-
-@add_returns_methods([
-    ('daily', 'daily_returns'),
-    ('annual', 'annual_returns'),
-    ('cumulative', 'cumulative_returns'),
-    ('annualized', 'annualized_return'),
-    'annualized_volatility',
-    'calmar_ratio',
-    'omega_ratio',
-    'sharpe_ratio',
-    'deflated_sharpe_ratio',
-    'downside_risk',
-    'sortino_ratio',
-    'information_ratio',
-    'beta',
-    'alpha',
-    'tail_ratio',
-    'value_at_risk',
-    'cond_value_at_risk',
-    'capture',
-    'up_capture',
-    'down_capture',
-    'drawdown',
-    'max_drawdown'
-])
+@add_returns_acc_methods(returns_acc_config)
 class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
     """Class for modeling portfolio and measuring its performance.
 
@@ -3121,7 +3119,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.get_init_cash()
 
     @cached_method
-    def get_init_cash(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_cash(self, group_by: tp.GroupByLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Initial amount of cash per column/group with default arguments.
 
         !!! note
@@ -3207,7 +3206,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def net_exposure(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def net_exposure(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get net exposure."""
         long_exposure = to_2d(self.gross_exposure(direction='longonly', group_by=group_by), raw=True)
         short_exposure = to_2d(self.gross_exposure(direction='shortonly', group_by=group_by), raw=True)
@@ -3239,7 +3239,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.wrapper.wrap(value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def total_profit(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total_profit(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group.
 
         Calculated directly from order records (fast)."""
@@ -3265,7 +3266,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def final_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def final_value(self, group_by: tp.GroupByLike = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
         total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
@@ -3274,7 +3276,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.wrapper.wrap_reduced(final_value, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def total_return(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total_return(self, group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
         total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
@@ -3298,7 +3301,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self.wrapper.wrap(returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def asset_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def asset_returns(self, group_by: tp.GroupByLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset return series per column/group.
 
         This type of returns is based solely on cash flows and asset value rather than portfolio
@@ -3315,7 +3319,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
                     group_by: tp.GroupByLike = None,
                     freq: tp.Optional[tp.FrequencyLike] = None,
                     year_freq: tp.Optional[tp.FrequencyLike] = None,
-                    use_asset_returns: bool = False) -> ReturnsAccessor:
+                    use_asset_returns: bool = False,
+                    defaults: tp.KwargsLike = None,
+                    **kwargs) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbt.returns.accessors.ReturnsAccessor`.
 
         !!! hint
@@ -3326,11 +3332,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             returns = self.asset_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by)
-        return returns.vbt.returns(freq=freq, year_freq=year_freq)
+        return returns.vbt.returns(freq=freq, year_freq=year_freq, defaults=defaults, **kwargs)
 
     @cached_method
-    def market_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get market (benchmark) value series per column/group.
+    def benchmark_value(self, group_by: tp.GroupByLike = None,
+                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get market benchmark value series per column/group.
 
         If grouped, evenly distributes the initial cash among assets in the group.
 
@@ -3343,32 +3350,31 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash_grouped = to_1d(self.get_init_cash(group_by=group_by), raw=True)
-            market_value = nb.market_value_grouped_nb(close, group_lens, init_cash_grouped)
+            benchmark_value = nb.benchmark_value_grouped_nb(close, group_lens, init_cash_grouped)
         else:
             init_cash = to_1d(self.get_init_cash(group_by=False), raw=True)
-            market_value = nb.market_value_nb(close, init_cash)
-        return self.wrapper.wrap(market_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
+            benchmark_value = nb.benchmark_value_nb(close, init_cash)
+        return self.wrapper.wrap(benchmark_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def market_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get return series per column/group based on market (benchmark) value."""
-        market_value = to_2d(self.market_value(group_by=group_by), raw=True)
+    def benchmark_returns(self, group_by: tp.GroupByLike = None,
+                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get return series per column/group based on benchmark value."""
+        benchmark_value = to_2d(self.benchmark_value(group_by=group_by), raw=True)
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
-        market_returns = returns_nb.returns_nb(market_value, init_cash)
-        return self.wrapper.wrap(market_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
-
-    benchmark_rets = market_returns
+        benchmark_returns = returns_nb.returns_nb(benchmark_value, init_cash)
+        return self.wrapper.wrap(benchmark_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def total_market_return(self, group_by: tp.GroupByLike = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Get total market (benchmark) return."""
-        market_value = to_2d(self.market_value(group_by=group_by), raw=True)
-        total_market_return = nb.total_market_return_nb(market_value)
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_market_return'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(total_market_return, group_by=group_by, **wrap_kwargs)
+    def total_benchmark_return(self, group_by: tp.GroupByLike = None,
+                               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Get total benchmark return."""
+        benchmark_value = to_2d(self.benchmark_value(group_by=group_by), raw=True)
+        total_benchmark_return = nb.total_benchmark_return_nb(benchmark_value)
+        wrap_kwargs = merge_dicts(dict(name_or_index='total_benchmark_return'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(total_benchmark_return, group_by=group_by, **wrap_kwargs)
 
-    # ############# Attribute resolution ############# #
+    # ############# Resolution ############# #
 
     @property
     def self_aliases(self) -> tp.Set[str]:
@@ -3395,8 +3401,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
 
         Uses the following keys:
 
-        * `incl_unrealized`: Whether to include open trades/positions when resolving `trades`/`positions` argument."""
-        if attr in ['trades', 'positions'] and not final_kwargs['incl_unrealized']:
+        * `incl_open`: Whether to include open trades/positions when resolving `trades`/`positions` argument."""
+        if attr in ['trades', 'positions'] and not final_kwargs['incl_open']:
             out = out.closed
         return out
 
@@ -3414,7 +3420,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
 
         return merge_dicts(
             StatsBuilderMixin.stats_defaults.__get__(self),
-            dict(settings=dict(year_freq=returns_cfg['year_freq'])),
+            dict(
+                settings=dict(
+                    year_freq=returns_cfg['year_freq'],
+                    benchmark_rets=None
+                )
+            ),
             portfolio_stats_cfg
         )
 
@@ -3435,7 +3446,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                apply_to_duration=True,
+                apply_to_timedelta=True,
                 agg_func=None,
                 tags='wrapper'
             ),
@@ -3457,7 +3468,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
-                calc_func='benchmark_rets.vbt.returns.total',
+                calc_func=RepEval("'benchmark_returns.vbt.returns.total' if benchmark_rets is None else "
+                                  "benchmark_rets.vbt.returns.total()"),
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
@@ -3481,84 +3493,83 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
                 calc_func='drawdowns.max_duration',
-                pass_wrap_to_duration=True,
+                fill_wrap_kwargs=True,
                 tags=['portfolio', 'drawdowns', 'duration']
             ),
             total_trades=dict(
                 title=RepEval("'Total Positions' if use_positions else 'Total Trades'"),
                 calc_func='trades.count',
-                incl_unrealized=True,
-                tags=['portfolio', 'trades']
+                incl_open=True,
+                tags=['portfolio', Rep("trades_tag")]
+            ),
+            total_closed_trades=dict(
+                title=RepEval("'Total Closed Positions' if use_positions else 'Total Closed Trades'"),
+                calc_func='trades.closed.count',
+                tags=['portfolio', Rep("trades_tag"), 'closed']
             ),
             total_open_trades=dict(
                 title=RepEval("'Total Open Positions' if use_positions else 'Total Open Trades'"),
                 calc_func='trades.open.count',
-                incl_unrealized=True,
-                tags=['portfolio', 'trades']
+                incl_open=True,
+                tags=['portfolio', Rep("trades_tag"), 'open']
             ),
             open_trade_pnl=dict(
                 title=RepEval("'Open Position P&L' if use_positions else 'Open Trade P&L'"),
                 calc_func='trades.open.pnl.sum',
-                incl_unrealized=True,
-                tags=['portfolio', 'trades']
-            ),
-            long_trade_rate=dict(
-                title=RepEval("'Long Positions [%]' if use_positions else 'Long Trades [%]'"),
-                calc_func='trades.long_rate',
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
+                incl_open=True,
+                tags=['portfolio', Rep("trades_tag"), 'open']
             ),
             win_rate=dict(
                 title='Win Rate [%]',
                 calc_func='trades.win_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
             ),
             best_trade=dict(
                 title=RepEval("'Best Position [%]' if use_positions else 'Best Trade [%]'"),
                 calc_func='trades.returns.max',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
             ),
             worst_trade=dict(
                 title=RepEval("'Worst Position [%]' if use_positions else 'Worst Trade [%]'"),
                 calc_func='trades.returns.min',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
             ),
             avg_winning_trade=dict(
                 title=RepEval("'Avg Winning Position [%]' if use_positions else 'Avg Winning Trade [%]'"),
                 calc_func='trades.winning.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
-            ),
-            avg_winning_trade_duration=dict(
-                title=RepEval("'Avg Winning Position Duration' if use_positions else 'Avg Winning Trade Duration'"),
-                calc_func='trades.winning.duration.mean',
-                apply_to_duration=True,
-                tags=['portfolio', 'trades', 'duration']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'winning']")
             ),
             avg_losing_trade=dict(
                 title=RepEval("'Avg Losing Position [%]' if use_positions else 'Avg Losing Trade [%]'"),
                 calc_func='trades.losing.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'losing']")
+            ),
+            avg_winning_trade_duration=dict(
+                title=RepEval("'Avg Winning Position Duration' if use_positions else 'Avg Winning Trade Duration'"),
+                calc_func='trades.winning.duration.mean',
+                apply_to_timedelta=True,
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'winning', 'duration']")
             ),
             avg_losing_trade_duration=dict(
                 title=RepEval("'Avg Losing Position Duration' if use_positions else 'Avg Losing Trade Duration'"),
                 calc_func='trades.losing.duration.mean',
-                apply_to_duration=True,
-                tags=['portfolio', 'trades', 'duration']
+                apply_to_timedelta=True,
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'losing', 'duration']")
             ),
             profit_factor=dict(
                 title='Profit Factor',
                 calc_func='trades.profit_factor',
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
             ),
             expectancy=dict(
                 title='Expectancy',
                 calc_func='trades.expectancy',
-                tags=['portfolio', 'trades']
+                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
             ),
             sharpe_ratio=dict(
                 title='Sharpe Ratio',
@@ -3597,46 +3608,30 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         return self._metrics
 
     def returns_stats(self,
-                      column: tp.Optional[tp.Label] = None,
                       group_by: tp.GroupByLike = None,
-                      use_asset_returns: bool = False,
-                      in_sim_order: bool = False,
-                      agg_func: tp.Optional[tp.Callable] = np.mean,
+                      freq: tp.Optional[tp.FrequencyLike] = None,
                       year_freq: tp.Optional[tp.FrequencyLike] = None,
+                      use_asset_returns: bool = False,
+                      defaults: tp.KwargsLike = None,
+                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                       **kwargs) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
 
-        For keyword arguments and notes, see `Portfolio.stats`.
+        See `Portfolio.returns_acc` and `vectorbt.returns.accessors.ReturnsAccessor.metrics`.
 
         `kwargs` will be passed to `vectorbt.returns.accessors.ReturnsAccessor.stats` method.
-        If `benchmark_rets` is not set, uses `Portfolio.market_returns`."""
-        # Pre-calculate
-        if use_asset_returns:
-            returns = self.asset_returns(group_by=group_by)
-        else:
-            returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
-
-        # Run stats
-        if 'benchmark_rets' not in kwargs:
-            kwargs['benchmark_rets'] = self.market_returns(group_by=group_by)
-        stats_obj = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq).stats(**kwargs)
-
-        # Select columns or reduce
-        if checks.is_series(stats_obj):
-            return stats_obj
-        if column is not None:
-            return stats_obj.loc[column]
-        if agg_func is not None:
-            if agg_func == np.mean:
-                warnings.warn("Taking mean across columns. To return a DataFrame, pass agg_func=None.", stacklevel=2)
-                func_name = 'stats_mean'
-            else:
-                func_name = 'stats_' + agg_func.__name__
-            agg_stats_sr = pd.Series(index=stats_obj.columns, name=func_name)
-            agg_stats_sr.iloc[:3] = stats_obj.iloc[0, :3]
-            agg_stats_sr.iloc[3:] = agg_func(stats_obj.iloc[:, 3:])
-            return agg_stats_sr
-        return stats_obj
+        If `benchmark_rets` is not set, uses `Portfolio.benchmark_returns`."""
+        returns_acc = self.returns_acc(
+            group_by=group_by,
+            freq=freq,
+            year_freq=year_freq,
+            use_asset_returns=use_asset_returns,
+            defaults=defaults
+        )
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_returns(group_by=group_by)
+        settings = dict(benchmark_rets=benchmark_rets)
+        return getattr(returns_acc, 'stats')(settings=settings, **kwargs)
 
     # ############# Plotting ############# #
 
@@ -3971,10 +3966,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        market_returns = self.market_returns(group_by=group_by)
-        market_returns = self.select_one_from_obj(market_returns, self.wrapper.regroup(group_by), column=column)
+        benchmark_returns = self.benchmark_returns(group_by=group_by)
+        benchmark_returns = self.select_one_from_obj(benchmark_returns, self.wrapper.regroup(group_by), column=column)
         kwargs = merge_dicts(dict(
-            benchmark_rets=market_returns,
+            benchmark_rets=benchmark_returns,
             main_kwargs=dict(
                 trace_kwargs=dict(
                     line=dict(
@@ -4214,7 +4209,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             {k: v for k, v in portfolio_plot_cfg.items() if k in plot_res_settings}
         )
         plot_res_settings['year_freq'] = returns_cfg['year_freq']
-        plot_res_settings['incl_unrealized'] = portfolio_plot_cfg['incl_unrealized']
+        plot_res_settings['incl_open'] = portfolio_plot_cfg['incl_open']
         plot_res_settings['use_asset_returns'] = portfolio_plot_cfg['use_asset_returns']
         plot_res_settings['use_positions'] = portfolio_plot_cfg['use_positions']
         return plot_res_settings
@@ -4339,5 +4334,4 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         But copying `Portfolio` using `Portfolio.copy` won't create a copy of the config."""
 
 
-__pdoc__ = dict()
 Portfolio.override_metrics_doc(__pdoc__)
