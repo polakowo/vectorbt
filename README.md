@@ -18,11 +18,11 @@ In contrast to other backtesters, vectorbt represents data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
 compiled operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
 [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
-to Tableau right in the Jupyter notebook. Due to high performance, vectorbt is able to process large amounts of 
-data even without GPU and parallelization, and enable the user to interact with data-hungry widgets 
+to Tableau right in the Jupyter notebook. Due to high performance, vectorbt can process large amounts of 
+data even without GPU and parallelization and enables the user to interact with data-hungry widgets 
 without significant delays.
 
-With vectorbt you can
+With vectorbt, you can
 * Build your pipelines in a few lines of code
 * Retain full control over execution (as opposed to web-based services such as TradingView)
 * Optimize your trading strategy against many parameters, assets, and periods in one go
@@ -232,7 +232,7 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 ## How it works?
 
 vectorbt combines pandas, NumPy, and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
-It natively works on pandas objects, while performing all computations using NumPy and Numba under the hood. 
+It natively works on pandas objects while performing all computations using NumPy and Numba under the hood. 
 This way, it is often much faster than pandas alone:
 
 ```python-repl
@@ -248,12 +248,12 @@ This way, it is often much faster than pandas alone:
 ```
 
 In contrast to other backtesters, vectorbt is optimized for working with multi-dimensional data: 
-it treats index of a Series/DataFrame as a time axis and columns as distinct configurations that 
+it treats the index of a Series/DataFrame as a time axis and columns as distinct configurations that 
 should be backtested, and performs computations on the entire array at once, without slow Python loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
-This way, user can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
+This way, users can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
 method is flexible towards inputs and can work on both Series and DataFrames.
 
 ## Features
@@ -538,4 +538,3 @@ This work is licensed under Apache 2.0, but installing optional dependencies may
 
 This software is for educational purposes only. Do not risk money which you are afraid to lose. 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
-

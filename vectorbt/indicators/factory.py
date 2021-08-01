@@ -1084,6 +1084,36 @@ Name: (2, b), dtype: float64
 2020-01-05  4.5  1.5
 ```
 
+## Stats
+
+!!! hint
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+We can attach metrics to any new indicator class:
+
+```python-repl
+>>> @njit
+... def apply_func_nb(price):
+...     return price ** 2, price ** 3
+
+>>> MyInd = vbt.IndicatorFactory(
+...     input_names=['price'],
+...     output_names=['out1', 'out2'],
+...     metrics=dict(
+...         sum_diff=dict(
+...             calc_func=lambda self: self.out2.sum() - self.out1.sum()
+...         )
+...     )
+... ).from_apply_func(
+...     apply_func_nb
+... )
+
+>>> myind = MyInd.run(price)
+>>> myind.stats(column='a')
+sum_diff    170.0
+Name: a, dtype: float64
+```
+
 ## TA-Lib
 
 Indicator factory also provides a class method `IndicatorFactory.from_talib`
