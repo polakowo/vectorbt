@@ -79,7 +79,7 @@ class PXAccessor(BaseAccessor):
     >>> pd.Series([1, 2, 3]).vbt.px.bar()
     ```
 
-    ![](/vectorbt/docs/img/px_bar.svg)
+    ![](/docs/img/px_bar.svg)
     """
 
     def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:

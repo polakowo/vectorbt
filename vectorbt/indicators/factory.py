@@ -979,7 +979,7 @@ Another way of defining own properties and methods is subclassing:
 >>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()
 ```
 
-![](/vectorbt/docs/img/MyInd_plot.svg)
+![](/docs/img/MyInd_plot.svg)
 
 ## Helper properties and methods
 

@@ -1044,7 +1044,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
         ```
 
-        ![](/vectorbt/docs/img/plot_cumulative.svg)
+        ![](/docs/img/plot_cumulative.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

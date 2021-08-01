@@ -3,7 +3,7 @@
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
 [![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
 [![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
-[![Website](https://img.shields.io/website?url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
+[![Website](https://img.shields.io/website?url=https://vectorbt.dev/)](https://vectorbt.dev/)
 [![Downloads](https://pepy.tech/badge/vectorbt)](https://pepy.tech/project/vectorbt)
 [![Binder](https://img.shields.io/badge/launch-binder-d6604a)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -476,7 +476,7 @@ dtype: object
 
 ### Documentation
 
-Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
+Head over to the [documentation](https://vectorbt.dev/docs/index.html) to get started.
 
 ### Notebooks
 

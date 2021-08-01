@@ -181,7 +181,7 @@ class Drawdowns(Records):
     >>> drawdowns.drawdown.histplot(trace_kwargs=dict(nbinsx=50))
     ```
 
-    ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.svg)
+    ![](/docs/img/drawdowns_drawdown_histplot.svg)
     """
 
     def __init__(self,
@@ -627,7 +627,7 @@ class Drawdowns(Records):
         >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
         ```
 
-        ![](/vectorbt/docs/img/drawdowns_plot.svg)
+        ![](/docs/img/drawdowns_plot.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

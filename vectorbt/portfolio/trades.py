@@ -879,7 +879,7 @@ class Trades(Records):
         >>> trades.plot_pnl()
         ```
 
-        ![](/vectorbt/docs/img/trades_plot_pnl.svg)"""
+        ![](/docs/img/trades_plot_pnl.svg)"""
         return self.plot_pnl_returns(as_pct=False, **kwargs)
 
     def plot_returns(self, **kwargs):
@@ -931,7 +931,7 @@ class Trades(Records):
         >>> trades.plot()
         ```
 
-        ![](/vectorbt/docs/img/trades_plot.svg)"""
+        ![](/docs/img/trades_plot.svg)"""
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 

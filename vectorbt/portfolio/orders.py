@@ -380,7 +380,7 @@ class Orders(Records):
         >>> orders.plot()
         ```
 
-        ![](/vectorbt/docs/img/orders_plot.svg)"""
+        ![](/docs/img/orders_plot.svg)"""
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 

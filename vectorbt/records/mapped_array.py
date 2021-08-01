@@ -149,7 +149,7 @@ You can build histograms and boxplots of `MappedArray` directly:
 >>> ma.boxplot()
 ```
 
-![](/vectorbt/docs/img/mapped_boxplot.svg)
+![](/docs/img/mapped_boxplot.svg)
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
@@ -157,7 +157,7 @@ To use scatterplots or any other plots that require index, convert to pandas fir
 >>> ma.to_pd().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/mapped_to_pd_plot.svg)
+![](/docs/img/mapped_to_pd_plot.svg)
 
 ## Grouping
 

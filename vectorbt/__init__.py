@@ -457,7 +457,7 @@ Name: total_return, dtype: float64
 >>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
 ```
 
-![](/vectorbt/docs/img/index_by_symbol.svg)
+![](/docs/img/index_by_symbol.svg)
 
 Not only strategies and instruments can act as separate features, but also time. If we want to find out
 when our strategy performs best, it's reasonable to test it over multiple time periods. vectorbt allows
@@ -516,7 +516,7 @@ by any feature, such as window pair, symbol, and time period.
 ...     legend_title_text='Symbol')
 ```
 
-![](/vectorbt/docs/img/index_by_any.svg)
+![](/docs/img/index_by_any.svg)
 
 There is much more to backtesting than simply stacking columns: vectorbt offers functions for
 most parts of a backtesting pipeline, from building indicators and generating signals, to

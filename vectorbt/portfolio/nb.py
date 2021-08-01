@@ -1445,11 +1445,11 @@ def simulate_nb(target_shape: tp.Shape,
            [1, 0, 0]])
     ```
 
-    ![](/vectorbt/docs/img/simulate_nb.gif)
+    ![](/docs/img/simulate_nb.gif)
 
     And here is the context information available at each step:
 
-    ![](/vectorbt/docs/img/context_info.png)
+    ![](/docs/img/context_info.png)
 
     ## Example
 
@@ -1627,7 +1627,7 @@ def simulate_nb(target_shape: tp.Shape,
     >>> Scatter(data=asset_value).fig.show()
     ```
 
-    ![](/vectorbt/docs/img/simulate_nb.svg)
+    ![](/docs/img/simulate_nb.svg)
 
     Note that the last order in a group with cash sharing is always disadvantaged
     as it has a bit less funds than the previous orders due to costs, which are not
@@ -2157,7 +2157,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
     Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-    ![](/vectorbt/docs/img/simulate_row_wise_nb.gif)
+    ![](/docs/img/simulate_row_wise_nb.gif)
 
     ## Example
 

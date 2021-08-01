@@ -1969,7 +1969,7 @@ class SignalsAccessor(GenericAccessor):
         >>> mask[['a', 'c']].vbt.signals.plot()
         ```
 
-        ![](/vectorbt/docs/img/signals_df_plot.svg)
+        ![](/docs/img/signals_df_plot.svg)
         """
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(
@@ -2007,7 +2007,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         >>> (~mask['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
         ```
 
-        ![](/vectorbt/docs/img/signals_plot_as_markers.svg)
+        ![](/docs/img/signals_plot_as_markers.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

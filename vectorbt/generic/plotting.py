@@ -93,7 +93,7 @@ class Gauge(Configured, TraceUpdater):
         ... )
         >>> gauge.fig
         ```
-        ![](/vectorbt/docs/img/Gauge.svg)
+        ![](/docs/img/Gauge.svg)
         """
         Configured.__init__(
             self,
@@ -193,7 +193,7 @@ class Bar(Configured, TraceUpdater):
         ... )
         >>> bar.fig
         ```
-        ![](/vectorbt/docs/img/Bar.svg)
+        ![](/docs/img/Bar.svg)
         """
         Configured.__init__(
             self,
@@ -252,7 +252,7 @@ class Bar(Configured, TraceUpdater):
         >>> bar.update([[2, 1], [4, 3]])
         >>> bar.fig
         ```
-        ![](/vectorbt/docs/img/Bar_updated.svg)
+        ![](/docs/img/Bar_updated.svg)
         """
         data = reshape_fns.to_2d(np.asarray(data))
         with self.fig.batch_update():
@@ -298,7 +298,7 @@ class Scatter(Configured, TraceUpdater):
         ... )
         >>> scatter.fig
         ```
-        ![](/vectorbt/docs/img/Scatter.svg)
+        ![](/docs/img/Scatter.svg)
         """
         Configured.__init__(
             self,
@@ -402,7 +402,7 @@ class Histogram(Configured, TraceUpdater):
         ... )
         >>> hist.fig
         ```
-        ![](/vectorbt/docs/img/Histogram.svg)
+        ![](/docs/img/Histogram.svg)
         """
         Configured.__init__(
             self,
@@ -508,7 +508,7 @@ class Box(Configured, TraceUpdater):
         ... )
         >>> box.fig
         ```
-        ![](/vectorbt/docs/img/Box.svg)
+        ![](/docs/img/Box.svg)
         """
         Configured.__init__(
             self,
@@ -623,7 +623,7 @@ class Heatmap(Configured, TraceUpdater):
         ... )
         >>> heatmap.fig
         ```
-        ![](/vectorbt/docs/img/Heatmap.svg)
+        ![](/docs/img/Heatmap.svg)
         """
         Configured.__init__(
             self,
@@ -762,7 +762,7 @@ class Volume(Configured, TraceUpdater):
         >>> volume.fig
         ```
 
-        ![](/vectorbt/docs/img/Volume.svg)
+        ![](/docs/img/Volume.svg)
         """
         Configured.__init__(
             self,

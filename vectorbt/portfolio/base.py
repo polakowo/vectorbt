@@ -91,7 +91,7 @@ Date
 >>> pf.value().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/portfolio_value.svg)
+![](/docs/img/portfolio_value.svg)
 
 ## Broadcasting
 
@@ -948,7 +948,7 @@ Plot portfolio of a random strategy:
 >>> pf.plot(column=10)
 ```
 
-![](/vectorbt/docs/img/portfolio_plot.svg)
+![](/docs/img/portfolio_plot.svg)
 
 You can choose any of the subplots in `Portfolio.subplots`, in any order, and
 control their appearance using keyword arguments:
@@ -971,7 +971,7 @@ control their appearance using keyword arguments:
 ... )
 ```
 
-![](/vectorbt/docs/img/portfolio_plot_drawdowns.svg)
+![](/docs/img/portfolio_plot_drawdowns.svg)
 
 To create a new subplot, a preferred way is to pass a plotting function:
 
@@ -1017,7 +1017,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ... )
 ```
 
-![](/vectorbt/docs/img/portfolio_plot_custom.svg)
+![](/docs/img/portfolio_plot_custom.svg)
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
 the path to this function (see `vectorbt.utils.attr.deep_getattr` for the path format).
@@ -1064,7 +1064,7 @@ You can also replace templates across all subplots by using the global template 
 >>> pf.plot(subplots, column=10, template_mapping=dict(window=10))
 ```
 
-![](/vectorbt/docs/img/portfolio_plot_path.svg)
+![](/docs/img/portfolio_plot_path.svg)
 """
 import numpy as np
 import pandas as pd
@@ -2270,7 +2270,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         >>> pf.asset_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.svg)
+        ![](/docs/img/simulate_nb.svg)
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -2728,7 +2728,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         >>> pf.asset_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.svg)
+        ![](/docs/img/simulate_nb.svg)
 
         Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
