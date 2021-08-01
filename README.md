@@ -11,10 +11,10 @@
 
 # vectorbt :boom:
 
-vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
+vectorbt is a backtesting library on steroids: it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
-In contrast to conventional libraries, vectorbt represents any data as nd-arrays.
+In contrast to other backtesters, vectorbt represents data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
 compiled operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
 [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
@@ -230,15 +230,11 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 
 ## How it works?
 
-vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
+vectorbt combines pandas, NumPy, and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
 It natively works on pandas objects, while performing all computations using NumPy and Numba under the hood. 
 This way, it is often much faster than pandas alone:
 
 ```python-repl
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
 
 # pandas
