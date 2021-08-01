@@ -23,11 +23,13 @@ data even without GPU and parallelization, and enable the user to interact with 
 without significant delays.
 
 With vectorbt you can
-* Analyze time series and engineer new features
+* Build flexible algorithmic trading pipelines
+* Test your trading strategy against many parameters, assets, and periods in one go
+* Explore financial markets and uncover hidden patterns
+* Analyze time series and engineer new features for ML models
 * Supercharge pandas and your favorite tools to run much faster
-* Test many trading strategies, configurations, assets, and periods in one go
-* Test machine learning models
-* Build interactive charts/dashboards without leaving Jupyter
+* Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
+* Fetch data periodically, send Telegram notifications, and more
 
 ## Installation
 
@@ -72,7 +74,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 
 ## Examples
 
-You can start backtesting with just a couple of lines.
+Start backtesting with just a couple of lines:
 
 Here is how much profit we would have made if we invested $100 into Bitcoin in 2014 and held 
 (Note: first time compiling with Numba may take a while):
@@ -90,7 +92,7 @@ pf.total_profit()
 8961.008555963961
 ```
 
-The crossover of 10-day SMA and 50-day SMA under the same conditions:
+The crossover of 10-day SMA and 50-day SMA:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -106,7 +108,7 @@ pf.total_profit()
 16423.251963801864
 ```
 
-Quickly assessing the performance of 1000 random signal strategies on BTC and ETH:
+Generate 1,000 random strategies and test them on BTC and ETH:
 
 ```python
 import numpy as np
@@ -124,8 +126,8 @@ fig.show()
 
 ![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
 
-For fans of hyperparameter optimization, here is a snippet for testing 10000 window combinations of a 
-dual SMA crossover strategy on BTC, USD and LTC:
+For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
+dual SMA crossover strategy on BTC, USD, and LTC:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
@@ -185,6 +187,8 @@ Sortino Ratio                                   3.519894
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
+The same for plotting:
+
 ```python
 pf[(10, 20, 'ETH-USD')].plot().show()
 ```
@@ -223,13 +227,6 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 ```
 
 ![bbands.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif)
-
-## Motivation
-
-While there are [many great backtesting packages for Python](https://github.com/mementum/backtrader#alternatives), 
-vectorbt combines an extremely fast backtester and a data science tool: it excels at processing performance and offers 
-interactive tools to explore complex phenomena in trading. With it, you can traverse a huge number of strategy configurations, 
-time periods, and instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data.
 
 ## How it works?
 
