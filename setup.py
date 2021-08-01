@@ -42,11 +42,10 @@ setup(
     ],
     extras_require={
         'full': [
-            'yfinance',
+            'yfinance>=0.1.63',
             'python-binance',
             'ccxt',
-            'ray; python_version < "3.9"',
-            'empyrical',
+            'ray>=1.4.1',
             'ta',
             'pandas_ta',
             'TA-Lib',

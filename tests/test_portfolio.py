@@ -9,7 +9,6 @@ from copy import deepcopy
 import vectorbt as vbt
 from vectorbt.portfolio.enums import *
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt import settings
 from vectorbt.utils.random import set_seed
 from vectorbt.portfolio import nb
 
@@ -18,8 +17,6 @@ from tests.utils import record_arrays_close
 seed = 42
 
 day_dt = np.timedelta64(86400000000000)
-
-settings.returns['year_freq'] = '252 days'  # same as empyrical
 
 price = pd.Series([1., 2., 3., 4., 5.], index=pd.Index([
     datetime(2020, 1, 1),
@@ -32,6 +29,19 @@ price_wide = price.vbt.tile(3, keys=['a', 'b', 'c'])
 big_price = pd.DataFrame(np.random.uniform(size=(1000,)))
 big_price.index = [datetime(2018, 1, 1) + timedelta(days=i) for i in range(1000)]
 big_price_wide = big_price.vbt.tile(1000)
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
 
 
 # ############# nb ############# #
@@ -2010,8 +2020,8 @@ class TestFromSignals:
         close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
 
         @njit
-        def adjust_sl_func_nb(i, col, position, val_price, init_i, init_price, init_stop, init_trail, dur):
-            return 0. if i - init_i >= dur else init_stop, init_trail
+        def adjust_sl_func_nb(c, dur):
+            return 0. if c.i - c.init_i >= dur else c.curr_stop, c.curr_trail
 
         record_arrays_close(
             from_signals_longonly(
@@ -2022,14 +2032,32 @@ class TestFromSignals:
             ], dtype=order_dt)
         )
 
+    def test_adjust_ts_func(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([10., 11., 12., 11., 10.], index=price.index)
+
+        @njit
+        def adjust_sl_func_nb(c, dur):
+            return 0. if c.i - c.curr_i >= dur else c.curr_stop, c.curr_trail
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=np.inf, adjust_sl_func_nb=adjust_sl_func_nb, adjust_sl_args=(2,)).order_records,
+            np.array([
+                (0, 0, 0, 10.0, 10.0, 0.0, 0), (1, 4, 0, 10.0, 10.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
     def test_adjust_tp_func(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
         close = pd.Series([1., 2., 3., 4., 5.], index=price.index)
 
         @njit
-        def adjust_tp_func_nb(i, col, position, val_price, init_i, init_price, init_stop, dur):
-            return 0. if i - init_i >= dur else init_stop
+        def adjust_tp_func_nb(c, dur):
+            return 0. if c.i - c.init_i >= dur else c.curr_stop
 
         record_arrays_close(
             from_signals_longonly(
@@ -2101,7 +2129,7 @@ class TestFromRandomSignals:
         )
         pd.testing.assert_index_equal(
             result.wrapper.columns,
-            pd.Int64Index([1, 2], dtype='int64', name='rand_n')
+            pd.Int64Index([1, 2], dtype='int64', name='randnx_n')
         )
 
     def test_from_random_prob(self):
@@ -2139,7 +2167,9 @@ class TestFromRandomSignals:
         )
         pd.testing.assert_index_equal(
             result.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0.25, 0.25), (0.5, 0.5)], names=['rprob_entry_prob', 'rprob_exit_prob'])
+            pd.MultiIndex.from_tuples(
+                [(0.25, 0.25), (0.5, 0.5)],
+                names=['rprobnx_entry_prob', 'rprobnx_exit_prob'])
         )
 
 
@@ -4886,9 +4916,9 @@ pf_shared = vbt.Portfolio.from_orders(
 class TestPortfolio:
     def test_config(self, tmp_path):
         pf2 = pf.copy()
-        pf2.metrics = pf2.metrics.copy()
+        pf2._metrics = pf2._metrics.copy()
         pf2.metrics['hello'] = 'world'
-        pf2.subplots = pf2.subplots.copy()
+        pf2._subplots = pf2.subplots.copy()
         pf2.subplots['hello'] = 'world'
         assert vbt.Portfolio.loads(pf2['a'].dumps()) == pf2['a']
         assert vbt.Portfolio.loads(pf2.dumps()) == pf2
@@ -6331,7 +6361,7 @@ class TestPortfolio:
             result
         )
 
-    def test_market_value(self):
+    def test_benchmark_value(self):
         result = pd.DataFrame(
             np.array([
                 [100., 100., 100.],
@@ -6344,15 +6374,15 @@ class TestPortfolio:
             columns=price_na.columns
         )
         pd.testing.assert_frame_equal(
-            pf.market_value(),
+            pf.benchmark_value(),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_grouped.market_value(group_by=False),
+            pf_grouped.benchmark_value(group_by=False),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_shared.market_value(group_by=False),
+            pf_shared.benchmark_value(group_by=False),
             pd.DataFrame(
                 np.array([
                     [200., 200., 100.],
@@ -6377,19 +6407,19 @@ class TestPortfolio:
             columns=pd.Index(['first', 'second'], dtype='object', name='group')
         )
         pd.testing.assert_frame_equal(
-            pf.market_value(group_by=group_by),
+            pf.benchmark_value(group_by=group_by),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_grouped.market_value(),
+            pf_grouped.benchmark_value(),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_shared.market_value(),
+            pf_shared.benchmark_value(),
             result
         )
 
-    def test_market_returns(self):
+    def test_benchmark_returns(self):
         result = pd.DataFrame(
             np.array([
                 [0., 0., 0.],
@@ -6402,15 +6432,15 @@ class TestPortfolio:
             columns=price_na.columns
         )
         pd.testing.assert_frame_equal(
-            pf.market_returns(),
+            pf.benchmark_returns(),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_grouped.market_returns(group_by=False),
+            pf_grouped.benchmark_returns(group_by=False),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_shared.market_returns(group_by=False),
+            pf_shared.benchmark_returns(group_by=False),
             result
         )
         result = pd.DataFrame(
@@ -6425,49 +6455,49 @@ class TestPortfolio:
             columns=pd.Index(['first', 'second'], dtype='object', name='group')
         )
         pd.testing.assert_frame_equal(
-            pf.market_returns(group_by=group_by),
+            pf.benchmark_returns(group_by=group_by),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_grouped.market_returns(),
+            pf_grouped.benchmark_returns(),
             result
         )
         pd.testing.assert_frame_equal(
-            pf_shared.market_returns(),
+            pf_shared.benchmark_returns(),
             result
         )
 
-    def test_total_market_return(self):
+    def test_total_benchmark_return(self):
         result = pd.Series(
             np.array([1.5, 4., 3.]),
             index=price_na.columns
-        ).rename('total_market_return')
+        ).rename('total_benchmark_return')
         pd.testing.assert_series_equal(
-            pf.total_market_return(),
+            pf.total_benchmark_return(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_grouped.total_market_return(group_by=False),
+            pf_grouped.total_benchmark_return(group_by=False),
             result
         )
         pd.testing.assert_series_equal(
-            pf_shared.total_market_return(group_by=False),
+            pf_shared.total_benchmark_return(group_by=False),
             result
         )
         result = pd.Series(
             np.array([2.75, 3.]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        ).rename('total_market_return')
+        ).rename('total_benchmark_return')
         pd.testing.assert_series_equal(
-            pf.total_market_return(group_by=group_by),
+            pf.total_benchmark_return(group_by=group_by),
             result
         )
         pd.testing.assert_series_equal(
-            pf_grouped.total_market_return(),
+            pf_grouped.total_benchmark_return(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_shared.total_market_return(),
+            pf_shared.total_benchmark_return(),
             result
         )
 
@@ -6503,14 +6533,14 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf_shared.sharpe_ratio(),
             pd.Series(
-                np.array([-16.697884366310568, 10.257634695847853]),
+                np.array([-20.095906945591288, 12.345065267401496]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
             ).rename('sharpe_ratio')
         )
         pd.testing.assert_series_equal(
             pf_shared.sharpe_ratio(risk_free=0.01),
             pd.Series(
-                np.array([-49.54098765664797, -19.873024060759022]),
+                np.array([-59.62258787402645, -23.91718815937344]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
             ).rename('sharpe_ratio')
         )
@@ -6524,162 +6554,165 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf_shared.sharpe_ratio(group_by=False),
             pd.Series(
-                np.array([-11.058998255347488, -16.018796953152307, 10.257634695847853]),
+                np.array([-13.30950646054953, -19.278625117344564, 12.345065267401496]),
                 index=price_na.columns
             ).rename('sharpe_ratio')
         )
+        pd.testing.assert_series_equal(
+            pf_shared.information_ratio(group_by=False),
+            pd.Series(
+                np.array([-0.9988561334618041, -0.8809478746008806, -0.884780642352239]),
+                index=price_na.columns
+            ).rename('information_ratio')
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = pf_shared.information_ratio(pf_shared.benchmark_returns(group_by=False) * 2)
 
     def test_stats(self):
-        stat_cols = pd.Index([
-            'Start', 'End', 'Duration', 'Initial Cash', 'Total Profit',
-            'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-            'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
-            'Avg Drawdown Duration', 'Trade Count', 'Win Rate [%]',
-            'Best Trade [%]', 'Worst Trade [%]', 'Avg Trade [%]',
-            'Max Trade Duration', 'Avg Trade Duration', 'Expectancy', 'SQN',
-            'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
+        stats_index = pd.Index([
+            'Start', 'End', 'Period', 'Start Value', 'End Value',
+            'Total Return [%]', 'Benchmark Return [%]', 'Max Gross Exposure [%]',
+            'Total Fees Paid', 'Max Drawdown [%]', 'Max Drawdown Duration',
+            'Total Trades', 'Total Closed Trades', 'Total Open Trades',
+            'Open Trade P&L', 'Win Rate [%]', 'Best Trade [%]', 'Worst Trade [%]',
+            'Avg Winning Trade [%]', 'Avg Losing Trade [%]',
+            'Avg Winning Trade Duration', 'Avg Losing Trade Duration',
+            'Profit Factor', 'Expectancy', 'Sharpe Ratio', 'Calmar Ratio',
+            'Omega Ratio', 'Sortino Ratio'
         ], dtype='object')
         pd.testing.assert_series_equal(
             pf.stats(),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -1.1112299999999966,
-                    -1.1112299999999966, 283.3333333333333, 66.66666666666667,
-                    1.6451238489727062, 1.6451238489727062,
-                    pd.Timedelta('3 days 08:00:00'), pd.Timedelta('3 days 08:00:00'),
-                    1.3333333333333333, 33.333333333333336, -98.38058805880588,
-                    -100.8038553855386, -99.59222172217225,
-                    pd.Timedelta('2 days 08:00:00'), pd.Timedelta('2 days 04:00:00'),
-                    0.10827272727272726, 1.2350921335789007, -0.008766789792898303,
-                    -5.609478162762282, 26.256548486255838, 5720.684444410799
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 98.88877000000001, -1.11123, 283.3333333333333,
+                    2.05906183131983, 0.42223000000000005, 1.6451238489727062, pd.Timedelta('3 days 08:00:00'),
+                    2.0, 1.3333333333333333, 0.6666666666666666, -1.5042060606060605, 33.333333333333336,
+                    -98.38058805880588, -100.8038553855386, 143.91625412541256, -221.34645964596464,
+                    pd.Timedelta('2 days 12:00:00'), pd.Timedelta('2 days 00:00:00'), np.inf, 0.10827272727272726,
+                    -6.751008013903537, 10378.930331014584, 4.768700318817701, 31.599760994679134
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='agg_func_mean')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(),
+            pf.stats(column='a'),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104900000000015,
-                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
-                    0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
-                    pd.Timedelta('4 days 00:00:00'), 1, 0.0, -54.450495049504966,
-                    -54.450495049504966, -54.450495049504966,
-                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
-                    -0.10999000000000003, np.nan, 0.010431562217554364,
-                    -11.057783842772304, -9.75393669809172, -46.721467294341814
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
+                    5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -54.450495049504966, -54.450495049504966,
+                    np.nan, -54.450495049504966, pd.NaT, pd.Timedelta('1 days 00:00:00'), 0.0,
+                    -0.10999000000000003, -13.30804491478906, -65.40868619923044, 0.0, -11.738864633265454
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(freq=None),
+            pf.stats(column='a', settings=dict(freq='10 days', year_freq='200 days')),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    5, 100.0, -0.3104900000000015,
-                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
-                    0.3104900000000015, 4,
-                    4, 1, 0.0, -54.450495049504966,
-                    -54.450495049504966, -54.450495049504966,
-                    1, 1,
-                    -0.10999000000000003, np.nan, 0.010431562217554364
+                    pd.Timedelta('50 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
+                    5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('40 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -54.450495049504966, -54.450495049504966,
+                    np.nan, -54.450495049504966, pd.NaT, pd.Timedelta('10 days 00:00:00'), 0.0, -0.10999000000000003,
+                    -3.1151776875290866, -3.981409131683691, 0.0, -2.7478603669149457
                 ]),
-                index=stat_cols[:-3],
+                index=stats_index,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(use_positions=True),
+            pf.stats(column='a', settings=dict(use_positions=True)),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104899999999997,
-                    -0.3104899999999997, 150.0, 40.0, 0.3104900000000015, 0.3104900000000015,
-                    pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 1, 0.0,
-                    -54.450495049504966, -54.450495049504966, -54.450495049504966,
-                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
-                    -0.10999000000000003, np.nan, 0.010431562217554364, -11.057783842772304,
-                    -9.75393669809172, -46.721467294341814
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
+                    5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -54.450495049504966, -54.450495049504966,
+                    np.nan, -54.450495049504966, pd.NaT, pd.Timedelta('1 days 00:00:00'), 0.0,
+                    -0.10999000000000003, -13.30804491478906, -65.40868619923044, 0.0, -11.738864633265454
                 ]),
                 index=pd.Index([
-                    'Start', 'End', 'Duration', 'Initial Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
-                    'Avg Drawdown Duration', 'Position Count', 'Win Rate [%]',
-                    'Best Position [%]', 'Worst Position [%]', 'Avg Position [%]',
-                    'Max Position Duration', 'Avg Position Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
+                    'Start', 'End', 'Period', 'Start Value', 'End Value',
+                    'Total Return [%]', 'Benchmark Return [%]', 'Max Gross Exposure [%]',
+                    'Total Fees Paid', 'Max Drawdown [%]', 'Max Drawdown Duration',
+                    'Total Positions', 'Total Closed Positions', 'Total Open Positions',
+                    'Open Position P&L', 'Win Rate [%]', 'Best Position [%]',
+                    'Worst Position [%]', 'Avg Winning Position [%]',
+                    'Avg Losing Position [%]', 'Avg Winning Position Duration',
+                    'Avg Losing Position Duration', 'Profit Factor', 'Expectancy',
+                    'Sharpe Ratio', 'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio'
                 ], dtype='object'),
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(global_settings=dict(required_return=0.1, risk_free=0.01)),
+            pf.stats(column='a', settings=dict(required_return=0.1, risk_free=0.01)),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104900000000015,
-                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
-                    0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
-                    pd.Timedelta('4 days 00:00:00'), 1, 0.0, -54.450495049504966,
-                    -54.450495049504966, -54.450495049504966,
-                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
-                    -0.10999000000000003, np.nan, 0.010431562217554364,
-                    -188.9975847831419, -15.874008737030774, -46.721467294341814
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
+                    5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -54.450495049504966, -54.450495049504966,
+                    np.nan, -54.450495049504966, pd.NaT, pd.Timedelta('1 days 00:00:00'), 0.0,
+                    -0.10999000000000003, -227.45862849586334, -65.40868619923044, 0.0, -19.104372472268942
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(use_asset_returns=True),
+            pf.stats(column='a', settings=dict(use_asset_returns=True)),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104900000000015,
-                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
-                    0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
-                    pd.Timedelta('4 days 00:00:00'), 1, 0.0, -54.450495049504966,
-                    -54.450495049504966, -54.450495049504966,
-                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
-                    -0.10999000000000003, np.nan, 0.010431562217554364, np.nan, np.nan, np.nan
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997,
+                    150.0, 5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -54.450495049504966, -54.450495049504966, np.nan,
+                    -54.450495049504966, pd.NaT, pd.Timedelta('1 days 00:00:00'), 0.0, -0.10999000000000003,
+                    np.nan, np.nan, 0.0, np.nan
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf['a'].stats(incl_unrealized=True),
+            pf.stats(column='a', settings=dict(incl_open=True)),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104900000000015,
-                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
-                    0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
-                    pd.Timedelta('4 days 00:00:00'), 2, 0.0, -3.9702970297029667,
-                    -54.450495049504966, -29.210396039603964,
-                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('0 days 12:00:00'),
-                    -0.1552449999999999, -3.43044967406917, 0.010431562217554364,
-                    -11.057783842772304, -9.75393669809172, -46.721467294341814
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
+                    5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
+                    2, 1, 1, -0.20049999999999982, 0.0, -3.9702970297029667, -54.450495049504966,
+                    np.nan, -29.210396039603964, pd.NaT, pd.Timedelta('0 days 12:00:00'), 0.0,
+                    -0.1552449999999999, -13.30804491478906, -65.40868619923044, 0.0, -11.738864633265454
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf_grouped['first'].stats(),
+            pf_grouped.stats(column='first'),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 200.0, -5.04191,
-                    -2.520955, 275.0, 70.0, 2.46248125751388,
-                    2.46248125751388, pd.Timedelta('4 days 00:00:00'),
-                    pd.Timedelta('4 days 00:00:00'), 2, 0.0, -54.450495049504966,
-                    -388.2424242424243, -221.34645964596461,
-                    pd.Timedelta('3 days 00:00:00'), pd.Timedelta('2 days 00:00:00'),
-                    -0.2646459090909091, -1.711191707103453, -0.014876959289761857,
-                    -16.697884366310568, -12.093485199472159, -29.39559309128514
+                    pd.Timedelta('5 days 00:00:00'), 200.0, 194.95809, -2.520955, 275.0, -0.505305454620791,
+                    0.82091, 2.46248125751388, pd.Timedelta('4 days 00:00:00'), 4, 2, 2, -4.512618181818182,
+                    0.0, -54.450495049504966, -388.2424242424243, np.nan, -221.34645964596461, pd.NaT,
+                    pd.Timedelta('2 days 00:00:00'), 0.0, -0.2646459090909091, -20.095906945591288,
+                    -34.312217430388344, 0.0, -14.554511690523578
                 ]),
-                index=stat_cols,
+                index=stats_index,
                 name='first')
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(column='a', tags='trades and open and not closed', settings=dict(incl_open=True)),
+            pd.Series(
+                np.array([
+                    1, -0.20049999999999982
+                ]),
+                index=pd.Index([
+                    'Total Open Trades', 'Open Trade P&L'
+                ], dtype='object'),
+                name='a')
         )
         pd.testing.assert_series_equal(
             pf['c'].stats(),
@@ -6693,108 +6726,39 @@ class TestPortfolio:
             pf_grouped['second'].stats(),
             pf_grouped.stats(column='second')
         )
+        pd.testing.assert_series_equal(
+            pf_grouped['second'].stats(),
+            pf.stats(column='second', group_by=group_by)
+        )
+        pd.testing.assert_series_equal(
+            pf.copy(wrapper=pf.wrapper.copy(freq='10d')).stats(),
+            pf.stats(settings=dict(freq='10d'))
+        )
         stats_df = pf.stats(agg_func=None)
-        assert stats_df.shape == (3, 25)
+        assert stats_df.shape == (3, 28)
         pd.testing.assert_index_equal(stats_df.index, pf.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stat_cols)
-        freq_metric = ('freq_metric', dict(title='Freq', calc_func=lambda freq: freq))
-        pd.testing.assert_series_equal(
-            pf.stats(freq_metric, column='a'),
-            pd.Series([day_dt], index=['Freq'], name='a')
-        )
-        pd.testing.assert_series_equal(
-            pf.stats(freq_metric, column='a', freq=day_dt * 2),
-            pd.Series([day_dt * 2], index=['Freq'], name='a')
-        )
-        def_freq_metric = ('freq_metric', dict(title='Freq', freq=day_dt * 3, calc_func=lambda freq: freq))
-        pd.testing.assert_series_equal(
-            pf.stats(def_freq_metric, column='a', freq=day_dt * 2),
-            pd.Series([day_dt * 3], index=['Freq'], name='a')
-        )
-        pd.testing.assert_series_equal(
-            pf.stats(def_freq_metric, column='a', freq=day_dt * 2, global_settings=dict(freq=day_dt * 4)),
-            pd.Series([day_dt * 4], index=['Freq'], name='a')
-        )
-        pd.testing.assert_series_equal(
-            pf.stats(
-                def_freq_metric, column='a', freq=day_dt * 2,
-                global_settings=dict(freq=day_dt * 4), freq_metric_kwargs=dict(freq=day_dt * 5)),
-            pd.Series([day_dt * 5], index=['Freq'], name='a')
-        )
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
     def test_returns_stats(self):
         pd.testing.assert_series_equal(
-            pf.returns_stats(),
+            pf.returns_stats(column='a'),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), -1.1112300000000113, 283.3333333333333,
-                    9.669922456336872, 8.29654627059829, -5.609478162762282, 5720.684444410799,
-                    -1.6451238489727107, 4.768700318817701, 26.256548486255838, -0.3997971268456455,
-                    -1.2025410695003063, 3.1644021626949534, 7.42228636406823, -0.007990063884177678,
-                    -0.26918960772379186, -0.00123384949617063
+                    pd.Timedelta('5 days 00:00:00'), -0.3104900000000077, 150.0, -20.30874297799884,
+                    1.7044081500801351, 0.3104900000000077, pd.Timedelta('4 days 00:00:00'),
+                    -13.30804491478906, -65.40868619923044, 0.0, -11.738864633265454,
+                    -1.2191070234483876, 0.12297560887596681, 0.0, 0.0, -0.0018138061822238526,
+                    -0.24888299449497553, 0.0007493142128979539
                 ]),
                 index=pd.Index([
-                    'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
-                    'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
-                    'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
-                    'Alpha', 'Beta'
-                ], dtype='object'),
-                name='stats_mean')
-        )
-        pd.testing.assert_series_equal(
-            pf['a'].returns_stats(),
-            pd.Series(
-                np.array([
-                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), -0.3104900000000077,
-                    150.0, -14.50654838022003, 1.4162092947628355,
-                    -11.057783842772304, -46.721467294341814, -0.3104899999999966,
-                    0.0, -9.75393669809172, -1.2191070234483876,
-                    0.12297560887596681, 0.0, 0.0,
-                    -0.0018138061822238526, -0.1792948451549693, 0.0007493142128979539
-                ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
-                    'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
-                    'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
-                    'Alpha', 'Beta'
+                    'Start', 'End', 'Period', 'Total Return [%]', 'Benchmark Return [%]',
+                    'Annualized Return [%]', 'Annualized Volatility [%]',
+                    'Max Drawdown [%]', 'Max Drawdown Duration', 'Sharpe Ratio',
+                    'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio', 'Skew', 'Kurtosis',
+                    'Tail Ratio', 'Common Sense Ratio', 'Value at Risk', 'Alpha', 'Beta'
                 ], dtype='object'),
                 name='a')
-        )
-        pd.testing.assert_series_equal(
-            pf_grouped['first'].returns_stats(),
-            pd.Series(
-                np.array([
-                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), -2.5209550000000136, 275.0, -72.38609704079454,
-                    7.672843755728151, -16.697884366310568, -29.39559309128514, -2.4624812575138932,
-                    0.0, -12.093485199472159, -0.2547821486147648, -1.363875757616844,
-                    0.013427062091730372, 0.0037077358962826876, -0.010720112114907941,
-                    -0.03756411921635805, -0.01512065272545035
-                ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
-                    'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
-                    'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
-                    'Alpha', 'Beta'
-                ], dtype='object'),
-                name='first')
-        )
-        pd.testing.assert_series_equal(
-            pf['c'].returns_stats(),
-            pf.returns_stats(column='c')
-        )
-        pd.testing.assert_series_equal(
-            pf['c'].returns_stats(),
-            pf_grouped.returns_stats(column='c', group_by=False)
-        )
-        pd.testing.assert_series_equal(
-            pf_grouped['second'].returns_stats(),
-            pf_grouped.returns_stats(column='second')
         )
 
     def test_plot_methods(self):

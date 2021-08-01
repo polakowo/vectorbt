@@ -57,6 +57,7 @@ from vectorbt.utils.math import (
 from vectorbt.utils.array import insert_argsort_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
+from vectorbt.returns import nb as returns_nb
 from vectorbt.portfolio.enums import *
 
 
@@ -1271,7 +1272,7 @@ def simulate_nb(target_shape: tp.Shape,
     Args:
         target_shape (tuple): Target shape.
 
-            A tuple with exactly two elements: the number of steps and columns.
+            A tuple with exactly two elements: the number of rows and columns.
         close (array_like of float): Last asset price at each time step.
 
             Should have shape `target_shape`.
@@ -1402,12 +1403,6 @@ def simulate_nb(target_shape: tp.Shape,
         together with `vectorbt.base.reshape_fns.flex_select_nb`.
 
         Also remember that indexing of 2-dim arrays in vectorbt follows that of pandas: `a[i, col]`.
-
-    !!! note
-        Function `pre_group_func_nb` is only called if there is at least on active segment in
-        the group. Functions `pre_segment_func_nb` and `order_func_nb` are only called if their
-        segment is active. If the main task of `pre_group_func_nb` is to activate/deactivate segments,
-        all segments should be activated by default to allow `pre_group_func_nb` to be called.
 
     !!! warning
         You can only safely access data of columns that are to the left of the current group and
@@ -1778,14 +1773,14 @@ def simulate_nb(target_shape: tp.Shape,
                     last_position,
                     last_val_price
                 )
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
                         last_value[col] = last_cash[col]
                     else:
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Is this segment active?
             if segment_mask[i, group]:
@@ -1891,9 +1886,9 @@ def simulate_nb(target_shape: tp.Shape,
                     val_price_now = new_state.val_price
                     value_now = new_state.value
                     if cash_sharing:
-                        return_now = get_return_nb(second_last_value[group], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
                     else:
-                        return_now = get_return_nb(second_last_value[col], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
                     oidx = new_state.oidx
                     lidx = new_state.lidx
 
@@ -1993,7 +1988,7 @@ def simulate_nb(target_shape: tp.Shape,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
@@ -2002,7 +1997,7 @@ def simulate_nb(target_shape: tp.Shape,
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
                     second_last_value[col] = temp_value[col]
                     temp_value[col] = last_value[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Update open position stats
             if fill_pos_record:
@@ -2380,14 +2375,14 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     last_position,
                     last_val_price
                 )
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
                         last_value[col] = last_cash[col]
                     else:
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Is this segment active?
             if segment_mask[i, group]:
@@ -2493,9 +2488,9 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     val_price_now = new_state.val_price
                     value_now = new_state.value
                     if cash_sharing:
-                        return_now = get_return_nb(second_last_value[group], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
                     else:
-                        return_now = get_return_nb(second_last_value[col], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
                     oidx = new_state.oidx
                     lidx = new_state.lidx
 
@@ -2595,7 +2590,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
@@ -2604,7 +2599,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
                     second_last_value[col] = temp_value[col]
                     temp_value[col] = last_value[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Update open position stats
             if fill_pos_record:
@@ -3072,8 +3067,8 @@ def should_update_stop_nb(stop: float, stop_update_mode: int) -> bool:
 
 @njit(cache=True)
 def get_stop_price_nb(position_now: float,
-                      init_price: float,
-                      init_stop: float,
+                      stop_price: float,
+                      stop: float,
                       open: float,
                       low: float,
                       high: float,
@@ -3081,17 +3076,17 @@ def get_stop_price_nb(position_now: float,
     """Get stop price.
 
     If hit before open, returns open."""
-    if init_stop < 0:
+    if stop < 0:
         raise ValueError("Stop value must be 0 or greater")
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
-        stop_price = init_price * (1 - init_stop)
+        stop_price = stop_price * (1 - stop)
         if open <= stop_price:
             return open
         if low <= stop_price <= high:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
-        stop_price = init_price * (1 + init_stop)
+        stop_price = stop_price * (1 + stop)
         if stop_price <= open:
             return open
         if low <= stop_price <= high:
@@ -3101,34 +3096,19 @@ def get_stop_price_nb(position_now: float,
 
 
 @njit
-def no_adjust_sl_func_nb(i: int,
-                         col: int,
-                         position: float,
-                         val_price: float,
-                         init_i: int,
-                         init_price: float,
-                         init_stop: float,
-                         init_trail: bool,
-                         *args) -> tp.Tuple[float, bool]:
+def no_adjust_sl_func_nb(c: AdjustSLContext, *args) -> tp.Tuple[float, bool]:
     """Placeholder function that returns the initial stop-loss value and trailing flag."""
-    return init_stop, init_trail
+    return c.curr_stop, c.curr_trail
 
 
 @njit
-def no_adjust_tp_func_nb(i: int,
-                         col: int,
-                         position: float,
-                         val_price: float,
-                         init_i: int,
-                         init_price: float,
-                         init_stop: float,
-                         *args) -> float:
+def no_adjust_tp_func_nb(c: AdjustTPContext, *args) -> float:
     """Placeholder function that returns the initial take-profit value."""
-    return init_stop
+    return c.curr_stop
 
 
-AdjustSLFuncT = tp.Callable[[int, int, float, float, int, float, float, bool, tp.VarArg()], tp.Tuple[float, bool]]
-AdjustTPFuncT = tp.Callable[[int, int, float, float, int, float, float, tp.VarArg()], float]
+AdjustSLFuncT = tp.Callable[[AdjustSLContext, tp.VarArg()], tp.Tuple[float, bool]]
+AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 
 
 @njit(cache=True)
@@ -3233,19 +3213,23 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
     if use_stops:
         sl_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         sl_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_init_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_init_trail = np.full(target_shape[1], False, dtype=np.bool_)
+        sl_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
+        sl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        sl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        sl_curr_trail = np.full(target_shape[1], False, dtype=np.bool_)
         tp_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        tp_init_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
     else:
         sl_init_i = np.empty(0, dtype=np.int_)
         sl_init_price = np.empty(0, dtype=np.float_)
-        sl_init_stop = np.empty(0, dtype=np.float_)
-        sl_init_trail = np.empty(0, dtype=np.bool_)
+        sl_curr_i = np.empty(0, dtype=np.int_)
+        sl_curr_price = np.empty(0, dtype=np.float_)
+        sl_curr_stop = np.empty(0, dtype=np.float_)
+        sl_curr_trail = np.empty(0, dtype=np.bool_)
         tp_init_i = np.empty(0, dtype=np.int_)
         tp_init_price = np.empty(0, dtype=np.float_)
-        tp_init_stop = np.empty(0, dtype=np.float_)
+        tp_curr_stop = np.empty(0, dtype=np.float_)
     order_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     order_size = np.empty(target_shape[1], dtype=np.float_)
     order_size_type = np.empty(target_shape[1], dtype=np.float_)
@@ -3301,30 +3285,32 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                 stop_price_hit = False
                 if use_stops:
                     # Adjust stops
-                    sl_init_stop[col], sl_init_trail[col] = adjust_sl_func_nb(
-                        i,
-                        col,
-                        last_position[col],
-                        last_val_price[col],
-                        sl_init_i[col],
-                        sl_init_price[col],
-                        sl_init_stop[col],
-                        sl_init_trail[col],
-                        *adjust_sl_args
+                    adjust_sl_ctx = AdjustSLContext(
+                        i=i,
+                        col=col,
+                        position_now=last_position[col],
+                        val_price_now=last_val_price[col],
+                        init_i=sl_init_i[col],
+                        init_price=sl_init_price[col],
+                        curr_i=sl_curr_i[col],
+                        curr_price=sl_curr_price[col],
+                        curr_stop=sl_curr_stop[col],
+                        curr_trail=sl_curr_trail[col]
                     )
-                    tp_init_stop[col] = adjust_tp_func_nb(
-                        i,
-                        col,
-                        last_position[col],
-                        last_val_price[col],
-                        tp_init_i[col],
-                        tp_init_price[col],
-                        tp_init_stop[col],
-                        *adjust_tp_args
+                    sl_curr_stop[col], sl_curr_trail[col] = adjust_sl_func_nb(adjust_sl_ctx, *adjust_sl_args)
+                    adjust_tp_ctx = AdjustTPContext(
+                        i=i,
+                        col=col,
+                        position_now=last_position[col],
+                        val_price_now=last_val_price[col],
+                        init_i=tp_init_i[col],
+                        init_price=tp_init_price[col],
+                        curr_stop=tp_curr_stop[col]
                     )
+                    tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
 
-                    if not np.isnan(sl_init_stop[col]) or not np.isnan(tp_init_stop[col]):
-                        # Get stop price
+                    if not np.isnan(sl_curr_stop[col]) or not np.isnan(tp_curr_stop[col]):
+                        # Resolve current bar
                         _open = flex_select_auto_nb(i, col, open, flex_2d)
                         _high = flex_select_auto_nb(i, col, high, flex_2d)
                         _low = flex_select_auto_nb(i, col, low, flex_2d)
@@ -3336,33 +3322,36 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         if np.isnan(_high):
                             _high = max(_open, _close)
 
+                        # Get stop price
                         stop_price = np.nan
                         position_now = last_position[col]
-                        if not np.isnan(sl_init_stop[col]):
+                        if not np.isnan(sl_curr_stop[col]):
                             stop_price = get_stop_price_nb(
                                 position_now,
-                                sl_init_price[col],
-                                sl_init_stop[col],
+                                sl_curr_price[col],
+                                sl_curr_stop[col],
                                 _open, _low, _high,
                                 True
                             )
-                        if np.isnan(stop_price) and not np.isnan(tp_init_stop[col]):
+                        if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                             stop_price = get_stop_price_nb(
                                 position_now,
                                 tp_init_price[col],
-                                tp_init_stop[col],
+                                tp_curr_stop[col],
                                 _open, _low, _high,
                                 False
                             )
 
-                        if not np.isnan(sl_init_stop[col]) and sl_init_trail[col]:
+                        if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
                             # Update trailing stop
                             if position_now > 0:
-                                if _high > sl_init_price[col]:
-                                    sl_init_price[col] = _high
+                                if _high > sl_curr_price[col]:
+                                    sl_curr_i[col] = i
+                                    sl_curr_price[col] = _high
                             elif position_now < 0:
-                                if _low < sl_init_price[col]:
-                                    sl_init_price[col] = _low
+                                if _low < sl_curr_price[col]:
+                                    sl_curr_i[col] = i
+                                    sl_curr_price[col] = _low
 
                         if not np.isnan(stop_price):
                             # Stop price has been hit
@@ -3525,13 +3514,13 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         if order_result.status == OrderStatus.Filled:
                             if position_now == 0:
                                 # Position closed -> clear stops
-                                sl_init_i[col] = -1
-                                sl_init_price[col] = np.nan
-                                sl_init_stop[col] = np.nan
-                                sl_init_trail[col] = False
+                                sl_curr_i[col] = sl_init_i[col] = -1
+                                sl_curr_price[col] = sl_init_price[col] = np.nan
+                                sl_curr_stop[col] = np.nan
+                                sl_curr_trail[col] = False
                                 tp_init_i[col] = -1
                                 tp_init_price[col] = np.nan
-                                tp_init_stop[col] = np.nan
+                                tp_curr_stop[col] = np.nan
                             else:
                                 _stop_entry_price = flex_select_auto_nb(i, col, stop_entry_price, flex_2d)
                                 if _stop_entry_price == StopEntryPrice.ValPrice:
@@ -3549,24 +3538,24 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                                 if state.position == 0 or np.sign(position_now) != np.sign(state.position):
                                     # Position opened/reversed -> set stops
-                                    sl_init_i[col] = i
-                                    sl_init_price[col] = new_init_price
-                                    sl_init_stop[col] = _sl_stop
-                                    sl_init_trail[col] = _sl_trail
+                                    sl_curr_i[col] = sl_init_i[col] = i
+                                    sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                    sl_curr_stop[col] = _sl_stop
+                                    sl_curr_trail[col] = _sl_trail
                                     tp_init_i[col] = i
                                     tp_init_price[col] = new_init_price
-                                    tp_init_stop[col] = _tp_stop
+                                    tp_curr_stop[col] = _tp_stop
                                 elif abs(position_now) > abs(state.position):
                                     # Position increased -> keep/override stops
                                     if should_update_stop_nb(_sl_stop, _stop_update_mode):
-                                        sl_init_i[col] = i
-                                        sl_init_price[col] = new_init_price
-                                        sl_init_stop[col] = _sl_stop
-                                        sl_init_trail[col] = _sl_trail
+                                        sl_curr_i[col] = sl_init_i[col] = i
+                                        sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                        sl_curr_stop[col] = _sl_stop
+                                        sl_curr_trail[col] = _sl_trail
                                     if should_update_stop_nb(_tp_stop, _stop_update_mode):
                                         tp_init_i[col] = i
                                         tp_init_price[col] = new_init_price
-                                        tp_init_stop[col] = _tp_stop
+                                        tp_curr_stop[col] = _tp_stop
 
                 # Now becomes last
                 last_position[col] = position_now
@@ -3586,6 +3575,34 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 def trade_duration_map_nb(record: tp.Record) -> int:
     """`map_func_nb` that returns trade duration."""
     return record['exit_idx'] - record['entry_idx']
+
+
+@njit(cache=True)
+def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current winning streak of each trade."""
+    out = np.full(len(records), 0, dtype=np.int_)
+    curr_rank = 0
+    for i in range(len(records)):
+        if records[i]['pnl'] > 0:
+            curr_rank += 1
+        else:
+            curr_rank = 0
+        out[i] = curr_rank
+    return out
+
+
+@njit(cache=True)
+def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current losing streak of each trade."""
+    out = np.full(len(records), 0, dtype=np.int_)
+    curr_rank = 0
+    for i in range(len(records)):
+        if records[i]['pnl'] < 0:
+            curr_rank += 1
+        else:
+            curr_rank = 0
+        out[i] = curr_rank
+    return out
 
 
 @njit(cache=True)
@@ -4472,32 +4489,6 @@ def total_return_nb(total_profit: tp.Array1d, init_cash: tp.Array1d) -> tp.Array
 
 
 @njit(cache=True)
-def get_return_nb(input_value: float, output_value: float) -> float:
-    """Get return from input and output value."""
-    if input_value == 0:
-        if output_value == 0:
-            return 0.
-        return np.inf * np.sign(output_value)
-    return_value = (output_value - input_value) / input_value
-    if input_value < 0:
-        return_value *= -1
-    return return_value
-
-
-@njit(cache=True)
-def returns_nb(value: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
-    """Get portfolio return series per column/group."""
-    out = np.empty(value.shape, dtype=np.float_)
-    for col in range(out.shape[1]):
-        input_value = init_cash[col]
-        for i in range(out.shape[0]):
-            output_value = value[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
-            input_value = output_value
-    return out
-
-
-@njit(cache=True)
 def returns_in_sim_order_nb(value_iso: tp.Array2d,
                             group_lens: tp.Array1d,
                             init_cash_grouped: tp.Array1d,
@@ -4515,7 +4506,7 @@ def returns_in_sim_order_nb(value_iso: tp.Array2d,
             i = j // group_len
             col = from_col + call_seq[i, from_col + j % group_len]
             output_value = value_iso[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
+            out[i, col] = returns_nb.get_return_nb(input_value, output_value)
             input_value = output_value
         from_col = to_col
     return out
@@ -4529,18 +4520,18 @@ def asset_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array
         for i in range(cash_flow.shape[0]):
             input_value = 0. if i == 0 else asset_value[i - 1, col]
             output_value = asset_value[i, col] + cash_flow[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
+            out[i, col] = returns_nb.get_return_nb(input_value, output_value)
     return out
 
 
 @njit(cache=True)
-def market_value_nb(close: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
+def benchmark_value_nb(close: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
     """Get market value per column."""
     return close / close[0] * init_cash
 
 
 @njit(cache=True)
-def market_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d) -> tp.Array2d:
+def benchmark_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d) -> tp.Array2d:
     """Get market value per group."""
     check_group_lens(group_lens, close.shape[1])
 
@@ -4557,11 +4548,11 @@ def market_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash
 
 
 @njit(cache=True)
-def total_market_return_nb(market_value: tp.Array2d) -> tp.Array1d:
+def total_benchmark_return_nb(benchmark_value: tp.Array2d) -> tp.Array1d:
     """Get total market return per column/group."""
-    out = np.empty(market_value.shape[1], dtype=np.float_)
-    for col in range(market_value.shape[1]):
-        out[col] = get_return_nb(market_value[0, col], market_value[-1, col])
+    out = np.empty(benchmark_value.shape[1], dtype=np.float_)
+    for col in range(benchmark_value.shape[1]):
+        out[col] = returns_nb.get_return_nb(benchmark_value[0, col], benchmark_value[-1, col])
     return out
 
 

@@ -4,13 +4,11 @@ from numba import njit
 import pytest
 from datetime import datetime
 
-from vectorbt import settings
+import vectorbt as vbt
 from vectorbt.base import (
-    accessors,
     array_wrapper,
     column_grouper,
     combine_fns,
-    class_helpers,
     index_fns,
     indexing,
     reshape_fns
@@ -21,9 +19,6 @@ try:
     import ray
 except ImportError:
     ray_available = False
-
-settings.broadcasting['index_from'] = 'stack'
-settings.broadcasting['columns_from'] = 'stack'
 
 day_dt = np.timedelta64(86400000000000)
 
@@ -56,6 +51,22 @@ df4 = pd.DataFrame(
 multi_i = pd.MultiIndex.from_arrays([['x7', 'y7', 'z7'], ['x8', 'y8', 'z8']], names=['i7', 'i8'])
 multi_c = pd.MultiIndex.from_arrays([['a7', 'b7', 'c7'], ['a8', 'b8', 'c8']], names=['c7', 'c8'])
 df5 = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], index=multi_i, columns=multi_c)
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.broadcasting['index_from'] = 'stack'
+    vbt.settings.broadcasting['columns_from'] = 'stack'
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
 
 # ############# column_grouper.py ############# #
 
@@ -675,10 +686,10 @@ class TestArrayWrapper:
             datetime(2020, 1, 3)
         ])).freq == day_dt
 
-    def test_to_time_units(self):
+    def test_to_timedelta(self):
         sr = pd.Series([1, 2, np.nan], index=['x', 'y', 'z'], name='name')
         pd.testing.assert_series_equal(
-            array_wrapper.ArrayWrapper.from_obj(sr, freq='1 days').to_time_units(sr),
+            array_wrapper.ArrayWrapper.from_obj(sr, freq='1 days').to_timedelta(sr),
             pd.Series(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=sr.index,
@@ -687,7 +698,7 @@ class TestArrayWrapper:
         )
         df = sr.to_frame()
         pd.testing.assert_frame_equal(
-            array_wrapper.ArrayWrapper.from_obj(df, freq='1 days').to_time_units(df),
+            array_wrapper.ArrayWrapper.from_obj(df, freq='1 days').to_timedelta(df),
             pd.DataFrame(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=df.index,
@@ -1135,13 +1146,21 @@ class TestIndexFns:
             pd.Index(['x7', 'y7', 'z7'], dtype='object', name='i7')
         )
         pd.testing.assert_index_equal(
-            index_fns.drop_levels(multi_i, ['i7', 'i8']),  # won't do anything
+            index_fns.drop_levels(multi_i, 'i9', strict=False),
+            multi_i
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.drop_levels(multi_i, 'i9')
+        pd.testing.assert_index_equal(
+            index_fns.drop_levels(multi_i, ['i7', 'i8'], strict=False),  # won't do anything
             pd.MultiIndex.from_tuples([
                 ('x7', 'x8'),
                 ('y7', 'y8'),
                 ('z7', 'z8')
             ], names=['i7', 'i8'])
         )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.drop_levels(multi_i, ['i7', 'i8'])
 
     def test_rename_levels(self):
         i = pd.Int64Index([1, 2, 3], name='i')
@@ -1149,6 +1168,12 @@ class TestIndexFns:
             index_fns.rename_levels(i, {'i': 'f'}),
             pd.Int64Index([1, 2, 3], dtype='int64', name='f')
         )
+        pd.testing.assert_index_equal(
+            index_fns.rename_levels(i, {'a': 'b'}, strict=False),
+            i
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.rename_levels(i, {'a': 'b'}, strict=True)
         pd.testing.assert_index_equal(
             index_fns.rename_levels(multi_i, {'i7': 'f7', 'i8': 'f8'}),
             pd.MultiIndex.from_tuples([
@@ -2205,7 +2230,6 @@ class TestReshapeFns:
 
 called_dict = {}
 
-
 PandasIndexer = indexing.PandasIndexer
 ParamIndexer = indexing.build_param_indexer(['param1', 'param2', 'tuple'])
 
@@ -2573,83 +2597,6 @@ class TestCombineFns:
             combine_fns.combine_multiple_nb(
                 (df4.values, df4.values * 2, df4.values * 3), combine_func_nb, 100),
             target2
-        )
-
-
-# ############# common.py ############# #
-
-class TestCommon:
-    def test_add_nb_methods_1d(self):
-        @njit
-        def same_shape_1d_nb(a): return a ** 2
-
-        @njit
-        def wkw_1d_nb(a, b=10): return a ** 3 + b
-
-        @njit
-        def reduced_dim0_1d_nb(a): return 0
-
-        @njit
-        def reduced_dim1_one_1d_nb(a): return np.zeros(1)
-
-        @njit
-        def reduced_dim1_1d_nb(a): return np.zeros(a.shape[0] - 1)
-
-        @class_helpers.add_nb_methods([
-            (same_shape_1d_nb, False),
-            (wkw_1d_nb, False),
-            (reduced_dim0_1d_nb, True, 'reduced_dim0'),
-            (reduced_dim1_one_1d_nb, True, 'reduced_dim1_one'),
-            (reduced_dim1_1d_nb, True)
-        ])
-        class H_1d(accessors.BaseAccessor):
-            def __init__(self, sr):
-                super().__init__(sr)
-
-        pd.testing.assert_series_equal(H_1d(sr2).same_shape(), sr2 ** 2)
-        pd.testing.assert_series_equal(H_1d(sr2).wkw(), sr2 ** 3 + 10)
-        pd.testing.assert_series_equal(H_1d(sr2).wkw(b=20), sr2 ** 3 + 20)
-        assert H_1d(sr2).reduced_dim0() == 0
-        assert H_1d(sr2).reduced_dim1_one() == 0
-        pd.testing.assert_series_equal(H_1d(sr2).reduced_dim1(), pd.Series(np.zeros(sr2.shape[0] - 1), name=sr2.name))
-
-    def test_add_nb_methods_2d(self):
-        @njit
-        def same_shape_nb(a): return a ** 2
-
-        @njit
-        def wkw_nb(a, b=10): return a ** 3 + b
-
-        @njit
-        def reduced_dim0_nb(a): return 0
-
-        @njit
-        def reduced_dim1_nb(a): return np.zeros(a.shape[1])
-
-        @njit
-        def reduced_dim2_nb(a): return np.zeros((a.shape[0] - 1, a.shape[1]))
-
-        @class_helpers.add_nb_methods([
-            (same_shape_nb, False),
-            (wkw_nb, False),
-            (reduced_dim0_nb, True, 'reduced_dim0'),
-            (reduced_dim1_nb, True, 'reduced_dim1'),
-            (reduced_dim2_nb, True),
-        ])
-        class H(accessors.BaseAccessor):
-            pass
-
-        pd.testing.assert_frame_equal(H(df3).same_shape(), df3 ** 2)
-        pd.testing.assert_frame_equal(H(df3).wkw(), df3 ** 3 + 10)
-        pd.testing.assert_frame_equal(H(df3).wkw(b=20), df3 ** 3 + 20)
-        assert H(df3).reduced_dim0() == 0
-        pd.testing.assert_series_equal(
-            H(df3).reduced_dim1(),
-            pd.Series(np.zeros(df3.shape[1]), index=df3.columns, name='reduced_dim1')
-        )
-        pd.testing.assert_frame_equal(
-            H(df3).reduced_dim2(),
-            pd.DataFrame(np.zeros((df3.shape[0] - 1, df3.shape[1])), columns=df3.columns)
         )
 
 
@@ -3166,7 +3113,7 @@ class TestAccessors:
                 columns=pd.Index(['a6', 'b6', 'c6'], dtype='object', name='c6')
             )
         )
-        
+
         target = pd.DataFrame(
             np.array([
                 [232, 233, 234],
@@ -3282,49 +3229,3 @@ class TestAccessors:
                 ], names=[None, 'c6'])
             )
         )
-
-    @pytest.mark.parametrize(
-        "test_input",
-        [sr2, df5],
-    )
-    def test_magic(self, test_input):
-        a = test_input
-        b = test_input.copy()
-        np.random.shuffle(b.values)
-        assert_func = pd.testing.assert_series_equal if isinstance(a, pd.Series) else pd.testing.assert_frame_equal
-
-        # binary ops
-        # comparison ops
-        assert_func(a.vbt == b, a == b)
-        assert_func(a.vbt != b, a != b)
-        assert_func(a.vbt < b, a < b)
-        assert_func(a.vbt > b, a > b)
-        assert_func(a.vbt <= b, a <= b)
-        assert_func(a.vbt >= b, a >= b)
-        # arithmetic ops
-        assert_func(a.vbt + b, a + b)
-        assert_func(a.vbt - b, a - b)
-        assert_func(a.vbt * b, a * b)
-        assert_func(a.vbt ** b, a ** b)
-        assert_func(a.vbt % b, a % b)
-        assert_func(a.vbt // b, a // b)
-        assert_func(a.vbt / b, a / b)
-        # __r*__ is only called if the left object does not have an __*__ method
-        assert_func(10 + a.vbt, 10 + a)
-        assert_func(10 - a.vbt, 10 - a)
-        assert_func(10 * a.vbt, 10 * a)
-        assert_func(10 ** a.vbt, 10 ** a)
-        assert_func(10 % a.vbt, 10 % a)
-        assert_func(10 // a.vbt, 10 // a)
-        assert_func(10 / a.vbt, 10 / a)
-        # mask ops
-        assert_func(a.vbt & b, a & b)
-        assert_func(a.vbt | b, a | b)
-        assert_func(a.vbt ^ b, a ^ b)
-        assert_func(10 & a.vbt, 10 & a)
-        assert_func(10 | a.vbt, 10 | a)
-        assert_func(10 ^ a.vbt, 10 ^ a)
-        # unary ops
-        assert_func(-a.vbt, -a.vbt)
-        assert_func(+a.vbt, +a.vbt)
-        assert_func(abs((-a).vbt), abs((-a).vbt))

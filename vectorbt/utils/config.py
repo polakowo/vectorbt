@@ -4,10 +4,24 @@ from copy import copy, deepcopy
 from collections import namedtuple
 import dill
 import inspect
+import pickle
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.attr import deep_getattr
+from vectorbt.utils.docs import Documented, to_doc
+
+
+class Default:
+    """Class for wrapping default values."""
+
+    def __init__(self, value: tp.Any) -> None:
+        self.value = value
+
+    def __repr__(self) -> str:
+        return "Default(" + self.value.__repr__() + ")"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -172,11 +186,18 @@ def merge_dicts(*dicts: InConfigLikeT,
     if to_dict:
         dicts = tuple([convert_to_dict(dct, nested=nested) for dct in dicts])
     if copy_mode is not None:
-        dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
+        if not to_dict or copy_mode != 'shallow':
+            # to_dict already does a shallow copy
+            dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
     x, y = dicts[0], dicts[1]
+    should_update = True
+    if x.__class__ is dict and y.__class__ is dict and len(x) == 0:
+        x = y
+        should_update = False
     if isinstance(x, atomic_dict) or isinstance(y, atomic_dict):
         x = y
-    else:
+        should_update = False
+    if should_update:
         update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
     if len(dicts) > 2:
         return merge_dicts(
@@ -201,12 +222,12 @@ class Pickleable:
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        raise NotImplementedError
+        return pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL)
 
     @classmethod
     def loads(cls: tp.Type[PickleableT], dumps: bytes, **kwargs) -> PickleableT:
         """Unpickle from bytes."""
-        raise NotImplementedError
+        return pickle.loads(dumps)
 
     def save(self, fname: tp.FileName, **kwargs) -> None:
         """Save dumps to a file."""
@@ -256,7 +277,7 @@ class PickleableDict(Pickleable, dict):
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
-class Config(PickleableDict):
+class Config(PickleableDict, Documented):
     """Extends dict with config features such as nested updates, frozen keys/values, and pickling.
 
     Args:
@@ -424,7 +445,7 @@ class Config(PickleableDict):
         if as_attrs:
             for k, v in self.items():
                 if k in self.__dir__():
-                    raise ValueError(f"Cannot set key '{k}' as attribute of the config. Disable set_attrs.")
+                    raise ValueError(f"Cannot set key '{k}' as attribute of the config. Disable as_attrs.")
                 self.__dict__[k] = v
 
     @property
@@ -599,6 +620,10 @@ class Config(PickleableDict):
             nested = self.nested_
         return merge_dicts(self, other, nested=nested, **kwargs)
 
+    def to_dict(self, nested: tp.Optional[bool] = None) -> dict:
+        """Convert to dict."""
+        return convert_to_dict(self, nested=nested)
+
     def reset(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
         """Clears the config and updates it with the initial config.
 
@@ -665,6 +690,22 @@ class Config(PickleableDict):
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
 
+    def to_doc(self, with_params: bool = False, **kwargs) -> str:
+        """Convert to a doc."""
+        doc = self.__class__.__name__ + "(" + to_doc(dict(self), **kwargs) + ")"
+        if with_params:
+            doc += " with params " + to_doc(dict(
+                copy_kwargs=self.copy_kwargs_,
+                reset_dct=self.reset_dct_,
+                reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
+                frozen_keys=self.frozen_keys_,
+                readonly=self.readonly_,
+                nested=self.nested_,
+                convert_dicts=self.convert_dicts_,
+                as_attrs=self.as_attrs_
+            ), **kwargs)
+        return doc
+
 
 class AtomicConfig(Config, atomic_dict):
     """Config that behaves like a single value when merging."""
@@ -674,12 +715,12 @@ class AtomicConfig(Config, atomic_dict):
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
-class Configured(Pickleable):
+class Configured(Pickleable, Documented):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
 
-    Config settings are defined under `config.configured` in `vectorbt._settings.settings`.
+    Settings are defined under `configured` in `vectorbt._settings.settings`.
 
     !!! warning
         If any attribute has been overwritten that isn't listed in `Configured.writeable_attrs`,
@@ -687,30 +728,54 @@ class Configured(Pickleable):
         their values won't be copied over. Make sure to pass them explicitly to
         make the saved & loaded / copied instance resilient to changes in globals."""
 
-    writeable_attrs: tp.ClassVar[tp.List[str]] = []
-    """List of writeable attributes that will be saved/copied along with the config."""
-
     def __init__(self, **config) -> None:
         from vectorbt._settings import settings
-        configured_cfg = settings['config']['configured']
+        configured_cfg = settings['configured']
 
-        self._config = Config(config, **configured_cfg)
-        self.writeable_attrs = copy(self.writeable_attrs)
+        self._config = Config(config, **configured_cfg['config'])
 
     @property
     def config(self) -> Config:
         """Initialization config."""
         return self._config
 
-    def copy(self: ConfiguredT, nested: tp.Optional[bool] = None, **new_config) -> ConfiguredT:
+    @property
+    def writeable_attrs(self) -> tp.Set[str]:
+        """Set of writeable attributes that will be saved/copied along with the config."""
+        return {
+            base_cls.writeable_attrs.__get__(self)
+            for base_cls in self.__class__.__bases__
+            if isinstance(base_cls, Configured)
+        }
+
+    def copy(self: ConfiguredT,
+             copy_mode: tp.Optional[str] = 'shallow',
+             nested: tp.Optional[bool] = None,
+             _class: tp.Optional[type] = None,
+             **new_config) -> ConfiguredT:
         """Copy config and writeable attributes to initialize a new instance.
 
         !!! warning
             This "copy" operation won't return a copy of the instance but a new instance
-            initialized with the same config and writeable attributes."""
-        new_instance = self.__class__(**self.config.merge_with(new_config, nested=nested))
+            initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
+        if _class is None:
+            _class = self.__class__
+        new_config = self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested)
+        new_instance = _class(**new_config)
         for attr in self.writeable_attrs:
-            setattr(new_instance, attr, getattr(self, attr))
+            attr_obj = getattr(self, attr)
+            if isinstance(attr_obj, Config):
+                attr_obj = attr_obj.copy(
+                    copy_mode=copy_mode,
+                    nested=nested
+                )
+            else:
+                if copy_mode is not None:
+                    if copy_mode == 'hybrid':
+                        attr_obj = copy(attr_obj)
+                    elif copy_mode == 'deep':
+                        attr_obj = deepcopy(attr_obj)
+            setattr(new_instance, attr, attr_obj)
         return new_instance
 
     def dumps(self, **kwargs) -> bytes:
@@ -742,10 +807,10 @@ class Configured(Pickleable):
                 return False
         return self.config == other.config
 
-    def getattr(self, *args, **kwargs) -> tp.Any:
-        """See `vectorbt.utils.attr.deep_getattr`."""
-        return deep_getattr(self, *args, **kwargs)
-
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
         self.config.update(*args, **kwargs, force=True)
+
+    def to_doc(self, **kwargs) -> str:
+        """Convert to a doc."""
+        return self.__class__.__name__ + "(**" + self.config.to_doc(**kwargs) + ")"

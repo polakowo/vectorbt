@@ -48,7 +48,7 @@ def index_from_values(values: tp.ArrayLikeSequence, name: tp.Optional[str] = Non
         if v is None or isinstance(v, scalar_types):
             value_names.append(v)
         elif isinstance(v, np.ndarray):
-            if (v == v.item(0)).all():
+            if np.isclose(v, v.item(0), equal_nan=True).all():
                 value_names.append(v.item(0))
             else:
                 value_names.append('array_%d' % i)
@@ -137,37 +137,40 @@ def combine_indexes(indexes: tp.Sequence[tp.IndexLike],
     return new_index
 
 
-def drop_levels(index: tp.Index, levels: tp.MaybeLevelSequence) -> tp.Index:
-    """Softly drop `levels` in `index` by their name/position."""
+def drop_levels(index: tp.Index, levels: tp.MaybeLevelSequence, strict: bool = True) -> tp.Index:
+    """Drop `levels` in `index` by their name/position."""
     if not isinstance(index, pd.MultiIndex):
         return index
+    if strict:
+        return index.droplevel(levels)
 
-    levels_to_drop = []
+    levels_to_drop = set()
     if isinstance(levels, (int, str)):
         levels = (levels,)
     for level in levels:
         if level in index.names:
-            if level not in levels_to_drop:
-                levels_to_drop.append(level)
-        elif isinstance(level, int):
-            if 0 <= level < index.nlevels or level == -1:
-                if level not in levels_to_drop:
-                    levels_to_drop.append(level)
+            levels_to_drop.add(level)
+        elif isinstance(level, int) and 0 <= level < index.nlevels or level == -1:
+            levels_to_drop.add(level)
     if len(levels_to_drop) < index.nlevels:
         # Drop only if there will be some indexes left
-        return index.droplevel(levels_to_drop)
+        return index.droplevel(list(levels_to_drop))
     return index
 
 
-def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any]) -> tp.Index:
+def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any], strict: bool = True) -> tp.Index:
     """Rename levels in `index` by `name_dict`."""
     for k, v in name_dict.items():
         if isinstance(index, pd.MultiIndex):
             if k in index.names:
                 index = index.rename(v, level=k)
+            elif strict:
+                raise KeyError(f"Level '{k}' not found")
         else:
             if index.name == k:
                 index.name = v
+            elif strict:
+                raise KeyError(f"Level '{k}' not found")
     return index
 
 

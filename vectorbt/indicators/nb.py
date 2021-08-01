@@ -218,5 +218,5 @@ def atr_apply_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, window: i
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
     obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
-    obv = generic_nb.cumsum_nb(obv)
+    obv = generic_nb.nancumsum_nb(obv)
     return obv

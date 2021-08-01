@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from collections.abc import Sequence
+import functools
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
@@ -69,6 +70,9 @@ def to_1d(arg: tp.ArrayLike, raw: bool = False) -> tp.AnyArray1d:
     raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 1 dimension")
 
 
+to_1d_array = functools.partial(to_1d, raw=True)
+
+
 def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyArray2d:
     """Reshape argument to two dimensions. 
 
@@ -87,6 +91,17 @@ def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyA
     elif arg.ndim == 0:
         return arg.reshape((1, 1))
     raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions")
+
+
+to_2d_array = functools.partial(to_2d, raw=True)
+
+
+def to_dict(arg: tp.ArrayLike, orient: str = 'dict') -> dict:
+    """Convert object to dict."""
+    arg = to_pd_array(arg)
+    if orient == 'index_series':
+        return {arg.index[i]: arg.iloc[i] for i in range(len(arg.index))}
+    return arg.to_dict(orient)
 
 
 def repeat(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False) -> tp.AnyArray:
@@ -153,7 +168,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
             * 'stack' - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * 'strict' - ensure that all pandas objects have the same index/columns
             * 'reset' - reset any index/columns (they become a simple range)
-            * integer - use the index/columns of the i-nth object in `args`
+            * integer - use the index/columns of the i-th object in `args`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
@@ -825,24 +840,31 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
         idx_vals = np.unique(np.concatenate((df.index, df.columns))).tolist()
     else:
         idx_vals = list(dict.fromkeys(np.concatenate((df.index, df.columns))))
-    df = df.copy()
+    df_index = df.index.copy()
+    df_columns = df.columns.copy()
     if isinstance(df.index, pd.MultiIndex):
         unique_index = pd.MultiIndex.from_tuples(idx_vals, names=new_name)
-        df.index.names = new_name
-        df.columns.names = new_name
+        df_index.names = new_name
+        df_columns.names = new_name
     else:
         unique_index = pd.Index(idx_vals, name=new_name)
-        df.index.name = new_name
-        df.columns.name = new_name
-    df_out = pd.DataFrame(index=unique_index, columns=unique_index)
+        df_index.name = new_name
+        df_columns.name = new_name
+    df = df.copy(deep=False)
+    df.index = df_index
+    df.columns = df_columns
+    df_out_dtype = np.promote_types(df.values.dtype, np.min_scalar_type(np.nan))
+    df_out = pd.DataFrame(index=unique_index, columns=unique_index, dtype=df_out_dtype)
     df_out.loc[:, :] = df
     df_out[df_out.isnull()] = df.transpose()
     return df_out
 
 
-def unstack_to_df(arg: tp.SeriesFrame, index_levels: tp.Optional[tp.MaybeLevelSequence] = None,
+def unstack_to_df(arg: tp.SeriesFrame,
+                  index_levels: tp.Optional[tp.MaybeLevelSequence] = None,
                   column_levels: tp.Optional[tp.MaybeLevelSequence] = None,
-                  symmetric: bool = False, sort: bool = True) -> tp.Frame:
+                  symmetric: bool = False,
+                  sort: bool = True) -> tp.Frame:
     """Reshape `arg` based on its multi-index into a DataFrame.
 
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 

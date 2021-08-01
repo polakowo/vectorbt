@@ -6,6 +6,47 @@ phenomena in trading. With it, you can traverse a huge number of strategy config
 instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data. 
 Accessing and analyzing this information for yourself could give you an information advantage in your own trading.
 
+## Installation
+
+```bash
+pip install vectorbt
+```
+
+To also install optional dependencies:
+
+```bash
+pip install vectorbt[full]
+```
+
+See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.
+
+Troubleshooting:
+
+* [TA-Lib support](https://github.com/mrjbq7/ta-lib#dependencies)
+* [Jupyter Notebook and JupyterLab support](https://plotly.com/python/getting-started/#jupyter-notebook-support)
+
+### Docker
+
+You can pull the most recent Docker image if you [have Docker installed](https://docs.docker.com/install/).
+
+```bash
+docker run --rm -p 8888:8888 -v "$PWD":/home/jovyan/work polakowo/vectorbt
+```
+
+This command pulls the latest `polakowo/vectorbt` image from Docker Hub. It then starts a container running
+a Jupyter Notebook server and exposes the server on host port 8888. Visiting `http://127.0.0.1:8888/?token=<token>`
+in a browser loads JupyterLab, where token is the secret token printed in the console. Docker destroys
+the container after notebook server exit, but any files written to the working directory in the container
+remain intact in the working directory on the host. See [Jupyter Docker Stacks - Quick Start](https://github.com/jupyter/docker-stacks#quick-start).
+
+There are two types of images:
+
+* [polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt): vanilla version (default)
+* [polakowo/vectorbt-full](https://hub.docker.com/r/polakowo/vectorbt-full): full version (with optional dependencies)
+
+Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook)
+and comes with Jupyter environment, vectorbt, and other scientific packages installed.
+
 ## How it works?
 
 vectorbt was implemented to address common performance shortcomings of backtesting libraries.
@@ -54,7 +95,7 @@ Moreover, pandas functions cannot be accessed within user-defined Numba code, si
 compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding
 maximum for each order, we cannot simply do `df.expanding().max()` from within Numba, but we must write
 and compile our own expanding max function wrapped with `@njit`. That's why vectorbt provides an arsenal
-of Numba-compiled functions for any sort of task.
+of Numba-compiled functions for any sort of tasks.
 
 ## Usability
 
@@ -481,6 +522,23 @@ There is much more to backtesting than simply stacking columns: vectorbt offers 
 most parts of a backtesting pipeline, from building indicators and generating signals, to
 modeling portfolio performance and visualizing results.
 
+## Limitations
+
+In its current shape, vectorbt is a raw (but fast-evolving) backtesting engine.
+
+- *High RAM usage*: Probably the main challenge of using vectorbt is high RAM usage since you need to keep
+a bunch of (sometimes huge) arrays in memory. But there is plenty of tricks already implemented to
+reduce the memory footprint, and you as a user always have 90-95% control over memory management
+(avoid array materialization, disable caching, split data, etc.)
+- *No built-in order management*: Once you issue an order command, it gets executed/rejected immediately
+(just like a market order, but you can easily build upon it to implement limit and stop orders).
+This means order execution is effectively state-less - it simply receives a command with inputs and gives you the
+result of the execution including the new cash balance and other metrics. There is no list of pending orders.
+Update: `Portfolio.from_signals` now supports stop orders.
+- *One order limit*: Only one order command per symbol and bar - although this can (and probably will) be expanded.
+- *Limited support for parallelization*: Read [this](https://github.com/polakowo/vectorbt/issues/129#issuecomment-823596039).
+- *Python skills required*: Having an intermediate knowledge of Pandas, NumPy, and broadcasting principles is a must.
+
 ## Resources
 
 ### Notebooks
@@ -504,6 +562,40 @@ Note: you must run the notebook to play with the widgets.
 ### Articles
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
+
+## Getting Help
+
+- If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
+- For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
+- If you have general questions, start a new [GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
+  - Alternatively, you can ask on [Gitter](https://gitter.im/vectorbt/community)
+- If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
+- For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
+
+## How to contribute
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+First, you need to install vectorbt from the repository:
+
+```bash
+pip uninstall vectorbt
+git clone https://github.com/polakowo/vectorbt.git
+cd vectorbt
+pip install -e .
+```
+
+After making changes, make sure you did not break any functionality:
+
+```bash
+pytest
+```
+
+Please make sure to update tests as appropriate.
+
+## License
+
+This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
 
 ## Disclaimer
 

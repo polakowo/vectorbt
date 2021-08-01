@@ -7,6 +7,8 @@ import pytest
 from itertools import product
 from collections import namedtuple
 
+import vectorbt as vbt
+
 ray_available = True
 try:
     import ray
@@ -32,6 +34,20 @@ except ImportError:
     talib_available = False
 
 seed = 42
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
 
 # ############# factory.py ############# #
 
@@ -1833,7 +1849,7 @@ class TestFactory:
             in_output_names=['in_o1', 'in_o2'],
             custom_output_props={
                 'co1': lambda self: self.ts1 + self.ts2,
-                'co2': property(lambda self: self.o1 + self.o2)
+                'co2': lambda self: self.o1 + self.o2
             }
         ).from_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2)).run(ts, ts + 1, [1, 2], 3)
 
@@ -1896,7 +1912,7 @@ class TestFactory:
             ), axis=1)
         )
 
-    def test_numeric_method(self):
+    def test_numeric_attr(self):
         obj = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out']) \
             .from_apply_func(lambda ts, p: ts * p).run(ts, 1)
 
@@ -1950,8 +1966,22 @@ class TestFactory:
                 ], names=['custom_p', None])
             )
         )
+        pd.testing.assert_series_equal(
+            obj.out_stats(),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                5.0, 2.6, 1.3329792289008184, 1.0, 2.6666666666666665, 4.333333333333333
+            ],
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Count', 'Mean', 'Std', 'Min', 'Median', 'Max'
+                ], dtype='object'),
+                name='agg_func_mean'
+            )
+        )
 
-    def test_bool_method(self):
+    def test_boolean_attr(self):
         obj = vbt.IndicatorFactory(
             input_names=['ts'], param_names=['p'], output_names=['out'],
             attr_settings=dict(out=dict(dtype=np.bool_))) \
@@ -1989,8 +2019,32 @@ class TestFactory:
                 columns=columns
             )
         )
+        pd.testing.assert_series_equal(
+            obj.out_stats(),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'), 2.3333333333333335, 46.666666666666664,
+                pd.Timestamp('2018-01-02 08:00:00'), pd.Timestamp('2018-01-03 16:00:00'), 0.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('0 days 00:00:00'),
+                1.0, 55.55555555555555, pd.Timedelta('2 days 08:00:00'),
+                pd.Timedelta('2 days 08:00:00'), pd.Timedelta('2 days 08:00:00'),
+                pd.NaT, pd.NaT, pd.NaT, pd.NaT, pd.NaT
+            ],
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Total', 'Rate [%]', 'First Index',
+                    'Last Index', 'Norm Avg Index [-1, 1]', 'Distance: Min',
+                    'Distance: Max', 'Distance: Mean', 'Distance: Std', 'Total Partitions',
+                    'Partition Rate [%]', 'Partition Length: Min', 'Partition Length: Max',
+                    'Partition Length: Mean', 'Partition Length: Std',
+                    'Partition Distance: Min', 'Partition Distance: Max',
+                    'Partition Distance: Mean', 'Partition Distance: Std'
+                ], dtype='object'),
+                name='agg_func_mean'
+            )
+        )
 
-    def test_readable(self):
+    def test_mapping_attr(self):
         TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
         obj = vbt.IndicatorFactory(
             output_names=['out'],
@@ -2001,8 +2055,19 @@ class TestFactory:
             obj.out_readable,
             pd.DataFrame([
                 ['Hello', 'World'],
-                ['World', '']
+                ['World', None]
             ])
+        )
+        pd.testing.assert_series_equal(
+            obj.out_stats(),
+            pd.Series([
+                0.0, 1.0, 2.0, 0.5, 0.5, 1.0
+            ],
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Value Counts: None', 'Value Counts: Hello', 'Value Counts: World'
+                ], dtype='object'),
+                name='agg_func_mean'
+            )
         )
 
     def test_dir(self):
@@ -2056,6 +2121,7 @@ class TestFactory:
             '_input_names',
             '_level_names',
             '_loc',
+            '_metrics',
             '_o1',
             '_o2',
             '_output_flags',
@@ -2075,14 +2141,16 @@ class TestFactory:
             '_tuple_mapper',
             '_wrapper',
             'apply_func',
+            'build_metrics_doc',
             'config',
             'copy',
             'custom_func',
+            'deep_getattr',
             'dumps',
-            'getattr',
             'iloc',
             'in_out',
             'in_out_readable',
+            'in_out_stats',
             'in_output_names',
             'indexing_func',
             'indexing_kwargs',
@@ -2091,32 +2159,45 @@ class TestFactory:
             'load',
             'loads',
             'loc',
+            'metrics',
             'o1',
             'o1_above',
             'o1_below',
             'o1_equal',
+            'o1_stats',
             'o2',
             'o2_and',
             'o2_or',
+            'o2_stats',
             'o2_xor',
             'output_flags',
             'output_names',
+            'override_metrics_doc',
             'p1_list',
             'p1_loc',
             'p2_list',
             'p2_loc',
             'param_names',
+            'post_resolve_attr',
+            'pre_resolve_attr',
             'regroup',
+            'resolve_attr',
+            'resolve_self',
             'run',
             'run_combs',
             'save',
             'select_one',
             'select_one_from_obj',
+            'self_aliases',
             'short_name',
+            'stats',
+            'stats_defaults',
+            'to_doc',
             'ts',
             'ts_above',
             'ts_below',
             'ts_equal',
+            'ts_stats',
             'tuple_loc',
             'update_config',
             'wrapper',
@@ -2261,7 +2342,8 @@ class TestFactory:
                 pd.DataFrame(
                     ts.rolling(2).mean().values,
                     index=ts.index,
-                    columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['smaindicator_window', None])
+                    columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')],
+                                                      names=['smaindicator_window', None])
                 )
             )
             pd.testing.assert_frame_equal(
@@ -2902,7 +2984,7 @@ class TestBasic:
         pd.testing.assert_series_equal(
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(
-                np.array([4., 7., 9., 10., 8., 5., 1.]),
+                np.array([4, 7, 9, 10, 8, 5, 1]),
                 index=close_ts.index,
                 name=close_ts.name
             )

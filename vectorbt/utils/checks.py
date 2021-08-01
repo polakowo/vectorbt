@@ -6,7 +6,7 @@ import pandas as pd
 from numba.core.registry import CPUDispatcher
 from inspect import signature, getmro
 import dill
-from collections.abc import Hashable
+from collections.abc import Hashable, Mapping
 
 from vectorbt import _typing as tp
 
@@ -14,9 +14,19 @@ from vectorbt import _typing as tp
 # ############# Checks ############# #
 
 
+def is_np_array(arg: tp.Any) -> bool:
+    """Check whether the argument is `np.ndarray`."""
+    return isinstance(arg, np.ndarray)
+
+
 def is_series(arg: tp.Any) -> bool:
     """Check whether the argument is `pd.Series`."""
     return isinstance(arg, pd.Series)
+
+
+def is_index(arg: tp.Any) -> bool:
+    """Check whether the argument is `pd.Index`."""
+    return isinstance(arg, pd.Index)
 
 
 def is_frame(arg: tp.Any) -> bool:
@@ -64,8 +74,15 @@ def is_iterable(arg: tp.Any) -> bool:
 
 def is_numba_func(arg: tp.Any) -> bool:
     """Check whether the argument is a Numba-compiled function."""
+    from vectorbt._settings import settings
+    numba_cfg = settings['numba']
+
+    if not numba_cfg['check_func_type']:
+        return True
     if 'NUMBA_DISABLE_JIT' in os.environ:
         if os.environ['NUMBA_DISABLE_JIT'] == '1':
+            if not numba_cfg['check_func_suffix']:
+                return True
             if arg.__name__.endswith('_nb'):
                 return True
     return isinstance(arg, CPUDispatcher)
@@ -231,6 +248,16 @@ def is_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) ->
 
     `types` can be one or multiple types or strings."""
     return is_subclass_of(type(arg), types)
+
+
+def is_mapping(arg: tp.Any) -> bool:
+    """Check whether the arguments is a mapping."""
+    return isinstance(arg, Mapping)
+
+
+def is_mapping_like(arg: tp.Any) -> bool:
+    """Check whether the arguments is a mapping-like object."""
+    return is_mapping(arg) or is_series(arg) or is_index(arg) or is_namedtuple(arg)
 
 
 # ############# Asserts ############# #

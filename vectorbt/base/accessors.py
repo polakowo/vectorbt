@@ -56,36 +56,27 @@ under the hood, which is mostly much faster than with pandas.
 !!! note
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 
-    Accessors do not utilize caching."""
+    Accessors do not utilize caching.
+
+    Grouping is only supported by the methods that accept the `group_by` argument."""
 
 import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.decorators import class_or_instancemethod, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.base import combine_fns, index_fns, reshape_fns
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.class_helpers import (
-    add_binary_magic_methods,
-    add_unary_magic_methods,
-    binary_magic_methods,
-    unary_magic_methods
-)
+from vectorbt.base.column_grouper import ColumnGrouper
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
-@add_binary_magic_methods(
-    binary_magic_methods,
-    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func)
-)
-@add_unary_magic_methods(
-    unary_magic_methods,
-    lambda self, np_func: self.apply(apply_func=np_func)
-)
-class BaseAccessor:
+@add_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
+@add_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
+class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
@@ -96,16 +87,53 @@ class BaseAccessor:
 
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
-    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
-        self._obj = obj
-        self._wrapper = ArrayWrapper.from_obj(obj, **kwargs)
+    def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
+        checks.assert_type(obj, (pd.Series, pd.DataFrame))
 
-    def __call__(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
+        self._obj = obj
+
+        wrapper_arg_names = get_func_arg_names(ArrayWrapper.__init__)
+        grouper_arg_names = get_func_arg_names(ColumnGrouper.__init__)
+        wrapping_kwargs = dict()
+        for k in list(kwargs.keys()):
+            if k in wrapper_arg_names or k in grouper_arg_names:
+                wrapping_kwargs[k] = kwargs.pop(k)
+        if wrapper is None:
+            wrapper = ArrayWrapper.from_obj(obj, **wrapping_kwargs)
+        else:
+            wrapper = wrapper.copy(**wrapping_kwargs)
+        Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
+
+    def __call__(self: BaseAccessorT, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""
 
-        return self.__class__(self.obj, *args, **kwargs)
+        return self.copy(**kwargs)
+
+    @property
+    def sr_accessor_cls(self):
+        """Accessor class for `pd.Series`."""
+        return BaseSRAccessor
+
+    @property
+    def df_accessor_cls(self):
+        """Accessor class for `pd.DataFrame`."""
+        return BaseDFAccessor
+
+    def indexing_func(self: BaseAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> BaseAccessorT:
+        """Perform indexing on `Wrapping`."""
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        if checks.is_series(new_obj):
+            return self.copy(
+                _class=self.sr_accessor_cls,
+                obj=new_obj,
+                wrapper=new_wrapper
+            )
+        return self.copy(
+            _class=self.df_accessor_cls,
+            obj=new_obj,
+            wrapper=new_wrapper
+        )
 
     @property
     def obj(self):
@@ -113,17 +141,12 @@ class BaseAccessor:
         return self._obj
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         raise NotImplementedError
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         raise NotImplementedError
-
-    @property
-    def wrapper(self) -> ArrayWrapper:
-        """Array wrapper."""
-        return self._wrapper
 
     # ############# Creation ############# #
 
@@ -186,24 +209,24 @@ class BaseAccessor:
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_levels(self, levels: tp.MaybeLevelSequence, axis: int = 1,
-                    inplace: bool = False) -> tp.Optional[tp.SeriesFrame]:
+                    inplace: bool = False, strict: bool = True) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.drop_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index: tp.Index) -> tp.Index:
-            return index_fns.drop_levels(obj_index, levels)
+            return index_fns.drop_levels(obj_index, levels, strict=strict)
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def rename_levels(self, name_dict: tp.Dict[str, tp.Any], axis: int = 1,
-                      inplace: bool = False) -> tp.Optional[tp.SeriesFrame]:
+                      inplace: bool = False, strict: bool = True) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.rename_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index: tp.Index) -> tp.Index:
-            return index_fns.rename_levels(obj_index, name_dict)
+            return index_fns.rename_levels(obj_index, name_dict, strict=strict)
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
@@ -245,13 +268,13 @@ class BaseAccessor:
         """Convert to 1-dim NumPy array
 
         See `vectorbt.base.reshape_fns.to_1d`."""
-        return reshape_fns.to_1d(self.obj, raw=True)
+        return reshape_fns.to_1d_array(self.obj)
 
     def to_2d_array(self) -> tp.Array2d:
         """Convert to 2-dim NumPy array.
 
         See `vectorbt.base.reshape_fns.to_2d`."""
-        return reshape_fns.to_2d(self.obj, raw=True)
+        return reshape_fns.to_2d_array(self.obj)
 
     def tile(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
@@ -263,11 +286,11 @@ class BaseAccessor:
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
-                return tiled.vbt.wrapper.wrap(
+                return ArrayWrapper.from_obj(tiled).wrap(
                     tiled.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
             else:
                 new_index = index_fns.combine_indexes([keys, self.wrapper.index])
-                return tiled.vbt.wrapper.wrap(
+                return ArrayWrapper.from_obj(tiled).wrap(
                     tiled.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return tiled
 
@@ -281,11 +304,11 @@ class BaseAccessor:
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes([self.wrapper.columns, keys])
-                return repeated.vbt.wrapper.wrap(
+                return ArrayWrapper.from_obj(repeated).wrap(
                     repeated.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
             else:
                 new_index = index_fns.combine_indexes([self.wrapper.index, keys])
-                return repeated.vbt.wrapper.wrap(
+                return ArrayWrapper.from_obj(repeated).wrap(
                     repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return repeated
 
@@ -331,12 +354,12 @@ class BaseAccessor:
             **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs))
 
     @class_or_instancemethod
-    def broadcast(self_or_cls, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
+    def broadcast(cls_or_self, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
-        if isinstance(self_or_cls, type):
+        if isinstance(cls_or_self, type):
             return reshape_fns.broadcast(*others, **kwargs)
-        return reshape_fns.broadcast(self_or_cls.obj, *others, **kwargs)
+        return reshape_fns.broadcast(cls_or_self.obj, *others, **kwargs)
 
     def broadcast_to(self, other: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast_to`."""
@@ -355,6 +378,10 @@ class BaseAccessor:
     def unstack_to_df(self, **kwargs) -> tp.Frame:  # pragma: no cover
         """See `vectorbt.base.reshape_fns.unstack_to_df`."""
         return reshape_fns.unstack_to_df(self.obj, **kwargs)
+
+    def to_dict(self, **kwargs) -> tp.Mapping:
+        """See `vectorbt.base.reshape_fns.to_dict`."""
+        return reshape_fns.to_dict(self.obj, **kwargs)
 
     # ############# Combining ############# #
 
@@ -403,7 +430,7 @@ class BaseAccessor:
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @class_or_instancemethod
-    def concat(self_or_cls, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
+    def concat(cls_or_self, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
                keys: tp.Optional[tp.IndexLike] = None) -> tp.Frame:
         """Concatenate with `others` along columns.
 
@@ -428,10 +455,10 @@ class BaseAccessor:
         ```
         """
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
-        if isinstance(self_or_cls, type):
+        if isinstance(cls_or_self, type):
             objs = others
         else:
-            objs = (self_or_cls.obj,) + others
+            objs = (cls_or_self.obj,) + others
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
@@ -641,7 +668,7 @@ class BaseAccessor:
                 inputs = new_obj, *new_others
         if len(inputs) == 2:
             result = combine_func(inputs[0], inputs[1], *args, **kwargs)
-            return new_obj.vbt.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(new_obj).wrap(result, **merge_dicts({}, wrap_kwargs))
         if concat:
             # Concat the results horizontally
             if checks.is_numba_func(combine_func) and numba_loop:
@@ -658,13 +685,13 @@ class BaseAccessor:
                 else:
                     result = combine_fns.combine_and_concat(
                         inputs[0], inputs[1:], combine_func, *args, **kwargs)
-            columns = new_obj.vbt.wrapper.columns
+            columns = ArrayWrapper.from_obj(new_obj).columns
             if keys is not None:
                 new_columns = index_fns.combine_indexes([keys, columns])
             else:
                 top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
                 new_columns = index_fns.combine_indexes([top_columns, columns])
-            return new_obj.vbt.wrapper.wrap(result, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
+            return ArrayWrapper.from_obj(new_obj).wrap(result, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
         else:
             # Combine arguments pairwise into one object
             if use_ray:
@@ -675,7 +702,7 @@ class BaseAccessor:
                 result = combine_fns.combine_multiple_nb(inputs, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(inputs, combine_func, *args, **kwargs)
-            return new_obj.vbt.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(new_obj).wrap(result, **merge_dicts({}, wrap_kwargs))
 
 
 class BaseSRAccessor(BaseAccessor):
@@ -684,18 +711,16 @@ class BaseSRAccessor(BaseAccessor):
     Accessible through `pd.Series.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         return True
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         return False
 
 
@@ -705,16 +730,14 @@ class BaseDFAccessor(BaseAccessor):
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        if not checks.is_pandas(obj):  # parent accessor
-            obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         return False
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         return True

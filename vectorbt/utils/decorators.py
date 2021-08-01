@@ -3,16 +3,18 @@
 from functools import wraps, lru_cache
 from threading import RLock
 import inspect
+import numpy as np
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
+from vectorbt.utils.config import Config
 
 
 class class_or_instancemethod(classmethod):
     """Function decorator that binds `self` to a class if the function is called as class method,
     otherwise to an instance."""
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         descr_get = super().__get__ if instance is None else self.__func__.__get__
         return descr_get(instance, owner)
 
@@ -24,8 +26,28 @@ class classproperty(object):
         self.func = func
         self.__doc__ = getattr(func, '__doc__')
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.func(owner)
+
+    def __set__(self, instance: object, value: tp.Any) -> None:
+        raise AttributeError("can't set attribute")
+
+
+class class_or_instanceproperty(object):
+    """Property that binds `self` to a class if the function is called as class method,
+    otherwise to an instance."""
+
+    def __init__(self, func: tp.Callable) -> None:
+        self.func = func
+        self.__doc__ = getattr(func, '__doc__')
+
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+        if instance is None:
+            return self.func(owner)
+        return self.func(instance)
+
+    def __set__(self, instance: object, value: tp.Any) -> None:
+        raise AttributeError("can't set attribute")
 
 
 custom_propertyT = tp.TypeVar("custom_propertyT", bound="custom_property")
@@ -63,12 +85,12 @@ class custom_property:
         self.flags = flags
         self.__doc__ = getattr(func, '__doc__')
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         return self.func(instance)
 
-    def __set__(self, instance: tp.Any, value: tp.Any) -> None:
+    def __set__(self, instance: object, value: tp.Any) -> None:
         raise AttributeError("can't set attribute")
 
     def __call__(self, *args, **kwargs) -> tp.Any:
@@ -97,7 +119,7 @@ class CacheCondition(tp.NamedTuple):
     """Rank to override the default rank."""
 
 
-def should_cache(func_name: str, instance: tp.Any, func: tp.Optional[tp.Callable] = None, **flags) -> bool:
+def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable] = None, **flags) -> bool:
     """Check whether to cache the method/property based on a range of conditions defined under
     `caching` in `vectorbt._settings.settings`.
 
@@ -284,7 +306,7 @@ class cached_property(custom_property):
         super().__init__(func, **flags)
         self.lock = RLock()
 
-    def clear_cache(self, instance: tp.Any) -> None:
+    def clear_cache(self, instance: object) -> None:
         """Clear the cache for this property belonging to `instance`."""
         if hasattr(instance, self.attrname):
             delattr(instance, self.attrname)
@@ -297,7 +319,7 @@ class cached_property(custom_property):
     def __set_name__(self, owner: tp.Type, name: str) -> None:
         self.name = name
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         if not should_cache(self.name, instance, func=self.func, **self.flags):
@@ -382,7 +404,7 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False,
 
     def decorator(func: tp.Callable) -> cached_methodT:
         @wraps(func)
-        def wrapper(instance: tp.Any, *args, **kwargs) -> tp.Any:
+        def wrapper(instance: object, *args, **kwargs) -> tp.Any:
             def partial_func(*args, **kwargs) -> tp.Any:
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)
@@ -438,3 +460,150 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False,
     elif len(args) == 1:
         return decorator(args[0])
     raise ValueError("Either function or keyword arguments must be passed")
+
+
+# ############# Magic methods ############# #
+
+WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
+
+__pdoc__ = {}
+
+binary_magic_config = Config(
+    {
+        '__eq__': dict(func=np.equal),
+        '__ne__': dict(func=np.not_equal),
+        '__lt__': dict(func=np.less),
+        '__gt__': dict(func=np.greater),
+        '__le__': dict(func=np.less_equal),
+        '__ge__': dict(func=np.greater_equal),
+        # arithmetic ops
+        '__add__': dict(func=np.add),
+        '__sub__': dict(func=np.subtract),
+        '__mul__': dict(func=np.multiply),
+        '__pow__': dict(func=np.power),
+        '__mod__': dict(func=np.mod),
+        '__floordiv__': dict(func=np.floor_divide),
+        '__truediv__': dict(func=np.true_divide),
+        '__radd__': dict(func=lambda x, y: np.add(y, x)),
+        '__rsub__': dict(func=lambda x, y: np.subtract(y, x)),
+        '__rmul__': dict(func=lambda x, y: np.multiply(y, x)),
+        '__rpow__': dict(func=lambda x, y: np.power(y, x)),
+        '__rmod__': dict(func=lambda x, y: np.mod(y, x)),
+        '__rfloordiv__': dict(func=lambda x, y: np.floor_divide(y, x)),
+        '__rtruediv__': dict(func=lambda x, y: np.true_divide(y, x)),
+        # mask ops
+        '__and__': dict(func=np.bitwise_and),
+        '__or__': dict(func=np.bitwise_or),
+        '__xor__': dict(func=np.bitwise_xor),
+        '__rand__': dict(func=lambda x, y: np.bitwise_and(y, x)),
+        '__ror__': dict(func=lambda x, y: np.bitwise_or(y, x)),
+        '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added to a class.
+
+```json
+{binary_magic_config.to_doc()}
+```
+"""
+
+BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
+
+
+def add_binary_magic_methods(translate_func: BinaryTranslateFuncT,
+                             config: tp.Optional[Config] = None) -> WrapperFuncT:
+    """Class decorator to add binary magic methods to a class.
+
+    `translate_func` should
+
+    * take `self`, `other`, and unary function,
+    * perform computation, and
+    * return the result.
+
+    `config` defaults to `binary_magic_config` and should contain target method names (keys)
+    and dictionaries (values) with the following keys:
+
+    * `func`: Function that combines two array-like objects.
+    """
+    if config is None:
+        config = binary_magic_config
+
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+        for target_name, settings in config.items():
+            func = settings['func']
+
+            def new_method(self,
+                           other: tp.Any,
+                           _translate_func: BinaryTranslateFuncT = translate_func,
+                           _func: tp.Callable = func) -> tp.SeriesFrame:
+                return _translate_func(self, other, _func)
+
+            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_method.__name__ = target_name
+            setattr(cls, target_name, new_method)
+        return cls
+
+    return wrapper
+
+
+unary_magic_config = Config(
+    {
+        '__neg__': dict(func=np.negative),
+        '__pos__': dict(func=np.positive),
+        '__abs__': dict(func=np.absolute),
+        '__invert__': dict(func=np.invert)
+    },
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added to a class.
+
+```json
+{unary_magic_config.to_doc()}
+```
+"""
+
+UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
+
+
+def add_unary_magic_methods(translate_func: UnaryTranslateFuncT,
+                            config: tp.Optional[Config] = None) -> WrapperFuncT:
+    """Class decorator to add unary magic methods to a class.
+
+    `translate_func` should
+
+    * take `self` and unary function,
+    * perform computation, and
+    * return the result.
+
+    `config` defaults to `unary_magic_config` and should contain target method names (keys)
+    and dictionaries (values) with the following keys:
+
+    * `func`: Function that transforms one array-like object.
+    """
+    if config is None:
+        config = unary_magic_config
+
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+        for target_name, settings in config.items():
+            func = settings['func']
+
+            def new_method(self,
+                           _translate_func: UnaryTranslateFuncT = translate_func,
+                           _func: tp.Callable = func) -> tp.SeriesFrame:
+                return _translate_func(self, _func)
+
+            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_method.__name__ = target_name
+            setattr(cls, target_name, new_method)
+        return cls
+
+    return wrapper

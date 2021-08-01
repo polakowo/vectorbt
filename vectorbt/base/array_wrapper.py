@@ -92,6 +92,7 @@ from vectorbt.utils.config import Configured, merge_dicts
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.attr import AttrResolver, AttrResolverT
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
@@ -284,7 +285,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 # Selection based on groups
                 # Get indices of columns corresponding to selected groups
                 group_idxs = col_idxs
-                group_idxs_arr = reshape_fns.to_1d(group_idxs)
+                group_idxs_arr = reshape_fns.to_1d_array(group_idxs)
                 group_start_idxs = _self.grouper.get_group_start_idxs()[group_idxs_arr]
                 group_end_idxs = _self.grouper.get_group_end_idxs()[group_idxs_arr]
                 ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
@@ -311,7 +312,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 ), idx_idxs, group_idxs, ungrouped_col_idxs
 
             # Selection based on columns
-            col_idxs_arr = reshape_fns.to_1d(col_idxs)
+            col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
             return _self.copy(
                 index=new_index,
                 columns=new_columns,
@@ -421,22 +422,25 @@ class ArrayWrapper(Configured, PandasIndexer):
             return freq_to_timedelta(freq)
         if isinstance(self.index, DatetimeIndexes):
             if self.index.freq is not None:
-                try:
-                    return freq_to_timedelta(self.index.freq)
-                except ValueError as e:
-                    warnings.warn(repr(e), stacklevel=2)
+                return freq_to_timedelta(self.index.freq)
             if self.index.inferred_freq is not None:
-                try:
-                    return freq_to_timedelta(self.index.inferred_freq)
-                except ValueError as e:
-                    warnings.warn(repr(e), stacklevel=2)
+                return freq_to_timedelta(self.index.inferred_freq)
         return freq
 
-    def to_time_units(self, a: tp.MaybeArray[float]) -> tp.Union[pd.Timedelta, tp.Array]:
-        """Convert array to time units."""
+    def to_timedelta(self, a: tp.MaybeArray[float],
+                    silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, tp.Array]:
+        """Convert array to duration using `ArrayWrapper.freq`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         if self.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. "
-                             "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
+            if not silence_warnings:
+                warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
+                              "define it globally under `settings.array_wrapper`.", stacklevel=2)
+            return a
         return a * self.freq
 
     @property
@@ -492,13 +496,25 @@ class ArrayWrapper(Configured, PandasIndexer):
         return _self  # important for keeping cache
 
     def wrap(self,
-             a: tp.ArrayLike,
+             arr: tp.ArrayLike,
              index: tp.Optional[tp.IndexLike] = None,
              columns: tp.Optional[tp.IndexLike] = None,
+             fillna: tp.Optional[tp.Scalar] = None,
              dtype: tp.Optional[tp.PandasDTypeLike] = None,
-             group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
-        """Wrap a NumPy array using the stored metadata."""
-        checks.assert_ndim(a, (1, 2))
+             group_by: tp.GroupByLike = None,
+             to_timedelta: bool = False,
+             to_index: bool = False,
+             silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
+        """Wrap a NumPy array using the stored metadata.
+
+        !!! note
+            Array will be converted to a NumPy array before wrapping."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         _self = self.resolve(group_by=group_by)
 
         if index is None:
@@ -516,33 +532,58 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             name = None
 
-        arr = np.asarray(a)
-        arr = reshape_fns.soft_to_ndim(arr, self.ndim)
-        checks.assert_shape_equal(arr, index, axis=(0, 0))
-        if arr.ndim == 2:
-            checks.assert_shape_equal(arr, columns, axis=(1, 0))
-        if arr.ndim == 1:
-            return pd.Series(arr, index=index, name=name, dtype=dtype)
-        if arr.ndim == 2:
-            if arr.shape[1] == 1 and _self.ndim == 1:
-                return pd.Series(arr[:, 0], index=index, name=name, dtype=dtype)
-            return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
-        raise ValueError(f"{arr.ndim}-d input is not supported")
+        def _wrap(arr):
+            arr = np.asarray(arr)
+            checks.assert_ndim(arr, (1, 2))
+            if fillna is not None:
+                arr[pd.isnull(arr)] = fillna
+            arr = reshape_fns.soft_to_ndim(arr, self.ndim)
+            checks.assert_shape_equal(arr, index, axis=(0, 0))
+            if arr.ndim == 2:
+                checks.assert_shape_equal(arr, columns, axis=(1, 0))
+            if arr.ndim == 1:
+                return pd.Series(arr, index=index, name=name, dtype=dtype)
+            if arr.ndim == 2:
+                if arr.shape[1] == 1 and _self.ndim == 1:
+                    return pd.Series(arr[:, 0], index=index, name=name, dtype=dtype)
+                return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
+            raise ValueError(f"{arr.ndim}-d input is not supported")
+
+        out = _wrap(arr)
+        if to_index:
+            # Convert to index
+            if checks.is_series(out):
+                out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
+            else:
+                out = out.applymap(lambda x: self.index[x] if x != -1 else np.nan)
+        if to_timedelta:
+            # Convert to timedelta
+            out = self.to_timedelta(out, silence_warnings=silence_warnings)
+        return out
 
     def wrap_reduced(self,
-                     a: tp.ArrayLike,
+                     arr: tp.ArrayLike,
                      name_or_index: tp.NameIndex = None,
                      columns: tp.Optional[tp.IndexLike] = None,
+                     fillna: tp.Optional[tp.Scalar] = None,
                      dtype: tp.Optional[tp.PandasDTypeLike] = None,
                      group_by: tp.GroupByLike = None,
-                     time_units: bool = False) -> tp.MaybeSeriesFrame:
+                     to_timedelta: bool = False,
+                     to_index: bool = False,
+                     silence_warnings: tp.Optional[bool] = False) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
         or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
-        If `time_units` is set, calls `to_time_units`."""
+        If `to_timedelta` is set, calls `ArrayWrapper.to_timedelta`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         checks.assert_not_none(self.ndim)
         _self = self.resolve(group_by=group_by)
 
@@ -551,44 +592,64 @@ class ArrayWrapper(Configured, PandasIndexer):
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
 
-        arr = np.asarray(a)
-        if dtype is not None:
-            try:
-                arr = arr.astype(dtype)
-            except Exception as e:
-                warnings.warn(repr(e), stacklevel=2)
-        if time_units:
-            arr = _self.to_time_units(arr)
-            dtype = None
-        if arr.ndim == 0:
-            # Scalar per Series/DataFrame
-            if time_units:
-                return pd.to_timedelta(arr.item())
-            return arr.item()
-        if arr.ndim == 1:
-            if _self.ndim == 1:
-                if arr.shape[0] == 1:
-                    # Scalar per Series/DataFrame with one column
-                    if time_units:
-                        return pd.to_timedelta(arr[0])
-                    return arr[0]
-                # Array per Series
-                sr_name = columns[0]
-                if sr_name == 0:  # was arr Series before
-                    sr_name = None
-                return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
-            # Scalar per column in arr DataFrame
-            return pd.Series(arr, index=columns, name=name_or_index, dtype=dtype)
-        if arr.ndim == 2:
-            if arr.shape[1] == 1 and _self.ndim == 1:
-                # Array per Series
-                sr_name = columns[0]
-                if sr_name == 0:  # was arr Series before
-                    sr_name = None
-                return pd.Series(arr[:, 0], index=name_or_index, name=sr_name, dtype=dtype)
-            # Array per column in arr DataFrame
-            return pd.DataFrame(arr, index=name_or_index, columns=columns, dtype=dtype)
-        raise ValueError(f"{arr.ndim}-d input is not supported")
+        if to_index:
+            if dtype is None:
+                dtype = np.int_
+            if fillna is None:
+                fillna = -1
+
+        def _wrap_reduced(arr):
+            nonlocal name_or_index
+
+            arr = np.asarray(arr)
+            if fillna is not None:
+                arr[pd.isnull(arr)] = fillna
+            if arr.ndim == 0:
+                # Scalar per Series/DataFrame
+                return pd.Series(arr, dtype=dtype)[0]
+            if arr.ndim == 1:
+                if _self.ndim == 1:
+                    if arr.shape[0] == 1:
+                        # Scalar per Series/DataFrame with one column
+                        return pd.Series(arr, dtype=dtype)[0]
+                    # Array per Series
+                    sr_name = columns[0]
+                    if sr_name == 0:  # was arr Series before
+                        sr_name = None
+                    if isinstance(name_or_index, str):
+                        name_or_index = None
+                    return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
+                # Scalar per column in arr DataFrame
+                return pd.Series(arr, index=columns, name=name_or_index, dtype=dtype)
+            if arr.ndim == 2:
+                if arr.shape[1] == 1 and _self.ndim == 1:
+                    arr = reshape_fns.soft_to_ndim(arr, 1)
+                    # Array per Series
+                    sr_name = columns[0]
+                    if sr_name == 0:  # was arr Series before
+                        sr_name = None
+                    if isinstance(name_or_index, str):
+                        name_or_index = None
+                    return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
+                # Array per column in DataFrame
+                if isinstance(name_or_index, str):
+                    name_or_index = None
+                return pd.DataFrame(arr, index=name_or_index, columns=columns, dtype=dtype)
+            raise ValueError(f"{arr.ndim}-d input is not supported")
+
+        out = _wrap_reduced(arr)
+        if to_index:
+            # Convert to index
+            if checks.is_series(out):
+                out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
+            elif checks.is_frame(out):
+                out = out.applymap(lambda x: self.index[x] if x != -1 else np.nan)
+            else:
+                out = self.index[out] if out != -1 else np.nan
+        if to_timedelta:
+            # Convert to timedelta
+            out = self.to_timedelta(out, silence_warnings=silence_warnings)
+        return out
 
     def dummy(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
         """Create a dummy Series/DataFrame."""
@@ -599,7 +660,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
-class Wrapping(Configured, PandasIndexer):
+class Wrapping(Configured, PandasIndexer, AttrResolver):
     """Class that uses `ArrayWrapper` globally."""
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
@@ -608,6 +669,7 @@ class Wrapping(Configured, PandasIndexer):
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
         PandasIndexer.__init__(self)
+        AttrResolver.__init__(self)
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
@@ -628,6 +690,41 @@ class Wrapping(Configured, PandasIndexer):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
+
+    def resolve_self(self: AttrResolverT,
+                     cond_kwargs: tp.KwargsLike = None,
+                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
+                     impacts_caching: bool = True,
+                     silence_warnings: tp.Optional[bool] = None) -> AttrResolverT:
+        """Resolve self.
+
+        Creates a copy of this instance if a different `freq` can be found in `cond_kwargs`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if cond_kwargs is None:
+            cond_kwargs = {}
+        if custom_arg_names is None:
+            custom_arg_names = set()
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
+        if 'freq' in cond_kwargs:
+            wrapper_copy = self.wrapper.copy(freq=cond_kwargs['freq'])
+
+            if wrapper_copy.freq != self.wrapper.freq:
+                if not silence_warnings:
+                    warnings.warn(f"Changing the frequency will create a copy of this object. "
+                                  f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
+                self_copy = self.copy(wrapper=wrapper_copy)
+                for alias in self.self_aliases:
+                    if alias not in custom_arg_names:
+                        cond_kwargs[alias] = self_copy
+                cond_kwargs['freq'] = self_copy.wrapper.freq
+                if impacts_caching:
+                    cond_kwargs['use_caching'] = False
+                return self_copy
+        return self
 
     def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group."""

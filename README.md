@@ -1,34 +1,36 @@
-[![Build Status](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)](https://travis-ci.com/github/polakowo/vectorbt)
-[![Code Coverage](https://img.shields.io/codecov/c/github/polakowo/vectorbt?style=for-the-badge)](https://codecov.io/gh/polakowo/vectorbt)
-[![Website](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
-[![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)](https://pypi.org/project/vectorbt)
-[![Downloads](https://img.shields.io/pypi/dm/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
-[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
-[![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
-[![Binder](https://img.shields.io/badge/launch-binder-d6604a?style=for-the-badge)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
-[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
+[![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
+[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
+[![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
+[![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
+[![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
+[![Downloads](https://pepy.tech/badge/vectorbt)](https://pepy.tech/project/vectorbt)
+[![Binder](https://img.shields.io/badge/launch-binder-d6604a)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
+[![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-# vectorbt
+# vectorbt :boom:
 
-![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-100x100-dark.png)
+vectorbt is a backtesting library on steroids — it operates entirely on pandas and NumPy objects, and is 
+accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
-vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
-accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale :fire:
-
-In contrast to conventional libraries, vectorbt represents any data as nd-arrays.
+In contrast to other backtesters, vectorbt represents data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
 compiled operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
 [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
-to Tableau right in the Jupyter notebook. Due to high performance, vectorbt is able to process large amounts of 
-data even without GPU and parallelization, and enable the user to interact with data-hungry widgets 
+to Tableau right in the Jupyter notebook. Due to high performance, vectorbt can process large amounts of 
+data even without GPU and parallelization and enables the user to interact with data-hungry widgets 
 without significant delays.
 
-With vectorbt you can
-* Analyze time series and engineer new features
+With vectorbt, you can
+* Build your pipelines in a few lines of code
+* Retain full control over execution (as opposed to web-based services such as TradingView)
+* Optimize your trading strategy against many parameters, assets, and periods in one go
+* Uncover hidden patterns in financial markets
+* Analyze time series and engineer new features for ML models
 * Supercharge pandas and your favorite tools to run much faster
-* Test many trading strategies, configurations, assets, and periods in one go
-* Test machine learning models
-* Build interactive charts/dashboards without leaving Jupyter
+* Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
+* Fetch and process data periodically, send Telegram notifications, and more
 
 ## Installation
 
@@ -73,7 +75,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 
 ## Examples
 
-You can start backtesting with just a couple of lines.
+Start backtesting with just a couple of lines:
 
 Here is how much profit we would have made if we invested $100 into Bitcoin in 2014 and held 
 (Note: first time compiling with Numba may take a while):
@@ -88,10 +90,10 @@ pf.total_profit()
 ```
 
 ```plaintext
-7528.904276220327
+8961.008555963961
 ```
 
-The crossover of 10-day SMA and 50-day SMA under the same conditions:
+The crossover of 10-day SMA and 50-day SMA:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -104,10 +106,10 @@ pf.total_profit()
 ```
 
 ```plaintext
-15852.799327152732
+16423.251963801864
 ```
 
-Quickly assessing the performance of 1000 random signal strategies on BTC and ETH:
+Generate 1,000 random strategies and test them on BTC and ETH:
 
 ```python
 import numpy as np
@@ -118,15 +120,15 @@ price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 n = np.random.randint(10, 101, size=1000).tolist()
 pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
 
-mean_expectancy = pf.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
-fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_title='mean_expectancy')
+mean_expectancy = pf.trades.expectancy().groupby(['randnx_n', 'symbol']).mean()
+fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_title='mean_expectancy')
 fig.show()
 ```
 
 ![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
 
-For fans of hyperparameter optimization, here is a snippet for testing 10000 window combinations of a 
-dual SMA crossover strategy on BTC, USD and LTC:
+For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
+dual SMA crossover strategy on BTC, USD, and LTC:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
@@ -146,7 +148,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-![dmac_heatmap.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif)
+<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif">
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -155,33 +157,38 @@ pf[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                     2015-08-07 00:00:00+00:00
-End                       2021-06-24 00:00:00+00:00
-Duration                         2145 days 00:00:00
-Initial Cash                                    100
-Total Profit                                 637467
-Total Return [%]                             637467
-Benchmark Return [%]                        72649.5
-Position Coverage [%]                       55.8042
-Max Drawdown [%]                             70.735
-Avg Drawdown [%]                            12.4471
-Max Drawdown Duration             760 days 00:00:00
-Avg Drawdown Duration    29 days 01:01:42.857142857
-Trade Count                                      52
-Win Rate [%]                                53.8462
-Best Trade [%]                               1075.8
-Worst Trade [%]                            -29.5934
-Avg Trade [%]                               46.0668
-Max Trade Duration                 80 days 00:00:00
-Avg Trade Duration       23 days 00:27:41.538461538
-Expectancy                                    12259
-SQN                                         1.44836
-Gross Exposure                             0.558042
-Sharpe Ratio                                1.71742
-Sortino Ratio                               2.96685
-Calmar Ratio                                2.54295
+Start                          2015-08-07 00:00:00+00:00
+End                            2021-08-01 00:00:00+00:00
+Period                                2183 days 00:00:00
+Start Value                                        100.0
+End Value                                  620402.791485
+Total Return [%]                           620302.791485
+Benchmark Return [%]                        92987.961948
+Max Gross Exposure [%]                             100.0
+Total Fees Paid                             10991.676981
+Max Drawdown [%]                               70.734951
+Max Drawdown Duration                  760 days 00:00:00
+Total Trades                                          54
+Total Closed Trades                                   53
+Total Open Trades                                      1
+Open Trade P&L                              67287.940601
+Win Rate [%]                                   52.830189
+Best Trade [%]                               1075.803607
+Worst Trade [%]                               -29.593414
+Avg Winning Trade [%]                          95.695343
+Avg Losing Trade [%]                          -11.890246
+Avg Winning Trade Duration    35 days 23:08:34.285714286
+Avg Losing Trade Duration                8 days 00:00:00
+Profit Factor                                   2.651143
+Expectancy                                   10434.24247
+Sharpe Ratio                                    2.041211
+Calmar Ratio                                      4.6747
+Omega Ratio                                     1.547013
+Sortino Ratio                                   3.519894
 Name: (10, 20, ETH-USD), dtype: object
 ```
+
+The same for plotting:
 
 ```python
 pf[(10, 20, 'ETH-USD')].plot().show()
@@ -200,20 +207,17 @@ bbands = vbt.BBANDS.run(price)
 def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
-        rows=5, cols=1, shared_xaxes=True, 
-        row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
         subplot_titles=(*symbols, '%B', 'Bandwidth'))
-    fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=650)
-    for i, symbol in enumerate(symbols):
-        bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
+    fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=400)
     bbands.percent_b.vbt.ts_heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
-            y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=4, col=1), fig=fig)
+            y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=1, col=1), fig=fig)
     bbands.bandwidth.vbt.ts_heatmap(
         trace_kwargs=dict(colorbar=dict(
-            y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=5, col=1), fig=fig)
+            y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
     return fig
 
 vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
@@ -223,26 +227,15 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-![bbands.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif)
-
-## Motivation
-
-While there are [many great backtesting packages for Python](https://github.com/mementum/backtrader#alternatives), 
-vectorbt combines an extremely fast backtester and a data science tool: it excels at processing performance and offers 
-interactive tools to explore complex phenomena in trading. With it, you can traverse a huge number of strategy configurations, 
-time periods, and instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data.
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
 
 ## How it works?
 
-vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
-It natively works on pandas objects, while performing all computations using NumPy and Numba under the hood. 
+vectorbt combines pandas, NumPy, and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
+It natively works on pandas objects while performing all computations using NumPy and Numba under the hood. 
 This way, it is often much faster than pandas alone:
 
 ```python-repl
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
 
 # pandas
@@ -254,14 +247,13 @@ This way, it is often much faster than pandas alone:
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
-(price, signals, etc.), vectorbt is optimized for working with multi-dimensional data: it treats index 
-of a DataFrame as time axis and columns as distinct features that should be backtest, and performs 
-computations on the entire matrix at once, without slow Python loops.
+In contrast to other backtesters, vectorbt is optimized for working with multi-dimensional data: 
+it treats the index of a Series/DataFrame as a time axis and columns as distinct configurations that 
+should be backtested, and performs computations on the entire array at once, without slow Python loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
-This way, user can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
+This way, users can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
 method is flexible towards inputs and can work on both Series and DataFrames.
 
 ## Features
@@ -282,7 +274,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 ```
     
 - Functions for combining, transforming, and indexing NumPy and pandas objects
-    - NumPy-like broadcasting for pandas, among other features
+    - Smart broadcasting for pandas
     
 ```python-repl
 # pandas
@@ -324,6 +316,7 @@ split_idx    0    1    2    3  4
 4          NaN  NaN  NaN  NaN  5
 ```
 
+- Transformation functions for rescaling and normalization
 - Drawdown analysis
 
 ```python-repl
@@ -334,7 +327,7 @@ split_idx    0    1    2    3  4
 
 - Functions for working with signals
     - Entry, exit, and random signal generators
-    - Ranking and distance functions
+    - Stop signal, ranking, and map-reduce functions
     
 ```python-repl
 >>> pd.Series([False, True, True, True]).vbt.signals.first()
@@ -345,27 +338,27 @@ split_idx    0    1    2    3  4
 dtype: bool
 ```
 
-- Signal factory for building iterative signal generators
+- Signal factory for building signal generators
     - Includes basic generators such for random signal generation
 
 ```python-repl
->>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
->>> rand.entries
-rand_n      0      1      2
-0       False   True   True
-1       False  False  False
-2       False  False  False
-3       False  False   True
-4       False  False  False
-5       False  False  False
->>> rand.exits
-rand_n      0      1      2
-0       False  False  False
-1       False  False   True
-2       False  False  False
-3       False   True  False
-4       False  False   True
-5       False  False  False
+>>> randnx = vbt.RANDNX.run(n=[0, 1, 2], input_shape=(6,), seed=42)
+>>> randnx.entries
+randnx_n      0      1      2
+0         False   True   True
+1         False  False  False
+2         False  False  False
+3         False  False   True
+4         False  False  False
+5         False  False  False
+>>> randnx.exits
+randnx_n      0      1      2
+0         False  False  False
+1         False  False   True
+2         False  False  False
+3         False   True  False
+4         False  False   True
+5         False  False  False
 ```
     
 - Functions for working with returns
@@ -435,10 +428,36 @@ sma_timeperiod    2    3
 2               2.5  2.0
 3               3.5  3.0
 4               4.5  4.0
-``` 
+```
 
-- Label generation for machine learning
-    - Labeling based on local extrema, breakouts, and more
+- Tailored statistics for many backtesting components
+  
+```python-repl
+>>> pd.Series([1, 2, 3, 2, 3, 2, 1, 2]).vbt(freq='d').drawdowns.stats()
+Start                                        0
+End                                          7
+Period                         8 days 00:00:00
+Total Records                                2
+Total Recovered Drawdowns                    1
+Total Active Drawdowns                       1
+Active Drawdown [%]                  33.333333
+Active Duration                3 days 00:00:00
+Active Recovery [%]                       50.0
+Active Recovery Return [%]               100.0
+Active Recovery Duration       1 days 00:00:00
+Max Drawdown [%]                     33.333333
+Avg Drawdown [%]                     33.333333
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          2 days 00:00:00
+Max Recovery Return [%]                   50.0
+Avg Recovery Return [%]                   50.0
+Max Recovery Duration          1 days 00:00:00
+Avg Recovery Duration          1 days 00:00:00
+Avg Recovery Duration Ratio                0.5
+dtype: object
+```
+
+- Label generation for ML models
 
 ```python-repl
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
@@ -449,10 +468,13 @@ sma_timeperiod    2    3
 
 - Classes for downloading and (periodically) updating data
     - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
+    - Allows creation of new data classes with ease
 - Telegram bot based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - Interactive Plotly-based widgets for visual data analysis
 
 ## Resources
+
+### Documentation
 
 Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
 
@@ -478,7 +500,16 @@ Note: you must run the notebook to play with the widgets.
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
-## How to contribute
+## Getting Help
+
+- If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
+- For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
+- If you have general questions, start a new [GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
+  - Alternatively, you can ask on [Gitter](https://gitter.im/vectorbt/community)
+- If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
+- For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
+
+## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
@@ -507,4 +538,3 @@ This work is licensed under Apache 2.0, but installing optional dependencies may
 
 This software is for educational purposes only. Do not risk money which you are afraid to lose. 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
-

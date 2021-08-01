@@ -1,13 +1,71 @@
 """Base class for working with log records.
 
 Class `Logs` wraps log records to analyze logs. Logs are mainly populated when
-simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.logs`."""
+simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.logs`.
+
+## Stats
+
+!!! hint
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Logs.metrics`.
+
+```python-repl
+>>> import pandas as pd
+>>> import numpy as np
+>>> from datetime import datetime, timedelta
+>>> import vectorbt as vbt
+
+>>> np.random.seed(42)
+>>> price = pd.DataFrame({
+...     'a': np.random.uniform(1, 2, size=100),
+...     'b': np.random.uniform(1, 2, size=100)
+... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+>>> size = pd.DataFrame({
+...     'a': np.random.uniform(-100, 100, size=100),
+...     'b': np.random.uniform(-100, 100, size=100),
+... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+>>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d', log=True)
+
+>>> pf.logs.stats(column='a')
+Start                             2020-01-01 00:00:00
+End                               2020-04-09 00:00:00
+Period                              100 days 00:00:00
+Total Records                                     100
+Status Counts: None                                 0
+Status Counts: Filled                              88
+Status Counts: Ignored                              0
+Status Counts: Rejected                            12
+Status Info Counts: None                           88
+Status Info Counts: NoCashLong                     12
+Name: a, dtype: object
+```
+
+`Logs.stats` also supports (re-)grouping:
+
+```python-repl
+>>> pf.logs.stats(group_by=True)
+Start                             2020-01-01 00:00:00
+End                               2020-04-09 00:00:00
+Period                              100 days 00:00:00
+Total Records                                     200
+Status Counts: None                                 0
+Status Counts: Filled                             187
+Status Counts: Ignored                              0
+Status Counts: Rejected                            13
+Status Info Counts: None                          187
+Status Info Counts: NoCashLong                     13
+Name: group, dtype: object
+```"""
 
 import pandas as pd
 
 from vectorbt import _typing as tp
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.enum import map_enum_values
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.reshape_fns import to_dict
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
+from vectorbt.records.decorators import add_mapped_fields
 from vectorbt.portfolio.enums import (
     log_dt,
     SizeType,
@@ -17,7 +75,32 @@ from vectorbt.portfolio.enums import (
     StatusInfo
 )
 
+__pdoc__ = {}
 
+logs_mf_config = Config(
+    dict(
+        size_type=dict(defaults=dict(mapping=SizeType)),
+        direction=dict(defaults=dict(mapping=Direction)),
+        res_side=dict(defaults=dict(mapping=OrderSide)),
+        res_status=dict(defaults=dict(mapping=OrderStatus)),
+        res_status_info=dict(defaults=dict(mapping=StatusInfo))
+    ),
+    as_attrs=False,
+    readonly=True,
+    copy_kwargs=dict(copy_mode='deep')
+)
+"""_"""
+
+__pdoc__['logs_mf_config'] = f"""Config of `vectorbt.portfolio.enums.log_dt` 
+mapped fields to be overridden in `Logs`.
+
+```json
+{logs_mf_config.to_doc()}
+```
+"""
+
+
+@add_mapped_fields(log_dt, logs_mf_config)
 class Logs(Records):
     """Extends `Records` for working with log records.
 
@@ -44,8 +127,8 @@ class Logs(Records):
     @property  # no need for cached
     def records_readable(self) -> tp.Frame:
         """Records in readable format."""
-        records_df = self.records
-        out = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
+        df = self.records.copy()
+        df.columns = pd.MultiIndex.from_tuples([
             ('Context', 'Log Id'),
             ('Context', 'Date'),
             ('Context', 'Column'),
@@ -83,46 +166,79 @@ class Logs(Records):
             ('Order Result', 'Status'),
             ('Order Result', 'Status Info'),
             ('Order Result', 'Order Id')
-        ]))
+        ])
 
-        def map_enum(sr, enum):
-            return sr.map(lambda x: enum._fields[x] if x != -1 else None)
+        df[('Context', 'Date')] = df[('Context', 'Date')].map(lambda x: self.wrapper.index[x])
+        df[('Context', 'Column')] = df[('Context', 'Column')].map(lambda x: self.wrapper.columns[x])
+        df[('Order', 'Size Type')] = map_enum_values(df[('Order', 'Size Type')], SizeType)
+        df[('Order', 'Direction')] = map_enum_values(df[('Order', 'Direction')], Direction)
+        df[('Order Result', 'Side')] = map_enum_values(df[('Order Result', 'Side')], OrderSide)
+        df[('Order Result', 'Status')] = map_enum_values(df[('Order Result', 'Status')], OrderStatus)
+        df[('Order Result', 'Status Info')] = map_enum_values(df[('Order Result', 'Status Info')], StatusInfo)
+        return df
 
-        out.iloc[:, 0] = records_df['id']
-        out.iloc[:, 1] = records_df['idx'].map(lambda x: self.wrapper.index[x])
-        out.iloc[:, 2] = records_df['col'].map(lambda x: self.wrapper.columns[x])
-        out.iloc[:, 3] = records_df['group']
-        out.iloc[:, 4] = records_df['cash']
-        out.iloc[:, 5] = records_df['position']
-        out.iloc[:, 6] = records_df['debt']
-        out.iloc[:, 7] = records_df['free_cash']
-        out.iloc[:, 8] = records_df['val_price']
-        out.iloc[:, 9] = records_df['value']
-        out.iloc[:, 10] = records_df['size']
-        out.iloc[:, 11] = records_df['price']
-        out.iloc[:, 12] = map_enum(records_df['size_type'], SizeType)
-        out.iloc[:, 13] = map_enum(records_df['direction'], Direction)
-        out.iloc[:, 14] = records_df['fees']
-        out.iloc[:, 15] = records_df['fixed_fees']
-        out.iloc[:, 16] = records_df['slippage']
-        out.iloc[:, 17] = records_df['min_size']
-        out.iloc[:, 18] = records_df['max_size']
-        out.iloc[:, 19] = records_df['reject_prob']
-        out.iloc[:, 20] = records_df['lock_cash']
-        out.iloc[:, 21] = records_df['allow_partial']
-        out.iloc[:, 22] = records_df['raise_reject']
-        out.iloc[:, 23] = records_df['log']
-        out.iloc[:, 24] = records_df['new_cash']
-        out.iloc[:, 25] = records_df['new_position']
-        out.iloc[:, 26] = records_df['new_debt']
-        out.iloc[:, 27] = records_df['new_free_cash']
-        out.iloc[:, 28] = records_df['new_val_price']
-        out.iloc[:, 29] = records_df['new_value']
-        out.iloc[:, 30] = records_df['res_size']
-        out.iloc[:, 31] = records_df['res_price']
-        out.iloc[:, 32] = records_df['res_fees']
-        out.iloc[:, 33] = map_enum(records_df['res_side'], OrderSide)
-        out.iloc[:, 34] = map_enum(records_df['res_status'], OrderStatus)
-        out.iloc[:, 35] = map_enum(records_df['res_status_info'], StatusInfo)
-        out.iloc[:, 36] = records_df['order_id']
-        return out
+    # ############# Stats ############# #
+
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `Orders.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
+        `logs.stats` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        logs_stats_cfg = settings['logs']['stats']
+
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            logs_stats_cfg
+        )
+
+    _metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self: len(self.wrapper.index),
+                apply_to_timedelta=True,
+                agg_func=None,
+                tags='wrapper'
+            ),
+            total_records=dict(
+                title='Total Records',
+                calc_func='count',
+                tags='records'
+            ),
+            res_status_counts=dict(
+                title='Status Counts',
+                calc_func='res_status.value_counts',
+                incl_all_keys=True,
+                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
+                tags=['logs', 'res_status', 'value_counts']
+            ),
+            res_status_info_counts=dict(
+                title='Status Info Counts',
+                calc_func='res_status_info.value_counts',
+                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
+                tags=['logs', 'res_status_info', 'value_counts']
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
+
+
+Logs.override_metrics_doc(__pdoc__)

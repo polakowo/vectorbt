@@ -194,10 +194,11 @@ scalar, an array, or any other object. Multiple values are passed as a list or a
 and each is having multiple values, their values will broadcast to a single shape:
 
 ```plaintext
-       p1      p2            result
-0       0       1          [(0, 1)]
-1  [0, 1]     [2]  [(0, 2), (1, 2)]
-2  [0, 1]  [2, 3]  [(0, 2), (1, 3)]
+       p1         p2            result
+0       0          1          [(0, 1)]
+1  [0, 1]        [2]  [(0, 2), (1, 2)]
+2  [0, 1]     [2, 3]  [(0, 2), (1, 3)]
+3  [0, 1]  [2, 3, 4]             error
 ```
 
 To illustrate the usage of parameters in indicators, let's build a basic indicator that returns 1
@@ -527,7 +528,7 @@ generates synthetic price:
 >>> @njit
 ... def apply_func_nb(input_shape, start, mu, sigma):
 ...     rand_returns = np.random.normal(mu, sigma, input_shape)
-...     return start * vbt.nb.cumprod_nb(rand_returns + 1)
+...     return start * vbt.nb.nancumprod_nb(rand_returns + 1)
 
 >>> MyInd = vbt.IndicatorFactory(
 ...     param_names=['start', 'mu', 'sigma'],
@@ -932,7 +933,7 @@ We have cut down the processing time almost in half.
 
 Similar to raw outputs, we can force `IndicatorFactory` to return the cache, so it can be used
 in other calculations or even indicators. The clear advantage of this approach is that we don't
-rely on some fixed set of parameter combinations anymore, but on the values of each parameter,
+rely on some fixed set of parameter combinations any more, but on the values of each parameter,
 which gives us more granularity in managing performance.
 
 ```python-repl
@@ -1013,18 +1014,22 @@ What kind of methods are created can be regulated using `dtype` in the `attr_set
     'out_bool',
     'out_bool_and',
     'out_bool_or',
+    'out_bool_stats',
     'out_bool_xor',
     'out_enum',
     'out_enum_readable',
+    'out_enum_stats',
     'out_float',
     'out_float_above',
     'out_float_below',
     'out_float_equal',
+    'out_float_stats',
     ...
     'price',
     'price_above',
     'price_below',
     'price_equal',
+    'price_stats',
     ...
 ]
 ```
@@ -1079,6 +1084,36 @@ Name: (2, b), dtype: float64
 2020-01-05  4.5  1.5
 ```
 
+## Stats
+
+!!! hint
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+We can attach metrics to any new indicator class:
+
+```python-repl
+>>> @njit
+... def apply_func_nb(price):
+...     return price ** 2, price ** 3
+
+>>> MyInd = vbt.IndicatorFactory(
+...     input_names=['price'],
+...     output_names=['out1', 'out2'],
+...     metrics=dict(
+...         sum_diff=dict(
+...             calc_func=lambda self: self.out2.sum() - self.out1.sum()
+...         )
+...     )
+... ).from_apply_func(
+...     apply_func_nb
+... )
+
+>>> myind = MyInd.run(price)
+>>> myind.stats(column='a')
+sum_diff    170.0
+Name: a, dtype: float64
+```
+
 ## TA-Lib
 
 Indicator factory also provides a class method `IndicatorFactory.from_talib`
@@ -1101,19 +1136,17 @@ from collections import Counter
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
-from vectorbt.utils.config import merge_dicts, resolve_dict
+from vectorbt.utils.config import merge_dicts, resolve_dict, Config, Default
 from vectorbt.utils.random import set_seed
-from vectorbt.utils.params import (
-    to_typed_list,
-    broadcast_params,
-    create_param_product,
-    DefaultParam
-)
-from vectorbt.utils.enum import cast_enum_value
+from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
+from vectorbt.utils.enum import map_enum_fields
+from vectorbt.utils.mapping import to_mapping, apply_mapping
+from vectorbt.utils.docs import to_doc
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import build_param_indexer
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.accessors import BaseAccessor
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -1145,8 +1178,11 @@ def prepare_params(param_list: tp.Sequence[tp.Params],
         _param_settings = resolve_dict(param_settings, i=i)
         is_tuple = _param_settings.get('is_tuple', False)
         dtype = _param_settings.get('dtype', None)
-        if checks.is_namedtuple(dtype):
-            params = cast_enum_value(params, dtype)
+        if checks.is_mapping_like(dtype):
+            if checks.is_namedtuple(dtype):
+                params = map_enum_fields(params, dtype)
+            else:
+                params = apply_mapping(params, dtype)
         is_array_like = _param_settings.get('is_array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
         broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))
@@ -1352,8 +1388,8 @@ def run_pipeline(
 
             Following keys are accepted:
 
-            * `dtype`: If data type is enumerated type and a string as parameter value was passed,
-                will convert it to integer first.
+            * `dtype`: If data type is an enumerated type or other mapping, and a string as parameter
+                value was passed, will convert it first.
             * `is_tuple`: If tuple was passed, it will be considered as a single value.
                 To treat it as multiple values, pack it into a list.
             * `is_array_like`: If array-like object was passed, it will be considered as a single value.
@@ -1838,7 +1874,7 @@ def run_pipeline(
                 _output_list = _output_list[:num_ret_outputs]
             if len(_output_list) != num_ret_outputs:
                 raise ValueError("Number of returned outputs other than expected")
-            _output_list = list(map(lambda x: reshape_fns.to_2d(x, raw=True), _output_list))
+            _output_list = list(map(lambda x: reshape_fns.to_2d_array(x), _output_list))
             return _output_list, _other_list
 
         if per_column:
@@ -1959,7 +1995,7 @@ RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOu
 RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
-class IndicatorBase(Wrapping):
+class IndicatorBase(Wrapping, StatsBuilderMixin):
     """Indicator base class.
 
     Properties should be set before instantiation."""
@@ -1982,29 +2018,29 @@ class IndicatorBase(Wrapping):
         return self._level_names
 
     @classproperty
-    def input_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def input_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the input arrays."""
-        return self_or_cls._input_names
+        return cls_or_self._input_names
 
     @classproperty
-    def param_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def param_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the parameters."""
-        return self_or_cls._param_names
+        return cls_or_self._param_names
 
     @classproperty
-    def in_output_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def in_output_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the in-place output arrays."""
-        return self_or_cls._in_output_names
+        return cls_or_self._in_output_names
 
     @classproperty
-    def output_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def output_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the regular output arrays."""
-        return self_or_cls._output_names
+        return cls_or_self._output_names
 
     @classproperty
-    def output_flags(self_or_cls) -> tp.Kwargs:
+    def output_flags(cls_or_self) -> tp.Kwargs:
         """Dictionary of output flags."""
-        return self_or_cls._output_flags
+        return cls_or_self._output_flags
 
     def __init__(self,
                  wrapper: ArrayWrapper,
@@ -2028,6 +2064,7 @@ class IndicatorBase(Wrapping):
             short_name=short_name,
             level_names=level_names
         )
+        StatsBuilderMixin.__init__(self)
 
         if input_mapper is not None:
             checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
@@ -2062,8 +2099,8 @@ class IndicatorBase(Wrapping):
     def indexing_func(self: IndicatorBaseT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-        idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
-        col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
+        idx_idxs_arr = reshape_fns.to_1d_array(idx_idxs)
+        col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
         if np.array_equal(idx_idxs_arr, np.arange(self.wrapper.shape_2d[0])):
             idx_idxs_arr = slice(None, None, None)
         if np.array_equal(col_idxs_arr, np.arange(self.wrapper.shape_2d[1])):
@@ -2133,7 +2170,9 @@ class IndicatorFactory:
                  output_names: tp.Optional[tp.Sequence[str]] = None,
                  output_flags: tp.KwargsLike = None,
                  custom_output_props: tp.KwargsLike = None,
-                 attr_settings: tp.KwargsLike = None):
+                 attr_settings: tp.KwargsLike = None,
+                 metrics: tp.Optional[tp.Kwargs] = None,
+                 stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None) -> None:
         """A factory for creating new indicators.
 
         Initialize `IndicatorFactory` to create a skeleton and then use a class method
@@ -2161,7 +2200,7 @@ class IndicatorFactory:
             output_names (list of str): A list of names of output arrays.
             output_flags (dict): A dictionary of in-place and regular output flags.
             custom_output_props (dict): A dictionary with user-defined functions that will be
-                bound to the indicator class and (if not a property) wrapped with `@cached_property`.
+                bound to the indicator class and wrapped with `@cached_property`.
             attr_settings (dict): A dictionary of settings by attribute name.
 
                 Attributes can be `input_names`, `in_output_names`, `output_names` and `custom_output_props`.
@@ -2170,8 +2209,14 @@ class IndicatorFactory:
 
                 * `dtype`: Data type used to determine which methods to generate around this attribute.
                     Set to None to disable. Default is `np.float_`. Can be set to instance of
-                    `collections.namedtuple` acting as enumerated type; it will then create a property
-                    with suffix `readable` that contains data in a string format.
+                    `collections.namedtuple` acting as enumerated type, or any other mapping;
+                    It will then create a property with suffix `readable` that contains data in a string format.
+            metrics (dict): Metrics supported by `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+                If dict, will be converted to `vectorbt.utils.config.Config`.
+            stats_defaults (callable or dict): Defaults for `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+                If dict, will be converted into a property.
 
         !!! note
             The `__init__` method is not used for running the indicator, for this use `run`.
@@ -2279,7 +2324,7 @@ class IndicatorFactory:
         for input_name in input_names:
             def input_prop(self, _input_name: str = input_name) -> tp.SeriesFrame:
                 """Input array."""
-                old_input = reshape_fns.to_2d(getattr(self, '_' + _input_name), raw=True)
+                old_input = reshape_fns.to_2d_array(getattr(self, '_' + _input_name))
                 input_mapper = getattr(self, '_input_mapper')
                 if input_mapper is None:
                     return self.wrapper.wrap(old_input)
@@ -2347,9 +2392,8 @@ class IndicatorFactory:
         for prop_name, prop in custom_output_props.items():
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
-            if not isinstance(prop, (property, cached_property)):
-                prop.__name__ = prop_name
-                prop = cached_property(prop)
+            prop.__name__ = prop_name
+            prop = cached_property(prop)
             setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
@@ -2391,7 +2435,7 @@ class IndicatorFactory:
                     **kwargs
                 )
                 if crossover:
-                    return out.vbt.signals.nst(wait + 1, after_false=after_false)
+                    return out.vbt.signals.nth(wait, after_false=after_false)
                 return out
 
             combine_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'
@@ -2403,13 +2447,43 @@ class IndicatorFactory:
             checks.assert_dict_valid(_attr_settings, ['dtype'])
             dtype = _attr_settings.get('dtype', np.float_)
 
-            if checks.is_namedtuple(dtype):
-                def attr_readable(self, _attr_name: str = attr_name, enum: tp.NamedTuple = dtype) -> tp.SeriesFrame:
-                    return getattr(self, _attr_name).vbt.map_enum(enum)
+            if checks.is_mapping_like(dtype):
+                def attr_readable(self,
+                                  _attr_name: str = attr_name,
+                                  _mapping: tp.MappingLike = dtype) -> tp.SeriesFrame:
+                    return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping()
 
                 attr_readable.__qualname__ = f'{Indicator.__name__}.{attr_name}_readable'
-                attr_readable.__doc__ = f"""{attr_name} in readable format based on enum {dtype}."""
+                attr_readable.__doc__ = inspect.cleandoc(
+                    """`{attr_name}` in readable format based on the following mapping: 
+                                
+                    ```json
+                    {dtype}
+                    ```"""
+                ).format(
+                    attr_name=attr_name,
+                    dtype=to_doc(to_mapping(dtype))
+                )
                 setattr(Indicator, f'{attr_name}_readable', property(attr_readable))
+
+                def attr_stats(self, *args,
+                               _attr_name: str = attr_name,
+                               _mapping: tp.MappingLike = dtype,
+                               **kwargs) -> tp.SeriesFrame:
+                    return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
+
+                attr_stats.__qualname__ = f'{Indicator.__name__}.{attr_name}_stats'
+                attr_stats.__doc__ = inspect.cleandoc(
+                    """Stats of `{attr_name}` based on the following mapping: 
+
+                    ```json
+                    {dtype}
+                    ```"""
+                ).format(
+                    attr_name=attr_name,
+                    dtype=to_doc(to_mapping(dtype))
+                )
+                setattr(Indicator, f'{attr_name}_stats', attr_stats)
 
             elif np.issubdtype(dtype, np.number):
                 func_info = [
@@ -2426,6 +2500,13 @@ class IndicatorFactory:
                     See `vectorbt.indicators.factory.combine_objs`."""
                     assign_combine_method(func_name, np_func, attr_name, method_docstring)
 
+                def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
+                    return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
+
+                attr_stats.__qualname__ = f'{Indicator.__name__}.{attr_name}_stats'
+                attr_stats.__doc__ = f"""Stats of `{attr_name}` as generic."""
+                setattr(Indicator, f'{attr_name}_stats', attr_stats)
+
             elif np.issubdtype(dtype, np.bool_):
                 func_info = [
                     ('and', np.logical_and),
@@ -2438,7 +2519,31 @@ class IndicatorFactory:
                     See `vectorbt.indicators.factory.combine_objs`."""
                     assign_combine_method(func_name, np_func, attr_name, method_docstring)
 
-            self.Indicator = Indicator
+                def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
+                    return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)
+
+                attr_stats.__qualname__ = f'{Indicator.__name__}.{attr_name}_stats'
+                attr_stats.__doc__ = f"""Stats of `{attr_name}` as signals."""
+                setattr(Indicator, f'{attr_name}_stats', attr_stats)
+
+        # Prepare stats
+        if metrics is not None:
+            if not isinstance(metrics, Config):
+                metrics = Config(metrics, copy_kwargs=dict(copy_mode='deep'))
+            setattr(Indicator, "_metrics", metrics.copy())
+
+        if stats_defaults is not None:
+            if isinstance(stats_defaults, dict):
+                def stats_defaults_prop(self, _stats_defaults: tp.Kwargs = stats_defaults) -> tp.Kwargs:
+                    return _stats_defaults
+            else:
+                def stats_defaults_prop(self, _stats_defaults: tp.Kwargs = stats_defaults) -> tp.Kwargs:
+                    return stats_defaults(self)
+            stats_defaults_prop.__name__ = "stats_defaults"
+            setattr(Indicator, "stats_defaults", property(stats_defaults_prop))
+
+        # Save indicator
+        self.Indicator = Indicator
 
     def from_custom_func(self,
                          custom_func: tp.Callable,
@@ -2594,14 +2699,14 @@ class IndicatorFactory:
             for i in range(len(all_inputs)):
                 input = all_inputs[i]
                 is_default = False
-                if isinstance(input, DefaultParam):
+                if isinstance(input, Default):
                     input = input.value
                     is_default = True
                 if isinstance(input, str):
                     if input in all_input_names:
                         new_input = all_inputs[all_input_names.index(input)]
                         if is_default:
-                            new_input = DefaultParam(new_input)
+                            new_input = Default(new_input)
                         all_inputs[i] = new_input
             input_list = all_inputs[:len(input_list)]
             all_inputs = all_inputs[len(input_list):]
@@ -2630,8 +2735,8 @@ class IndicatorFactory:
             return input_list, param_list, in_output_list, args
 
         for k, v in pipeline_kwargs.items():
-            if k in param_names and not isinstance(v, DefaultParam):
-                pipeline_kwargs[k] = DefaultParam(v)  # track default params
+            if k in param_names and not isinstance(v, Default):
+                pipeline_kwargs[k] = Default(v)  # track default params
         pipeline_kwargs = merge_dicts({k: None for k in in_output_names}, pipeline_kwargs)
 
         # Display default parameters and in-place outputs in the signature
@@ -2680,9 +2785,9 @@ class IndicatorFactory:
             for i, pname in enumerate(param_names):
                 level_name = _short_name + '_' + pname if prepend_name else pname
                 level_names.append(level_name)
-                if pname in _hide_params or (_hide_default and isinstance(param_list[i], DefaultParam)):
+                if pname in _hide_params or (_hide_default and isinstance(param_list[i], Default)):
                     hide_levels.append(i)
-            param_list = [params.value if isinstance(params, DefaultParam) else params for params in param_list]
+            param_list = [params.value if isinstance(params, Default) else params for params in param_list]
 
             # Run the pipeline
             results = run_pipeline(
@@ -2775,7 +2880,7 @@ class IndicatorFactory:
                        "    return cls._{0}({6}{3}{7}**kwargs)".format(
                 _0, _1, _2, _3, _4, _5, _6, _7
             )
-            scope = {**dict(DefaultParam=DefaultParam), **_default_kwargs}
+            scope = {**dict(Default=Default), **_default_kwargs}
             filename = inspect.getfile(lambda: None)
             code = compile(func_str, filename, 'single')
             exec(code, scope)
@@ -2840,7 +2945,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
 
                 # Hide params
                 for i, pname in enumerate(param_names):
-                    if _hide_default and isinstance(param_list[i], DefaultParam):
+                    if _hide_default and isinstance(param_list[i], Default):
                         if pname not in _hide_params:
                             _hide_params.append(pname)
                         param_list[i] = param_list[i].value

@@ -6,9 +6,6 @@
 :root {
     --highlight-color: #e82;
 }
-.flex {
-    display: flex !important;
-}
 
 body {
     line-height: 1.5em;
@@ -18,7 +15,7 @@ body {
     font-weight: normal;
     font-style: italic;
     font-size: .75em;
-    color: #56b6c2;
+    color: #8b949e;
 }
 
 #content {
@@ -103,11 +100,6 @@ a:hover {
     color: #e82;
 }
 
-.title code {
-    font-weight: bold;
-    word-break: break-all;
-}
-
 h2[id^="header-"] {
     margin-top: 2em;
 }
@@ -116,18 +108,36 @@ h2[id^="header-"] {
     color: #900;
 }
 
+.headerlink {
+    color: inherit;
+}
+.headerlink:hover {
+    color: inherit;
+}
+
 pre code {
     background: #f8f8f8
 }
 
 .hljs {
     padding: 1.25rem 1.5rem;
-    margin-left: -15px;
-    margin-right: -15px;
     border: 1px solid #eee;
     border-radius: 6px;
     background: #282c34 !important;
     color: #9da29e !important;
+    word-break: normal;
+}
+
+.hljs-keyword {
+    color: #ff7b72 !important;
+}
+
+.hljs-comment {
+    color: #8b949e !important;
+}
+
+.hljs-meta {
+    color: #8b949e !important;
 }
 
 .python {
@@ -137,7 +147,6 @@ pre code {
 code {
     background: #f2f2f1;
     padding: 1px 4px;
-    overflow-wrap: break-word;
     font-size: 90%;
 }
 
@@ -187,22 +196,6 @@ h1 code {
     font-weight: bold;
 }
 
-
-/* Make TOC lists have 2+ columns when viewport is wide enough.
-    Assuming ~20-character identifiers and ~30% wide sidebar. */
-
-@media (min-width: 200ex) {
-    #index .two-column {
-        column-count: 2
-    }
-}
-
-@media (min-width: 300ex) {
-    #index .two-column {
-        column-count: 3
-    }
-}
-
 dl {
     margin-bottom: 2em;
 }
@@ -212,7 +205,7 @@ dl dl:last-child {
 }
 
 dd {
-    margin: 0 0 1em 3em;
+    margin: 0 0 1em 1.5em;
 }
 
 #header-classes+dl>dd {
@@ -220,7 +213,7 @@ dd {
 }
 
 dd dd {
-    margin-left: 2em;
+    margin-left: 1em;
 }
 
 dd p {
@@ -308,7 +301,6 @@ dt:target .name {
 
 .source pre code {
     font-size: 12px;
-    overflow: visible;
 }
 
 .hlist {
@@ -650,7 +642,7 @@ pre .btnIcon:hover {
 <%def name="desktop()" filter="minify_css">
 @media screen and (min-width: 700px) {
 	#sidebar {
-		width: 400px;
+		min-width: 400px;
 		height: 100vh;
 		overflow: visible;
 		position: sticky;
@@ -672,6 +664,23 @@ pre .btnIcon:hover {
     .scrollable-index {
         overflow-y: scroll;
         height: calc(100vh - 250px);
+    }
+    .hljs {
+        margin-left: -15px;
+        margin-right: -15px;
+    }
+    .source pre code {
+        margin-left: 0px;
+        margin-right: 0px;
+    }
+    dd {
+        margin: 0 0 1em 3em;
+    }
+    dd dd {
+        margin-left: 2em;
+    }
+    .flex {
+        display: flex !important;
     }
 }
 </%def>

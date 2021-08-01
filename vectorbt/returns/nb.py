@@ -29,18 +29,49 @@ from vectorbt import _typing as tp
 from vectorbt.generic import nb as generic_nb
 
 
-# ############# Financial risk and performance metrics ############# #
+@njit(cache=True)
+def get_return_nb(input_value: float, output_value: float) -> float:
+    """Calculate return from input and output value."""
+    if input_value == 0:
+        if output_value == 0:
+            return 0.
+        return np.inf * np.sign(output_value)
+    return_value = (output_value - input_value) / input_value
+    if input_value < 0:
+        return_value *= -1
+    return return_value
+
+
+@njit(cache=True)
+def returns_1d_nb(value: tp.Array1d, init_value: float) -> tp.Array1d:
+    """Calculate returns from value."""
+    out = np.empty(value.shape, dtype=np.float_)
+    input_value = init_value
+    for i in range(out.shape[0]):
+        output_value = value[i]
+        out[i] = get_return_nb(input_value, output_value)
+        input_value = output_value
+    return out
+
+
+@njit(cache=True)
+def returns_nb(value: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
+    """2-dim version of `returns_1d_nb`."""
+    out = np.empty(value.shape, dtype=np.float_)
+    for col in range(out.shape[1]):
+        out[:, col] = returns_1d_nb(value[:, col], init_value[col])
+    return out
 
 
 @njit(cache=True)
 def total_return_apply_nb(idxs: tp.Array1d, col: int, returns: tp.Array1d) -> float:
     """Calculate total return from returns."""
-    return generic_nb.product_1d_nb(returns + 1) - 1
+    return np.nanprod(returns + 1) - 1
 
 
 @njit(cache=True)
 def cum_returns_1d_nb(returns: tp.Array1d, start_value: float) -> tp.Array1d:
-    """See `empyrical.cum_returns`."""
+    """Cumulative returns."""
     out = np.empty_like(returns, dtype=np.float_)
     cumprod = 1
     for i in range(returns.shape[0]):
@@ -63,8 +94,8 @@ def cum_returns_nb(returns: tp.Array2d, start_value: float) -> tp.Array2d:
 
 @njit(cache=True)
 def cum_returns_final_1d_nb(returns: tp.Array1d, start_value: float = 0.) -> float:
-    """See `empyrical.cum_returns_final`."""
-    out = generic_nb.product_1d_nb(returns + 1.)
+    """Total return."""
+    out = np.nanprod(returns + 1.)
     if start_value == 0.:
         return out - 1.
     return out * start_value
@@ -93,7 +124,9 @@ def rolling_cum_returns_final_nb(returns: tp.Array2d, window: int, minp: tp.Opti
 
 @njit(cache=True)
 def annualized_return_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
-    """See `empyrical.annual_return`."""
+    """Mean annual growth rate of returns.
+
+    This is equivalent to the compound annual growth rate."""
     end_value = cum_returns_final_1d_nb(returns, 1.)
     return end_value ** (ann_factor / returns.shape[0]) - 1
 
@@ -122,7 +155,7 @@ def rolling_annualized_return_nb(returns: tp.Array2d, window: int,
 @njit(cache=True)
 def annualized_volatility_1d_nb(returns: tp.Array1d, ann_factor: float,
                                 levy_alpha: float = 2.0, ddof: int = 1) -> float:
-    """See `empyrical.annual_volatility`."""
+    """Annualized volatility of a strategy."""
     if returns.shape[0] < 2:
         return np.nan
 
@@ -170,7 +203,7 @@ def drawdown_nb(returns: tp.Array2d) -> tp.Array2d:
 
 @njit(cache=True)
 def max_drawdown_1d_nb(returns: tp.Array1d) -> float:
-    """See `empyrical.max_drawdown`."""
+    """Total maximum drawdown (MDD)."""
     return np.min(drawdown_1d_nb(returns))
 
 
@@ -196,7 +229,7 @@ def rolling_max_drawdown_nb(returns: tp.Array2d, window: int, minp: tp.Optional[
 
 @njit(cache=True)
 def calmar_ratio_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
-    """See `empyrical.calmar_ratio`."""
+    """Calmar ratio, or drawdown ratio, of a strategy."""
     max_drawdown = max_drawdown_1d_nb(returns)
     if max_drawdown == 0.:
         return np.nan
@@ -230,7 +263,7 @@ def rolling_calmar_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[
 @njit(cache=True)
 def omega_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0.,
                       required_return: float = 0.) -> float:
-    """See `empyrical.omega_ratio`."""
+    """Omega ratio of a strategy.."""
     if ann_factor == 1:
         return_threshold = required_return
     elif ann_factor <= -1:
@@ -270,7 +303,7 @@ def rolling_omega_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[i
 
 @njit(cache=True)
 def sharpe_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0., ddof: int = 1) -> float:
-    """See `empyrical.sharpe_ratio`."""
+    """Sharpe ratio of a strategy."""
     if returns.shape[0] < 2:
         return np.nan
 
@@ -306,7 +339,7 @@ def rolling_sharpe_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[
 
 @njit(cache=True)
 def downside_risk_1d_nb(returns: tp.Array1d, ann_factor: float, required_return: float = 0.) -> float:
-    """See `empyrical.downside_risk`."""
+    """Downside deviation below a threshold."""
     adj_returns = returns - required_return
     adj_returns[adj_returns > 0] = 0
     return np.sqrt(np.nanmean(adj_returns ** 2)) * np.sqrt(ann_factor)
@@ -335,7 +368,7 @@ def rolling_downside_risk_nb(returns: tp.Array2d, window: int, minp: tp.Optional
 
 @njit(cache=True)
 def sortino_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, required_return: float = 0.) -> float:
-    """See `empyrical.sortino_ratio`."""
+    """Sortino ratio of a strategy."""
     if returns.shape[0] < 2:
         return np.nan
 
@@ -370,7 +403,7 @@ def rolling_sortino_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional
 
 @njit(cache=True)
 def information_ratio_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ddof: int = 1) -> float:
-    """See `empyrical.excess_sharpe`."""
+    """Information ratio of a strategy."""
     if returns.shape[0] < 2:
         return np.nan
 
@@ -405,7 +438,7 @@ def rolling_information_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Opti
 
 @njit(cache=True)
 def beta_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d) -> float:
-    """See `empyrical.beta`."""
+    """Beta."""
     if benchmark_rets.shape[0] < 2:
         return np.nan
 
@@ -449,7 +482,7 @@ def rolling_beta_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int],
 @njit(cache=True)
 def alpha_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float,
                 risk_free: float = 0.) -> float:
-    """See `empyrical.alpha`."""
+    """Annualized alpha."""
     if returns.shape[0] < 2:
         return np.nan
 
@@ -484,7 +517,7 @@ def rolling_alpha_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int], b
 
 @njit(cache=True)
 def tail_ratio_1d_nb(returns: tp.Array1d) -> float:
-    """See `empyrical.tail_ratio`."""
+    """Ratio between the right (95%) and left tail (5%)."""
     returns = returns[~np.isnan(returns)]
     if len(returns) < 1:
         return np.nan
@@ -517,7 +550,7 @@ def rolling_tail_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[in
 
 @njit(cache=True)
 def value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
-    """See `empyrical.value_at_risk`."""
+    """Value at risk (VaR) of a returns stream."""
     returns = returns[~np.isnan(returns)]
     if len(returns) < 1:
         return np.nan
@@ -547,7 +580,7 @@ def rolling_value_at_risk_nb(returns: tp.Array2d, window: int, minp: tp.Optional
 
 @njit(cache=True)
 def cond_value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
-    """See `empyrical.cond_value_at_risk`."""
+    """Conditional value at risk (CVaR) of a returns stream."""
     cutoff_index = int((len(returns) - 1) * cutoff)
     return np.mean(np.partition(returns, cutoff_index)[:cutoff_index + 1])
 
@@ -575,7 +608,7 @@ def rolling_cond_value_at_risk_nb(returns: tp.Array2d, window: int, minp: tp.Opt
 
 @njit(cache=True)
 def capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
-    """See `empyrical.capture`."""
+    """Capture ratio."""
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
     annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
     if annualized_return2 == 0.:
@@ -606,7 +639,7 @@ def rolling_capture_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int],
 
 @njit(cache=True)
 def up_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
-    """See `empyrical.up_capture`."""
+    """Capture ratio for periods when the benchmark return is positive."""
     returns = returns[benchmark_rets > 0]
     benchmark_rets = benchmark_rets[benchmark_rets > 0]
     if returns.shape[0] < 1:
@@ -641,7 +674,7 @@ def rolling_up_capture_nb(returns: tp.Array2d, window: int, minp: tp.Optional[in
 
 @njit(cache=True)
 def down_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
-    """See `empyrical.down_capture`."""
+    """Capture ratio for periods when the benchmark return is negative."""
     returns = returns[benchmark_rets < 0]
     benchmark_rets = benchmark_rets[benchmark_rets < 0]
     if returns.shape[0] < 1:

@@ -13,16 +13,135 @@ from vectorbt.signals.nb import (
     rand_enex_apply_nb,
     rand_by_prob_choice_nb,
     stop_choice_nb,
-    ohlc_stop_choice_nb
+    ohlc_stop_choice_nb,
+    rand_choice_nb
 )
 
-# ############# Random signals ############# #
-
+# ############# RAND ############# #
 
 RAND = SignalFactory(
     class_name='RAND',
     module_name=__name__,
     short_name='rand',
+    mode='entries',
+    param_names=['n']
+).from_choice_func(
+    entry_choice_func=rand_choice_nb,
+    entry_settings=dict(
+        pass_params=['n']
+    ),
+    param_settings=dict(
+        n=flex_col_param_config
+    ),
+    seed=None
+)
+
+
+class _RAND(RAND):
+    """Random entry signal generator based on the number of signals.
+
+    Generates `entries` based on `vectorbt.signals.nb.rand_choice_nb`.
+
+    !!! hint
+        Parameter `n` can be either a single value (per frame) or a NumPy array (per column).
+        To generate multiple combinations, pass it as a list.
+
+    ## Example
+
+    Test three different entry counts values:
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> rand = vbt.RAND.run(input_shape=(6,), n=[1, 2, 3], seed=42)
+
+    >>> rand.entries
+    rand_n      1      2      3
+    0        True   True   True
+    1       False  False   True
+    2       False  False  False
+    3       False   True  False
+    4       False  False   True
+    5       False  False  False
+    ```
+
+    Entry count can also be set per column:
+
+    ```python-repl
+    >>> import numpy as np
+
+    >>> rand = vbt.RAND.run(input_shape=(8, 2), n=[np.array([1, 2]), 3], seed=42)
+
+    >>> rand.entries
+    rand_n      1      2      3      3
+                0      1      0      1
+    0       False  False   True  False
+    1        True  False  False  False
+    2       False  False  False   True
+    3       False   True   True  False
+    4       False  False  False  False
+    5       False  False  False   True
+    6       False  False   True  False
+    7       False   True  False   True
+    ```
+    """
+    pass
+
+
+setattr(RAND, '__doc__', _RAND.__doc__)
+
+RANDX = SignalFactory(
+    class_name='RANDX',
+    module_name=__name__,
+    short_name='randx',
+    mode='exits'
+).from_choice_func(
+    exit_choice_func=rand_choice_nb,
+    exit_settings=dict(
+        pass_kwargs=dict(n=1)
+    ),
+    seed=None
+)
+
+
+class _RANDX(RANDX):
+    """Random exit signal generator based on the number of signals.
+
+    Generates `exits` based on `entries` and `vectorbt.signals.nb.rand_choice_nb`.
+
+    See `RAND` for notes on parameters.
+
+    ## Example
+
+    Generate an exit for each entry:
+
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import pandas as pd
+
+    >>> entries = pd.Series([True, False, False, True, False, False])
+    >>> randx = vbt.RANDX.run(entries, seed=42)
+
+    >>> randx.exits
+    0    False
+    1    False
+    2     True
+    3    False
+    4     True
+    5    False
+    dtype: bool
+    ```
+    """
+    pass
+
+
+setattr(RANDX, '__doc__', _RANDX.__doc__)
+
+RANDNX = SignalFactory(
+    class_name='RANDNX',
+    module_name=__name__,
+    short_name='randnx',
+    mode='both',
     param_names=['n']
 ).from_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
@@ -37,100 +156,204 @@ RAND = SignalFactory(
 )
 
 
-class _RAND(RAND):
+class _RANDNX(RANDNX):
     """Random entry and exit signal generator based on the number of signals.
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_enex_apply_nb`.
 
-    !!! hint
-        Parameter `n` can be either a single value (per frame) or a NumPy array (per column).
-        To generate multiple combinations, pass it as a list.
+    See `RAND` for notes on parameters.
 
     ## Example
 
-    Test three different `n` values:
+    Test three different entry and exit counts:
+
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> rand = vbt.RAND.run(
+    >>> randnx = vbt.RANDNX.run(
     ...     input_shape=(6,),
     ...     n=[1, 2, 3],
     ...     seed=42)
 
-    >>> rand.entries
-    rand_n      1      2      3
-    0        True   True   True
-    1       False  False  False
-    2       False   True   True
-    3       False  False  False
-    4       False  False   True
-    5       False  False  False
+    >>> randnx.entries
+    randnx_n      1      2      3
+    0          True   True   True
+    1         False  False  False
+    2         False   True   True
+    3         False  False  False
+    4         False  False   True
+    5         False  False  False
 
-    >>> rand.exits
-    rand_n      1      2      3
-    0       False  False  False
-    1        True   True   True
-    2       False  False  False
-    3       False   True   True
-    4       False  False  False
-    5       False  False   True
-    ```
-
-    `n` can also be set per column:
-    ```python-repl
-    >>> import numpy as np
-
-    >>> rand = vbt.RAND.run(
-    ...     input_shape=(8, 2),
-    ...     n=[np.array([1, 2]), 3],
-    ...     seed=42)
-
-    >>> rand.entries
-    rand_n      1      2             3
-                0      1      0      1
-    0       False   True   True   True
-    1        True  False  False  False
-    2       False  False  False  False
-    3       False  False   True  False
-    4       False   True  False   True
-    5       False  False   True  False
-    6       False  False  False   True
-    7       False  False  False  False
-
-    >>> rand.exits
-    rand_n      1      2             3
-                0      1      0      1
-    0       False  False  False  False
-    1       False  False   True  False
-    2       False  False  False   True
-    3       False   True  False  False
-    4       False  False   True  False
-    5        True  False  False   True
-    6       False  False   True  False
-    7       False   True  False   True
+    >>> randnx.exits
+    randnx_n      1      2      3
+    0         False  False  False
+    1          True   True   True
+    2         False  False  False
+    3         False   True   True
+    4         False  False  False
+    5         False  False   True
     ```
     """
     pass
 
 
-setattr(RAND, '__doc__', _RAND.__doc__)
+setattr(RANDNX, '__doc__', _RANDNX.__doc__)
+
+# ############# RPROB ############# #
 
 RPROB = SignalFactory(
     class_name='RPROB',
     module_name=__name__,
     short_name='rprob',
+    mode='entries',
+    param_names=['prob']
+).from_choice_func(
+    entry_choice_func=rand_by_prob_choice_nb,
+    entry_settings=dict(
+        pass_params=['prob'],
+        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
+    ),
+    pass_flex_2d=True,
+    param_settings=dict(
+        prob=flex_elem_param_config,
+    ),
+    seed=None
+)
+
+
+class _RPROB(RPROB):
+    """Random entry signal generator based on probabilities.
+
+    Generates `entries` based on `vectorbt.signals.nb.rand_by_prob_choice_nb`.
+
+    !!! hint
+        All parameters can be either a single value (per frame) or a NumPy array (per row, column,
+        or element). To generate multiple combinations, pass them as lists.
+
+    ## Example
+
+    Generate three columns with different entry probabilities:
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=[0., 0.5, 1.], seed=42)
+
+    >>> rprob.entries
+    rprob_prob    0.0    0.5   1.0
+    0           False   True  True
+    1           False   True  True
+    2           False  False  True
+    3           False  False  True
+    4           False  False  True
+    ```
+
+    Probability can also be set per row, column, or element:
+
+    ```python-repl
+    >>> import numpy as np
+
+    >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=np.array([0., 0., 1., 1., 1.]), seed=42)
+
+    >>> rprob.entries
+    0    False
+    1    False
+    2     True
+    3     True
+    4     True
+    Name: array_0, dtype: bool
+    ```"""
+    pass
+
+
+setattr(RPROB, '__doc__', _RPROB.__doc__)
+
+rprobx_config = Config(
+    dict(
+        class_name='RPROBX',
+        module_name=__name__,
+        short_name='rprobx',
+        mode='exits',
+        param_names=['prob']
+    )
+)
+"""Factory config for `RPROBX`."""
+
+rprobx_func_config = Config(
+    dict(
+        exit_choice_func=rand_by_prob_choice_nb,
+        exit_settings=dict(
+            pass_params=['prob'],
+            pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
+        ),
+        pass_flex_2d=True,
+        param_settings=dict(
+            prob=flex_elem_param_config
+        ),
+        seed=None
+    )
+)
+"""Exit function config for `RPROBX`."""
+
+RPROBX = SignalFactory(
+    **rprobx_config
+).from_choice_func(
+    **rprobx_func_config
+)
+
+
+class _RPROBX(RPROBX):
+    """Random exit signal generator based on probabilities.
+
+    Generates `exits` based on `entries` and `vectorbt.signals.nb.rand_by_prob_choice_nb`.
+
+    See `RPROB` for notes on parameters."""
+    pass
+
+
+setattr(RPROBX, '__doc__', _RPROBX.__doc__)
+
+RPROBCX = SignalFactory(
+    **rprobx_config.merge_with(
+        dict(
+            class_name='RPROBCX',
+            short_name='rprobcx',
+            mode='chain'
+        )
+    )
+).from_choice_func(
+    **rprobx_func_config
+)
+
+
+class _RPROBCX(RPROBCX):
+    """Random exit signal generator based on probabilities.
+
+    Generates chain of `new_entries` and `exits` based on `entries` and
+    `vectorbt.signals.nb.rand_by_prob_choice_nb`.
+
+    See `RPROB` for notes on parameters."""
+    pass
+
+
+setattr(RPROBCX, '__doc__', _RPROBCX.__doc__)
+
+RPROBNX = SignalFactory(
+    class_name='RPROBNX',
+    module_name=__name__,
+    short_name='rprobnx',
+    mode='both',
     param_names=['entry_prob', 'exit_prob']
 ).from_choice_func(
-    require_input_shape=True,
     entry_choice_func=rand_by_prob_choice_nb,
     entry_settings=dict(
         pass_params=['entry_prob'],
-        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
+        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
     ),
     exit_choice_func=rand_by_prob_choice_nb,
     exit_settings=dict(
         pass_params=['exit_prob'],
-        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
+        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
     ),
     pass_flex_2d=True,
     param_settings=dict(
@@ -141,176 +364,104 @@ RPROB = SignalFactory(
 )
 
 
-class _RPROB(RPROB):
+class _RPROBNX(RPROBNX):
     """Random entry and exit signal generator based on probabilities.
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_by_prob_choice_nb`.
 
-    !!! hint
-        All parameters can be either a single value (per frame) or a NumPy array (per row, column,
-        or element). To generate multiple combinations, pass them as lists.
+    See `RPROB` for notes on parameters.
 
     ## Example
 
     Test all probability combinations:
+
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> rprob = vbt.RPROB.run(
+    >>> rprobnx = vbt.RPROBNX.run(
     ...     input_shape=(5,),
     ...     entry_prob=[0.5, 1.],
     ...     exit_prob=[0.5, 1.],
     ...     param_product=True,
     ...     seed=42)
 
-    >>> rprob.entries
-    rprob_entry_prob           0.5           1.0
-    rprob_exit_prob     0.5    1.0    0.5    1.0
-    0                  True   True   True   True
-    1                 False  False  False  False
-    2                 False  False  False   True
-    3                 False  False  False  False
-    4                 False  False   True   True
+    >>> rprobnx.entries
+    rprobnx_entry_prob    0.5    0.5    1.0    0.5
+    rprobnx_exit_prob     0.5    1.0    0.5    1.0
+    0                    True   True   True   True
+    1                   False  False  False  False
+    2                   False  False  False   True
+    3                   False  False  False  False
+    4                   False  False   True   True
 
-    >>> rprob.exits
-    rprob_entry_prob           0.5           1.0
-    rprob_exit_prob     0.5    1.0    0.5    1.0
-    0                 False  False  False  False
-    1                 False   True  False   True
-    2                 False  False  False  False
-    3                 False  False   True   True
-    4                  True  False  False  False
+    >>> rprobnx.exits
+    rprobnx_entry_prob    0.5    0.5    1.0    1.0
+    rprobnx_exit_prob     0.5    1.0    0.5    1.0
+    0                   False  False  False  False
+    1                   False   True  False   True
+    2                   False  False  False  False
+    3                   False  False   True   True
+    4                    True  False  False  False
     ```
 
-    `entry_prob` and `exit_prob` can also be set per row, column, or element:
+    Probabilities can also be set per row, column, or element:
+
     ```python-repl
     >>> import numpy as np
 
     >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
     >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
-    >>> rprob = vbt.RPROB.run(
+    >>> rprobnx = vbt.RPROBNX.run(
     ...     input_shape=(5,),
     ...     entry_prob=[entry_prob1, entry_prob2],
     ...     exit_prob=1.,
     ...     seed=42)
 
-    >>> rprob.entries
-    rprob_entry_prob array_0 array_1
-    rprob_exit_prob      1.0     1.0
-    0                   True   False
-    1                  False    True
-    2                   True   False
-    3                  False    True
-    4                   True   False
+    >>> rprobnx.entries
+    rprobnx_entry_prob array_0 array_1
+    rprobnx_exit_prob      1.0     1.0
+    0                     True   False
+    1                    False    True
+    2                     True   False
+    3                    False    True
+    4                     True   False
 
-    >>> rprob.exits
-    rprob_entry_prob array_0 array_1
-    rprob_exit_prob      1.0     1.0
-    0                  False   False
-    1                   True   False
-    2                  False    True
-    3                   True   False
-    4                  False    True
+    >>> rprobnx.exits
+    rprobnx_entry_prob array_0 array_1
+    rprobnx_exit_prob      1.0     1.0
+    0                    False   False
+    1                     True   False
+    2                    False    True
+    3                     True   False
+    4                    False    True
     ```
     """
     pass
 
 
-setattr(RPROB, '__doc__', _RPROB.__doc__)
+setattr(RPROBNX, '__doc__', _RPROBNX.__doc__)
 
-rprobex_config = Config(
+# ############# ST ############# #
+
+stx_config = Config(
     dict(
-        class_name='RPROBEX',
+        class_name='STX',
         module_name=__name__,
-        short_name='rprobex',
-        param_names=['prob'],
-        exit_only=True,
-        iteratively=False
-    )
-)
-"""Factory config for `RPROBEX`."""
-
-rprobex_func_config = Config(
-    dict(
-        exit_choice_func=rand_by_prob_choice_nb,
-        exit_settings=dict(
-            pass_params=['prob'],
-            pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
-        ),
-        pass_flex_2d=True,
-        param_settings=dict(
-            prob=flex_elem_param_config
-        ),
-        seed=None
-    )
-)
-"""Exit function config for `RPROBEX`."""
-
-RPROBEX = SignalFactory(
-    **rprobex_config
-).from_choice_func(
-    **rprobex_func_config
-)
-
-
-class _RPROBEX(RPROBEX):
-    """Random exit signal generator based on probabilities.
-
-    Generates `exits` based on `entries` and `vectorbt.signals.nb.rand_by_prob_choice_nb`.
-
-    See `RPROB` for notes on parameters."""
-    pass
-
-
-setattr(RPROBEX, '__doc__', _RPROBEX.__doc__)
-
-IRPROBEX = SignalFactory(
-    **rprobex_config.merge_with(
-        dict(
-            class_name='IRPROBEX',
-            short_name='irprobex',
-            iteratively=True
-        )
-    )
-).from_choice_func(
-    **rprobex_func_config
-)
-
-
-class _IRPROBEX(IRPROBEX):
-    """Random exit signal generator based on probabilities.
-
-    Iteratively generates `new_entries` and `exits` based on `entries` and
-    `vectorbt.signals.nb.rand_by_prob_choice_nb`.
-
-    See `RPROB` for notes on parameters."""
-    pass
-
-
-setattr(IRPROBEX, '__doc__', _IRPROBEX.__doc__)
-
-# ############# Stop signals ############# #
-
-stex_config = Config(
-    dict(
-        class_name='STEX',
-        module_name=__name__,
-        short_name='stex',
+        short_name='stx',
+        mode='exits',
         input_names=['ts'],
-        param_names=['stop', 'trailing'],
-        exit_only=True,
-        iteratively=False
+        param_names=['stop', 'trailing']
     )
 )
-"""Factory config for `STEX`."""
+"""Factory config for `STX`."""
 
-stex_func_config = Config(
+stx_func_config = Config(
     dict(
         exit_choice_func=stop_choice_nb,
         exit_settings=dict(
             pass_inputs=['ts'],
             pass_params=['stop', 'trailing'],
-            pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
+            pass_kwargs=['wait', 'pick_first', 'temp_idx_arr', 'flex_2d']
         ),
         pass_flex_2d=True,
         param_settings=dict(
@@ -320,16 +471,16 @@ stex_func_config = Config(
         trailing=False
     )
 )
-"""Exit function config for `STEX`."""
+"""Exit function config for `STX`."""
 
-STEX = SignalFactory(
-    **stex_config
+STX = SignalFactory(
+    **stx_config
 ).from_choice_func(
-    **stex_func_config
+    **stx_func_config
 )
 
 
-class _STEX(STEX):
+class _STX(STX):
     """Exit signal generator based on stop values.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.stop_choice_nb`.
@@ -340,64 +491,63 @@ class _STEX(STEX):
     pass
 
 
-setattr(STEX, '__doc__', _STEX.__doc__)
+setattr(STX, '__doc__', _STX.__doc__)
 
-ISTEX = SignalFactory(
-    **stex_config.merge_with(
+STCX = SignalFactory(
+    **stx_config.merge_with(
         dict(
-            class_name='ISTEX',
-            short_name='istex',
-            iteratively=True
+            class_name='STCX',
+            short_name='stcx',
+            mode='chain'
         )
     )
 ).from_choice_func(
-    **stex_func_config
+    **stx_func_config
 )
 
 
-class _ISTEX(ISTEX):
+class _STCX(STCX):
     """Exit signal generator based on stop values.
 
-    Iteratively generates `new_entries` and `exits` based on `entries` and
+    Generates chain of `new_entries` and `exits` based on `entries` and
     `vectorbt.signals.nb.stop_choice_nb`.
 
-    See `STEX` for notes on parameters."""
+    See `STX` for notes on parameters."""
     pass
 
 
-setattr(ISTEX, '__doc__', _ISTEX.__doc__)
+setattr(STCX, '__doc__', _STCX.__doc__)
 
-# ############# OHLC stop signals ############# #
+# ############# OHLCST ############# #
 
-ohlcstex_config = Config(
+ohlcstx_config = Config(
     dict(
-        class_name='OHLCSTEX',
+        class_name='OHLCSTX',
         module_name=__name__,
-        short_name='ohlcstex',
+        short_name='ohlcstx',
+        mode='exits',
         input_names=['open', 'high', 'low', 'close'],
-        in_output_names=['hit_price', 'stop_type'],
-        param_names=['sl_stop', 'ts_stop', 'tp_stop'],
+        in_output_names=['stop_price', 'stop_type'],
+        param_names=['sl_stop', 'sl_trail', 'tp_stop'],
         attr_settings=dict(
             stop_type=dict(dtype=StopType)  # creates rand_type_readable
-        ),
-        exit_only=True,
-        iteratively=False
+        )
     )
 )
-"""Factory config for `OHLCSTEX`."""
+"""Factory config for `OHLCSTX`."""
 
-ohlcstex_func_config = Config(
+ohlcstx_func_config = Config(
     dict(
         exit_choice_func=ohlc_stop_choice_nb,
         exit_settings=dict(
             pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
-            pass_in_outputs=['hit_price', 'stop_type'],
-            pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
-            pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
+            pass_in_outputs=['stop_price', 'stop_type'],
+            pass_params=['sl_stop', 'sl_trail', 'tp_stop'],
+            pass_kwargs=[('is_open_safe', True), 'wait', 'pick_first', 'temp_idx_arr', 'flex_2d'],
         ),
         pass_flex_2d=True,
         in_output_settings=dict(
-            hit_price=dict(
+            stop_price=dict(
                 dtype=np.float_
             ),
             stop_type=dict(
@@ -406,26 +556,26 @@ ohlcstex_func_config = Config(
         ),
         param_settings=dict(
             sl_stop=flex_elem_param_config,
-            ts_stop=flex_elem_param_config,
+            sl_trail=flex_elem_param_config,
             tp_stop=flex_elem_param_config
         ),
         sl_stop=np.nan,
-        ts_stop=np.nan,
+        sl_trail=False,
         tp_stop=np.nan,
-        hit_price=np.nan,
+        stop_price=np.nan,
         stop_type=-1
     )
 )
-"""Exit function config for `OHLCSTEX`."""
+"""Exit function config for `OHLCSTX`."""
 
-OHLCSTEX = SignalFactory(
-    **ohlcstex_config
+OHLCSTX = SignalFactory(
+    **ohlcstx_config
 ).from_choice_func(
-    **ohlcstex_func_config
+    **ohlcstx_func_config
 )
 
 
-def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
+def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
 
     base_cls_plot = base_cls.plot
 
@@ -498,7 +648,7 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
         _base_cls_plot(
             self,
             entry_y=self.open,
-            exit_y=self.hit_price,
+            exit_y=self.stop_price,
             exit_types=self.stop_type_readable,
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
@@ -524,16 +674,16 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
     ## Example
         
     ```python-repl
-    >>> ohlcstex.iloc[:, 0].plot()
+    >>> ohlcstx.iloc[:, 0].plot()
     ```
     
-    ![](/vectorbt/docs/img/ohlcstex.svg)
+    ![](/vectorbt/docs/img/ohlcstx.svg)
     """
     return plot
 
 
-class _OHLCSTEX(OHLCSTEX):
-    """Advanced exit signal generator based on stop values.
+class _OHLCSTX(OHLCSTX):
+    """Exit signal generator based on OHLC and stop values.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.ohlc_stop_choice_nb`.
 
@@ -543,93 +693,102 @@ class _OHLCSTEX(OHLCSTEX):
 
     ## Example
 
-    Test each stop type individually:
+    Test each stop type:
+
     ```python-repl
     >>> import vectorbt as vbt
     >>> import pandas as pd
+    >>> import numpy as np
 
-    >>> entries = pd.Series([True, False, False, False, False])
+    >>> entries = pd.Series([True, False, False, False, False, False])
     >>> price = pd.DataFrame({
-    ...     'open': [10, 11, 12, 11, 10],
-    ...     'high': [11, 12, 13, 12, 11],
-    ...     'low': [9, 10, 11, 10, 9],
-    ...     'close': [10, 11, 12, 11, 10]
+    ...     'open': [10, 11, 12, 11, 10, 9],
+    ...     'high': [11, 12, 13, 12, 11, 10],
+    ...     'low': [9, 10, 11, 10, 9, 8],
+    ...     'close': [10, 11, 12, 11, 10, 9]
     ... })
-    >>> ohlcstex = vbt.OHLCSTEX.run(
-    ...     entries, price['open'], price['high'], price['low'], price['close'],
-    ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1])
+    >>> ohlcstx = vbt.OHLCSTX.run(
+    ...     entries,
+    ...     price['open'], price['high'], price['low'], price['close'],
+    ...     sl_stop=[0.1, 0.1, np.nan],
+    ...     sl_trail=[False, True, False],
+    ...     tp_stop=[np.nan, np.nan, 0.1])
 
-    >>> ohlcstex.entries
-    ohlcstex_sl_stop    0.1    0.0    0.0
-    ohlcstex_ts_stop    0.0    0.1    0.0
-    ohlcstex_tp_stop    0.0    0.0    0.1
+    >>> ohlcstx.entries
+    ohlcstx_sl_stop     0.1    0.1    NaN
+    ohlcstx_sl_trail  False   True  False
+    ohlcstx_tp_stop     NaN    NaN    0.1
     0                  True   True   True
     1                 False  False  False
     2                 False  False  False
     3                 False  False  False
     4                 False  False  False
+    5                 False  False  False
 
-    >>> ohlcstex.exits
-    ohlcstex_sl_stop    0.1    0.0    0.0
-    ohlcstex_ts_stop    0.0    0.1    0.0
-    ohlcstex_tp_stop    0.0    0.0    0.1
+    >>> ohlcstx.exits
+    ohlcstx_sl_stop     0.1    0.1    NaN
+    ohlcstx_sl_trail  False   True  False
+    ohlcstx_tp_stop     NaN    NaN    0.1
     0                 False  False  False
     1                 False  False   True
     2                 False  False  False
     3                 False   True  False
     4                  True  False  False
+    5                 False  False  False
 
-    >>> ohlcstex.hit_price
-    ohlcstex_sl_stop  0.1   0.0   0.0
-    ohlcstex_ts_stop  0.0   0.1   0.0
-    ohlcstex_tp_stop  0.0   0.0   0.1
-    0                 NaN   NaN   NaN
-    1                 NaN   NaN  11.0
-    2                 NaN   NaN   NaN
-    3                 NaN  11.7   NaN
-    4                 9.0   NaN   NaN
+    >>> ohlcstx.stop_price
+    ohlcstx_sl_stop     0.1    0.1    NaN
+    ohlcstx_sl_trail  False   True  False
+    ohlcstx_tp_stop     NaN    NaN    0.1
+    0                   NaN    NaN    NaN
+    1                   NaN    NaN   11.0
+    2                   NaN    NaN    NaN
+    3                   NaN   11.7    NaN
+    4                   9.0    NaN    NaN
+    5                   NaN    NaN    NaN
 
-    >>> ohlcstex.stop_type_readable
-    ohlcstex_sl_stop       0.1        0.0         0.0
-    ohlcstex_ts_stop       0.0        0.1         0.0
-    ohlcstex_tp_stop       0.0        0.0         0.1
-    0
-    1                                      TakeProfit
-    2
-    3                           TrailStop
-    4                 StopLoss
+    >>> ohlcstx.stop_type_readable
+    ohlcstx_sl_stop        0.1        0.1         NaN
+    ohlcstx_sl_trail     False       True       False
+    ohlcstx_tp_stop        NaN        NaN         0.1
+    0                     None       None        None
+    1                     None       None  TakeProfit
+    2                     None       None        None
+    3                     None  TrailStop        None
+    4                 StopLoss       None        None
+    5                     None       None        None
     ```
     """
 
-    plot = _bind_ohlcstex_plot(OHLCSTEX, 'entries')
+    plot = _bind_ohlcstx_plot(OHLCSTX, 'entries')
 
 
-setattr(OHLCSTEX, '__doc__', _OHLCSTEX.__doc__)
-setattr(OHLCSTEX, 'plot', _OHLCSTEX.plot)
+setattr(OHLCSTX, '__doc__', _OHLCSTX.__doc__)
+setattr(OHLCSTX, 'plot', _OHLCSTX.plot)
 
-IOHLCSTEX = SignalFactory(
-    **ohlcstex_config.merge_with(
+OHLCSTCX = SignalFactory(
+    **ohlcstx_config.merge_with(
         dict(
-            class_name='IOHLCSTEX',
-            short_name='iohlcstex',
-            iteratively=True
+            class_name='OHLCSTCX',
+            short_name='ohlcstcx',
+            mode='chain'
         )
     )
 ).from_choice_func(
-    **ohlcstex_func_config
+    **ohlcstx_func_config
 )
 
 
-class _IOHLCSTEX(IOHLCSTEX):
-    """Advanced exit signal generator based on stop values.
+class _OHLCSTCX(OHLCSTCX):
+    """Exit signal generator based on OHLC and stop values.
 
-    Iteratively generates `new_entries` and `exits` based on `entries` and
+    Generates chain of `new_entries` and `exits` based on `entries` and
     `vectorbt.signals.nb.ohlc_stop_choice_nb`.
 
-    See `OHLCSTEX` for notes on parameters."""
+    See `OHLCSTX` for notes on parameters."""
 
-    plot = _bind_ohlcstex_plot(IOHLCSTEX, 'new_entries')
+    plot = _bind_ohlcstx_plot(OHLCSTCX, 'new_entries')
 
 
-setattr(IOHLCSTEX, '__doc__', _IOHLCSTEX.__doc__)
-setattr(IOHLCSTEX, 'plot', _IOHLCSTEX.plot)
+setattr(OHLCSTCX, '__doc__', _OHLCSTCX.__doc__)
+setattr(OHLCSTCX, 'plot', _OHLCSTCX.plot)

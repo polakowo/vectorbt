@@ -115,30 +115,41 @@ TraceNames = MaybeSequence[TraceName]
 # Generic
 I = TypeVar("I")
 R = TypeVar("R")
-ApplyFunc = Callable[[int, Array1d, VarArg()], R]
-RollApplyFunc = Callable[[int, int, Array1d, VarArg()], R]
-RollApplyMatrixFunc = Callable[[int, Array2d, VarArg()], R]
-GroupByApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], R]
-GroupByApplyMatrixFunc = Callable[[Array1d, Array2d, VarArg()], R]
-ApplyMapFunc = Callable[[int, int, I, VarArg()], R]
-ReduceFunc = Callable[[int, Array1d, VarArg()], R]
-GroupReduceFunc = Callable[[int, Array2d, VarArg()], R]
-GroupReduceFlatFunc = Callable[[int, Array1d, VarArg()], R]
+ApplyFunc = Callable[[int, Array1d, VarArg()], MaybeArray]
+RowApplyFunc = Callable[[int, Array1d, VarArg()], MaybeArray]
+RollApplyFunc = Callable[[int, int, Array1d, VarArg()], Scalar]
+RollMatrixApplyFunc = Callable[[int, Array2d, VarArg()], MaybeArray]
+GroupByApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Scalar]
+GroupByMatrixApplyFunc = Callable[[Array1d, Array2d, VarArg()], MaybeArray]
+ApplyMapFunc = Callable[[int, int, I, VarArg()], Scalar]
+FilterFunc = Callable[[int, int, I, VarArg()], bool]
+ReduceFunc = Callable[[int, Array1d, VarArg()], Scalar]
+ReduceArrayFunc = Callable[[int, Array1d, VarArg()], Array1d]
+GroupReduceFunc = Callable[[int, Array2d, VarArg()], Scalar]
+FlatGroupReduceFunc = Callable[[int, Array1d, VarArg()], Scalar]
+GroupReduceArrayFunc = Callable[[int, Array2d, VarArg()], Array1d]
+FlatGroupReduceArrayFunc = Callable[[int, Array1d, VarArg()], Array1d]
 GroupSqueezeFunc = Callable[[int, int, Array1d, VarArg()], R]
 
 # Signals
-SignalChoiceFunc = Callable[[int, int, int, VarArg()], Array1d]
-SignalMapFunc = Callable[[int, int, int, VarArg()], float]
-SignalReduceFunc = Callable[[int, Array1d, VarArg()], float]
+ChoiceFunc = Callable[[int, int, int, VarArg()], Array1d]
+RangeMapMetaOutput = Tuple[Array1d, Array1d, Array1d]
+RangeMapMetaFunc = Callable[[VarArg()], RangeMapMetaOutput]
+RangeMapFunc = Callable[[int, int, int, VarArg()], float]
+RankFunc = Callable[[int, int, int, int, int, VarArg()], int]
 
 # Records
 ColRange = Array2d
 ColMap = Tuple[Array1d, Array1d]
+MappedApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Array1d]
+RecordApplyFunc = Callable[[RecordArray, VarArg()], Array1d]
 RecordMapFunc = Callable[[np.void, VarArg()], R]
 MaskInOutMapFunc = Callable[[Array1d, Array1d, int, Array1d, VarArg()], None]
-ValueMap = Mapping
-ValueMapLike = Union[NamedTuple, ValueMap]
 
 # Indicators
 Param = Any
 Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
+
+# Mappings
+Enum = NamedTuple
+MappingLike = Union[Mapping, Enum, IndexLike]

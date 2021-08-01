@@ -35,6 +35,8 @@ __all__ = [
     'Order',
     'NoOrder',
     'OrderResult',
+    'AdjustSLContext',
+    'AdjustTPContext',
     'order_dt',
     'trade_dt',
     'position_dt',
@@ -526,7 +528,7 @@ A tuple with exactly two elements: the number of rows and columns.
 One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
 where the first axis are rows (minutes) and the second axis are columns (assets).
 """
-__pdoc__['SimulationContext.close'] = """Last asset price at each time step.
+__pdoc__['SimulationContext.close'] = """Latest asset price at each time step.
 
 Has shape `SimulationContext.target_shape`.
 """
@@ -608,7 +610,7 @@ gradually filled with order data. The number of initialized records depends upon
 but usually it's `target_shape[0] * target_shape[1]`, meaning there is maximal one order record per element.
 `max_orders` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
 
-You can use `SimulationContext.last_oidx` to get the index of the last filled order of each column.
+You can use `SimulationContext.last_oidx` to get the index of the latest filled order of each column.
 
 ## Example
 
@@ -627,19 +629,19 @@ np.array([(0, 0, 1, 50., 1., 0., 1)]
 __pdoc__['SimulationContext.log_records'] = """Log records.
 
 Similar to `SimulationContext.order_records` but of type `log_dt` and index `SimulationContext.last_lidx`."""
-__pdoc__['SimulationContext.last_cash'] = """Last cash per column or group with cash sharing.
+__pdoc__['SimulationContext.last_cash'] = """Latest cash per column or group with cash sharing.
 
 Has the same shape as `SimulationContext.init_cash`.
 
 Gets updated right after `order_func_nb`.
 """
-__pdoc__['SimulationContext.last_position'] = """Last position per column.
+__pdoc__['SimulationContext.last_position'] = """Latest position per column.
 
 Has shape `(target_shape[1],)`.
 
 Gets updated right after `order_func_nb`.
 """
-__pdoc__['SimulationContext.last_debt'] = """Last debt from shorting per column.
+__pdoc__['SimulationContext.last_debt'] = """Latest debt from shorting per column.
 
 Debt is the total value from shorting that hasn't been covered yet. Used to update `OrderContext.free_cash_now`.
 
@@ -647,7 +649,7 @@ Has shape `(target_shape[1],)`.
 
 Gets updated right after `order_func_nb`.
 """
-__pdoc__['SimulationContext.last_free_cash'] = """Last free cash per column or group with cash sharing.
+__pdoc__['SimulationContext.last_free_cash'] = """Latest free cash per column or group with cash sharing.
 
 Free cash never goes above the initial level, because an operation always costs money.
 
@@ -655,7 +657,7 @@ Has shape `(target_shape[1],)`.
 
 Gets updated right after `order_func_nb`.
 """
-__pdoc__['SimulationContext.last_val_price'] = """Last valuation price per column.
+__pdoc__['SimulationContext.last_val_price'] = """Latest valuation price per column.
 
 Has shape `(target_shape[1],)`.
 
@@ -688,7 +690,7 @@ with cash sharing, the group is valued at $1400 before any `order_func_nb` is ca
 be later accessed via `OrderContext.value_now`.
 
 """
-__pdoc__['SimulationContext.last_value'] = """Last value per column or group with cash sharing.
+__pdoc__['SimulationContext.last_value'] = """Latest value per column or group with cash sharing.
 
 Has the same shape as `SimulationContext.init_cash`.
 
@@ -700,7 +702,7 @@ before `post_segment_func_nb`. If `SimulationContext.update_value`, gets also up
 `order_func_nb` using filled order price as the latest known price (the difference will be minimal, 
 only affected by costs).
 """
-__pdoc__['SimulationContext.second_last_value'] = """Second-last value per column or group with cash sharing.
+__pdoc__['SimulationContext.second_last_value'] = """Second-latest value per column or group with cash sharing.
 
 Has the same shape as `SimulationContext.last_value`.
 
@@ -709,7 +711,7 @@ one row before (`i - 1`) or now (`i`).
 
 Gets updated at the end of each segment/row. 
 """
-__pdoc__['SimulationContext.last_return'] = """Last return per column or group with cash sharing.
+__pdoc__['SimulationContext.last_return'] = """Latest return per column or group with cash sharing.
 
 Has the same shape as `SimulationContext.last_value`.
 
@@ -717,21 +719,21 @@ Calculated by comparing `SimulationContext.last_value` to `SimulationContext.sec
 
 Gets updated each time `SimulationContext.last_value` is updated.
 """
-__pdoc__['SimulationContext.last_oidx'] = """Index of the last order record of each column.
+__pdoc__['SimulationContext.last_oidx'] = """Index of the latest order record of each column.
 
 Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
 
 ## Example
 
-`last_oidx` of `np.array([1, 100, -1])` means the last filled order is `order_records[1]` for the
+`last_oidx` of `np.array([1, 100, -1])` means the latest filled order is `order_records[1]` for the
 first column, `order_records[100]` for the second column, and no orders have been filled yet
 for the third column.
 """
-__pdoc__['SimulationContext.last_lidx'] = """Index of the last log record of each column.
+__pdoc__['SimulationContext.last_lidx'] = """Index of the latest log record of each column.
 
 Similar to `SimulationContext.last_oidx` but for log records.
 """
-__pdoc__['SimulationContext.last_pos_record'] = """Last position record of each column.
+__pdoc__['SimulationContext.last_pos_record'] = """Latest position record of each column.
 
 It's a 1-dimensional array with records of type `position_dt`.
 
@@ -1261,6 +1263,68 @@ __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
 __pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
+
+
+class AdjustSLContext(tp.NamedTuple):
+    i: int
+    col: int
+    position_now: float
+    val_price_now: float
+    init_i: int
+    init_price: float
+    curr_i: int
+    curr_price: float
+    curr_stop: float
+    curr_trail: bool
+
+
+__pdoc__['AdjustSLContext'] = "A named tuple representing the context for adjusting (trailing) stop loss."
+__pdoc__['AdjustSLContext.i'] = """Index of the current row.
+
+Has range `[0, target_shape[0])`."""
+__pdoc__['AdjustSLContext.col'] = """Current column.
+
+Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
+__pdoc__['AdjustSLContext.position_now'] = "Latest position."
+__pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
+__pdoc__['AdjustSLContext.init_i'] = """Index of the row of the initial stop.
+
+Doesn't change."""
+__pdoc__['AdjustSLContext.init_price'] = """Price of the initial stop.
+
+Doesn't change."""
+__pdoc__['AdjustSLContext.curr_i'] = """Index of the row of the updated stop.
+
+Gets updated once the price is updated."""
+__pdoc__['AdjustSLContext.curr_price'] = """Current stop price.
+
+Gets updated in trailing SL once a higher price is discovered."""
+__pdoc__['AdjustSLContext.curr_stop'] = """Current stop value.
+
+Can be updated by adjustment function."""
+__pdoc__['AdjustSLContext.curr_trail'] = """Current trailing flag.
+
+Can be updated by adjustment function."""
+
+
+class AdjustTPContext(tp.NamedTuple):
+    i: int
+    col: int
+    position_now: float
+    val_price_now: float
+    init_i: int
+    init_price: float
+    curr_stop: float
+
+
+__pdoc__['AdjustTPContext'] = "A named tuple representing the context for adjusting take profit."
+__pdoc__['AdjustTPContext.i'] = "See `AdjustSLContext.i`."
+__pdoc__['AdjustTPContext.col'] = "See `AdjustSLContext.col`."
+__pdoc__['AdjustTPContext.position_now'] = "See `AdjustSLContext.position_now`."
+__pdoc__['AdjustTPContext.val_price_now'] = "See `AdjustSLContext.val_price_now`."
+__pdoc__['AdjustTPContext.init_i'] = "See `AdjustSLContext.init_i`."
+__pdoc__['AdjustTPContext.init_price'] = "See `AdjustSLContext.curr_price`."
+__pdoc__['AdjustTPContext.curr_stop'] = "See `AdjustSLContext.curr_stop`."
 
 # ############# Records ############# #
 
