@@ -1,4 +1,3 @@
-import vectorbt as vbt
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -2313,22 +2312,6 @@ class TestFactory:
                     index=ts.index,
                     columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
                 )
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochk,
-                pd.Series([np.nan, np.nan, np.nan, 33.333333333333336, 0.0], index=ts.index, name=(2, 2))
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochd,
-                pd.Series([np.nan, np.nan, np.nan, np.nan, 16.666666666666668], index=ts.index, name=(2, 2))
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('PVR').run(ts['a'], ts['b']).pvr,
-                pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('ICHIMOKU').run(ts['a'], ts['b'], ts['c'], 2, 2, 2).isa,
-                pd.Series([np.nan, np.nan, np.nan, 3.0, 3.0], index=ts.index, name=(2, 2, 2))
             )
 
     def test_get_ta_indicators(self):
