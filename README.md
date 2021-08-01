@@ -23,13 +23,14 @@ data even without GPU and parallelization, and enable the user to interact with 
 without significant delays.
 
 With vectorbt you can
-* Build flexible algorithmic trading pipelines
-* Test your trading strategy against many parameters, assets, and periods in one go
-* Explore financial markets and uncover hidden patterns
+* Build your pipelines in a few lines of code
+* Retain full control over execution (as opposed to web-based services such as TradingView)
+* Optimize your trading strategy against many parameters, assets, and periods in one go
+* Uncover hidden patterns in financial markets
 * Analyze time series and engineer new features for ML models
 * Supercharge pandas and your favorite tools to run much faster
 * Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
-* Fetch data periodically, send Telegram notifications, and more
+* Fetch and process data periodically, send Telegram notifications, and more
 
 ## Installation
 
@@ -147,7 +148,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-![dmac_heatmap.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif)
+<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif">
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -226,7 +227,7 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-![bbands.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif)
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
 
 ## How it works?
 

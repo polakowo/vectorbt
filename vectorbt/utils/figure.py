@@ -22,13 +22,13 @@ class FigureMixin:
         """Display the figure in PNG format."""
         raise NotImplementedError
 
-    def show_png(self) -> None:
+    def show_png(self, **kwargs) -> None:
         """Display the figure in PNG format."""
-        self.show(renderer="png")
+        self.show(renderer="png", **kwargs)
 
-    def show_svg(self) -> None:
+    def show_svg(self, **kwargs) -> None:
         """Display the figure in SVG format."""
-        self.show(renderer="svg")
+        self.show(renderer="svg", **kwargs)
 
 
 class Figure(_Figure, FigureMixin):

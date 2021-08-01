@@ -95,7 +95,7 @@ Moreover, pandas functions cannot be accessed within user-defined Numba code, si
 compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding
 maximum for each order, we cannot simply do `df.expanding().max()` from within Numba, but we must write
 and compile our own expanding max function wrapped with `@njit`. That's why vectorbt provides an arsenal
-of Numba-compiled functions for any sort of task.
+of Numba-compiled functions for any sort of tasks.
 
 ## Usability
 
@@ -523,8 +523,6 @@ most parts of a backtesting pipeline, from building indicators and generating si
 modeling portfolio performance and visualizing results.
 
 ## Resources
-
-Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
 
 ### Notebooks
 
