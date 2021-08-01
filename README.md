@@ -250,10 +250,9 @@ This way, it is often much faster than pandas alone:
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
-(price, signals, etc.), vectorbt is optimized for working with multi-dimensional data: it treats index 
-of a DataFrame as time axis and columns as distinct features that should be backtest, and performs 
-computations on the entire matrix at once, without slow Python loops.
+In contrast to other backtesters, vectorbt is optimized for working with multi-dimensional data: 
+it treats index of a Series/DataFrame as a time axis and columns as distinct configurations that 
+should be backtested, and performs computations on the entire array at once, without slow Python loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
