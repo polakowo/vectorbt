@@ -273,7 +273,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 ```
     
 - Functions for combining, transforming, and indexing NumPy and pandas objects
-    - NumPy-like broadcasting for pandas, among other features
+    - Smart broadcasting for pandas
     
 ```python-repl
 # pandas
@@ -326,7 +326,7 @@ split_idx    0    1    2    3  4
 
 - Functions for working with signals
     - Entry, exit, and random signal generators
-    - Ranking and distance functions
+    - Stop signal, ranking, and map-reduce functions
     
 ```python-repl
 >>> pd.Series([False, True, True, True]).vbt.signals.first()
@@ -337,7 +337,7 @@ split_idx    0    1    2    3  4
 dtype: bool
 ```
 
-- Signal factory for building iterative signal generators
+- Signal factory for building signal generators
     - Includes basic generators such for random signal generation
 
 ```python-repl
@@ -456,7 +456,7 @@ Avg Recovery Duration Ratio                0.5
 dtype: object
 ```
 
-- Label generation for machine learning
+- Label generation for ML models
 
 ```python-repl
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
@@ -467,10 +467,13 @@ dtype: object
 
 - Classes for downloading and (periodically) updating data
     - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
+    - Allows creation of new data classes with ease
 - Telegram bot based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - Interactive Plotly-based widgets for visual data analysis
 
 ## Resources
+
+### Documentation
 
 Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
 
