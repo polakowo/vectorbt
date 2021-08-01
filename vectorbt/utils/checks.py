@@ -14,6 +14,11 @@ from vectorbt import _typing as tp
 # ############# Checks ############# #
 
 
+def is_np_array(arg: tp.Any) -> bool:
+    """Check whether the argument is `np.ndarray`."""
+    return isinstance(arg, np.ndarray)
+
+
 def is_series(arg: tp.Any) -> bool:
     """Check whether the argument is `pd.Series`."""
     return isinstance(arg, pd.Series)

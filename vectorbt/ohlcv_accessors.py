@@ -14,15 +14,15 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_accessor
+from vectorbt.root_accessors import register_dataframe_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.figure import make_figure, make_subplots
 from vectorbt.utils.config import merge_dicts
 from vectorbt.generic.accessors import GenericDFAccessor
 
 
-@register_dataframe_accessor('ohlc')
-@register_dataframe_accessor('ohlcv')
+@register_dataframe_vbt_accessor('ohlc')
+@register_dataframe_vbt_accessor('ohlcv')
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
 

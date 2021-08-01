@@ -933,7 +933,7 @@ We have cut down the processing time almost in half.
 
 Similar to raw outputs, we can force `IndicatorFactory` to return the cache, so it can be used
 in other calculations or even indicators. The clear advantage of this approach is that we don't
-rely on some fixed set of parameter combinations anymore, but on the values of each parameter,
+rely on some fixed set of parameter combinations any more, but on the values of each parameter,
 which gives us more granularity in managing performance.
 
 ```python-repl
@@ -1844,7 +1844,7 @@ def run_pipeline(
                 _output_list = _output_list[:num_ret_outputs]
             if len(_output_list) != num_ret_outputs:
                 raise ValueError("Number of returned outputs other than expected")
-            _output_list = list(map(lambda x: reshape_fns.to_2d(x, raw=True), _output_list))
+            _output_list = list(map(lambda x: reshape_fns.to_2d_array(x), _output_list))
             return _output_list, _other_list
 
         if per_column:
@@ -2069,8 +2069,8 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
     def indexing_func(self: IndicatorBaseT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-        idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
-        col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
+        idx_idxs_arr = reshape_fns.to_1d_array(idx_idxs)
+        col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
         if np.array_equal(idx_idxs_arr, np.arange(self.wrapper.shape_2d[0])):
             idx_idxs_arr = slice(None, None, None)
         if np.array_equal(col_idxs_arr, np.arange(self.wrapper.shape_2d[1])):
@@ -2294,7 +2294,7 @@ class IndicatorFactory:
         for input_name in input_names:
             def input_prop(self, _input_name: str = input_name) -> tp.SeriesFrame:
                 """Input array."""
-                old_input = reshape_fns.to_2d(getattr(self, '_' + _input_name), raw=True)
+                old_input = reshape_fns.to_2d_array(getattr(self, '_' + _input_name))
                 input_mapper = getattr(self, '_input_mapper')
                 if input_mapper is None:
                     return self.wrapper.wrap(old_input)

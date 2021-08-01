@@ -89,7 +89,7 @@ pf.total_profit()
 ```
 
 ```plaintext
-7528.904276220327
+8961.008555963961
 ```
 
 The crossover of 10-day SMA and 50-day SMA under the same conditions:
@@ -105,7 +105,7 @@ pf.total_profit()
 ```
 
 ```plaintext
-15852.799327152732
+16423.251963801864
 ```
 
 Quickly assessing the performance of 1000 random signal strategies on BTC and ETH:
@@ -119,8 +119,8 @@ price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 n = np.random.randint(10, 101, size=1000).tolist()
 pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
 
-mean_expectancy = pf.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
-fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_title='mean_expectancy')
+mean_expectancy = pf.trades.expectancy().groupby(['randnx_n', 'symbol']).mean()
+fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_title='mean_expectancy')
 fig.show()
 ```
 
@@ -156,31 +156,34 @@ pf[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                     2015-08-07 00:00:00+00:00
-End                       2021-06-24 00:00:00+00:00
-Duration                         2145 days 00:00:00
-Initial Cash                                    100
-Total Profit                                 637467
-Total Return [%]                             637467
-Benchmark Return [%]                        72649.5
-Position Coverage [%]                       55.8042
-Max Drawdown [%]                             70.735
-Avg Drawdown [%]                            12.4471
-Max Drawdown Duration             760 days 00:00:00
-Avg Drawdown Duration    29 days 01:01:42.857142857
-Trade Count                                      52
-Win Rate [%]                                53.8462
-Best Trade [%]                               1075.8
-Worst Trade [%]                            -29.5934
-Avg Trade [%]                               46.0668
-Max Trade Duration                 80 days 00:00:00
-Avg Trade Duration       23 days 00:27:41.538461538
-Expectancy                                    12259
-SQN                                         1.44836
-Gross Exposure                             0.558042
-Sharpe Ratio                                1.71742
-Sortino Ratio                               2.96685
-Calmar Ratio                                2.54295
+Start                          2015-08-07 00:00:00+00:00
+End                            2021-08-01 00:00:00+00:00
+Period                                2183 days 00:00:00
+Start Value                                        100.0
+End Value                                  620402.791485
+Total Return [%]                           620302.791485
+Benchmark Return [%]                        92987.961948
+Max Gross Exposure [%]                             100.0
+Total Fees Paid                             10991.676981
+Max Drawdown [%]                               70.734951
+Max Drawdown Duration                  760 days 00:00:00
+Total Trades                                          54
+Total Closed Trades                                   53
+Total Open Trades                                      1
+Open Trade P&L                              67287.940601
+Win Rate [%]                                   52.830189
+Best Trade [%]                               1075.803607
+Worst Trade [%]                               -29.593414
+Avg Winning Trade [%]                          95.695343
+Avg Losing Trade [%]                          -11.890246
+Avg Winning Trade Duration    35 days 23:08:34.285714286
+Avg Losing Trade Duration                8 days 00:00:00
+Profit Factor                                   2.651143
+Expectancy                                   10434.24247
+Sharpe Ratio                                    2.041211
+Calmar Ratio                                      4.6747
+Omega Ratio                                     1.547013
+Sortino Ratio                                   3.519894
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
@@ -201,20 +204,17 @@ bbands = vbt.BBANDS.run(price)
 def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
-        rows=5, cols=1, shared_xaxes=True, 
-        row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
         subplot_titles=(*symbols, '%B', 'Bandwidth'))
-    fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=650)
-    for i, symbol in enumerate(symbols):
-        bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
+    fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=400)
     bbands.percent_b.vbt.ts_heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
-            y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=4, col=1), fig=fig)
+            y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=1, col=1), fig=fig)
     bbands.bandwidth.vbt.ts_heatmap(
         trace_kwargs=dict(colorbar=dict(
-            y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=5, col=1), fig=fig)
+            y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
     return fig
 
 vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)

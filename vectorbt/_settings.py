@@ -251,29 +251,45 @@ settings = SettingsConfig(
                     use_caching=True
                 )
             ),
-            metric_kwargs=Config(),  # flex
+            metric_settings=Config(),  # flex
         ),
         plot_builder=dict(
             subplots='all',
-            grouped_subplots=None,
+            tags='all',
+            silence_warnings=False,
+            template_mapping=Config(),  # flex
+            filters=Config(  # flex
+                dict(
+                    is_not_grouped=dict(
+                        filter_func=lambda self, subplot_settings:
+                        not self.wrapper.grouper.is_grouped(group_by=subplot_settings['group_by']),
+                        warning_message=Sub("Subplot '$subplot_name' does not support grouped data")
+                    ),
+                    has_freq=dict(
+                        filter_func=lambda self, subplot_settings:
+                        self.wrapper.freq is not None,
+                        warning_message=Sub("Subplot '$subplot_name' requires frequency to be set")
+                    )
+                )
+            ),
+            settings=Config(  # flex
+                dict(
+                    use_caching=True,
+                    hline_shape_kwargs=dict(
+                        type='line',
+                        line=dict(
+                            color='gray',
+                            dash="dash",
+                        )
+                    )
+                )
+            ),
+            subplot_settings=Config(),  # flex
             show_titles=True,
             hide_id_labels=True,
             group_id_labels=True,
             make_subplots_kwargs=Config(),  # flex
-            silence_warnings=False,
-            template_mapping=Config(),  # flex
-            global_settings=Config(),  # flex
             kwargs=Config(),  # flex
-            use_caching=True,
-            hline_shape_kwargs=Config(  # flex
-                dict(
-                    type='line',
-                    line=dict(
-                        color='gray',
-                        dash="dash",
-                    )
-                )
-            )
         ),
         generic=dict(
             stats=Config(  # flex
@@ -382,9 +398,6 @@ settings = SettingsConfig(
         orders=dict(
             stats=Config()  # flex
         ),
-        logs=dict(
-            stats=Config()  # flex
-        ),
         trades=dict(
             stats=Config(  # flex
                 dict(
@@ -402,6 +415,9 @@ settings = SettingsConfig(
                     )
                 )
             )
+        ),
+        logs=dict(
+            stats=Config()  # flex
         ),
         portfolio=dict(
             call_seq='default',
@@ -464,11 +480,26 @@ settings = SettingsConfig(
                     )
                 )
             ),
-            plot=dict(
-                subplots=['orders', 'trade_returns', 'cum_returns'],
-                use_asset_returns=False,
-                use_positions=False,
-                incl_open=True
+            plot=Config(  # flex
+                dict(
+                    subplots=['orders', 'trade_returns', 'cum_returns'],
+                    filters=dict(
+                        has_year_freq=dict(
+                            filter_func=lambda self, subplot_settings:
+                            subplot_settings['year_freq'] is not None,
+                            warning_message=Sub("Subplot '$subplot_name' requires year frequency to be set")
+                        )
+                    ),
+                    settings=dict(
+                        use_asset_returns=False,
+                        use_positions=False,
+                        incl_open=True
+                    ),
+                    template_mapping=dict(
+                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
+                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+                    )
+                )
             )
         ),
         messaging=dict(
@@ -667,6 +698,22 @@ Settings applied across `vectorbt.portfolio.orders`.
 
 ```json
 {settings['orders'].to_doc()}
+```
+
+## settings.portfolio.trades
+
+Settings applied across `vectorbt.portfolio.trades`.
+
+```json
+{settings['trades'].to_doc()}
+```
+
+## settings.portfolio.logs
+
+Settings applied across `vectorbt.portfolio.logs`.
+
+```json
+{settings['logs'].to_doc()}
 ```
 
 ## settings.portfolio

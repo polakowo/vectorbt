@@ -86,7 +86,7 @@ from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
@@ -162,7 +162,7 @@ class Orders(Records):
         """Perform indexing on `Orders` and return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
             Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
-        new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
+        new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
             records_arr=new_records_arr,
@@ -207,8 +207,8 @@ class Orders(Records):
     @cached_method
     def buy_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of buy operations."""
-        buy_count = to_1d(self.buy.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        buy_count = to_1d_array(self.buy.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='buy_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(buy_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -221,8 +221,8 @@ class Orders(Records):
     @cached_method
     def sell_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of sell operations."""
-        sell_count = to_1d(self.sell.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        sell_count = to_1d_array(self.sell.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='sell_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(sell_count / total_count, group_by=group_by, **wrap_kwargs)
 

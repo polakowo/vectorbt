@@ -760,7 +760,8 @@ class Configured(Pickleable, Documented):
             initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
         if _class is None:
             _class = self.__class__
-        new_instance = _class(**self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested))
+        new_config = self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested)
+        new_instance = _class(**new_config)
         for attr in self.writeable_attrs:
             attr_obj = getattr(self, attr)
             if isinstance(attr_obj, Config):

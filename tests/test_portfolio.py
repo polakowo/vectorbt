@@ -4918,7 +4918,7 @@ class TestPortfolio:
         pf2 = pf.copy()
         pf2._metrics = pf2._metrics.copy()
         pf2.metrics['hello'] = 'world'
-        pf2.subplots = pf2.subplots.copy()
+        pf2._subplots = pf2.subplots.copy()
         pf2.subplots['hello'] = 'world'
         assert vbt.Portfolio.loads(pf2['a'].dumps()) == pf2['a']
         assert vbt.Portfolio.loads(pf2.dumps()) == pf2

@@ -11,6 +11,8 @@ Methods can be accessed as follows:
 
     Grouping is only supported by the methods that accept the `group_by` argument.
 
+    Accessors do not utilize caching.
+
 There are three options to compute returns and get the accessor:
 
 ```python-repl
@@ -127,14 +129,13 @@ from scipy.stats import skew, kurtosis
 import warnings
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
-from vectorbt.base.array_wrapper import Wrapping
+from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.accessors import (
     GenericAccessor,
@@ -193,11 +194,11 @@ class ReturnsAccessor(GenericAccessor):
             wrap_kwargs = {}
         if not checks.is_any_array(value):
             value = np.asarray(value)
-        value_2d = to_2d(value, raw=True)
+        value_2d = to_2d_array(value)
         init_value = broadcast(init_value, to_shape=value_2d.shape[1], **broadcast_kwargs)
 
         returns = nb.returns_nb(value_2d, init_value)
-        returns = value.vbt.wrapper.wrap(returns, **wrap_kwargs)
+        returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
         return cls(returns, **kwargs)
 
     @property
@@ -435,12 +436,12 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults['risk_free']
         if ddof is None:
             ddof = self.defaults['ddof']
-        sharpe_ratio = to_1d(self.sharpe_ratio(risk_free=risk_free), raw=True)
+        sharpe_ratio = to_1d_array(self.sharpe_ratio(risk_free=risk_free))
         if var_sharpe is None:
             var_sharpe = np.var(sharpe_ratio, ddof=ddof)
         if nb_trials is None:
             nb_trials = self.wrapper.shape_2d[1]
-        returns = to_2d(self.obj, raw=True)
+        returns = to_2d_array(self.obj)
         nanmask = np.isnan(returns)
         if nanmask.any():
             returns = returns.copy()
@@ -515,7 +516,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbt.returns.nb.information_ratio_nb`."""
         if ddof is None:
             ddof = self.defaults['ddof']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.information_ratio_nb(self.to_2d_array(), benchmark_rets, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='information_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -534,13 +535,13 @@ class ReturnsAccessor(GenericAccessor):
         if ddof is None:
             ddof = self.defaults['ddof']
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_information_ratio_nb(self.to_2d_array(), window, minp, benchmark_rets, ddof)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def beta(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.beta_nb`."""
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.beta_nb(self.to_2d_array(), benchmark_rets)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -555,7 +556,7 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_beta_nb(self.to_2d_array(), window, minp, benchmark_rets)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
@@ -567,7 +568,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbt.returns.nb.alpha_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.alpha_nb(self.to_2d_array(), benchmark_rets, self.ann_factor, risk_free)
         wrap_kwargs = merge_dicts(dict(name_or_index='alpha'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -585,7 +586,7 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_alpha_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor, risk_free)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
@@ -611,7 +612,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def common_sense_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Common Sense Ratio."""
-        result = to_1d(self.tail_ratio(), raw=True) * (1 + to_1d(self.annualized(), raw=True))
+        result = to_1d_array(self.tail_ratio()) * (1 + to_1d_array(self.annualized()))
         wrap_kwargs = merge_dicts(dict(name_or_index='common_sense_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
@@ -624,8 +625,8 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        rolling_tail_ratio = to_2d(self.rolling_tail_ratio(window, minp=minp), raw=True)
-        rolling_annualized = to_2d(self.rolling_annualized(window, minp=minp), raw=True)
+        rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(window, minp=minp))
+        rolling_annualized = to_2d_array(self.rolling_annualized(window, minp=minp))
         result = rolling_tail_ratio * (1 + rolling_annualized)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
@@ -684,7 +685,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.capture_nb`."""
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -699,14 +700,14 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def up_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.up_capture_nb`."""
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.up_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='up_capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -721,14 +722,14 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_up_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def down_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.down_capture_nb`."""
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.down_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='down_capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -743,7 +744,7 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self.obj, raw=True))
+        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.rolling_down_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
@@ -775,7 +776,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    @cached_property
+    @property
     def drawdowns(self) -> Drawdowns:
         """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
@@ -989,7 +990,7 @@ class ReturnsAccessor(GenericAccessor):
         return self._metrics
 
 
-@register_series_accessor('returns')
+@register_series_vbt_accessor('returns')
 class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
     """Accessor on top of return series. For Series only.
 
@@ -1109,7 +1110,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         return fig
 
 
-@register_dataframe_accessor('returns')
+@register_dataframe_vbt_accessor('returns')
 class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
     """Accessor on top of return series. For DataFrames only.
 

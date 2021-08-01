@@ -55,11 +55,8 @@ def apply_mapping(obj: tp.Any,
         reverse (bool): See `reverse` in `to_mapping`.
         ignore_case (bool): Whether to ignore the case if the key is a string.
         ignore_underscores (bool): Whether to ignore underscores if the key is a string.
-        ignore_other_types (bool): Whether to prepare the object and the keys, for example, by lowering their case.
+        ignore_other_types (bool): Whether to ignore other data types. Otherwise, throws an error.
         na_sentinel (any): Value to mark “not found”.
-
-    !!! note
-        Casts array/Series/DataFrame if the first element is of the same type as the first mapping's key.
     """
     if mapping_like is None:
         return na_sentinel
@@ -75,6 +72,7 @@ def apply_mapping(obj: tp.Any,
 
     mapping = to_mapping(mapping_like, reverse=reverse)
 
+    key_types = set()
     new_mapping = dict()
     for k, v in mapping.items():
         if pd.isnull(k):
@@ -83,20 +81,22 @@ def apply_mapping(obj: tp.Any,
             if isinstance(k, str):
                 k = key_func(k)
             new_mapping[k] = v
-    keys = list(new_mapping.keys())
+            key_types.add(type(k))
 
-    key = keys[0]
-    if key is None:
-        if len(new_mapping) > 1:
-            key = keys[1]
-        else:
-            raise ValueError("Mapping keys contain only one value: null")
-
-    def _same_type(x: tp.Any) -> bool:
-        if type(x) == type(key):
-            return True
-        if np.dtype(type(x)) == np.dtype(type(key)):
-            return True
+    def _type_in_key_types(x_type: type) -> bool:
+        for key_type in key_types:
+            if x_type is key_type:
+                return True
+            x_dtype = np.dtype(x_type)
+            key_dtype = np.dtype(key_type)
+            if x_dtype is key_dtype:
+                return True
+            if np.issubdtype(x_dtype, np.number) and np.issubdtype(key_dtype, np.number):
+                return True
+            if np.issubdtype(x_dtype, np.bool_) and np.issubdtype(key_dtype, np.bool_):
+                return True
+            if np.issubdtype(x_dtype, np.flexible) and np.issubdtype(key_dtype, np.flexible):
+                return True
         return False
 
     def _converter(x: tp.Any) -> tp.Any:
@@ -106,7 +106,7 @@ def apply_mapping(obj: tp.Any,
             x = key_func(x)
         return new_mapping[x]
 
-    if _same_type(obj):
+    if _type_in_key_types(type(obj)):
         return _converter(obj)
     if isinstance(obj, (tuple, list, set, frozenset)):
         result = [apply_mapping(
@@ -122,30 +122,39 @@ def apply_mapping(obj: tp.Any,
     if isinstance(obj, np.ndarray):
         if obj.size == 0:
             return obj
-        if _same_type(obj.item(0)):
+        if _type_in_key_types(type(obj.item(0))):
             return np.vectorize(_converter)(obj)
+        if not ignore_other_types:
+            raise ValueError(f"Type is {type(obj.item(0))}, must be one of types {key_types}")
+        return obj
     if isinstance(obj, pd.Series):
         if obj.size == 0:
             return obj
-        if _same_type(obj.iloc[0]):
+        if _type_in_key_types(type(obj.iloc[0])):
             return obj.map(_converter)
+        if not ignore_other_types:
+            raise ValueError(f"Type is {type(obj.iloc[0])}, must be one of types {key_types}")
+        return obj
     if isinstance(obj, pd.Index):
         if obj.size == 0:
             return obj
-        if _same_type(obj[0]):
+        if _type_in_key_types(type(obj[0])):
             return obj.map(_converter)
+        if not ignore_other_types:
+            raise ValueError(f"Type is {type(obj[0])}, must be one of types {key_types}")
+        return obj
     if isinstance(obj, pd.DataFrame):
         if obj.size == 0:
             return obj
         series = []
         for sr_name, sr in obj.iteritems():
-            if _same_type(sr.iloc[0]):
+            if _type_in_key_types(type(sr.iloc[0])):
                 series.append(sr.map(_converter))
             else:
                 if not ignore_other_types:
-                    raise ValueError(f"Type of column '{sr_name}' is {type(obj)}, must be {type(key)}")
+                    raise ValueError(f"Type is {type(sr.iloc[0])}, must be one of types {key_types}")
                 series.append(sr)
         return pd.concat(series, axis=1, keys=obj.columns)
     if not ignore_other_types:
-        raise ValueError(f"Type of object is {type(obj)}, must be {type(key)}")
+        raise ValueError(f"Type is {type(obj)}, must be one of types {key_types}")
     return obj

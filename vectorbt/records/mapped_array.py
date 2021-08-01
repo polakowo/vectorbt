@@ -340,8 +340,8 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method, add_binary_magic_methods, add_unary_magic_methods
 from vectorbt.utils.mapping import to_mapping, apply_mapping
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.base.reshape_fns import to_1d
+from vectorbt.utils.config import merge_dicts, Config, Configured
+from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.stats_builder import StatsBuilderMixin
@@ -360,7 +360,8 @@ IndexingMetaT = tp.Tuple[
 ]
 
 
-def combine_mapped_with_other(self: MappedArrayT, other: tp.Union["MappedArray", tp.ArrayLike],
+def combine_mapped_with_other(self: MappedArrayT,
+                              other: tp.Union["MappedArray", tp.ArrayLike],
                               np_func: tp.Callable[[tp.ArrayLike, tp.ArrayLike], tp.Array1d]) -> MappedArrayT:
     """Combine `MappedArray` with other compatible object.
 
@@ -393,6 +394,13 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
             Must be of the same size as `mapped_arr`.
         mapping (namedtuple, dict or callable): Mapping.
+        col_mapper (ColumnMapper): Column mapper if already known.
+
+            !!! note
+                It depends upon `wrapper` and `col_arr`, so make sure to invalidate `col_mapper` upon creating
+                a `MappedArray` instance with a modified `wrapper` or `col_arr.
+
+                `MappedArray.copy` does it automatically.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -405,6 +413,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                  id_arr: tp.Optional[tp.ArrayLike] = None,
                  idx_arr: tp.Optional[tp.ArrayLike] = None,
                  mapping: tp.Optional[tp.MappingLike] = None,
+                 col_mapper: tp.Optional[ColumnMapper] = None,
                  **kwargs) -> None:
         Wrapping.__init__(
             self,
@@ -414,6 +423,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             id_arr=id_arr,
             idx_arr=idx_arr,
             mapping=mapping,
+            col_mapper=col_mapper,
             **kwargs
         )
         StatsBuilderMixin.__init__(self)
@@ -436,7 +446,22 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         self._col_arr = col_arr
         self._idx_arr = idx_arr
         self._mapping = mapping
-        self._col_mapper = ColumnMapper(wrapper, col_arr)
+        if col_mapper is None:
+            col_mapper = ColumnMapper(wrapper, col_arr)
+        self._col_mapper = col_mapper
+
+    def copy(self: MappedArrayT, **kwargs) -> MappedArrayT:
+        """See `vectorbt.utils.config.Configured.copy`.
+
+        Also, makes sure that `MappedArray.col_mapper` is not passed to the new instance."""
+        if self.config.get('col_mapper', None) is not None:
+            if 'wrapper' in kwargs:
+                if self.wrapper is not kwargs.get('wrapper'):
+                    kwargs['col_mapper'] = None
+            if 'col_arr' in kwargs:
+                if self.col_arr is not kwargs.get('col_arr'):
+                    kwargs['col_mapper'] = None
+        return Configured.copy(self, **kwargs)
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
@@ -876,7 +901,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                  group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
-            percentiles = to_1d(percentiles, raw=True)
+            percentiles = to_1d_array(percentiles)
         else:
             percentiles = np.array([0.25, 0.5, 0.75])
         percentiles = percentiles.tolist()
@@ -1057,7 +1082,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             ),
             value_counts=dict(
                 title='Value Counts',
-                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
+                calc_func=lambda value_counts: to_dict(value_counts, orient='index_series'),
                 resolve_value_counts=True,
                 check_has_mapping=True,
                 tags=['mapped_array', 'value_counts']

@@ -27,7 +27,10 @@ vbt.base.accessors.BaseSR/DFAccessor
 ```
 
 So, for example, the method `pd.Series.vbt.to_2d_array` is also available as
-`pd.Series.vbt.returns.to_2d_array`."""
+`pd.Series.vbt.returns.to_2d_array`.
+
+!!! note
+    Accessors in vectorbt are not cached, so querying `df.vbt` twice will also call `Vbt_DFAccessor` twice."""
 
 import pandas as pd
 from pandas.core.accessor import DirNamesMixin
@@ -37,38 +40,17 @@ from vectorbt import _typing as tp
 from vectorbt.utils.config import Configured
 from vectorbt.generic.accessors import GenericSRAccessor, GenericDFAccessor
 
-
-# By subclassing DirNamesMixin, we can build accessors on top of each other
-@pd.api.extensions.register_series_accessor("vbt")
-class Vbt_SRAccessor(DirNamesMixin, GenericSRAccessor):
-    """The main vectorbt accessor for `pd.Series`."""
-
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        self._obj = obj
-
-        DirNamesMixin.__init__(self)
-        GenericSRAccessor.__init__(self, obj, **kwargs)
-
-
-@pd.api.extensions.register_dataframe_accessor("vbt")
-class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
-    """The main vectorbt accessor for `pd.DataFrame`."""
-
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        self._obj = obj
-
-        DirNamesMixin.__init__(self)
-        GenericDFAccessor.__init__(self, obj, **kwargs)
-
-
 ParentAccessorT = tp.TypeVar("ParentAccessorT", bound=object)
 AccessorT = tp.TypeVar("AccessorT", bound=object)
 
 
-class CachedAccessor:
+class Accessor:
     """Custom property-like object.
 
-    A descriptor for caching accessors."""
+    !!! note
+        In contrast to other pandas accessors, this accessor is not cached!
+
+        This prevents from using old data if the object has been changed in-place."""
 
     def __init__(self, name: str, accessor: tp.Type[AccessorT]) -> None:
         self._name = name
@@ -83,7 +65,6 @@ class CachedAccessor:
             accessor_obj = obj.copy(_class=self._accessor)
         else:
             accessor_obj = self._accessor(obj.obj)
-        object.__setattr__(obj, self._name, accessor_obj)
         return accessor_obj
 
 
@@ -101,7 +82,7 @@ def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
                 UserWarning,
                 stacklevel=2,
             )
-        setattr(cls, name, CachedAccessor(name, accessor))
+        setattr(cls, name, Accessor(name, accessor))
         cls._accessors.add(name)
         return accessor
 
@@ -109,10 +90,43 @@ def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
 
 
 def register_series_accessor(name: str) -> tp.Callable:
+    """Decorator to register a custom `pd.Series` accessor on top of the `pd.Series`."""
+    return register_accessor(name, pd.Series)
+
+
+def register_dataframe_accessor(name: str) -> tp.Callable:
+    """Decorator to register a custom `pd.DataFrame` accessor on top of the `pd.DataFrame`."""
+    return register_accessor(name, pd.DataFrame)
+
+
+# By subclassing DirNamesMixin, we can build accessors on top of each other
+@register_series_accessor("vbt")
+class Vbt_SRAccessor(DirNamesMixin, GenericSRAccessor):
+    """The main vectorbt accessor for `pd.Series`."""
+
+    def __init__(self, obj: tp.Series, **kwargs) -> None:
+        self._obj = obj
+
+        DirNamesMixin.__init__(self)
+        GenericSRAccessor.__init__(self, obj, **kwargs)
+
+
+@register_dataframe_accessor("vbt")
+class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
+    """The main vectorbt accessor for `pd.DataFrame`."""
+
+    def __init__(self, obj: tp.Frame, **kwargs) -> None:
+        self._obj = obj
+
+        DirNamesMixin.__init__(self)
+        GenericDFAccessor.__init__(self, obj, **kwargs)
+
+
+def register_series_vbt_accessor(name: str) -> tp.Callable:
     """Decorator to register a custom `pd.Series` accessor on top of the `vbt` accessor."""
     return register_accessor(name, Vbt_SRAccessor)
 
 
-def register_dataframe_accessor(name: str) -> tp.Callable:
+def register_dataframe_vbt_accessor(name: str) -> tp.Callable:
     """Decorator to register a custom `pd.DataFrame` accessor on top of the `vbt` accessor."""
     return register_accessor(name, Vbt_DFAccessor)

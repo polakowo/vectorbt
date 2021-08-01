@@ -1146,13 +1146,21 @@ class TestIndexFns:
             pd.Index(['x7', 'y7', 'z7'], dtype='object', name='i7')
         )
         pd.testing.assert_index_equal(
-            index_fns.drop_levels(multi_i, ['i7', 'i8']),  # won't do anything
+            index_fns.drop_levels(multi_i, 'i9', strict=False),
+            multi_i
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.drop_levels(multi_i, 'i9')
+        pd.testing.assert_index_equal(
+            index_fns.drop_levels(multi_i, ['i7', 'i8'], strict=False),  # won't do anything
             pd.MultiIndex.from_tuples([
                 ('x7', 'x8'),
                 ('y7', 'y8'),
                 ('z7', 'z8')
             ], names=['i7', 'i8'])
         )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.drop_levels(multi_i, ['i7', 'i8'])
 
     def test_rename_levels(self):
         i = pd.Int64Index([1, 2, 3], name='i')
@@ -1160,6 +1168,12 @@ class TestIndexFns:
             index_fns.rename_levels(i, {'i': 'f'}),
             pd.Int64Index([1, 2, 3], dtype='int64', name='f')
         )
+        pd.testing.assert_index_equal(
+            index_fns.rename_levels(i, {'a': 'b'}, strict=False),
+            i
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = index_fns.rename_levels(i, {'a': 'b'}, strict=True)
         pd.testing.assert_index_equal(
             index_fns.rename_levels(multi_i, {'i7': 'f7', 'i8': 'f8'}),
             pd.MultiIndex.from_tuples([

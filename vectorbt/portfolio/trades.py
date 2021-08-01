@@ -166,7 +166,7 @@ from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.utils.template import RepEval, Rep
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
@@ -331,7 +331,7 @@ class Trades(Records):
         """Perform indexing on `Trades` and also return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
             Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
-        new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
+        new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
             records_arr=new_records_arr,
@@ -356,7 +356,7 @@ class Trades(Records):
     def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
         """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
         trade_records_arr = nb.orders_to_trades_nb(
-            orders.close.vbt.to_2d_array(),
+            to_2d_array(orders.close),
             orders.values,
             orders.col_mapper.col_map
         )
@@ -402,8 +402,8 @@ class Trades(Records):
     def win_rate(self, group_by: tp.GroupByLike = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of winning trades."""
-        win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        win_count = to_1d_array(self.winning.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='win_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(win_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -417,8 +417,8 @@ class Trades(Records):
     def loss_rate(self, group_by: tp.GroupByLike = None,
                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of losing trades."""
-        loss_count = to_1d(self.losing.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        loss_count = to_1d_array(self.losing.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='loss_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(loss_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -436,11 +436,11 @@ class Trades(Records):
     def profit_factor(self, group_by: tp.GroupByLike = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Profit factor."""
-        total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
-        total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
+        total_win = to_1d_array(self.winning.pnl.sum(group_by=group_by))
+        total_loss = to_1d_array(self.losing.pnl.sum(group_by=group_by))
 
         # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d(self.count(group_by=group_by), raw=True) > 0
+        has_values = to_1d_array(self.count(group_by=group_by)) > 0
         total_win[np.isnan(total_win) & has_values] = 0.
         total_loss[np.isnan(total_loss) & has_values] = 0.
 
@@ -452,12 +452,12 @@ class Trades(Records):
     def expectancy(self, group_by: tp.GroupByLike = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability."""
-        win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
-        avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
-        avg_loss = to_1d(self.losing.pnl.mean(group_by=group_by), raw=True)
+        win_rate = to_1d_array(self.win_rate(group_by=group_by))
+        avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by))
+        avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by))
 
         # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d(self.count(group_by=group_by), raw=True) > 0
+        has_values = to_1d_array(self.count(group_by=group_by)) > 0
         avg_win[np.isnan(avg_win) & has_values] = 0.
         avg_loss[np.isnan(avg_loss) & has_values] = 0.
 
@@ -469,9 +469,9 @@ class Trades(Records):
     def sqn(self, group_by: tp.GroupByLike = None,
             wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """System Quality Number (SQN)."""
-        count = to_1d(self.count(group_by=group_by), raw=True)
-        pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
-        pnl_std = to_1d(self.pnl.std(group_by=group_by), raw=True)
+        count = to_1d_array(self.count(group_by=group_by))
+        pnl_mean = to_1d_array(self.pnl.mean(group_by=group_by))
+        pnl_std = to_1d_array(self.pnl.std(group_by=group_by))
         sqn = np.sqrt(count) * pnl_mean / pnl_std
         wrap_kwargs = merge_dicts(dict(name_or_index='sqn'), wrap_kwargs)
         return self.wrapper.wrap_reduced(sqn, group_by=group_by, **wrap_kwargs)
@@ -488,8 +488,8 @@ class Trades(Records):
     def long_rate(self, group_by: tp.GroupByLike = None,
                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of long trades."""
-        long_count = to_1d(self.long.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        long_count = to_1d_array(self.long.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='long_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(long_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -503,8 +503,8 @@ class Trades(Records):
     def short_rate(self, group_by: tp.GroupByLike = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of short trades."""
-        short_count = to_1d(self.short.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        short_count = to_1d_array(self.short.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='short_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(short_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -520,8 +520,8 @@ class Trades(Records):
     def open_rate(self, group_by: tp.GroupByLike = None,
                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of open trades."""
-        open_count = to_1d(self.open.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        open_count = to_1d_array(self.open.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='open_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(open_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -535,8 +535,8 @@ class Trades(Records):
     def closed_rate(self, group_by: tp.GroupByLike = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of closed trades."""
-        closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        closed_count = to_1d_array(self.closed.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='closed_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(closed_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -1231,7 +1231,7 @@ class Positions(Trades):
     def coverage(self, group_by: tp.GroupByLike = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Coverage, that is, total duration divided by the whole period."""
-        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
+        total_duration = to_1d_array(self.duration.sum(group_by=group_by))
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)

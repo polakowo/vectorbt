@@ -2249,8 +2249,7 @@ class TestEnum:
         assert enum.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
         assert enum.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
         assert enum.map_enum_values(0, Enum, ignore_other_types=False) == 'Attr1'
-        with pytest.raises(Exception):
-            _ = enum.map_enum_values(0., Enum, ignore_other_types=False)
+        assert enum.map_enum_values(0., Enum, ignore_other_types=False) == 'Attr1'
         with pytest.raises(Exception):
             _ = enum.map_enum_values('hello', Enum, ignore_other_types=False)
         np.testing.assert_array_equal(
@@ -2259,7 +2258,7 @@ class TestEnum:
         )
         np.testing.assert_array_equal(
             enum.map_enum_values(np.array([[0., 1.]]), Enum),
-            np.array([[0., 1.]])
+            np.array([['Attr1', 'Attr2']])
         )
         np.testing.assert_array_equal(
             enum.map_enum_values(np.array([['Attr1', 'Attr2']]), Enum),
@@ -2275,7 +2274,7 @@ class TestEnum:
         )
         pd.testing.assert_series_equal(
             enum.map_enum_values(pd.Series([0., 1.]), Enum),
-            pd.Series([0., 1.])
+            pd.Series(['Attr1', 'Attr2'])
         )
         pd.testing.assert_series_equal(
             enum.map_enum_values(pd.Series([0, 1]), Enum),
@@ -2293,7 +2292,7 @@ class TestEnum:
         )
         pd.testing.assert_frame_equal(
             enum.map_enum_values(pd.DataFrame([[0., 1.]]), Enum),
-            pd.DataFrame([[0., 1.]])
+            pd.DataFrame([['Attr1', 'Attr2']])
         )
         pd.testing.assert_frame_equal(
             enum.map_enum_values(pd.DataFrame([[0, 1]]), Enum),

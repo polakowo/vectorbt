@@ -62,6 +62,7 @@ from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.enum import map_enum_values
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.reshape_fns import to_dict
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
 from vectorbt.records.decorators import add_mapped_fields
@@ -222,15 +223,13 @@ class Logs(Records):
                 title='Status Counts',
                 calc_func='res_status.value_counts',
                 incl_all_keys=True,
-                post_calc_func=lambda self, out, settings: out.vbt.to_dict(orient='index_series'),
-                check_has_mapping=True,
+                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
                 tags=['logs', 'res_status', 'value_counts']
             ),
             res_status_info_counts=dict(
                 title='Status Info Counts',
                 calc_func='res_status_info.value_counts',
-                post_calc_func=lambda self, out, settings: out.vbt.to_dict(orient='index_series'),
-                check_has_mapping=True,
+                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
                 tags=['logs', 'res_status_info', 'value_counts']
             )
         ),

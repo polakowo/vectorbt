@@ -28,6 +28,8 @@ The accessors extend `vectorbt.generic.accessors`.
 
     Grouping is only supported by the methods that accept the `group_by` argument.
 
+    Accessors do not utilize caching.
+
 Run for the examples below:
     
 ```python-repl
@@ -184,7 +186,7 @@ import pandas as pd
 import warnings
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_dicts, Config
@@ -440,13 +442,13 @@ class SignalsAccessor(GenericAccessor):
                 broadcast_kwargs = {}
             entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
             entries_out, exits_out = nb.clean_enex_nb(
-                entries.vbt.to_2d_array(),
-                exits.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(entries),
+                reshape_fns.to_2d_array(exits),
                 entry_first
             )
             return (
-                entries.vbt.wrapper.wrap(entries_out, group_by=False, **merge_dicts({}, wrap_kwargs)),
-                exits.vbt.wrapper.wrap(exits_out, group_by=False, **merge_dicts({}, wrap_kwargs))
+                ArrayWrapper.from_obj(entries).wrap(entries_out, group_by=False, **merge_dicts({}, wrap_kwargs)),
+                ArrayWrapper.from_obj(exits).wrap(exits_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             )
         else:
             raise ValueError("Either one or two arrays must be passed")
@@ -664,7 +666,7 @@ class SignalsAccessor(GenericAccessor):
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
             exits = nb.generate_rand_ex_by_prob_nb(
-                obj.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(obj),
                 prob,
                 wait,
                 until_next,
@@ -672,7 +674,7 @@ class SignalsAccessor(GenericAccessor):
                 obj.ndim == 2,
                 seed=seed
             )
-            return obj.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(obj).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         exits = nb.generate_rand_ex_nb(
             self.to_2d_array(),
             wait,
@@ -753,7 +755,7 @@ class SignalsAccessor(GenericAccessor):
         # Perform generation
         if chain:
             new_entries, exits = nb.generate_stop_enex_nb(
-                entries.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(entries),
                 ts,
                 stop,
                 trailing,
@@ -762,13 +764,13 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            return entries.vbt.wrapper.wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
-                   entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(entries).wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
+                   ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             exits = nb.generate_stop_ex_nb(
-                entries.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(entries),
                 ts,
                 stop,
                 trailing,
@@ -778,7 +780,7 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            return entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def generate_ohlc_stop_exits(self,
                                  open: tp.ArrayLike,
@@ -980,13 +982,13 @@ class SignalsAccessor(GenericAccessor):
             stop_type_out = np.empty_like(entries, dtype=np.int_)
         else:
             stop_type_out = out_args[0]
-        stop_price_out = reshape_fns.to_2d(stop_price_out, raw=True)
-        stop_type_out = reshape_fns.to_2d(stop_type_out, raw=True)
+        stop_price_out = reshape_fns.to_2d_array(stop_price_out)
+        stop_type_out = reshape_fns.to_2d_array(stop_type_out)
 
         # Perform generation
         if chain:
             new_entries, exits = nb.generate_ohlc_stop_enex_nb(
-                entries.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(entries),
                 open,
                 high,
                 low,
@@ -1002,17 +1004,17 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            out_dict['stop_price'] = entries.vbt.wrapper.wrap(
+            out_dict['stop_price'] = ArrayWrapper.from_obj(entries).wrap(
                 stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            out_dict['stop_type'] = entries.vbt.wrapper.wrap(
+            out_dict['stop_type'] = ArrayWrapper.from_obj(entries).wrap(
                 stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            return entries.vbt.wrapper.wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
-                   entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(entries).wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
+                   ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             exits = nb.generate_ohlc_stop_ex_nb(
-                entries.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(entries),
                 open,
                 high,
                 low,
@@ -1029,11 +1031,11 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            out_dict['stop_price'] = entries.vbt.wrapper.wrap(
+            out_dict['stop_price'] = ArrayWrapper.from_obj(entries).wrap(
                 stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            out_dict['stop_type'] = entries.vbt.wrapper.wrap(
+            out_dict['stop_type'] = ArrayWrapper.from_obj(entries).wrap(
                 stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            return entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Map and reduce ############# #
 
@@ -1101,11 +1103,11 @@ class SignalsAccessor(GenericAccessor):
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
             from_idxs, to_idxs, cols = nb.map_meta_between_two_nb(
-                obj.vbt.to_2d_array(),
-                other.vbt.to_2d_array(),
+                reshape_fns.to_2d_array(obj),
+                reshape_fns.to_2d_array(other),
                 from_other=from_other
             )
-            wrapper = obj.vbt.wrapper
+            wrapper = ArrayWrapper.from_obj(obj)
         mapped_arr = nb.range_map_meta_nb(
             from_idxs,
             to_idxs,
@@ -1305,8 +1307,8 @@ class SignalsAccessor(GenericAccessor):
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
             checks.assert_dtype(other, np.bool_)
-            obj_arr = self.to_2d_array()
-            other_arr = other.vbt.to_2d_array()
+            obj_arr = reshape_fns.to_2d_array(obj)
+            other_arr = reshape_fns.to_2d_array(other)
             from_idxs, to_idxs, cols = range_map_meta_func_nb(obj_arr, other_arr, *range_map_meta_args)
 
         result = nb.range_map_reduce_meta_nb(
@@ -1318,12 +1320,13 @@ class SignalsAccessor(GenericAccessor):
             reduce_func_nb, reduce_args
         )
         wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce'), wrap_kwargs)
-        return obj.vbt.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return ArrayWrapper.from_obj(obj).wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def map_reduce_between(self,
                            other: tp.Optional[tp.ArrayLike] = None,
                            from_other: bool = False,
-                           wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+                           wrap_kwargs: tp.KwargsLike = None,
+                           **kwargs) -> tp.MaybeSeries:
         """Map-reduce all ranges between two signals.
 
         Uses `SignalsAccessor.map_reduce` with `vectorbt.signals.nb.map_meta_between_nb` if `other` is None,
@@ -1479,10 +1482,10 @@ class SignalsAccessor(GenericAccessor):
 
         if reset_by is not None:
             obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
-            reset_by = reset_by.vbt.to_2d_array()
+            reset_by = reshape_fns.to_2d_array(reset_by)
         else:
             obj = self.obj
-        obj_arr = obj.vbt.to_2d_array()
+        obj_arr = reshape_fns.to_2d_array(obj)
         if prepare_func is not None:
             temp_arrs = prepare_func(obj_arr, reset_by)
         else:
@@ -1495,7 +1498,7 @@ class SignalsAccessor(GenericAccessor):
             *temp_arrs,
             *args
         )
-        rank_wrapped = obj.vbt.wrapper.wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
+        rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
             return rank_wrapped.vbt.to_mapped(
@@ -1657,7 +1660,7 @@ class SignalsAccessor(GenericAccessor):
         ```"""
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             squeezed = self.squeeze_grouped(generic_nb.any_squeeze_nb, group_by=group_by)
-            arr = squeezed.vbt.to_2d_array()
+            arr = reshape_fns.to_2d_array(squeezed)
         else:
             arr = self.to_2d_array()
         nth_index = nb.nth_index_nb(arr, n)
@@ -1728,8 +1731,6 @@ class SignalsAccessor(GenericAccessor):
             **kwargs
         )
 
-    # ############# Stats ############# #
-
     def total(self, wrap_kwargs: tp.KwargsLike = None,
               group_by: tp.GroupByLike = None) -> tp.MaybeSeries:
         """Total number of True values in each column/group."""
@@ -1739,7 +1740,7 @@ class SignalsAccessor(GenericAccessor):
     def rate(self, wrap_kwargs: tp.KwargsLike = None,
              group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """`SignalsAccessor.total` divided by the total index length in each column/group."""
-        total = reshape_fns.to_1d(self.total(group_by=group_by, **kwargs), raw=True)
+        total = reshape_fns.to_1d_array(self.total(group_by=group_by, **kwargs))
         wrap_kwargs = merge_dicts(dict(name_or_index='rate'), wrap_kwargs)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         return self.wrapper.wrap_reduced(total / total_steps, group_by=group_by, **wrap_kwargs)
@@ -1768,10 +1769,51 @@ class SignalsAccessor(GenericAccessor):
     def partition_rate(self, wrap_kwargs: tp.KwargsLike = None,
                        group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """`SignalsAccessor.total_partitions` divided by `SignalsAccessor.total` in each column/group."""
-        total_partitions = reshape_fns.to_1d(self.total_partitions(group_by=group_by, *kwargs), raw=True)
-        total = reshape_fns.to_1d(self.total(group_by=group_by, *kwargs), raw=True)
+        total_partitions = reshape_fns.to_1d_array(self.total_partitions(group_by=group_by, *kwargs))
+        total = reshape_fns.to_1d_array(self.total(group_by=group_by, *kwargs))
         wrap_kwargs = merge_dicts(dict(name_or_index='partition_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_partitions / total, group_by=group_by, **wrap_kwargs)
+
+    # ############# Logical operations ############# #
+
+    def AND(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Combine with `other` using logical AND.
+
+        See `vectorbt.base.accessors.BaseAccessor.combine`.
+
+        """
+        return self.combine(other, combine_func=np.logical_and, **kwargs)
+
+    def OR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Combine with `other` using logical OR.
+
+        See `vectorbt.base.accessors.BaseAccessor.combine`.
+
+        ## Example
+
+        Perform two OR operations and concatenate them:
+
+        ```python-repl
+        >>> ts = pd.Series([1, 2, 3, 2, 1])
+        >>> mask.vbt.signals.OR([ts > 1, ts > 2], concat=True, keys=['>1', '>2'])
+                                    >1                   >2
+                        a     b      c      a      b      c
+        2020-01-01   True  True   True   True   True   True
+        2020-01-02   True  True   True  False  False   True
+        2020-01-03   True  True   True   True   True   True
+        2020-01-04   True  True   True  False  False  False
+        2020-01-05  False  True  False  False   True  False
+        ```
+        """
+        return self.combine(other, combine_func=np.logical_or, **kwargs)
+
+    def XOR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Combine with `other` using logical XOR.
+
+        See `vectorbt.base.accessors.BaseAccessor.combine`."""
+        return self.combine(other, combine_func=np.logical_xor, **kwargs)
+
+    # ############# Stats ############# #
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -1912,45 +1954,6 @@ class SignalsAccessor(GenericAccessor):
     def metrics(self) -> Config:
         return self._metrics
 
-    # ############# Logical operations ############# #
-
-    def AND(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Combine with `other` using logical AND.
-
-        See `vectorbt.base.accessors.BaseAccessor.combine`.
-
-        """
-        return self.combine(other, combine_func=np.logical_and, **kwargs)
-
-    def OR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Combine with `other` using logical OR.
-
-        See `vectorbt.base.accessors.BaseAccessor.combine`.
-
-        ## Example
-
-        Perform two OR operations and concatenate them:
-
-        ```python-repl
-        >>> ts = pd.Series([1, 2, 3, 2, 1])
-        >>> mask.vbt.signals.OR([ts > 1, ts > 2], concat=True, keys=['>1', '>2'])
-                                    >1                   >2
-                        a     b      c      a      b      c
-        2020-01-01   True  True   True   True   True   True
-        2020-01-02   True  True   True  False  False   True
-        2020-01-03   True  True   True   True   True   True
-        2020-01-04   True  True   True  False  False  False
-        2020-01-05  False  True  False  False   True  False
-        ```
-        """
-        return self.combine(other, combine_func=np.logical_or, **kwargs)
-
-    def XOR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Combine with `other` using logical XOR.
-
-        See `vectorbt.base.accessors.BaseAccessor.combine`."""
-        return self.combine(other, combine_func=np.logical_xor, **kwargs)
-
     # ############# Plotting ############# #
 
     def plot(self, yref: str = 'y', **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
@@ -1977,7 +1980,7 @@ class SignalsAccessor(GenericAccessor):
         return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
 
 
-@register_series_accessor('signals')
+@register_series_vbt_accessor('signals')
 class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
     """Accessor on top of signal series. For Series only.
 
@@ -2075,7 +2078,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         ), kwargs))
 
 
-@register_dataframe_accessor('signals')
+@register_dataframe_vbt_accessor('signals')
 class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 

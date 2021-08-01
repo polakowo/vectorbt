@@ -1,32 +1,44 @@
-"""Class for building plots out of subplots."""
+"""Mixin for building plots out of subplots."""
 
 from collections import Counter
 import warnings
+import inspect
+import string
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import Config, merge_dicts, get_func_arg_names
-from vectorbt.utils.figure import make_subplots, get_domain
-from vectorbt.utils.datetime import freq_to_timedelta
 from vectorbt.utils.template import deep_substitute
+from vectorbt.utils.tags import match_tags
+from vectorbt.utils.attr import get_dict_attr
+from vectorbt.utils.figure import make_subplots, get_domain
 from vectorbt.base.array_wrapper import Wrapping
 
 
-class PlotBuilderMixin:
-    """Class that implements `PlotBuilderMixin.plot`.
+class MetaPlotBuilderMixin(type):
+    """Meta class that exposes a read-only class property `PlotBuilderMixin.subplots`."""
 
-    This class has a similar structure to that of `vectorbt.generic.stats_builder.StatsBuilderMixin`."""
+    @property
+    def subplots(cls) -> Config:
+        """Subplots supported by `PlotBuilderMixin.plot`."""
+        return cls._subplots
+
+
+class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
+    """Mixin that implements `PlotBuilderMixin.plot`.
+
+    Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
     def __init__(self):
         checks.assert_type(self, Wrapping)
 
         # Copy writeable attrs
-        self.subplots = self.__class__.subplots.copy()
+        self._subplots = self.__class__._subplots.copy()
 
     @property
     def writeable_attrs(self) -> tp.Set[str]:
         """Set of writeable attributes that will be saved/copied along with the config."""
-        return {'subplots'}
+        return {'_subplots'}
 
     @property
     def plot_defaults(self) -> tp.Kwargs:
@@ -36,230 +48,320 @@ class PlotBuilderMixin:
         from vectorbt._settings import settings
         plot_builder_cfg = settings['plot_builder']
 
-        return dict(
-            subplots=plot_builder_cfg['subplots'],
-            grouped_subplots=plot_builder_cfg['grouped_subplots'],
-            show_titles=plot_builder_cfg['show_titles'],
-            hide_id_labels=plot_builder_cfg['hide_id_labels'],
-            group_id_labels=plot_builder_cfg['group_id_labels'],
-            make_subplots_kwargs=plot_builder_cfg['make_subplots_kwargs'],
-            silence_warnings=plot_builder_cfg['silence_warnings'],
-            template_mapping=plot_builder_cfg['template_mapping'],
-            global_settings=plot_builder_cfg['global_settings'],
-            kwargs=plot_builder_cfg['kwargs']
+        return merge_dicts(
+            plot_builder_cfg,
+            dict(settings=dict(freq=self.wrapper.freq))
         )
 
-    @property
-    def plot_res_settings(self) -> tp.Kwargs:
-        """Resolution settings for `PlotBuilderMixin.plot`.
-
-        See `plot_builder` in `vectorbt._settings.settings`."""
-        from vectorbt._settings import settings
-        plot_builder_cfg = settings['plot_builder']
-
-        return dict(
-            freq=self.wrapper.freq,
-            use_caching=plot_builder_cfg['use_caching'],
-            hline_shape_kwargs=plot_builder_cfg['hline_shape_kwargs']
-        )
-
-    subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = Config(
         dict(),
         copy_kwargs=dict(copy_mode='deep')
     )
-    """Subplots supported by `PlotBuilderMixin.plot`.
 
-    !!! note
-        It's safe to change this config - it's a (deep) copy of the class variable.
-                
-        But copying `PlotBuilderMixin` using `PlotBuilderMixin.copy` won't create a copy of the config."""
+    @property
+    def subplots(self) -> Config:
+        """Subplots supported by `PlotBuilderMixin.plot`.
+
+        ```json
+        ${subplots}
+        ```
+
+        Returns `PlotBuilderMixin._subplots`, which gets (deep) copied upon creation of each instance.
+        Thus, changing this config won't affect the class.
+
+        To change subplots, you can either change the config in-place, override `PlotBuilderMixin.subplots`,
+        or overwrite the instance variable `PlotBuilderMixin._subplots`."""
+        return self._subplots
 
     def plot(self,
              subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
+             tags: tp.Optional[tp.MaybeIterable[str]] = None,
              column: tp.Optional[tp.Label] = None,
              group_by: tp.GroupByLike = None,
+             silence_warnings: tp.Optional[bool] = None,
+             template_mapping: tp.Optional[tp.Mapping] = None,
+             settings: tp.KwargsLike = None,
+             filters: tp.KwargsLike = None,
+             subplot_settings: tp.KwargsLike = None,
              show_titles: bool = None,
              hide_id_labels: bool = None,
              group_id_labels: bool = None,
              make_subplots_kwargs: tp.KwargsLike = None,
-             silence_warnings: bool = None,
-             template_mapping: tp.Optional[tp.Mapping] = None,
-             global_settings: tp.DictLike = None,
-             **kwargs) -> tp.BaseFigure:  # pragma: no cover
+             **kwargs) -> tp.Optional[tp.BaseFigure]:  # pragma: no cover
         """Plot various parts of this object.
 
         Args:
-            subplots (str, tuple, iterable, or dict): List of subplots to plot.
+            subplots (str, tuple, iterable, or dict): Subplots to plot.
 
                 Each element can be either:
 
                 * a subplot name (see keys in `PlotBuilderMixin.subplots`)
                 * a tuple of a subplot name and a settings dict as in `PlotBuilderMixin.subplots`.
 
-                Each settings dict can contain the following keys:
+                The settings dict can contain the following keys:
 
-                * `title`: title of the subplot. Defaults to None.
-                * `yaxis_title`: title of the y-axis. Defaults to `title`.
-                * `xaxis_title`: title of the x-axis. Defaults to 'Date'.
-                * `allow_grouped`: whether this subplot supports grouped data. Defaults to True.
-                    Must be known beforehand and cannot be provided as a template.
-                * `plot_func`: plotting function for custom subplots. If the function can be accessed
-                    by traversing attributes of this object, you can pass the path to this function
-                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
-                    Should write the supplied figure in-place and can return anything (it won't be used).
-                * `pass_{arg}`: whether to pass a resolution argument (see below). Defaults to True if
-                    this argument was found in the function's signature. Set to False to not pass.
-                * `glob_pass_{arg}`: whether to pass an argument from `global_settings`. Defaults to True if
-                    this argument was found both in `global_settings` and the function's signature.
-                    Set to False to not pass.
-                * `resolve_{arg}`: whether to resolve an argument that is meant to be an attribute of
-                    the object (see `PlotBuilderMixin.resolve_attr`). Defaults to True if this argument was found
-                    in the function's signature. Set to False to not resolve.
-                * `template_mapping`: mapping to replace templates in subplot settings and keyword arguments.
-                    Used across all settings.
-                * Any other keyword argument overrides resolution arguments or is passed directly to `plot_func`.
+                * `title`: Title of the subplot. Defaults to the name.
+                * `plot_func` (required): Plotting function for custom subplots.
+                    Should write the supplied figure `fig` in-place and can return anything (it won't be used).
+                * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
+                    `resolve_path_{arg}`, `resolve_{arg}` and `template_mapping`:
+                    The same as in `vectorbt.generic.stats_builder.StatsBuilderMixin` for `calc_func`.
+                * Any other keyword argument that overrides the settings or is passed directly to `plot_func`.
 
-                A plotting function may accept any keyword argument, but it should accept the current figure via
-                a `fig` keyword argument. It may also "request" any of the following resolution arguments by
-                accepting them or if `pass_{arg}` was found in the settings dict:
+                If `resolve_plot_func` is True, the plotting function may "request" any of the
+                following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `PlotBuilderMixin.self_aliases`: original object (ungrouped, with no column selected)
+                * Each of `vectorbt.utils.attr.AttrResolver.self_aliases`: original object
+                    (ungrouped, with no column selected)
+                * `group_by`: won't be passed if it was used in resolving the first attribute of `plot_func`
+                    specified as a path, use `pass_group_by=True` to pass anyway
                 * `column`
-                * `group_by`
                 * `subplot_name`
-                * `trace_names`: list with the subplot name
-                * `add_trace_kwargs`
+                * `trace_names`: list with the subplot name, can't be used in templates
+                * `add_trace_kwargs`: dict with subplot row and column index
                 * `xref`
                 * `yref`
                 * `xaxis`
                 * `yaxis`
                 * `x_domain`
                 * `y_domain`
-                * Any argument from `PlotBuilderMixin.plot_res_settings`
-                * Any attribute of this object if it meant to be resolved (see `PlotBuilderMixin.resolve_attr`)
+                * `fig`
+                * `silence_warnings`
+                * Any argument from `settings`
+                * Any attribute of this object if it meant to be resolved
+                    (see `vectorbt.utils.attr.AttrResolver.resolve_attr`)
+
+                !!! note
+                    Layout-related resolution arguments such as `add_trace_kwargs` are unavailable
+                    before filtering and thus cannot be used in any templates but can still be overridden.
 
                 Pass `subplots='all'` to plot all supported subplots.
-            column (str): Name of the column/group to plot.
+            tags (str or iterable): See `tags` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            column (str): See `column` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            group_by (any): See `group_by` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            silence_warnings (bool): See `silence_warnings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            template_mapping (mapping): See `template_mapping` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 
-                Won't have effect on this object, but passed down to each plotting function.
-            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
-
-                Won't have effect on this object, but passed down to each plotting function.
+                Applied on `settings`, `make_subplots_kwargs`, and `kwargs`, and then on each subplot settings.
+            filters (dict): See `filters` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            settings (dict): See `settings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+            subplot_settings (dict): See `metric_settings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
             show_titles (bool): Whether to show the title of each subplot.
             hide_id_labels (bool): Whether to hide identical legend labels.
 
                 Two labels are identical if their name, marker style and line style match.
             group_id_labels (bool): Whether to group identical legend labels.
             make_subplots_kwargs (dict): Keyword arguments passed to `plotly.subplots.make_subplots`.
-            silence_warnings (bool): Whether to silence all warnings.
-            template_mapping (mapping): Global mapping to replace templates.
-
-                Applied on `PlotBuilderMixin.plot_res_settings`, `global_settings`, and `kwargs`.
-            global_settings (dict): Keyword arguments that override default settings for each subplot.
-                Additionally, passes any argument that has the matching key in the signature of `plot_func`.
-                Use `glob_pass_{arg}` to force or ignore passing an argument.
             **kwargs: Additional keyword arguments.
 
-                Can contain keyword arguments for each subplot, specified as `{subplot_name}_kwargs`.
-                Can also contain keyword arguments that override arguments from `PlotBuilderMixin.plot_res_settings`.
-                Other keyword arguments are used to update the layout of the figure.
+                Keyword arguments used to update the layout of the figure.
 
-        For template logic, see `vectorbt.utils.template`.
+        !!! note
+            `PlotBuilderMixin` and `vectorbt.generic.stats_builder.StatsBuilderMixin` are very similar.
+            Some artifacts follow the same concept, just named differently:
 
-        For defaults, see `PlotBuilderMixin.plot_defaults`.
-        
-        !!! hint
-            Make sure to resolve and then to re-use as many object attributes as possible to
-            utilize built-in caching (even if global caching is disabled).
+            * `plot_defaults` vs `stats_defaults`
+            * `subplots` vs `metrics`
+            * `subplot_settings` vs `metric_settings`
+
+            See further notes under `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+
+        ## Example
+
+        See `vectorbt.portfolio.base` for examples.
         """
-        from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+        from vectorbt._settings import settings as _settings
+        plotting_cfg = _settings['plotting']
 
         # Resolve defaults
-        plot_res_settings = self.plot_res_settings
-        for k in list(kwargs.keys()):
-            if k in plot_res_settings:
-                plot_res_settings[k] = kwargs.pop(k)
-        make_subplots_kwargs = merge_dicts(self.plot_defaults['make_subplots_kwargs'], make_subplots_kwargs)
+        if silence_warnings is None:
+            silence_warnings = self.plot_defaults['silence_warnings']
+        if show_titles is None:
+            show_titles = self.plot_defaults['show_titles']
+        if hide_id_labels is None:
+            hide_id_labels = self.plot_defaults['hide_id_labels']
+        if group_id_labels is None:
+            group_id_labels = self.plot_defaults['group_id_labels']
         template_mapping = merge_dicts(self.plot_defaults['template_mapping'], template_mapping)
-        global_settings = merge_dicts(self.plot_defaults['global_settings'], global_settings)
+        filters = merge_dicts(self.plot_defaults['filters'], filters)
+        settings = merge_dicts(self.plot_defaults['settings'], settings)
+        subplot_settings = merge_dicts(self.plot_defaults['subplot_settings'], subplot_settings)
+        make_subplots_kwargs = merge_dicts(self.plot_defaults['make_subplots_kwargs'], make_subplots_kwargs)
         kwargs = merge_dicts(self.plot_defaults['kwargs'], kwargs)
 
-        # Check if grouped
-        is_grouped = self.wrapper.grouper.is_grouped(group_by=group_by)
-
-        # Replace templates globally
+        # Replace templates globally (not used at subplot level)
         if len(template_mapping) > 0:
-            plot_res_settings = deep_substitute(plot_res_settings, mapping=template_mapping)
-            global_settings = deep_substitute(global_settings, mapping=template_mapping)
-            kwargs = deep_substitute(kwargs, mapping=template_mapping)
+            sub_settings = deep_substitute(settings, mapping=template_mapping)
+            sub_make_subplots_kwargs = deep_substitute(make_subplots_kwargs, mapping=template_mapping)
+            sub_kwargs = deep_substitute(kwargs, mapping=template_mapping)
+        else:
+            sub_settings = settings
+            sub_make_subplots_kwargs = make_subplots_kwargs
+            sub_kwargs = kwargs
+
+        # Resolve self
+        reself = self.resolve_self(
+            cond_kwargs=sub_settings,
+            impacts_caching=False,
+            silence_warnings=silence_warnings
+        )
 
         # Prepare subplots
         if subplots is None:
-            subplots = self.plot_defaults['subplots']
-            if is_grouped:
-                grouped_subplots = self.plot_defaults['grouped_subplots']
-                if grouped_subplots is None:
-                    grouped_subplots = subplots
-                subplots = grouped_subplots
+            subplots = reself.plot_defaults['subplots']
         if subplots == 'all':
-            subplots = self.subplots
+            subplots = reself.subplots
         if isinstance(subplots, dict):
             subplots = list(subplots.items())
         if isinstance(subplots, (str, tuple)):
             subplots = [subplots]
+
+        # Prepare tags
+        if tags is None:
+            tags = reself.plot_defaults['tags']
+        if isinstance(tags, str) and tags == 'all':
+            tags = None
+        if isinstance(tags, (str, tuple)):
+            tags = [tags]
+
         # Bring to the same shape
         new_subplots = []
         for i, subplot in enumerate(subplots):
             if isinstance(subplot, str):
-                subplot = (subplot, self.subplots[subplot])
+                subplot = (subplot, reself.subplots[subplot])
             if not isinstance(subplot, tuple):
                 raise TypeError(f"Subplot at index {i} must be either a string or a tuple")
             new_subplots.append(subplot)
         subplots = new_subplots
+
         # Handle duplicate names
         subplot_counts = Counter(list(map(lambda x: x[0], subplots)))
         subplot_i = {k: -1 for k in subplot_counts.keys()}
         subplots_dct = {}
-        for i, (subplot_name, subplot_defaults) in enumerate(subplots):
+        for i, (subplot_name, _subplot_settings) in enumerate(subplots):
             if subplot_counts[subplot_name] > 1:
                 subplot_i[subplot_name] += 1
                 subplot_name = subplot_name + '_' + str(subplot_i[subplot_name])
-            subplots_dct[subplot_name] = subplot_defaults
+            subplots_dct[subplot_name] = _subplot_settings
+
+        # Check subplot_settings
+        missed_keys = set(subplot_settings.keys()).difference(set(subplots_dct.keys()))
+        if len(missed_keys) > 0:
+            raise ValueError(f"Keys {missed_keys} in subplot_settings could not be matched with any subplot")
+
         # Merge settings
+        opt_arg_names_dct = {}
         custom_arg_names_dct = {}
-        for subplot_name, subplot_defaults in subplots_dct.items():
-            passed_settings = kwargs.pop(f'{subplot_name}_kwargs', {})
-            subplots_dct[subplot_name] = merge_dicts(
-                subplot_defaults,
-                global_settings,
-                passed_settings
+        resolved_self_dct = {}
+        mapping_dct = {}
+        for subplot_name, _subplot_settings in list(subplots_dct.items()):
+            opt_settings = merge_dicts(
+                {name: reself for name in reself.self_aliases},
+                dict(
+                    column=column,
+                    group_by=group_by,
+                    subplot_name=subplot_name,
+                    trace_names=[subplot_name],
+                    silence_warnings=silence_warnings
+                ),
+                settings
             )
-            custom_arg_names_dct[subplot_name] = set(subplot_defaults.keys()).union(set(passed_settings.keys()))
-        # Filter subplots
-        if is_grouped:
-            left_out_names = []
-            for subplot_name in list(subplots_dct.keys()):
-                if not subplots_dct[subplot_name].get('allow_grouped', True):
+            _subplot_settings = _subplot_settings.copy()
+            passed_subplot_settings = subplot_settings.get(subplot_name, {})
+            merged_settings = merge_dicts(
+                opt_settings,
+                _subplot_settings,
+                passed_subplot_settings
+            )
+            subplot_template_mapping = merged_settings.pop('template_mapping', {})
+            template_mapping_merged = merge_dicts(template_mapping, subplot_template_mapping)
+            template_mapping_merged = deep_substitute(template_mapping_merged, mapping=merged_settings)
+            mapping = merge_dicts(template_mapping_merged, merged_settings)
+            # safe because we will use deep_substitute again once layout params are known
+            merged_settings = deep_substitute(merged_settings, mapping=mapping, safe=True)
+
+            # Filter by tag
+            if tags is not None:
+                in_tags = merged_settings.get('tags', None)
+                if in_tags is None or not match_tags(tags, in_tags):
                     subplots_dct.pop(subplot_name, None)
-                    custom_arg_names_dct.pop(subplot_name, None)
-                    left_out_names.append(subplot_name)
-            if len(left_out_names) > 0 and not silence_warnings:
-                warnings.warn(f"Subplots {left_out_names} do not support grouped data", stacklevel=2)
+                    continue
+
+            custom_arg_names = set(_subplot_settings.keys()).union(set(passed_subplot_settings.keys()))
+            opt_arg_names = set(opt_settings.keys())
+            custom_reself = reself.resolve_self(
+                cond_kwargs=merged_settings,
+                custom_arg_names=custom_arg_names,
+                impacts_caching=True,
+                silence_warnings=merged_settings['silence_warnings']
+            )
+
+            subplots_dct[subplot_name] = merged_settings
+            custom_arg_names_dct[subplot_name] = custom_arg_names
+            opt_arg_names_dct[subplot_name] = opt_arg_names
+            resolved_self_dct[subplot_name] = custom_reself
+            mapping_dct[subplot_name] = mapping
+
+        # Filter subplots
+        for subplot_name, _subplot_settings in list(subplots_dct.items()):
+            custom_reself = resolved_self_dct[subplot_name]
+            mapping = mapping_dct[subplot_name]
+            _silence_warnings = _subplot_settings.get('silence_warnings')
+
+            subplot_filters = set()
+            for k in _subplot_settings.keys():
+                filter_name = None
+                if k.startswith('check_'):
+                    filter_name = k[len('check_'):]
+                elif k.startswith('inv_check_'):
+                    filter_name = k[len('inv_check_'):]
+                if filter_name is not None:
+                    if filter_name not in filters:
+                        raise ValueError(f"Metric '{subplot_name}' requires filter '{filter_name}'")
+                    subplot_filters.add(filter_name)
+
+            for filter_name in subplot_filters:
+                filter_settings = filters[filter_name]
+                _filter_settings = deep_substitute(filter_settings, mapping=mapping)
+                filter_func = _filter_settings['filter_func']
+                warning_message = _filter_settings.get('warning_message', None)
+                inv_warning_message = _filter_settings.get('inv_warning_message', None)
+                to_check = _subplot_settings.get('check_' + filter_name, False)
+                inv_to_check = _subplot_settings.get('inv_check_' + filter_name, False)
+
+                if to_check or inv_to_check:
+                    whether_true = filter_func(custom_reself, _subplot_settings)
+                    to_remove = (to_check and not whether_true) or (inv_to_check and whether_true)
+                    if to_remove:
+                        if to_check and warning_message is not None and not _silence_warnings:
+                            warnings.warn(warning_message)
+                        if inv_to_check and inv_warning_message is not None and not _silence_warnings:
+                            warnings.warn(inv_warning_message)
+
+                        subplots_dct.pop(subplot_name, None)
+                        custom_arg_names_dct.pop(subplot_name, None)
+                        opt_arg_names_dct.pop(subplot_name, None)
+                        resolved_self_dct.pop(subplot_name, None)
+                        mapping_dct.pop(subplot_name, None)
+                        break
+
+        # Any subplots left?
         if len(subplots_dct) == 0:
-            raise ValueError("There is no subplot to plot")
+            if not silence_warnings:
+                warnings.warn("No subplots left to plot", stacklevel=2)
+            return None
 
         # Set up figure
-        rows = make_subplots_kwargs.pop('rows', len(subplots_dct))
-        cols = make_subplots_kwargs.pop('cols', 1)
-        specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
+        rows = sub_make_subplots_kwargs.pop('rows', len(subplots_dct))
+        cols = sub_make_subplots_kwargs.pop('cols', 1)
+        specs = sub_make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
             for col, col_spec in enumerate(row_spec):
                 if col_spec is not None:
                     row_col_tuples.append((row + 1, col + 1))
-        shared_xaxes = make_subplots_kwargs.pop('shared_xaxes', True)
-        shared_yaxes = make_subplots_kwargs.pop('shared_yaxes', False)
+        shared_xaxes = sub_make_subplots_kwargs.pop('shared_xaxes', True)
+        shared_yaxes = sub_make_subplots_kwargs.pop('shared_yaxes', False)
         default_height = plotting_cfg['layout']['height']
         default_width = plotting_cfg['layout']['width'] + 50
         min_space = 10  # space between subplots with no axis sharing
@@ -279,8 +381,8 @@ class PlotBuilderMixin:
             yaxis_spacing = max_yaxis_spacing
         else:
             yaxis_spacing = 0
-        if 'height' in kwargs:
-            height = kwargs.pop('height')
+        if 'height' in sub_kwargs:
+            height = sub_kwargs.pop('height')
         else:
             height = default_height + title_spacing
             if rows > 1:
@@ -289,8 +391,8 @@ class PlotBuilderMixin:
                 height += legend_height - legend_height * rows
                 if shared_xaxes:
                     height += max_xaxis_spacing - max_xaxis_spacing * rows
-        if 'width' in kwargs:
-            width = kwargs.pop('width')
+        if 'width' in sub_kwargs:
+            width = sub_kwargs.pop('width')
         else:
             width = default_width
             if cols > 1:
@@ -299,25 +401,25 @@ class PlotBuilderMixin:
                 if shared_yaxes:
                     width += max_yaxis_spacing - max_yaxis_spacing * cols
         if height is not None:
-            if 'vertical_spacing' in make_subplots_kwargs:
-                vertical_spacing = make_subplots_kwargs.pop('vertical_spacing')
+            if 'vertical_spacing' in sub_make_subplots_kwargs:
+                vertical_spacing = sub_make_subplots_kwargs.pop('vertical_spacing')
             else:
                 vertical_spacing = min_space + title_spacing + xaxis_spacing
             if vertical_spacing is not None and vertical_spacing > 1:
                 vertical_spacing /= height
             legend_y = 1 + (min_space + title_spacing) / height
         else:
-            vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', None)
+            vertical_spacing = sub_make_subplots_kwargs.pop('vertical_spacing', None)
             legend_y = 1.02
         if width is not None:
-            if 'horizontal_spacing' in make_subplots_kwargs:
-                horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing')
+            if 'horizontal_spacing' in sub_make_subplots_kwargs:
+                horizontal_spacing = sub_make_subplots_kwargs.pop('horizontal_spacing')
             else:
                 horizontal_spacing = min_space + yaxis_spacing
             if horizontal_spacing is not None and horizontal_spacing > 1:
                 horizontal_spacing /= width
         else:
-            horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing', None)
+            horizontal_spacing = sub_make_subplots_kwargs.pop('horizontal_spacing', None)
         if show_titles:
             _subplot_titles = []
             for i in range(len(subplots_dct)):
@@ -333,9 +435,9 @@ class PlotBuilderMixin:
             subplot_titles=_subplot_titles,
             vertical_spacing=vertical_spacing,
             horizontal_spacing=horizontal_spacing,
-            **make_subplots_kwargs
+            **sub_make_subplots_kwargs
         )
-        kwargs = merge_dicts(dict(
+        sub_kwargs = merge_dicts(dict(
             width=width,
             height=height,
             legend=dict(
@@ -346,32 +448,28 @@ class PlotBuilderMixin:
                 x=1,
                 traceorder='normal'
             )
-        ), kwargs)
-        fig.update_layout(**kwargs)  # final destination for kwargs
+        ), sub_kwargs)
+        fig.update_layout(**sub_kwargs)  # final destination for sub_kwargs
 
-        # Show subplots
+        # Plot subplots
         arg_cache_dct = {}
-        for i, (subplot_name, subplot_defaults) in enumerate(subplots_dct.items()):
-            final_settings = subplot_defaults.copy()
-            final_settings.pop('allow_grouped', None)
+        for i, (subplot_name, _subplot_settings) in enumerate(subplots_dct.items()):
+            try:
+                final_kwargs = _subplot_settings.copy()
+                opt_arg_names = opt_arg_names_dct[subplot_name]
+                custom_arg_names = custom_arg_names_dct[subplot_name]
+                custom_reself = resolved_self_dct[subplot_name]
+                mapping = mapping_dct[subplot_name]
 
-            # Compute figure artifacts
-            row, col = row_col_tuples[i]
-            xref = 'x' if i == 0 else 'x' + str(i + 1)
-            yref = 'y' if i == 0 else 'y' + str(i + 1)
-            xaxis = 'xaxis' + xref[1:]
-            yaxis = 'yaxis' + yref[1:]
-            x_domain = get_domain(xref, fig)
-            y_domain = get_domain(yref, fig)
-
-            # Replace templates
-            res_settings = merge_dicts(
-                {name: self for name in self.self_aliases},
-                dict(
-                    column=column,
-                    group_by=group_by,
-                    subplot_name=subplot_name,
-                    trace_names=[subplot_name],
+                # Compute figure artifacts
+                row, col = row_col_tuples[i]
+                xref = 'x' if i == 0 else 'x' + str(i + 1)
+                yref = 'y' if i == 0 else 'y' + str(i + 1)
+                xaxis = 'xaxis' + xref[1:]
+                yaxis = 'yaxis' + yref[1:]
+                x_domain = get_domain(xref, fig)
+                y_domain = get_domain(yref, fig)
+                subplot_layout_kwargs = dict(
                     add_trace_kwargs=dict(row=row, col=col),
                     xref=xref,
                     yref=yref,
@@ -379,105 +477,123 @@ class PlotBuilderMixin:
                     yaxis=yaxis,
                     x_domain=x_domain,
                     y_domain=y_domain,
-                    fig=fig
-                ),
-                plot_res_settings
-            )
-            res_arg_names = set(res_settings.keys())
-            res_arg_names.remove('fig')
-            final_settings = merge_dicts(res_settings, final_settings)
-            subplot_template_mapping = final_settings.pop('template_mapping', {})
-            mapping = merge_dicts(final_settings, template_mapping, subplot_template_mapping)
-            final_settings = deep_substitute(final_settings, mapping=mapping)
-            if final_settings['freq'] is not None:
-                final_settings['freq'] = freq_to_timedelta(final_settings['freq'])
-            for name in self.self_aliases:
-                final_settings[name] = self.resolve_self(name, final_settings)
+                    fig=fig,
+                    pass_fig=True  # force passing fig
+                )
+                for k in subplot_layout_kwargs:
+                    opt_arg_names.add(k)
+                    if k in final_kwargs:
+                        custom_arg_names.add(k)
+                final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
+                mapping = merge_dicts(subplot_layout_kwargs, mapping)
+                final_kwargs = deep_substitute(final_kwargs, mapping=mapping)
 
-            # Pop values
-            title = final_settings.pop('title', None)
-            plot_func = final_settings.pop('plot_func', None)
-            xaxis_title = final_settings.pop('xaxis_title', 'Date')
-            yaxis_title = final_settings.pop('yaxis_title', title)
+                # Clean up keys
+                for k, v in list(final_kwargs.items()):
+                    if k.startswith('check_') or k.startswith('inv_check_') or k in ('tags',):
+                        final_kwargs.pop(k, None)
 
-            # Prepare function and keyword arguments
-            if plot_func is not None:
-                # Prepare function and keyword arguments
-                custom_arg_names = custom_arg_names_dct[subplot_name]
-                if not callable(plot_func):
-                    def _getattr_func(obj: tp.Any,
-                                      attr: str,
-                                      args: tp.ArgsLike = None,
-                                      kwargs: tp.KwargsLike = None,
-                                      call_attr: bool = True,
-                                      _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                      _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                      _final_settings: tp.Kwargs = final_settings) -> tp.Any:
-                        if args is None:
-                            args = ()
-                        if kwargs is None:
-                            kwargs = {}
-                        if obj is self and _final_settings.pop('resolve_' + attr, True):
-                            if call_attr:
-                                return self.resolve_attr(
-                                    attr,
-                                    args=args,
-                                    cond_kwargs=_final_settings,
-                                    kwargs=kwargs,
-                                    custom_arg_names=_custom_arg_names,
-                                    cache_dct=_arg_cache_dct
-                                )
-                            return getattr(obj, attr)
-                        out = getattr(obj, attr)
-                        if callable(out) and call_attr:
-                            return out(*args, **kwargs)
-                        return out
+                # Get subplot-specific values
+                _column = final_kwargs.get('column')
+                _group_by = final_kwargs.get('group_by')
+                _silence_warnings = final_kwargs.get('silence_warnings')
+                title = final_kwargs.pop('title', subplot_name)
+                plot_func = final_kwargs.pop('plot_func', None)
+                xaxis_title = final_kwargs.pop('xaxis_title', 'Date')
+                yaxis_title = final_kwargs.pop('yaxis_title', title)
+                resolve_plot_func = final_kwargs.pop('resolve_plot_func', True)
+                use_caching = final_kwargs.pop('use_caching', True)
 
-                    plot_func = self.getattr(plot_func, getattr_func=_getattr_func, call_last_attr=False)
-                if not callable(plot_func):
-                    raise TypeError("calc_func must be callable")
+                if plot_func is not None:
+                    # Resolve plot_func
+                    if resolve_plot_func:
+                        if not callable(plot_func):
+                            passed_kwargs_out = {}
 
-                func_arg_names = get_func_arg_names(plot_func)
-                for k in func_arg_names:
-                    if k not in final_settings:
-                        if final_settings.pop('resolve_' + k, True):
-                            try:
-                                arg_out = self.resolve_attr(
-                                    k,
-                                    cond_kwargs=final_settings,
-                                    custom_arg_names=custom_arg_names,
-                                    cache_dct=arg_cache_dct
-                                )
-                            except AttributeError:
-                                continue
-                            final_settings[k] = arg_out
+                            def _getattr_func(obj: tp.Any,
+                                              attr: str,
+                                              args: tp.ArgsLike = None,
+                                              kwargs: tp.KwargsLike = None,
+                                              call_attr: bool = True,
+                                              _custom_arg_names: tp.Set[str] = custom_arg_names,
+                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                              _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
+                                if args is None:
+                                    args = ()
+                                if kwargs is None:
+                                    kwargs = {}
+                                if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
+                                    if call_attr:
+                                        return custom_reself.resolve_attr(
+                                            attr,
+                                            args=args,
+                                            cond_kwargs=_final_kwargs,
+                                            kwargs=kwargs,
+                                            custom_arg_names=_custom_arg_names,
+                                            cache_dct=_arg_cache_dct,
+                                            use_caching=use_caching,
+                                            passed_kwargs_out=passed_kwargs_out
+                                        )
+                                    return getattr(obj, attr)
+                                out = getattr(obj, attr)
+                                if callable(out) and call_attr:
+                                    return out(*args, **kwargs)
+                                return out
 
-                for k in res_arg_names:
-                    if 'pass_' + k in final_settings:
-                        if not final_settings.pop('pass_' + k):  # first priority
-                            final_settings.pop(k, None)
-                    elif k not in func_arg_names:  # second priority
-                        final_settings.pop(k, None)
-                for k in list(final_settings.keys()):
-                    if 'glob_pass_' + k in final_settings:
-                        if k not in global_settings or not final_settings.pop('glob_pass_' + k, True):
-                            final_settings.pop(k, None)  # global setting should not be utilized
+                            plot_func = custom_reself.deep_getattr(
+                                plot_func,
+                                getattr_func=_getattr_func,
+                                call_last_attr=False
+                            )
+
+                            if 'group_by' in passed_kwargs_out:
+                                if 'pass_group_by' not in final_kwargs:
+                                    final_kwargs.pop('group_by', None)
+                        if not callable(plot_func):
+                            raise TypeError("plot_func must be callable")
+
+                        # Resolve arguments
+                        func_arg_names = get_func_arg_names(plot_func)
+                        for k in func_arg_names:
+                            if k not in final_kwargs:
+                                if final_kwargs.pop('resolve_' + k, False):
+                                    try:
+                                        arg_out = custom_reself.resolve_attr(
+                                            k,
+                                            cond_kwargs=final_kwargs,
+                                            custom_arg_names=custom_arg_names,
+                                            cache_dct=arg_cache_dct,
+                                            use_caching=use_caching
+                                        )
+                                    except AttributeError:
+                                        continue
+                                    final_kwargs[k] = arg_out
+                        for k in list(final_kwargs.keys()):
+                            if k in opt_arg_names:
+                                if 'pass_' + k in final_kwargs:
+                                    if not final_kwargs.get('pass_' + k):  # first priority
+                                        final_kwargs.pop(k, None)
+                                elif k not in func_arg_names:  # second priority
+                                    final_kwargs.pop(k, None)
+                        for k in list(final_kwargs.keys()):
+                            if k.startswith('pass_') or k.startswith('resolve_'):
+                                final_kwargs.pop(k, None)  # cleanup
+
+                        # Call plot_func
+                        plot_func(**final_kwargs)
                     else:
-                        if k in global_settings and k not in custom_arg_names and k not in func_arg_names:
-                            final_settings.pop(k, None)  # global setting not utilized
-                for k in list(final_settings.keys()):
-                    if k.startswith('glob_pass_'):
-                        final_settings.pop(k, None)  # cleanup
+                        # Do not resolve plot_func
+                        plot_func(custom_reself, _subplot_settings)
 
-                # Call plotting function
-                plot_func(**final_settings)
-
-            # Update global layout
-            for annotation in fig.layout.annotations:
-                if 'text' in annotation and annotation['text'] == '$title_' + str(i):
-                    annotation['text'] = title
-            fig.layout[xaxis]['title'] = xaxis_title
-            fig.layout[yaxis]['title'] = yaxis_title
+                # Update global layout
+                for annotation in fig.layout.annotations:
+                    if 'text' in annotation and annotation['text'] == '$title_' + str(i):
+                        annotation['text'] = title
+                fig.layout[xaxis]['title'] = xaxis_title
+                fig.layout[yaxis]['title'] = yaxis_title
+            except Exception as e:
+                warnings.warn(f"Subplot '{subplot_name}' raised an exception", stacklevel=2)
+                raise e
 
         # Remove duplicate legend labels
         found_ids = dict()
@@ -544,4 +660,25 @@ class PlotBuilderMixin:
                             fig.layout[yaxis]['title'] = None
                         i += 1
 
+        # Return the figure
         return fig
+
+    @classmethod
+    def build_subplots_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build subplots documentation."""
+        if source_cls is None:
+            source_cls = PlotBuilderMixin
+        return string.Template(
+            inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
+        ).substitute(
+            {'subplots': cls.subplots.to_doc()}
+        )
+
+    @classmethod
+    def override_subplots_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `subplots`."""
+        __pdoc__[cls.__name__ + '.subplots'] = cls.build_subplots_doc(source_cls=source_cls)
+
+
+__pdoc__ = dict()
+PlotBuilderMixin.override_subplots_doc(__pdoc__)

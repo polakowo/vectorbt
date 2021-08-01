@@ -113,7 +113,7 @@ from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.template import RepEval
-from vectorbt.base.reshape_fns import to_1d, broadcast_to, to_pd_array
+from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
@@ -220,7 +220,7 @@ class Drawdowns(Records):
 
         `**kwargs` such as `freq` will be passed to `Drawdowns.__init__`."""
         pd_ts = to_pd_array(ts)
-        records_arr = nb.find_drawdowns_nb(pd_ts.vbt.to_2d_array())
+        records_arr = nb.find_drawdowns_nb(to_2d_array(pd_ts))
         wrapper = ArrayWrapper.from_obj(pd_ts, **kwargs)
         return cls(wrapper, records_arr, pd_ts, idx_field=idx_field)
 
@@ -251,22 +251,22 @@ class Drawdowns(Records):
     @cached_property
     def start_value(self) -> MappedArray:
         """Start value of each drawdown."""
-        return self.map(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_start_value_map_nb, to_2d_array(self.ts))
 
     @cached_property
     def valley_value(self) -> MappedArray:
         """Valley value of each drawdown."""
-        return self.map(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_valley_value_map_nb, to_2d_array(self.ts))
 
     @cached_property
     def end_value(self) -> MappedArray:
         """End value of each drawdown."""
-        return self.map(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_end_value_map_nb, to_2d_array(self.ts))
 
     @cached_property
     def drawdown(self) -> MappedArray:
         """Drawdown value (in percentage)."""
-        return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_drawdown_map_nb, to_2d_array(self.ts))
 
     @cached_method
     def avg_drawdown(self, group_by: tp.GroupByLike = None,
@@ -305,7 +305,7 @@ class Drawdowns(Records):
     def coverage(self, group_by: tp.GroupByLike = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Coverage, that is, total duration divided by the whole period."""
-        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
+        total_duration = to_1d_array(self.duration.sum(group_by=group_by))
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
@@ -318,7 +318,7 @@ class Drawdowns(Records):
     @cached_property
     def recovery_return(self) -> MappedArray:
         """Recovery return of each drawdown."""
-        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_recovery_return_map_nb, to_2d_array(self.ts))
 
     @cached_property
     def recovery_duration(self) -> MappedArray:
@@ -344,8 +344,8 @@ class Drawdowns(Records):
     def active_rate(self, group_by: tp.GroupByLike = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
-        active_count = to_1d(self.active.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        active_count = to_1d_array(self.active.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='active_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(active_count / total_count, group_by=group_by, **wrap_kwargs)
 
@@ -359,8 +359,8 @@ class Drawdowns(Records):
     def recovered_rate(self, group_by: tp.GroupByLike = None,
                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
-        recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        recovered_count = to_1d_array(self.recovered.count(group_by=group_by))
+        total_count = to_1d_array(self.count(group_by=group_by))
         wrap_kwargs = merge_dicts(dict(name_or_index='recovered_rate'), wrap_kwargs)
         return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **wrap_kwargs)
 

@@ -109,6 +109,12 @@ class TestAccessors:
     def test_fillna(self, test_value):
         pd.testing.assert_series_equal(df['a'].vbt.fillna(test_value), df['a'].fillna(test_value))
         pd.testing.assert_frame_equal(df.vbt.fillna(test_value), df.fillna(test_value))
+        pd.testing.assert_series_equal(
+            pd.Series([1, 2, 3]).vbt.fillna(-1),
+            pd.Series([1, 2, 3]))
+        pd.testing.assert_series_equal(
+            pd.Series([False, True, False]).vbt.fillna(False),
+            pd.Series([False, True, False]))
 
     @pytest.mark.parametrize(
         "test_n",
@@ -121,6 +127,14 @@ class TestAccessors:
             nb.bshift_1d_nb(df['a'].values, test_n)
         )
         pd.testing.assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
+        pd.testing.assert_series_equal(
+            pd.Series([1, 2, 3]).vbt.bshift(1, fill_value=-1),
+            pd.Series([2, 3, -1])
+        )
+        pd.testing.assert_series_equal(
+            pd.Series([True, True, True]).vbt.bshift(1, fill_value=False),
+            pd.Series([True, True, False])
+        )
 
     @pytest.mark.parametrize(
         "test_n",
@@ -133,6 +147,14 @@ class TestAccessors:
             nb.fshift_1d_nb(df['a'].values, test_n)
         )
         pd.testing.assert_frame_equal(df.vbt.fshift(test_n), df.shift(test_n))
+        pd.testing.assert_series_equal(
+            pd.Series([1, 2, 3]).vbt.fshift(1, fill_value=-1),
+            pd.Series([-1, 1, 2])
+        )
+        pd.testing.assert_series_equal(
+            pd.Series([True, True, True]).vbt.fshift(1, fill_value=False),
+            pd.Series([False, True, True])
+        )
 
     def test_diff(self):
         pd.testing.assert_series_equal(df['a'].vbt.diff(), df['a'].diff())

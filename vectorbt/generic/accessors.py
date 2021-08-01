@@ -24,6 +24,8 @@ specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.return
 !!! note
     Grouping is only supported by the methods that accept the `group_by` argument.
 
+    Accessors do not utilize caching.
+
 Run for the examples below:
     
 ```python-repl
@@ -205,11 +207,10 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import Config, merge_dicts, resolve_dict
 from vectorbt.utils.figure import make_figure, make_subplots
-from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.mapping import apply_mapping, to_mapping
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
-from vectorbt.base.array_wrapper import Wrapping
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
@@ -561,7 +562,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrapper.wrap(
             resampled_arr,
-            index=pd.Index(list(resampled.groups.keys()), freq=freq),
+            index=resampled.asfreq().index,
             group_by=False,
             **merge_dicts({}, wrap_kwargs)
         )
@@ -911,7 +912,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         ```
         """
         if percentiles is not None:
-            percentiles = reshape_fns.to_1d(percentiles, raw=True)
+            percentiles = reshape_fns.to_1d_array(percentiles)
         else:
             percentiles = np.array([0.25, 0.5, 0.75])
         percentiles = percentiles.tolist()
@@ -1123,7 +1124,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             ),
             value_counts=dict(
                 title='Value Counts',
-                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
+                calc_func=lambda value_counts: reshape_fns.to_dict(value_counts, orient='index_series'),
                 resolve_value_counts=True,
                 check_has_mapping=True,
                 tags=['generic', 'value_counts']
@@ -1143,7 +1144,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         out = self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    @cached_property
+    @property
     def drawdowns(self) -> Drawdowns:
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
@@ -1162,7 +1163,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                   group_by: tp.GroupByLike = None,
                   **kwargs) -> MappedArray:
         """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
-        mapped_arr = reshape_fns.to_2d(self.obj, raw=True).flatten(order='F')
+        mapped_arr = self.to_2d_array().flatten(order='F')
         col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
         idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
         if dropna and np.isnan(mapped_arr).any():
@@ -1181,14 +1182,6 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def to_returns(self, **kwargs) -> tp.SeriesFrame:
         """Get returns of this object."""
         return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
-
-    def to_dict(self, orient: str = 'dict') -> tp.Mapping:
-        """See [pandas.DataFrame.to_dict](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_dict.html).
-
-        Adds one more `orient` value: 'index_series'."""
-        if orient == 'index_series':
-            return {self.obj.index[i]: self.obj.iloc[i] for i in range(len(self.obj.index))}
-        return self.obj.to_dict(orient)
 
     # ############# Transformation ############# #
 
@@ -1677,7 +1670,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         obj_frame = self.obj.to_frame().transpose()
         squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func_nb, *args, group_by=group_by).iloc[0]
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
-        return obj_frame.vbt.wrapper.wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
+        return ArrayWrapper.from_obj(obj_frame).wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
 
     def flatten_grouped(self,
                         group_by: tp.GroupByLike = None,
@@ -2006,7 +1999,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             ), kwargs)
             default_size = fig is None and 'height' not in _kwargs
             fig = plotting.Heatmap(
-                data=df.vbt.to_2d_array(),
+                data=reshape_fns.to_2d_array(df),
                 x_labels=x_labels,
                 y_labels=y_labels,
                 fig=fig,

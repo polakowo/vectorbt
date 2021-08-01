@@ -284,7 +284,6 @@ Total Records                  6
 Name: first, dtype: object
 ```
 """
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -292,8 +291,8 @@ import pandas as pd
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.base.reshape_fns import to_1d
+from vectorbt.utils.config import merge_dicts, Config, Configured
+from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records import nb
@@ -319,6 +318,13 @@ class Records(Wrapping, StatsBuilderMixin):
 
             Searches for a field with name 'idx' if `idx_field` is 'auto'.
             Throws an error if the name was provided explicitly and the field cannot be found.
+        col_mapper (ColumnMapper): Column mapper if already known.
+
+            !!! note
+                It depends on `records_arr`, so make sure to invalidate `col_mapper` upon creating
+                a `Records` instance with a modified `records_arr`.
+
+                `Records.copy` does it automatically.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -327,12 +333,14 @@ class Records(Wrapping, StatsBuilderMixin):
                  wrapper: ArrayWrapper,
                  records_arr: tp.RecordArray,
                  idx_field: str = 'auto',
+                 col_mapper: tp.Optional[ColumnMapper] = None,
                  **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
             records_arr=records_arr,
             idx_field=idx_field,
+            col_mapper=col_mapper,
             **kwargs
         )
         StatsBuilderMixin.__init__(self)
@@ -349,7 +357,22 @@ class Records(Wrapping, StatsBuilderMixin):
 
         self._records_arr = records_arr
         self._idx_field = idx_field
-        self._col_mapper = ColumnMapper(wrapper, records_arr['col'])
+        if col_mapper is None:
+            col_mapper = ColumnMapper(wrapper, records_arr['col'])
+        self._col_mapper = col_mapper
+
+    def copy(self: RecordsT, **kwargs) -> RecordsT:
+        """See `vectorbt.utils.config.Configured.copy`.
+
+        Also, makes sure that `Records.col_mapper` is not passed to the new instance."""
+        if self.config.get('col_mapper', None) is not None:
+            if 'wrapper' in kwargs:
+                if self.wrapper is not kwargs.get('wrapper'):
+                    kwargs['col_mapper'] = None
+            if 'records_arr' in kwargs:
+                if self.records_arr is not kwargs.get('records_arr'):
+                    kwargs['col_mapper'] = None
+        return Configured.copy(self, **kwargs)
 
     def get_by_col_idxs(self, col_idxs: tp.Array1d) -> tp.RecordArray:
         """Get records corresponding to column indices.
@@ -357,10 +380,10 @@ class Records(Wrapping, StatsBuilderMixin):
         Returns new records array."""
         if self.col_mapper.is_sorted():
             new_records_arr = nb.record_col_range_select_nb(
-                self.values, self.col_mapper.col_range, to_1d(col_idxs))  # faster
+                self.values, self.col_mapper.col_range, to_1d_array(col_idxs))  # faster
         else:
             new_records_arr = nb.record_col_map_select_nb(
-                self.values, self.col_mapper.col_map, to_1d(col_idxs))
+                self.values, self.col_mapper.col_map, to_1d_array(col_idxs))
         return new_records_arr
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
@@ -461,6 +484,7 @@ class Records(Wrapping, StatsBuilderMixin):
             id_arr=self.values['id'],
             idx_arr=idx_arr,
             mapping=mapping,
+            col_mapper=self.col_mapper,
             **kwargs
         ).regroup(group_by)
 

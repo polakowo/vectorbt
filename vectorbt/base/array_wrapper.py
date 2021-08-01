@@ -285,7 +285,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 # Selection based on groups
                 # Get indices of columns corresponding to selected groups
                 group_idxs = col_idxs
-                group_idxs_arr = reshape_fns.to_1d(group_idxs)
+                group_idxs_arr = reshape_fns.to_1d_array(group_idxs)
                 group_start_idxs = _self.grouper.get_group_start_idxs()[group_idxs_arr]
                 group_end_idxs = _self.grouper.get_group_end_idxs()[group_idxs_arr]
                 ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
@@ -312,7 +312,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 ), idx_idxs, group_idxs, ungrouped_col_idxs
 
             # Selection based on columns
-            col_idxs_arr = reshape_fns.to_1d(col_idxs)
+            col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
             return _self.copy(
                 index=new_index,
                 columns=new_columns,
