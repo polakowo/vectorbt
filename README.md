@@ -1,3 +1,7 @@
+<p align="center">
+  <img width="100" height="100" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/logo.svg">
+</p>
+
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
 [![License](https://img.shields.io/pypi/l/vectorbt?color=yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
@@ -10,8 +14,6 @@
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
 # vectorbt :boom:
-
-![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-100x100-dark.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
