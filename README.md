@@ -11,10 +11,6 @@
 
 # vectorbt :boom:
 
-<p align="center">
-  <img width="100" height="100" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/logo.svg">
-</p>
-
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
