@@ -11,7 +11,7 @@
 
 # vectorbt :boom:
 
-vectorbt is a backtesting library on steroids: it operates entirely on pandas and NumPy objects, and is 
+vectorbt is a backtesting library on steroids — it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
 In contrast to other backtesters, vectorbt represents data as nd-arrays.
