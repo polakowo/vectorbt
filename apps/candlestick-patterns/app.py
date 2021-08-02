@@ -19,17 +19,18 @@ import json
 import random
 import yfinance as yf
 import talib
-from collections import OrderedDict
 from talib import abstract
 from talib._ta_lib import (
     CandleSettingType,
     RangeType,
     _ta_set_candle_settings
 )
-import vectorbt as vbt
 from vectorbt import settings
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_opacity
+from vectorbt.utils.template import deep_substitute
+from vectorbt.portfolio.enums import Direction, ConflictMode
+from vectorbt.portfolio.base import Portfolio
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -76,10 +77,19 @@ periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max
 intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1mo', '3mo']
 patterns = talib.get_function_groups()['Pattern Recognition']
 stats_table_columns = ["Metric", "Buy & Hold", "Random (Median)", "Strategy", "Z-Score"]
-directions = vbt.portfolio.enums.Direction._fields
-conflict_modes = vbt.portfolio.enums.ConflictMode._fields
+directions = Direction._fields
+conflict_modes = ConflictMode._fields
 plot_types = ['OHLC', 'Candlestick']
-subplots = OrderedDict([(k, v['title']) for k, v in vbt.Portfolio.subplot_settings.items()])
+
+# Populate subplots
+all_subplots = {}
+for k, v in Portfolio.subplots.items():
+    trades_sub_v = deep_substitute(v, mapping=dict(use_positions=False), safe=True)
+    all_subplots[k] = trades_sub_v
+    positions_sub_v = deep_substitute(v, mapping=dict(use_positions=True), safe=True)
+    if positions_sub_v['title'] != v['title']:
+        positions_sub_v['use_positions'] = True
+        all_subplots[k.replace('trade', 'position')] = positions_sub_v
 
 # Colors
 color_schema = settings['plotting']['color_schema']
@@ -284,8 +294,10 @@ app.layout = html.Div(
                                                                 html.Label("Select subplots:"),
                                                                 dcc.Dropdown(
                                                                     id="subplot_dropdown",
-                                                                    options=[{"value": k, "label": v}
-                                                                             for k, v in subplots.items()],
+                                                                    options=[
+                                                                        {"value": k, "label": v['title']}
+                                                                        for k, v in all_subplots.items()
+                                                                    ],
                                                                     multi=True,
                                                                     value=default_subplots,
                                                                 ),
@@ -897,6 +909,9 @@ app.layout = html.Div(
                                             options=[{
                                                 "label": "Include open trades in stats",
                                                 "value": "incl_open"
+                                            }, {
+                                                "label": "Use positions instead of trades in stats",
+                                                "value": "use_positions"
                                             }],
                                             value=default_stats_options,
                                             style={
@@ -1281,7 +1296,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
 
     # Simulate portfolio
     def _simulate_portfolio(size, init_cash='autoalign'):
-        return vbt.Portfolio.from_signals(
+        return Portfolio.from_signals(
             close=df['Close'],
             entries=size > 0,
             exits=size < 0,
@@ -1358,9 +1373,9 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
         sim_options, n_random_strat, prob_options, entry_prob, exit_prob)
 
-    subplot_kwags = dict()
+    subplot_settings = dict()
     if 'cum_returns' in subplots:
-        subplot_kwags['cum_returns_kwargs'] = dict(
+        subplot_settings['cum_returns'] = dict(
             benchmark_kwargs=dict(
                 trace_kwargs=dict(
                     line=dict(
@@ -1372,8 +1387,8 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         )
     height = int(6 / 21 * 2 / 3 * window_width)
     fig = main_portfolio.plot(
-        subplots=subplots,
-        **subplot_kwags,
+        subplots={k: all_subplots[k] for k in subplots},
+        subplot_settings=subplot_settings,
         **merge_dicts(
             default_layout,
             dict(
@@ -1402,9 +1417,10 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         return str(x)
 
     incl_open = 'incl_open' in stats_options
-    main_stats = main_portfolio.stats(incl_open=incl_open)
-    hold_stats = hold_portfolio.stats(incl_open=True)
-    rand_stats = rand_portfolio.stats(incl_open=incl_open, agg_func=None)
+    use_positions = 'use_positions' in stats_options
+    main_stats = main_portfolio.stats(settings=dict(incl_open=incl_open, use_positions=use_positions))
+    hold_stats = hold_portfolio.stats(settings=dict(incl_open=True, use_positions=use_positions))
+    rand_stats = rand_portfolio.stats(settings=dict(incl_open=incl_open, use_positions=use_positions), agg_func=None)
     rand_stats_median = rand_stats.iloc[:, 3:].median(axis=0)
     rand_stats_mean = rand_stats.iloc[:, 3:].mean(axis=0)
     rand_stats_std = rand_stats.iloc[:, 3:].std(axis=0, ddof=0)
