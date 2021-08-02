@@ -247,7 +247,7 @@ class TestMappedArray:
         assert mapped_array.sort().is_sorted(incl_id=True)
         assert mapped_array.sort(incl_id=True).is_sorted(incl_id=True)
         assert mapped_array_nosort.sort().is_sorted()
-        assert not mapped_array_nosort.sort().is_sorted(incl_id=True)
+        assert mapped_array_nosort.sort().is_sorted(incl_id=True)
         assert mapped_array_nosort.sort(incl_id=True).is_sorted(incl_id=True)
 
     def test_filter_by_mask(self):
