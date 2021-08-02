@@ -208,7 +208,7 @@ def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
-        subplot_titles=(*symbols, '%B', 'Bandwidth'))
+        subplot_titles=('%B', 'Bandwidth'))
     fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=400)
     bbands.percent_b.vbt.ts_heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(

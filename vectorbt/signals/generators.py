@@ -677,7 +677,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
     >>> ohlcstx.iloc[:, 0].plot()
     ```
     
-    ![](/docs/img/ohlcstx.svg)
+    ![](/docs/img/OHLCSTX.svg)
     """
     return plot
 
