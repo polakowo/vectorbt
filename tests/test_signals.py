@@ -125,7 +125,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate((5, 2), choice_func_nb, 1)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate(
@@ -505,7 +505,7 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.clean(entries, entries, entries)
 
     def test_generate_random(self):
@@ -518,7 +518,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -559,7 +559,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate_random((5, 2), prob=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -591,7 +591,7 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             pd.DataFrame.vbt.signals.generate_random((5, 3))
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -944,7 +944,7 @@ class TestAccessors:
             )
         )
         # none
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             pd.DataFrame.vbt.signals.generate_random((5, 3))
 
     def test_generate_random_exits(self):

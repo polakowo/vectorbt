@@ -74,6 +74,72 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_set_by_mask(self):
+        np.testing.assert_array_equal(
+            nb.set_by_mask_1d_nb(
+                np.array([1, 2, 3, 1, 2, 3]),
+                np.array([True, False, False, True, False, False]),
+                0
+            ),
+            np.array([0, 2, 3, 0, 2, 3])
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_1d_nb(
+                np.array([1, 2, 3, 1, 2, 3]),
+                np.array([True, False, False, True, False, False]),
+                0.
+            ),
+            np.array([0., 2., 3., 0., 2., 3.])
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_nb(
+                np.array([1, 2, 3, 1, 2, 3])[:, None],
+                np.array([True, False, False, True, False, False])[:, None],
+                0
+            ),
+            np.array([0, 2, 3, 0, 2, 3])[:, None]
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_nb(
+                np.array([1, 2, 3, 1, 2, 3])[:, None],
+                np.array([True, False, False, True, False, False])[:, None],
+                0.
+            ),
+            np.array([0., 2., 3., 0., 2., 3.])[:, None]
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_mult_1d_nb(
+                np.array([1, 2, 3, 1, 2, 3]),
+                np.array([True, False, False, True, False, False]),
+                np.array([0, -1, -1, 0, -1, -1])
+            ),
+            np.array([0, 2, 3, 0, 2, 3])
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_mult_1d_nb(
+                np.array([1, 2, 3, 1, 2, 3]),
+                np.array([True, False, False, True, False, False]),
+                np.array([0., -1., -1., 0., -1., -1.])
+            ),
+            np.array([0., 2., 3., 0., 2., 3.])
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_mult_nb(
+                np.array([1, 2, 3, 1, 2, 3])[:, None],
+                np.array([True, False, False, True, False, False])[:, None],
+                np.array([0, -1, -1, 0, -1, -1])[:, None]
+            ),
+            np.array([0, 2, 3, 0, 2, 3])[:, None]
+        )
+        np.testing.assert_array_equal(
+            nb.set_by_mask_mult_nb(
+                np.array([1, 2, 3, 1, 2, 3])[:, None],
+                np.array([True, False, False, True, False, False])[:, None],
+                np.array([0., -1., -1., 0., -1., -1.])[:, None]
+            ),
+            np.array([0., 2., 3., 0., 2., 3.])[:, None]
+        )
+
     def test_shuffle(self):
         pd.testing.assert_series_equal(
             df['a'].vbt.shuffle(seed=seed),
@@ -664,6 +730,7 @@ class TestAccessors:
                 [1.0, 1.0]
             ], index=df.index, columns=['g1', 'g2'])
         )
+        assert df['a'].vbt.squeeze_grouped(i_col_nanmean_nb, group_by=True) == 2.5
 
     def test_flatten_grouped(self):
         pd.testing.assert_frame_equal(
@@ -695,6 +762,18 @@ class TestAccessors:
                 [2.0, np.nan],
                 [1.0, np.nan]
             ], index=np.tile(df.index, 2), columns=['g1', 'g2'])
+        )
+        pd.testing.assert_series_equal(
+            pd.DataFrame([[False, True], [False, True]]).vbt.flatten_grouped(group_by=True, order='C'),
+            pd.Series([False, True, False, True], name='group')
+        )
+        pd.testing.assert_series_equal(
+            pd.DataFrame([[False, True], [False, True]]).vbt.flatten_grouped(group_by=True, order='F'),
+            pd.Series([False, False, True, True], name='group')
+        )
+        pd.testing.assert_frame_equal(
+            pd.Series([False, True, True, False]).vbt.flatten_grouped(group_by=[0, 0, 0, 1]),
+            pd.DataFrame([[0., 0.], [1., np.nan], [1., np.nan]], columns=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     @pytest.mark.parametrize(
@@ -1249,15 +1328,15 @@ class TestAccessors:
                 df.vbt.range_split(start_idxs=df.index[[0]], end_idxs=df.index[[2, 3]])[1][i],
                 target[i]
             )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.range_split()
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.range_split(start_idxs=[0, 1])
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.range_split(end_idxs=[2, 4])
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.range_split(min_len=10)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.range_split(n=10)
 
     def test_rolling_split(self):
@@ -1479,15 +1558,15 @@ class TestAccessors:
                 indexes1[i],
                 target[i]
             )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.rolling_split()
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.rolling_split(window_len=3, set_lens=(3, 1))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.rolling_split(window_len=1, set_lens=(1, 1))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.rolling_split(n=2, min_len=10)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.rolling_split(n=10)
 
     def test_expanding_split(self):
@@ -1580,9 +1659,9 @@ class TestAccessors:
                 indexes1[i],
                 target[i]
             )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.expanding_split(n=2, min_len=10)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df.vbt.expanding_split(n=10)
 
     def test_stats(self):

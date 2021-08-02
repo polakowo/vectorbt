@@ -168,9 +168,9 @@ class TestColumnGrouper:
             column_grouper.get_group_lens_nb(np.array([])),
             np.array([])
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             column_grouper.get_group_lens_nb(np.array([1, 1, 0, 0]))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             column_grouper.get_group_lens_nb(np.array([0, 1, 0, 1]))
 
     def test_is_grouped(self):
@@ -247,16 +247,16 @@ class TestColumnGrouper:
 
     def test_check_group_by(self):
         column_grouper.ColumnGrouper(grouped_columns, group_by=None, allow_enable=True).check_group_by(group_by=0)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             column_grouper.ColumnGrouper(grouped_columns, group_by=None, allow_enable=False).check_group_by(group_by=0)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_disable=True).check_group_by(group_by=False)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_disable=False).check_group_by(
                 group_by=False)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_modify=True).check_group_by(group_by=1)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_modify=False).check_group_by(
             group_by=np.array([2, 2, 2, 2, 3, 3, 3, 3]))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_modify=False).check_group_by(group_by=1)
 
     def test_resolve_group_by(self):
@@ -388,9 +388,9 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1]))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, 0])[1:]
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = df4_wrapper.indexing_func_meta(lambda x: x.iloc[[0], 0])[1:]
 
         # not grouped, column only
@@ -406,9 +406,9 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1]))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = sr2_wrapper_co.indexing_func_meta(lambda x: x.iloc[:2])[1:]
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[:, :2])[1:]
 
         # grouped
@@ -432,7 +432,7 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1, 2]))
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])[1:]
 
         # grouped, column only
@@ -739,6 +739,39 @@ class TestArrayWrapper:
             array_wrapper.ArrayWrapper.from_obj(df2).wrap(a2, index=df4.index),
             pd.DataFrame(a2, index=df4.index, columns=df2.columns)
         )
+        pd.testing.assert_frame_equal(
+            array_wrapper.ArrayWrapper(index=df4.index, columns=df4.columns, ndim=2).wrap(
+                np.array([[0, 0, np.nan], [1, np.nan, 1], [2, 2, np.nan]]),
+                fillna=-1
+            ),
+            pd.DataFrame([
+                [0., 0., -1.],
+                [1., -1., 1.],
+                [2., 2., -1.]
+            ], index=df4.index, columns=df4.columns)
+        )
+        pd.testing.assert_frame_equal(
+            array_wrapper.ArrayWrapper(index=df4.index, columns=df4.columns, ndim=2).wrap(
+                np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2]]),
+                to_index=True
+            ),
+            pd.DataFrame([
+                ['x6', 'x6', 'x6'],
+                ['y6', 'y6', 'y6'],
+                ['z6', 'z6', 'z6']
+            ], index=df4.index, columns=df4.columns)
+        )
+        pd.testing.assert_frame_equal(
+            array_wrapper.ArrayWrapper(index=df4.index, columns=df4.columns, ndim=2, freq='d').wrap(
+                np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2]]),
+                to_timedelta=True
+            ),
+            pd.DataFrame([
+                [pd.Timedelta(days=0), pd.Timedelta(days=0), pd.Timedelta(days=0)],
+                [pd.Timedelta(days=1), pd.Timedelta(days=1), pd.Timedelta(days=1)],
+                [pd.Timedelta(days=2), pd.Timedelta(days=2), pd.Timedelta(days=2)]
+            ], index=df4.index, columns=df4.columns)
+        )
 
     def test_wrap_reduced(self):
         # sr to value
@@ -951,9 +984,9 @@ class TestWrapping:
             df4_grouped_wrapping.select_one(column='g1').wrapper.get_columns(),
             pd.Index(['g1'], dtype='object')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df4_wrapping.select_one()
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             df4_grouped_wrapping.select_one()
 
 
@@ -1149,7 +1182,7 @@ class TestIndexFns:
             index_fns.drop_levels(multi_i, 'i9', strict=False),
             multi_i
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = index_fns.drop_levels(multi_i, 'i9')
         pd.testing.assert_index_equal(
             index_fns.drop_levels(multi_i, ['i7', 'i8'], strict=False),  # won't do anything
@@ -1159,7 +1192,7 @@ class TestIndexFns:
                 ('z7', 'z8')
             ], names=['i7', 'i8'])
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = index_fns.drop_levels(multi_i, ['i7', 'i8'])
 
     def test_rename_levels(self):
@@ -1172,7 +1205,7 @@ class TestIndexFns:
             index_fns.rename_levels(i, {'a': 'b'}, strict=False),
             i
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = index_fns.rename_levels(i, {'a': 'b'}, strict=True)
         pd.testing.assert_index_equal(
             index_fns.rename_levels(multi_i, {'i7': 'f7', 'i8': 'f8'}),
@@ -1278,7 +1311,7 @@ class TestIndexFns:
             index_fns.align_index_to(index1, index2),
             np.array([2, 1, 0, 2, 1, 0])
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             index_fns.align_index_to(pd.Index(['a']), pd.Index(['a', 'b', 'c']))
         index3 = pd.MultiIndex.from_tuples([
             (0, 'c'),
@@ -1292,12 +1325,12 @@ class TestIndexFns:
             index_fns.align_index_to(index1, index3),
             np.array([0, 1, 2, 0, 1, 2])
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             index_fns.align_index_to(
                 pd.Index(['b', 'a'], name='name1'),
                 index3
             )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             index_fns.align_index_to(
                 pd.Index(['c', 'b', 'a', 'a'], name='name1'),
                 index3
@@ -1370,9 +1403,9 @@ class TestIndexFns:
                == ([3, 2, 1], [0])
         assert index_fns.pick_levels(index, required_levels=[None, None, None, None], optional_levels=[None]) \
                == ([0, 1, 2, 3], [None])
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             index_fns.pick_levels(index, required_levels=['i8', 'i8', 'i8', 'i8'], optional_levels=[])
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8', 'i7'], optional_levels=['i7'])
 
 
@@ -1731,7 +1764,7 @@ class TestReshapeFns:
                     name=sr2.name
                 )
             )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = reshape_fns.broadcast(
                 *to_broadcast,
                 index_from=0,
@@ -1770,7 +1803,7 @@ class TestReshapeFns:
     def test_broadcast_strict(self):
         # 1d
         to_broadcast = sr1, sr2
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = reshape_fns.broadcast(
                 *to_broadcast,
                 index_from='strict',  # changing index not allowed
@@ -1781,7 +1814,7 @@ class TestReshapeFns:
             )
         # 2d
         to_broadcast = df1, df2
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = reshape_fns.broadcast(
                 *to_broadcast,
                 index_from='stack',
@@ -2977,7 +3010,7 @@ class TestAccessors:
             target
         )
         if ray_available:
-            with pytest.raises(Exception) as e_info:
+            with pytest.raises(Exception):
                 sr2.vbt.apply_and_concat(
                     3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True, use_ray=True,
                     keys=['a', 'b', 'c']
@@ -3142,7 +3175,7 @@ class TestAccessors:
             target
         )
         if ray_available:
-            with pytest.raises(Exception) as e_info:
+            with pytest.raises(Exception):
                 sr2.vbt.combine(
                     [10, df4], 10, 100,
                     combine_func=combine_func_nb, numba_loop=True, use_ray=True

@@ -243,11 +243,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         """
         # Resolve defaults
         if silence_warnings is None:
-            silence_warnings = self.stats_defaults['silence_warnings']
-        template_mapping = merge_dicts(self.stats_defaults['template_mapping'], template_mapping)
-        filters = merge_dicts(self.stats_defaults['filters'], filters)
-        settings = merge_dicts(self.stats_defaults['settings'], settings)
-        metric_settings = merge_dicts(self.stats_defaults['metric_settings'], metric_settings)
+            silence_warnings = self.stats_defaults.get('silence_warnings', False)
+        template_mapping = merge_dicts(self.stats_defaults.get('template_mapping', {}), template_mapping)
+        filters = merge_dicts(self.stats_defaults.get('filters', {}), filters)
+        settings = merge_dicts(self.stats_defaults.get('settings', {}), settings)
+        metric_settings = merge_dicts(self.stats_defaults.get('metric_settings', {}), metric_settings)
 
         # Replace templates globally (not used at metric level)
         if len(template_mapping) > 0:
@@ -264,7 +264,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Prepare metrics
         if metrics is None:
-            metrics = reself.stats_defaults['metrics']
+            metrics = reself.stats_defaults.get('metrics', 'all')
         if metrics == 'all':
             metrics = reself.metrics
         if isinstance(metrics, dict):
@@ -274,7 +274,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Prepare tags
         if tags is None:
-            tags = reself.stats_defaults['tags']
+            tags = reself.stats_defaults.get('tags', 'all')
         if isinstance(tags, str) and tags == 'all':
             tags = None
         if isinstance(tags, (str, tuple)):

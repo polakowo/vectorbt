@@ -31,6 +31,11 @@ records_arr = np.asarray([
     (7, 1, 2, 11, 20),
     (8, 2, 2, 10, 21)
 ], dtype=example_dt)
+records_nosort_arr = np.concatenate((
+    records_arr[0::3],
+    records_arr[1::3],
+    records_arr[2::3]
+))
 
 group_by = pd.Index(['g1', 'g1', 'g2', 'g2'])
 
@@ -44,7 +49,8 @@ wrapper_grouped = wrapper.copy(group_by=group_by)
 
 records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
-records_nosort = records.copy(records_arr=records.records_arr[::-1])
+records_nosort = records.copy(records_arr=records_nosort_arr)
+records_nosort_grouped = vbt.records.Records(wrapper_grouped, records_nosort_arr)
 
 
 # ############# Global ############# #
@@ -177,14 +183,11 @@ class TestColumnMapper:
 
 mapped_array = records.map_field('some_field1')
 mapped_array_grouped = records_grouped.map_field('some_field1')
+mapped_array_nosort = records_nosort.map_field('some_field1')
+mapped_array_nosort_grouped = records_nosort_grouped.map_field('some_field1')
 mapping = {x: 'test_' + str(x) for x in pd.unique(mapped_array.values)}
 mp_mapped_array = mapped_array.copy(mapping=mapping)
 mp_mapped_array_grouped = mapped_array_grouped.copy(mapping=mapping)
-mapped_array_nosort = mapped_array.copy(
-    col_arr=mapped_array.col_arr[::-1],
-    id_arr=mapped_array.id_arr[::-1],
-    idx_arr=mapped_array.idx_arr[::-1]
-)
 
 
 class TestMappedArray:
@@ -326,7 +329,7 @@ class TestMappedArray:
             records_arr['col'].tolist() + [2],
             idx_arr=records_arr['idx'].tolist() + [2]
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array2.to_pd()
         pd.testing.assert_series_equal(
             mapped_array['a'].to_pd(ignore_index=True),
@@ -598,7 +601,7 @@ class TestMappedArray:
             mapped_array.nth(-1),
             pd.Series(np.array([12., 13., 10., np.nan]), index=wrapper.columns).rename('nth')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array.nth(10)
         pd.testing.assert_series_equal(
             mapped_array_grouped.nth(0),
@@ -622,7 +625,7 @@ class TestMappedArray:
                 index=wrapper.columns
             ).rename('nth_index')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array.nth_index(10)
         pd.testing.assert_series_equal(
             mapped_array_grouped.nth_index(0),
@@ -906,95 +909,105 @@ class TestMappedArray:
             )
         )
 
-    def test_indexing(self):
+    @pytest.mark.parametrize(
+        "test_nosort",
+        [False, True],
+    )
+    def test_indexing(self, test_nosort):
+        if test_nosort:
+            ma = mapped_array_nosort
+            ma_grouped = mapped_array_nosort_grouped
+        else:
+            ma = mapped_array
+            ma_grouped = mapped_array_grouped
         np.testing.assert_array_equal(
-            mapped_array['a'].id_arr,
+            ma['a'].id_arr,
             np.array([0, 1, 2])
         )
         np.testing.assert_array_equal(
-            mapped_array['a'].col_arr,
+            ma['a'].col_arr,
             np.array([0, 0, 0])
         )
         pd.testing.assert_index_equal(
-            mapped_array['a'].wrapper.columns,
+            ma['a'].wrapper.columns,
             pd.Index(['a'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array['b'].id_arr,
+            ma['b'].id_arr,
             np.array([3, 4, 5])
         )
         np.testing.assert_array_equal(
-            mapped_array['b'].col_arr,
+            ma['b'].col_arr,
             np.array([0, 0, 0])
         )
         pd.testing.assert_index_equal(
-            mapped_array['b'].wrapper.columns,
+            ma['b'].wrapper.columns,
             pd.Index(['b'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'a']].id_arr,
+            ma[['a', 'a']].id_arr,
             np.array([0, 1, 2, 0, 1, 2])
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'a']].col_arr,
+            ma[['a', 'a']].col_arr,
             np.array([0, 0, 0, 1, 1, 1])
         )
         pd.testing.assert_index_equal(
-            mapped_array[['a', 'a']].wrapper.columns,
+            ma[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'b']].id_arr,
+            ma[['a', 'b']].id_arr,
             np.array([0, 1, 2, 3, 4, 5])
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'b']].col_arr,
+            ma[['a', 'b']].col_arr,
             np.array([0, 0, 0, 1, 1, 1])
         )
         pd.testing.assert_index_equal(
-            mapped_array[['a', 'b']].wrapper.columns,
+            ma[['a', 'b']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        with pytest.raises(Exception) as e_info:
-            _ = mapped_array.iloc[::2, :]  # changing time not supported
+        with pytest.raises(Exception):
+            _ = ma.iloc[::2, :]  # changing time not supported
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g1'].wrapper.columns,
+            ma_grouped['g1'].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert mapped_array_grouped['g1'].wrapper.ndim == 2
-        assert mapped_array_grouped['g1'].wrapper.grouped_ndim == 1
+        assert ma_grouped['g1'].wrapper.ndim == 2
+        assert ma_grouped['g1'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g1'].wrapper.grouper.group_by,
+            ma_grouped['g1'].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g2'].wrapper.columns,
+            ma_grouped['g2'].wrapper.columns,
             pd.Index(['c', 'd'], dtype='object')
         )
-        assert mapped_array_grouped['g2'].wrapper.ndim == 2
-        assert mapped_array_grouped['g2'].wrapper.grouped_ndim == 1
+        assert ma_grouped['g2'].wrapper.ndim == 2
+        assert ma_grouped['g2'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g2'].wrapper.grouper.group_by,
+            ma_grouped['g2'].wrapper.grouper.group_by,
             pd.Index(['g2', 'g2'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1']].wrapper.columns,
+            ma_grouped[['g1']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert mapped_array_grouped[['g1']].wrapper.ndim == 2
-        assert mapped_array_grouped[['g1']].wrapper.grouped_ndim == 2
+        assert ma_grouped[['g1']].wrapper.ndim == 2
+        assert ma_grouped[['g1']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1']].wrapper.grouper.group_by,
+            ma_grouped[['g1']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1', 'g2']].wrapper.columns,
+            ma_grouped[['g1', 'g2']].wrapper.columns,
             pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
-        assert mapped_array_grouped[['g1', 'g2']].wrapper.ndim == 2
-        assert mapped_array_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
+        assert ma_grouped[['g1', 'g2']].wrapper.ndim == 2
+        assert ma_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1', 'g2']].wrapper.grouper.group_by,
+            ma_grouped[['g1', 'g2']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1', 'g2', 'g2'], dtype='object')
         )
 
@@ -1023,7 +1036,7 @@ class TestMappedArray:
         )
         b_bool = records_arr['some_field2'] > np.mean(records_arr['some_field2'])
         assert a ** a == a ** 2
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = a * a_inv
 
         # binary ops
@@ -1215,7 +1228,7 @@ class TestRecords:
         assert records.sort().is_sorted(incl_id=True)
         assert records.sort(incl_id=True).is_sorted(incl_id=True)
         assert records_nosort.sort().is_sorted()
-        assert not records_nosort.sort().is_sorted(incl_id=True)
+        assert records_nosort.sort().is_sorted(incl_id=True)
         assert records_nosort.sort(incl_id=True).is_sorted(incl_id=True)
 
     def test_filter_by_mask(self):
@@ -1336,89 +1349,93 @@ class TestRecords:
             ).rename('count')
         )
 
-    def test_indexing(self):
+    @pytest.mark.parametrize(
+        "test_nosort",
+        [False, True],
+    )
+    def test_indexing(self, test_nosort):
+        if test_nosort:
+            r = records_nosort
+            r_grouped = records_nosort_grouped
+        else:
+            r = records
+            r_grouped = records_grouped
         record_arrays_close(
-            records['a'].values,
+            r['a'].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records['a'].wrapper.columns,
+            r['a'].wrapper.columns,
             pd.Index(['a'], dtype='object')
         )
-        record_arrays_close(
-            records['b'].values,
-            np.array([
-                (3, 0, 0, 13., 18.), (4, 1, 0, 14., 17.), (5, 2, 0, 13., 18.)
-            ], dtype=example_dt)
-        )
         pd.testing.assert_index_equal(
-            records['b'].wrapper.columns,
+            r['b'].wrapper.columns,
             pd.Index(['b'], dtype='object')
         )
         record_arrays_close(
-            records[['a', 'a']].values,
+            r[['a', 'a']].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
                 (0, 0, 1, 10., 21.), (1, 1, 1, 11., 20.), (2, 2, 1, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records[['a', 'a']].wrapper.columns,
+            r[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
         record_arrays_close(
-            records[['a', 'b']].values,
+            r[['a', 'b']].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
                 (3, 0, 1, 13., 18.), (4, 1, 1, 14., 17.), (5, 2, 1, 13., 18.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records[['a', 'b']].wrapper.columns,
+            r[['a', 'b']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        with pytest.raises(Exception) as e_info:
-            _ = records.iloc[::2, :]  # changing time not supported
+        with pytest.raises(Exception):
+            _ = r.iloc[::2, :]  # changing time not supported
         pd.testing.assert_index_equal(
-            records_grouped['g1'].wrapper.columns,
+            r_grouped['g1'].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert records_grouped['g1'].wrapper.ndim == 2
-        assert records_grouped['g1'].wrapper.grouped_ndim == 1
+        assert r_grouped['g1'].wrapper.ndim == 2
+        assert r_grouped['g1'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            records_grouped['g1'].wrapper.grouper.group_by,
+            r_grouped['g1'].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped['g2'].wrapper.columns,
+            r_grouped['g2'].wrapper.columns,
             pd.Index(['c', 'd'], dtype='object')
         )
-        assert records_grouped['g2'].wrapper.ndim == 2
-        assert records_grouped['g2'].wrapper.grouped_ndim == 1
+        assert r_grouped['g2'].wrapper.ndim == 2
+        assert r_grouped['g2'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            records_grouped['g2'].wrapper.grouper.group_by,
+            r_grouped['g2'].wrapper.grouper.group_by,
             pd.Index(['g2', 'g2'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['g1']].wrapper.columns,
+            r_grouped[['g1']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert records_grouped[['g1']].wrapper.ndim == 2
-        assert records_grouped[['g1']].wrapper.grouped_ndim == 2
+        assert r_grouped[['g1']].wrapper.ndim == 2
+        assert r_grouped[['g1']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            records_grouped[['g1']].wrapper.grouper.group_by,
+            r_grouped[['g1']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['g1', 'g2']].wrapper.columns,
+            r_grouped[['g1', 'g2']].wrapper.columns,
             pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
-        assert records_grouped[['g1', 'g2']].wrapper.ndim == 2
-        assert records_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
+        assert r_grouped[['g1', 'g2']].wrapper.ndim == 2
+        assert r_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            records_grouped[['g1', 'g2']].wrapper.grouper.group_by,
+            r_grouped[['g1', 'g2']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1', 'g2', 'g2'], dtype='object')
         )
 
@@ -1861,7 +1878,7 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_drawdown')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_drawdown()
 
     def test_active_duration(self):
@@ -1873,7 +1890,7 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_duration')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_duration()
 
     def test_active_recovery_return(self):
@@ -1885,7 +1902,7 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_recovery_return')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_recovery_return()
 
     def test_recovery_return(self):

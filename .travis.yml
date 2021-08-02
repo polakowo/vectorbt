@@ -3,25 +3,35 @@ test: &test
   language: python
   install:
     - ./scripts/install-talib.sh
-    - pip install .[full,cov]
+    - pip install .[full]
   script:
     - export NUMBA_BOUNDSCHECK=1
     - pytest tests/
     - export NUMBA_DISABLE_JIT=1
-    - pytest --cov=vectorbt tests/
-  after_success:
-    - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then codecov; fi
+    - pytest tests/
 
 jobs:
   include:
     - <<: *test
-      python: 3.6
+      python: "3.6"
     - <<: *test
-      python: 3.7
+      python: "3.7"
     - <<: *test
-      python: 3.8
+      python: "3.8"
     - <<: *test
-      python: 3.9
+      python: "3.9"
+    - stage: test-cov
+      language: python
+      python: "3.6"
+      install:
+        - ./scripts/install-talib.sh
+        - pip install .[full,cov]
+      script:
+        - export NUMBA_BOUNDSCHECK=1
+        - export NUMBA_DISABLE_JIT=1
+        - pytest --cov=vectorbt tests/
+      after_success:
+        - codecov
     - stage: deploy-pypi
       language: python
       python: "3.6"
@@ -65,6 +75,8 @@ jobs:
 stages:
   - name: test
     if: (type = pull_request) OR (commit_message =~ /(\[ci test\]|\[ci deploy\])/)
+  - name: test-cov
+    if: (type = pull_request) OR (commit_message =~ /(\[ci test\]|\[ci test-cov\]|\[ci deploy\])/)
   - name: deploy-pypi
     if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-pypi\]|\[ci deploy\])/)
   - name: deploy-pages

@@ -507,8 +507,13 @@ class ArrayWrapper(Configured, PandasIndexer):
              silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
 
-        !!! note
-            Array will be converted to a NumPy array before wrapping."""
+        Runs the following pipeline:
+
+        1) Converts to NumPy array
+        2) Fills NaN (optional)
+        3) Wraps using index, columns, and dtype (optional)
+        4) Converts to index (optional)
+        5) Converts to timedelta using `ArrayWrapper.to_timedelta` (optional)"""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
 
@@ -577,7 +582,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
-        If `to_timedelta` is set, calls `ArrayWrapper.to_timedelta`."""
+        See `ArrayWrapper.wrap` for the pipeline."""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
 

@@ -3460,8 +3460,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         new_args = {c: test_df[c] for c in input_names}
         try:
             result = func(**new_args)
-        except:
-            raise ValueError("Couldn't parse the indicator")
+        except Exception as e:
+            raise ValueError("Couldn't parse the indicator: " + str(e))
 
         # Concatenate Series/DataFrames if the result is a tuple
         if isinstance(result, tuple):
@@ -3528,7 +3528,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:
-                    warnings.warn(str(e), stacklevel=2)
+                    warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
         return indicators
 
     @classmethod

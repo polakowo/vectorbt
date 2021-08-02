@@ -684,14 +684,32 @@ current settings such as `group_by` if they are present in the method's signatur
 (a similar resolution procedure), and calling the method/property. The result of the resolution
 process is then passed as `arg` (or `trades` in our example).
 
-Here's an example without argument resolution:
+Here's an example without resolution of arguments:
 
 ```python-repl
 >>> max_winning_streak = (
 ...     'max_winning_streak',
 ...     dict(
 ...         title='Max Winning Streak',
-...         calc_func=lambda self, group_by: self.get_trades(group_by=group_by).winning_streak.max()
+...         calc_func=lambda self, group_by:
+...         self.get_trades(group_by=group_by).winning_streak.max()
+...     )
+... )
+>>> pf.stats(metrics=max_winning_streak, column=10)
+Max Winning Streak    3.0
+Name: 10, dtype: float64
+```
+
+And here's an example without resolution of the calculation function:
+
+```python-repl
+>>> max_winning_streak = (
+...     'max_winning_streak',
+...     dict(
+...         title='Max Winning Streak',
+...         calc_func=lambda self, settings:
+...         self.get_trades(group_by=settings['group_by']).winning_streak.max(),
+...         resolve_calc_func=False
 ...     )
 ... )
 >>> pf.stats(metrics=max_winning_streak, column=10)
@@ -835,8 +853,8 @@ Here's an example of a parametrized metric. Let's get the number of trades with 
 ...     dict(
 ...         title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
 ...         calc_func=lambda trades, min_pnl: trades.filter_by_mask(
-...             trades.pnl.values >= min_pnl).count()
-...         resolve_trades=True,
+...             trades.pnl.values >= min_pnl).count(),
+...         resolve_trades=True
 ...     )
 ... )
 >>> pf.stats(

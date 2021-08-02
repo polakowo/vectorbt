@@ -342,16 +342,16 @@ class TestData:
                 columns=pd.Int64Index([1], dtype='int64')
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             MyData.download([0, 1], shape=(5, 3), index_mask=index_mask, column_mask=column_mask,
                             missing_index='raise', missing_columns='nan')
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             MyData.download([0, 1], shape=(5, 3), index_mask=index_mask, column_mask=column_mask,
                             missing_index='nan', missing_columns='raise')
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             MyData.download([0, 1], shape=(5, 3), index_mask=index_mask, column_mask=column_mask,
                             missing_index='test', missing_columns='nan')
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             MyData.download([0, 1], shape=(5, 3), index_mask=index_mask, column_mask=column_mask,
                             missing_index='nan', missing_columns='test')
 

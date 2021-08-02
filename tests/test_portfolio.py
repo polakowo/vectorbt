@@ -53,115 +53,115 @@ def assert_same_tuple(tup1, tup2):
 
 def test_execute_order_nb():
     # Errors, ignored and rejected orders
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(-100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(np.nan, 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., np.inf, 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., np.nan, 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., np.nan, 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., -10., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., np.nan, 10., 1100., 0, 0),
             nb.order_nb(10, 10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, size_type=-2))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, size_type=20))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, direction=-2))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, direction=20))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., -100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, direction=Direction.LongOnly))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, direction=Direction.ShortOnly))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, np.inf))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, -10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, fees=np.inf))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, fees=-1))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, fixed_fees=np.inf))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, fixed_fees=-1))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, slippage=np.inf))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, slippage=-1))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, min_size=np.inf))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, min_size=-1))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, max_size=0))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, max_size=-10))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, reject_prob=np.nan))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, reject_prob=-1))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.order_nb(10, 10, reject_prob=2))
@@ -178,11 +178,11 @@ def test_execute_order_nb():
     assert exec_state == ExecuteOrderState(cash=100.0, position=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=4))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., np.inf, 1100., 0, 0),
             nb.order_nb(10, 10, size_type=SizeType.Value))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., -10., 1100, 0, 0),
             nb.order_nb(10, 10, size_type=SizeType.Value))
@@ -190,11 +190,11 @@ def test_execute_order_nb():
         ProcessOrderState(100., 100., 0., 100., np.nan, 1100., 0, 0),
         nb.order_nb(10, 10, size_type=SizeType.Value))
     assert exec_state == ExecuteOrderState(cash=100.0, position=100.0, debt=0.0, free_cash=100.0)
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., np.inf, 1100., 0, 0),
             nb.order_nb(10, 10, size_type=SizeType.TargetValue))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(100., 100., 0., 100., -10., 1100, 0, 0),
             nb.order_nb(10, 10, size_type=SizeType.TargetValue))
@@ -246,11 +246,11 @@ def test_execute_order_nb():
     assert exec_state == ExecuteOrderState(cash=0.0, position=100.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(np.inf, 100, 0., np.inf, np.nan, 1100., 0, 0),
             nb.order_nb(np.inf, 10, direction=Direction.LongOnly))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.order_nb(np.inf, 10, direction=Direction.All))
@@ -260,11 +260,11 @@ def test_execute_order_nb():
     assert exec_state == ExecuteOrderState(cash=100.0, position=0.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.order_nb(-np.inf, 10, direction=Direction.ShortOnly))
-    with pytest.raises(Exception) as e_info:
+    with pytest.raises(Exception):
         _ = nb.execute_order_nb(
             ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.order_nb(-np.inf, 10, direction=Direction.All))
@@ -689,7 +689,7 @@ class TestFromSignals:
         )
 
     def test_percent(self):
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(size=0.5, size_type='percent')
         record_arrays_close(
             from_signals_all(size=0.5, size_type='percent', close_first=True).order_records,
@@ -1073,13 +1073,13 @@ class TestFromSignals:
                 (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 3, 0, 100.0, 4.0, 0.0, 1)
             ], dtype=order_dt)
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_shortonly(size=1000, allow_partial=True, raise_reject=True).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(size=1000, allow_partial=False, raise_reject=True).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_longonly(size=1000, allow_partial=False, raise_reject=True).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_shortonly(size=1000, allow_partial=False, raise_reject=True).order_records
 
     def test_log(self):
@@ -1185,11 +1185,11 @@ class TestFromSignals:
                 (3, 3, 1, 0.5, 4.0, 0.0, 0), (4, 0, 2, 1.0, 1.0, 0.0, 1), (5, 3, 2, 1.0, 4.0, 0.0, 0)
             ], dtype=order_dt)
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(init_cash=np.inf).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_longonly(init_cash=np.inf).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_shortonly(init_cash=np.inf).order_records
 
     def test_group_by(self):
@@ -1229,7 +1229,7 @@ class TestFromSignals:
             pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert pf.cash_sharing
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf.regroup(group_by=False)
 
     def test_call_seq(self):
@@ -1396,7 +1396,7 @@ class TestFromSignals:
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(sl_stop=-0.1)
 
         close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
@@ -1541,7 +1541,7 @@ class TestFromSignals:
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(ts_stop=-0.1)
 
         close = pd.Series([4., 5., 4., 3., 2.], index=price.index)
@@ -1686,7 +1686,7 @@ class TestFromSignals:
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(sl_stop=-0.1)
 
         close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
@@ -2071,13 +2071,13 @@ class TestFromSignals:
     def test_max_orders(self):
         _ = from_signals_all(close=price_wide)
         _ = from_signals_all(close=price_wide, max_orders=6)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(close=price_wide, max_orders=5)
 
     def test_max_logs(self):
         _ = from_signals_all(close=price_wide, log=True)
         _ = from_signals_all(close=price_wide, log=True, max_logs=6)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_signals_all(close=price_wide, log=True, max_logs=5)
 
 
@@ -2819,11 +2819,11 @@ class TestFromOrders:
                 (3, 4, 0, 800.0, 5.0, 0.0, 0)
             ], dtype=order_dt)
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_orders_all(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_orders_longonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_orders_shortonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
 
     def test_log(self):
@@ -2887,7 +2887,7 @@ class TestFromOrders:
             pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert pf.cash_sharing
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf.regroup(group_by=False)
 
     def test_call_seq(self):
@@ -3266,13 +3266,13 @@ class TestFromOrders:
     def test_max_orders(self):
         _ = from_orders_all(close=price_wide)
         _ = from_orders_all(close=price_wide, max_orders=9)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_orders_all(close=price_wide, max_orders=8)
 
     def test_max_logs(self):
         _ = from_orders_all(close=price_wide, log=True)
         _ = from_orders_all(close=price_wide, log=True, max_logs=15)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = from_orders_all(close=price_wide, log=True, max_logs=14)
 
 
@@ -3614,7 +3614,7 @@ class TestFromOrderFunc:
                 [1, 0, 0]
             ])
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
                 price_wide, order_func_nb, np.inf, group_by=np.array([0, 0, 1]),
                 cash_sharing=True, call_seq='auto', row_wise=test_row_wise
@@ -4862,7 +4862,7 @@ class TestFromOrderFunc:
             price_wide, order_func_nb, np.inf, row_wise=test_row_wise)
         _ = vbt.Portfolio.from_order_func(
             price_wide, order_func_nb, np.inf, row_wise=test_row_wise, max_orders=15)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
                 price_wide, order_func_nb, np.inf, row_wise=test_row_wise, max_orders=14)
 
@@ -4875,7 +4875,7 @@ class TestFromOrderFunc:
             price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise)
         _ = vbt.Portfolio.from_order_func(
             price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise, max_logs=15)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
                 price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise, max_logs=14)
 
@@ -5059,7 +5059,7 @@ class TestPortfolio:
         assert pf_grouped.regroup(False).wrapper.grouper.group_by is None
         assert pf_grouped.regroup(group_by) == pf_grouped
         assert pf_shared.regroup(None) == pf_shared
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf_shared.regroup(False)
         assert pf_shared.regroup(group_by) == pf_shared
 
@@ -6565,7 +6565,7 @@ class TestPortfolio:
                 index=price_na.columns
             ).rename('information_ratio')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf_shared.information_ratio(pf_shared.benchmark_returns(group_by=False) * 2)
 
     def test_stats(self):
@@ -6714,6 +6714,97 @@ class TestPortfolio:
                 ], dtype='object'),
                 name='a')
         )
+        max_winning_streak = (
+            'max_winning_streak',
+            dict(
+                title='Max Winning Streak',
+                calc_func=lambda trades: trades.winning_streak.max(),
+                resolve_trades=True
+            )
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(column='a', metrics=max_winning_streak),
+            pd.Series([0.0], index=['Max Winning Streak'], name='a')
+        )
+        max_winning_streak = (
+            'max_winning_streak',
+            dict(
+                title='Max Winning Streak',
+                calc_func=lambda self, group_by: self.get_trades(group_by=group_by).winning_streak.max()
+            )
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(column='a', metrics=max_winning_streak),
+            pd.Series([0.0], index=['Max Winning Streak'], name='a')
+        )
+        max_winning_streak = (
+            'max_winning_streak',
+            dict(
+                title='Max Winning Streak',
+                calc_func=lambda self, settings:
+                self.get_trades(group_by=settings['group_by']).winning_streak.max(),
+                resolve_calc_func=False
+            )
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(column='a', metrics=max_winning_streak),
+            pd.Series([0.0], index=['Max Winning Streak'], name='a')
+        )
+        vbt.settings.portfolio.stats['settings']['my_arg'] = 100
+        my_arg_metric = ('my_arg_metric', dict(title='My Arg', calc_func=lambda my_arg: my_arg))
+        pd.testing.assert_series_equal(
+            pf.stats(my_arg_metric, column='a'),
+            pd.Series([100], index=['My Arg'], name='a')
+        )
+        vbt.settings.portfolio.stats.reset()
+        pd.testing.assert_series_equal(
+            pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200)),
+            pd.Series([200], index=['My Arg'], name='a')
+        )
+        my_arg_metric = ('my_arg_metric', dict(title='My Arg', my_arg=300, calc_func=lambda my_arg: my_arg))
+        pd.testing.assert_series_equal(
+            pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200)),
+            pd.Series([300], index=['My Arg'], name='a')
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200),
+                     metric_settings=dict(my_arg_metric=dict(my_arg=400))),
+            pd.Series([400], index=['My Arg'], name='a')
+        )
+        trade_min_pnl_cnt = (
+            'trade_min_pnl_cnt',
+            dict(
+                title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
+                calc_func=lambda trades, min_pnl: trades.filter_by_mask(
+                    trades.pnl.values >= min_pnl).count(),
+                resolve_trades=True
+            )
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(
+                metrics=trade_min_pnl_cnt, column='a',
+                metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=0))),
+            pd.Series([0], index=['Trades with P&L over $0'], name='a')
+        )
+        pd.testing.assert_series_equal(
+            pf.stats(
+                metrics=[
+                    trade_min_pnl_cnt,
+                    trade_min_pnl_cnt,
+                    trade_min_pnl_cnt
+                ],
+                column='a',
+                metric_settings=dict(
+                    trade_min_pnl_cnt_0=dict(min_pnl=0),
+                    trade_min_pnl_cnt_1=dict(min_pnl=10),
+                    trade_min_pnl_cnt_2=dict(min_pnl=20))
+            ),
+            pd.Series([0, 0, 0], index=[
+                'Trades with P&L over $0',
+                'Trades with P&L over $10',
+                'Trades with P&L over $20'
+            ], name='a')
+        )
         pd.testing.assert_series_equal(
             pf['c'].stats(),
             pf.stats(column='c')
@@ -6766,7 +6857,7 @@ class TestPortfolio:
         _ = pf_grouped.plot(column='first', subplots='all')
         _ = pf_grouped.plot(column='a', subplots='all', group_by=False)
         _ = pf_shared.plot(column='a', subplots='all', group_by=False)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf.plot(subplots='all')
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pf_grouped.plot(subplots='all')
