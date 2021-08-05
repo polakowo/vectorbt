@@ -129,8 +129,7 @@ drawdowns_mf_config = Config(
         status=dict(defaults=dict(mapping=DrawdownStatus))
     ),
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

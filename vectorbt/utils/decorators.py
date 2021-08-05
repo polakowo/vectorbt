@@ -500,8 +500,7 @@ binary_magic_config = Config(
         '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 
@@ -559,8 +558,7 @@ unary_magic_config = Config(
         '__invert__': dict(func=np.invert)
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

@@ -86,8 +86,7 @@ logs_mf_config = Config(
         res_status_info=dict(defaults=dict(mapping=StatusInfo))
     ),
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

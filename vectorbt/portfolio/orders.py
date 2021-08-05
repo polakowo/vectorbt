@@ -100,8 +100,7 @@ orders_mf_config = Config(
         side=dict(defaults=dict(mapping=OrderSide))
     ),
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

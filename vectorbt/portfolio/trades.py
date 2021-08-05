@@ -187,8 +187,7 @@ trades_mf_config = Config(
         'status': dict(defaults=dict(mapping=TradeStatus))
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

@@ -1139,8 +1139,7 @@ returns_acc_config = Config(
         'max_drawdown': dict()
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 

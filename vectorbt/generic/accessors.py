@@ -277,8 +277,7 @@ nb_config = Config(
         'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 
@@ -325,8 +324,7 @@ transform_config = Config(
         )
     },
     as_attrs=False,
-    readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    readonly=True
 )
 """_"""
 
