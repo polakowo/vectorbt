@@ -306,6 +306,9 @@ settings = SettingsConfig(
                 )
             )
         ),
+        ranges=dict(
+            stats=Config()  # flex
+        ),
         drawdowns=dict(
             stats=Config(  # flex
                 dict(
@@ -642,6 +645,14 @@ Settings applied across `vectorbt.generic`.
 
 ```json
 {settings['generic'].to_doc()}
+```
+
+## settings.generic.ranges
+
+Settings applied across `vectorbt.generic.ranges`.
+
+```json
+{settings['ranges'].to_doc()}
 ```
 
 ## settings.generic.drawdowns

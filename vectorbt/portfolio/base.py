@@ -1109,7 +1109,7 @@ from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
-from vectorbt.portfolio.decorators import add_returns_acc_methods
+from vectorbt.portfolio.decorators import attach_returns_acc_methods
 
 __pdoc__ = {}
 
@@ -1158,7 +1158,7 @@ class MetaPortfolio(type(StatsBuilderMixin), type(PlotBuilderMixin)):
     pass
 
 
-@add_returns_acc_methods(returns_acc_config)
+@attach_returns_acc_methods(returns_acc_config)
 class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPortfolio):
     """Class for modeling portfolio and measuring its performance.
 
@@ -3108,38 +3108,38 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     @cached_property
     def logs(self) -> Logs:
         """`Portfolio.get_logs` with default arguments."""
-        return Logs(self.wrapper, self.log_records)
+        return self.get_logs()
 
     @cached_method
-    def get_logs(self, group_by: tp.GroupByLike = None) -> Logs:
+    def get_logs(self, group_by: tp.GroupByLike = None, **kwargs) -> Logs:
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
-        return self.logs.regroup(group_by)
+        return Logs(self.wrapper, self.log_records, **kwargs).regroup(group_by)
 
     @cached_property
     def trades(self) -> Trades:
         """`Portfolio.get_trades` with default arguments."""
-        return Trades.from_orders(self.orders)
+        return self.get_trades()
 
     @cached_method
-    def get_trades(self, group_by: tp.GroupByLike = None) -> Trades:
+    def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade records.
 
         See `vectorbt.portfolio.trades.Trades`."""
-        return self.trades.regroup(group_by)
+        return Trades.from_orders(self.orders, **kwargs).regroup(group_by)
 
     @cached_property
     def positions(self) -> Positions:
         """`Portfolio.get_positions` with default arguments."""
-        return Positions.from_trades(self.trades)
+        return self.get_positions()
 
     @cached_method
-    def get_positions(self, group_by: tp.GroupByLike = None) -> Positions:
+    def get_positions(self, group_by: tp.GroupByLike = None, **kwargs) -> Positions:
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
-        return self.positions.regroup(group_by)
+        return Positions.from_trades(self.trades, **kwargs).regroup(group_by)
 
     @cached_property
     def drawdowns(self) -> Drawdowns:
@@ -3147,13 +3147,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return self.get_drawdowns()
 
     @cached_method
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None,
+                      wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Get drawdown records from `Portfolio.value`.
 
-        See `vectorbt.generic.drawdowns.Drawdowns`.
-
-        `**kwargs` are passed to `Portfolio.value`."""
-        return Drawdowns.from_ts(self.value(group_by=group_by, **kwargs), freq=self.wrapper.freq)
+        See `vectorbt.generic.drawdowns.Drawdowns`."""
+        wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs)
+        value = self.value(group_by=group_by, wrap_kwargs=wrap_kwargs)
+        return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Assets ############# #
 

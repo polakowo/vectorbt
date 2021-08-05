@@ -121,8 +121,9 @@ class Logs(Records):
             **kwargs
         )
 
-        if not all(field in records_arr.dtype.names for field in log_dt.names):
-            raise TypeError("Records array must match debug_info_dt")
+        for field in log_dt.names:
+            if field not in records_arr.dtype.names:
+                raise TypeError(f"Field '{field}' from log_dt cannot be found in records")
 
     @property  # no need for cached
     def records_readable(self) -> tp.Frame:

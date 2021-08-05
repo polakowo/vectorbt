@@ -81,7 +81,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     @property
     def metrics(self) -> Config:
-        """Metrics supported by `StatsBuilderMixin.stats`.
+        """Metrics supported by `${cls_name}`.
 
         ```json
         ${metrics}
@@ -488,38 +488,40 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         if 'group_by' in passed_kwargs_out:
                             if 'pass_group_by' not in final_kwargs:
                                 final_kwargs.pop('group_by', None)
-                    if not callable(calc_func):
-                        raise TypeError("calc_func must be callable")
 
                     # Resolve arguments
-                    func_arg_names = get_func_arg_names(calc_func)
-                    for k in func_arg_names:
-                        if k not in final_kwargs:
-                            if final_kwargs.pop('resolve_' + k, False):
-                                try:
-                                    arg_out = custom_reself.resolve_attr(
-                                        k,
-                                        cond_kwargs=final_kwargs,
-                                        custom_arg_names=custom_arg_names,
-                                        cache_dct=arg_cache_dct,
-                                        use_caching=use_caching
-                                    )
-                                except AttributeError:
-                                    continue
-                                final_kwargs[k] = arg_out
-                    for k in list(final_kwargs.keys()):
-                        if k in opt_arg_names:
-                            if 'pass_' + k in final_kwargs:
-                                if not final_kwargs.get('pass_' + k):  # first priority
+                    if callable(calc_func):
+                        func_arg_names = get_func_arg_names(calc_func)
+                        for k in func_arg_names:
+                            if k not in final_kwargs:
+                                if final_kwargs.pop('resolve_' + k, False):
+                                    try:
+                                        arg_out = custom_reself.resolve_attr(
+                                            k,
+                                            cond_kwargs=final_kwargs,
+                                            custom_arg_names=custom_arg_names,
+                                            cache_dct=arg_cache_dct,
+                                            use_caching=use_caching
+                                        )
+                                    except AttributeError:
+                                        continue
+                                    final_kwargs[k] = arg_out
+                        for k in list(final_kwargs.keys()):
+                            if k in opt_arg_names:
+                                if 'pass_' + k in final_kwargs:
+                                    if not final_kwargs.get('pass_' + k):  # first priority
+                                        final_kwargs.pop(k, None)
+                                elif k not in func_arg_names:  # second priority
                                     final_kwargs.pop(k, None)
-                            elif k not in func_arg_names:  # second priority
-                                final_kwargs.pop(k, None)
-                    for k in list(final_kwargs.keys()):
-                        if k.startswith('pass_') or k.startswith('resolve_'):
-                            final_kwargs.pop(k, None)  # cleanup
+                        for k in list(final_kwargs.keys()):
+                            if k.startswith('pass_') or k.startswith('resolve_'):
+                                final_kwargs.pop(k, None)  # cleanup
 
-                    # Call calc_func
-                    out = calc_func(**final_kwargs)
+                        # Call calc_func
+                        out = calc_func(**final_kwargs)
+                    else:
+                        # calc_func is already a result
+                        out = calc_func
                 else:
                     # Do not resolve calc_func
                     out = calc_func(custom_reself, _metric_settings)
@@ -598,7 +600,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
         ).substitute(
-            {'metrics': cls.metrics.to_doc()}
+            {'metrics': cls.metrics.to_doc(), 'cls_name': cls.__name__}
         )
 
     @classmethod

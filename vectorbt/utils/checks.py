@@ -7,6 +7,7 @@ from numba.core.registry import CPUDispatcher
 from inspect import signature, getmro
 import dill
 from collections.abc import Hashable, Mapping
+from keyword import iskeyword
 
 from vectorbt import _typing as tp
 
@@ -258,6 +259,11 @@ def is_mapping(arg: tp.Any) -> bool:
 def is_mapping_like(arg: tp.Any) -> bool:
     """Check whether the arguments is a mapping-like object."""
     return is_mapping(arg) or is_series(arg) or is_index(arg) or is_namedtuple(arg)
+
+
+def is_valid_variable_name(arg: str) -> bool:
+    """Check whether the argument is a valid variable name."""
+    return arg.isidentifier() and not iskeyword(arg)
 
 
 # ############# Asserts ############# #

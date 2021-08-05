@@ -212,10 +212,11 @@ from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import plotting, nb
+from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.decorators import add_nb_methods, add_transform_methods
+from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
@@ -338,20 +339,25 @@ __pdoc__['transform_config'] = f"""Config of transform methods to be added to `G
 """
 
 
-@add_nb_methods(nb_config)
-@add_transform_methods(transform_config)
+@attach_nb_methods(nb_config)
+@attach_transform_methods(transform_config)
 class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
     def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        if mapping is not None:
-            mapping = to_mapping(mapping)
-        self._mapping = mapping
-
         BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)
+
+        if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        self._mapping = mapping
 
     @property
     def sr_accessor_cls(self):
@@ -954,6 +960,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -1145,17 +1157,28 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
+    def ranges(self) -> Ranges:
+        """`GenericAccessor.get_ranges` with default arguments."""
+        return self.get_ranges()
+
+    def get_ranges(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Ranges:
+        """Generate range records.
+
+        See `vectorbt.generic.ranges.Ranges`."""
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+
+    @property
     def drawdowns(self) -> Drawdowns:
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
-        return Drawdowns.from_ts(self.obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(self,
                   dropna: bool = True,

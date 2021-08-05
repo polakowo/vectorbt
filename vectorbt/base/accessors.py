@@ -65,7 +65,7 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import class_or_instancemethod, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.decorators import class_or_instancemethod, attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.column_grouper import ColumnGrouper
@@ -74,8 +74,8 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
-@add_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
-@add_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
+@attach_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
+@attach_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
 class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
 

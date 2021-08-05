@@ -338,7 +338,7 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.decorators import cached_method, attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.config import merge_dicts, Config, Configured
 from vectorbt.base.reshape_fns import to_1d_array, to_dict
@@ -373,8 +373,8 @@ def combine_mapped_with_other(self: MappedArrayT,
     return self.copy(mapped_arr=np_func(self.values, other))
 
 
-@add_binary_magic_methods(combine_mapped_with_other)
-@add_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
+@attach_binary_magic_methods(combine_mapped_with_other)
+@attach_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
 class MappedArray(Wrapping, StatsBuilderMixin):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
@@ -439,6 +439,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
         if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
 
         self._mapped_arr = mapped_arr
@@ -854,7 +859,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def sum(self, fill_value: float = 0., group_by: tp.GroupByLike = None,
+    def sum(self, group_by: tp.GroupByLike = None,
             wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
@@ -862,7 +867,6 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             generic_nb.sum_reduce_nb,
             returns_array=False,
             returns_idx=False,
-            fill_value=fill_value,
             group_by=group_by,
             wrap_kwargs=wrap_kwargs,
             **kwargs
@@ -897,8 +901,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1,
-                 group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def describe(self,
+                 percentiles: tp.Optional[tp.ArrayLike] = None,
+                 ddof: int = 1,
+                 group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None,
+                 **kwargs) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
@@ -954,6 +962,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             Does not take into account missing values."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
@@ -993,6 +1007,19 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
+
+    @cached_method
+    def apply_mapping(self: MappedArrayT, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> MappedArrayT:
+        """Apply mapping on each element."""
+        if mapping is None:
+            mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        return self.copy(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
 
     # ############# Stats ############# #
 

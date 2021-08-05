@@ -4,7 +4,7 @@ Class `Drawdowns` accepts drawdown records and the corresponding time series
 to analyze the periods of drawdown. Using `Drawdowns.from_ts`, you can generate
 drawdown records for any time series and analyze them right away.
 
-Moreover, all time series accessors have a method `drawdowns`:
+Moreover, all time series accessors have a property `drawdowns` and a method `get_drawdowns`:
 
 ```python-repl
 >>> import pandas as pd
@@ -118,7 +118,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.records.base import Records
+from vectorbt.generic.ranges import Ranges
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.decorators import add_mapped_fields
 
@@ -145,9 +145,9 @@ mapped fields to be overridden in `Drawdowns`.
 DrawdownsT = tp.TypeVar("DrawdownsT", bound="Drawdowns")
 
 
-@add_mapped_fields(drawdown_dt, drawdowns_mf_config)
-class Drawdowns(Records):
-    """Extends `Records` for working with drawdown records.
+@add_mapped_fields(drawdown_dt, drawdowns_mf_config, on_conflict='ignore')
+class Drawdowns(Ranges):
+    """Extends `vectorbt.generic.ranges.Ranges` for working with drawdown records.
 
     Requires `records_arr` to have all fields defined in `vectorbt.generic.enums.drawdown_dt`.
 
@@ -190,7 +190,7 @@ class Drawdowns(Records):
                  ts: tp.ArrayLike,
                  idx_field: str = 'end_idx',
                  **kwargs) -> None:
-        Records.__init__(
+        Ranges.__init__(
             self,
             wrapper,
             records_arr,
@@ -200,13 +200,14 @@ class Drawdowns(Records):
         )
         self._ts = broadcast_to(ts, wrapper.dummy(group_by=False))
 
-        if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
-            raise TypeError("Records array must match drawdown_dt")
+        for field in drawdown_dt.names:
+            if field not in records_arr.dtype.names:
+                raise TypeError(f"Field '{field}' from drawdown_dt cannot be found in records")
 
     def indexing_func(self: DrawdownsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DrawdownsT:
         """Perform indexing on `Drawdowns`."""
         new_wrapper, new_records_arr, _, col_idxs = \
-            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
+            Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
@@ -215,14 +216,18 @@ class Drawdowns(Records):
         )
 
     @classmethod
-    def from_ts(cls: tp.Type[DrawdownsT], ts: tp.ArrayLike, idx_field: str = 'end_idx', **kwargs) -> DrawdownsT:
+    def from_ts(cls: tp.Type[DrawdownsT], ts: tp.ArrayLike,
+                wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DrawdownsT:
         """Build `Drawdowns` from time series `ts`.
 
-        `**kwargs` such as `freq` will be passed to `Drawdowns.__init__`."""
+        `**kwargs` will be passed to `Drawdowns.__init__`."""
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+
         pd_ts = to_pd_array(ts)
         records_arr = nb.find_drawdowns_nb(to_2d_array(pd_ts))
-        wrapper = ArrayWrapper.from_obj(pd_ts, **kwargs)
-        return cls(wrapper, records_arr, pd_ts, idx_field=idx_field)
+        wrapper = ArrayWrapper.from_obj(pd_ts, **wrapper_kwargs)
+        return cls(wrapper, records_arr, pd_ts, **kwargs)
 
     @property
     def ts(self) -> tp.SeriesFrame:
@@ -281,34 +286,6 @@ class Drawdowns(Records):
         """Maximum drawdown (MDD)."""
         wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
         return self.drawdown.min(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
-
-    @cached_property
-    def duration(self) -> MappedArray:
-        """Duration of each drawdown (in raw format)."""
-        return self.map(nb.dd_duration_map_nb)
-
-    @cached_method
-    def avg_duration(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
-        """Average drawdown duration (in time units)."""
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='avg_duration'), wrap_kwargs)
-        return self.duration.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
-
-    @cached_method
-    def max_duration(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
-        """Maximum drawdown duration (in time units)."""
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='max_duration'), wrap_kwargs)
-        return self.duration.max(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
-
-    @cached_method
-    def coverage(self, group_by: tp.GroupByLike = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Coverage, that is, total duration divided by the whole period."""
-        total_duration = to_1d_array(self.duration.sum(group_by=group_by))
-        total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def decline_duration(self) -> MappedArray:
@@ -469,6 +446,12 @@ class Drawdowns(Records):
                 title='Total Records',
                 calc_func='count',
                 tags='records'
+            ),
+            coverage=dict(
+                title='Coverage [%]',
+                calc_func='coverage',
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=['ranges', 'duration']
             ),
             total_recovered=dict(
                 title='Total Recovered Drawdowns',

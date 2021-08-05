@@ -2,6 +2,8 @@
 
 Defines enums and other schemas for `vectorbt.signals`."""
 
+import numpy as np
+
 from vectorbt import _typing as tp
 from vectorbt.utils.docs import to_doc
 
@@ -11,6 +13,9 @@ __all__ = [
 ]
 
 __pdoc__ = {}
+
+
+# ############# Enums ############# #
 
 
 class StopTypeT(tp.NamedTuple):

@@ -132,8 +132,8 @@ def col_map_select_nb(col_map: tp.ColMap, new_cols: tp.Array1d) -> tp.Tuple[tp.A
         col_len = col_lens[new_col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[new_col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
+        col_start_idx = col_start_idxs[new_col]
+        idxs = col_idxs[col_start_idx:col_start_idx + col_len]
         idxs_out[j:j + col_len] = idxs
         col_arr_out[j:j + col_len] = new_col_i
         j += col_len
@@ -153,9 +153,9 @@ def record_col_map_select_nb(records: tp.RecordArray, col_map: tp.ColMap, new_co
         col_len = col_lens[new_col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[new_col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        col_records = np.copy(records[idxs])
+        col_start_idx = col_start_idxs[new_col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        col_records = np.copy(records[ridxs])
         col_records['col'][:] = new_col_i
         out[j:j + col_len] = col_records
         j += col_len
@@ -205,9 +205,9 @@ def mapped_to_mask_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap,
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        inout_map_func_nb(inout, idxs, col, mapped_arr[idxs], *args)
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        inout_map_func_nb(inout, ridxs, col, mapped_arr[ridxs], *args)
     return inout
 
 
@@ -241,9 +241,9 @@ def apply_on_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap,
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        out[idxs] = apply_func_nb(idxs, col, mapped_arr[idxs], *args)
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        out[ridxs] = apply_func_nb(ridxs, col, mapped_arr[ridxs], *args)
     return out
 
 
@@ -263,9 +263,9 @@ def apply_on_records_nb(records: tp.RecordArray, col_map: tp.ColMap,
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        out[idxs] = apply_func_nb(records[idxs], *args)
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        out[ridxs] = apply_func_nb(records[ridxs], *args)
     return out
 
 
@@ -343,9 +343,9 @@ def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_valu
             col_len = col_lens[col]
             if col_len == 0:
                 continue
-            start_idx = col_start_idxs[col]
-            idxs = col_idxs[start_idx:start_idx + col_len]
-            out[:col_len, col] = mapped_arr[idxs]
+            col_start_idx = col_start_idxs[col]
+            ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+            out[:col_len, col] = mapped_arr[ridxs]
 
         return out
 
@@ -375,9 +375,9 @@ def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: flo
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        out[col] = reduce_func_nb(col, mapped_arr[idxs], *args)
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        out[col] = reduce_func_nb(col, mapped_arr[ridxs], *args)
     return out
 
 
@@ -398,10 +398,10 @@ def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr:
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        col_out = reduce_func_nb(col, mapped_arr[idxs], *args)
-        out[col] = idx_arr[idxs][col_out]
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        col_out = reduce_func_nb(col, mapped_arr[ridxs], *args)
+        out[col] = idx_arr[ridxs][col_out]
     return out
 
 
@@ -416,8 +416,8 @@ def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_v
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
         if col_len > 0:
-            start_idx = col_start_idxs[col]
-            col0, idxs0 = col, col_idxs[start_idx:start_idx + col_len]
+            col_start_idx = col_start_idxs[col]
+            col0, idxs0 = col, col_idxs[col_start_idx:col_start_idx + col_len]
             break
 
     col_out = reduce_func_nb(col0, mapped_arr[idxs0], *args)
@@ -428,9 +428,9 @@ def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_v
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        out[:, col] = reduce_func_nb(col, mapped_arr[idxs], *args)
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        out[:, col] = reduce_func_nb(col, mapped_arr[ridxs], *args)
     return out
 
 
@@ -448,8 +448,8 @@ def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, id
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
         if col_len > 0:
-            start_idx = col_start_idxs[col]
-            col0, idxs0 = col, col_idxs[start_idx:start_idx + col_len]
+            col_start_idx = col_start_idxs[col]
+            col0, idxs0 = col, col_idxs[col_start_idx:col_start_idx + col_len]
             break
 
     col_out = reduce_func_nb(col0, mapped_arr[idxs0], *args)
@@ -460,10 +460,10 @@ def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, id
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        col_out = reduce_func_nb(col, mapped_arr[idxs], *args)
-        out[:, col] = idx_arr[idxs][col_out]
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        col_out = reduce_func_nb(col, mapped_arr[ridxs], *args)
+        out[:, col] = idx_arr[ridxs][col_out]
     return out
 
 
@@ -478,7 +478,7 @@ def mapped_value_counts_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.ColMap
         col_len = col_lens[col]
         if col_len == 0:
             continue
-        start_idx = col_start_idxs[col]
+        col_start_idx = col_start_idxs[col]
         for i in range(col_len):
-            out[codes[col_idxs[start_idx + i]], col] += 1
+            out[codes[col_idxs[col_start_idx + i]], col] += 1
     return out

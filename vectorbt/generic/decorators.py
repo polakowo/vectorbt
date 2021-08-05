@@ -9,7 +9,7 @@ from vectorbt.utils.config import merge_dicts, Config, get_func_arg_names
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
 
-def add_nb_methods(config: Config) -> WrapperFuncT:
+def attach_nb_methods(config: Config) -> WrapperFuncT:
     """Class decorator to add Numba methods.
 
     `config` should contain target method names (keys) and dictionaries (values) with the following keys:
@@ -72,7 +72,7 @@ def add_nb_methods(config: Config) -> WrapperFuncT:
     return wrapper
 
 
-def add_transform_methods(config: Config) -> WrapperFuncT:
+def attach_transform_methods(config: Config) -> WrapperFuncT:
     """Class decorator to add transformation methods.
 
     `config` should contain target method names (keys) and dictionaries (values) with the following keys:

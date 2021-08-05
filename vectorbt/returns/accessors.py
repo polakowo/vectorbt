@@ -781,13 +781,12 @@ class ReturnsAccessor(GenericAccessor):
         """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
-        return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Drawdowns.from_ts(self.cumulative(start_value=1.), wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Resolution ############# #
 

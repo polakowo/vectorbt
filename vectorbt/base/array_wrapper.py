@@ -341,6 +341,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         index = index_fns.get_index(pd_obj, 0)
         columns = index_fns.get_index(pd_obj, 1)
         ndim = pd_obj.ndim
+        kwargs.pop('index', None)
+        kwargs.pop('columns', None)
+        kwargs.pop('ndim', None)
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod

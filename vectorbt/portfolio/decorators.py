@@ -8,7 +8,7 @@ from vectorbt.utils.decorators import cached_method
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
 
-def add_returns_acc_methods(config: Config) -> WrapperFuncT:
+def attach_returns_acc_methods(config: Config) -> WrapperFuncT:
     """Class decorator to add returns accessor methods.
 
     `config` should contain target method names (keys) and dictionaries (values) with the following keys:

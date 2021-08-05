@@ -60,7 +60,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
     @property
     def subplots(self) -> Config:
-        """Subplots supported by `PlotBuilderMixin.plot`.
+        """Subplots supported by `${cls_name}`.
 
         ```json
         ${subplots}
@@ -671,7 +671,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
         ).substitute(
-            {'subplots': cls.subplots.to_doc()}
+            {'subplots': cls.subplots.to_doc(), 'cls_name': cls.__name__}
         )
 
     @classmethod

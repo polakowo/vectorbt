@@ -515,7 +515,7 @@ __pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added
 BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 
-def add_binary_magic_methods(translate_func: BinaryTranslateFuncT,
+def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
                              config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add binary magic methods to a class.
 
@@ -574,7 +574,7 @@ __pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added t
 UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
 
 
-def add_unary_magic_methods(translate_func: UnaryTranslateFuncT,
+def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
                             config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add unary magic methods to a class.
 

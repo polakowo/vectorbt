@@ -31,7 +31,7 @@ from numba.typed import Dict
 from numba.core.types import Omitted
 
 from vectorbt import _typing as tp
-from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
+from vectorbt.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
 
 
 @njit(cache=True)
@@ -1406,6 +1406,131 @@ def any_squeeze_nb(col: int, group: int, a: tp.Array1d) -> bool:
     return np.any(a)
 
 
+# ############# Ranges ############# #
+
+@njit(cache=True)
+def find_ranges_nb(ts: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
+    """Find ranges and store their information as records to an array.
+
+    ## Example
+
+    Find ranges in time series:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.generic.nb import find_ranges_nb
+
+    >>> ts = np.asarray([
+    ...     [np.nan, np.nan, np.nan, np.nan],
+    ...     [     2, np.nan, np.nan, np.nan],
+    ...     [     3,      3, np.nan, np.nan],
+    ...     [np.nan,      4,      4, np.nan],
+    ...     [     5, np.nan,      5,      5],
+    ...     [     6,      6, np.nan,      6]
+    ... ])
+    >>> records = find_ranges_nb(ts, np.nan)
+
+    >>> pd.DataFrame.from_records(records)
+       id  col  start_idx  end_idx
+    0   0    0          1        3
+    1   1    0          4        6
+    2   2    1          2        4
+    3   3    1          5        6
+    4   4    2          3        5
+    5   5    3          4        6
+    ```
+    """
+    out = np.empty(ts.shape[0] * ts.shape[1], dtype=range_dt)
+    ridx = 0
+
+    for col in range(ts.shape[1]):
+        range_started = False
+        start_idx = -1
+        end_idx = -1
+        store_record = False
+        status = -1
+
+        for i in range(ts.shape[0]):
+            cur_val = ts[i, col]
+
+            if cur_val == gap_value or np.isnan(cur_val) and np.isnan(gap_value):
+                if range_started:
+                    # If stopped, save the current range
+                    end_idx = i
+                    range_started = False
+                    store_record = True
+                    status = RangeStatus.Closed
+            else:
+                if not range_started:
+                    # If started, register a new range
+                    start_idx = i
+                    range_started = True
+
+            if i == ts.shape[0] - 1 and range_started:
+                # If still running, mark for save
+                end_idx = ts.shape[0]
+                range_started = False
+                store_record = True
+                status = RangeStatus.Open
+
+            if store_record:
+                # Save range to the records
+                out[ridx]['id'] = ridx
+                out[ridx]['col'] = col
+                out[ridx]['start_idx'] = start_idx
+                out[ridx]['end_idx'] = end_idx
+                out[ridx]['status'] = status
+                ridx += 1
+
+                # Reset running vars for a new range
+                store_record = False
+
+    return out[:ridx]
+
+
+@njit(cache=True)
+def range_coverage_nb(start_idx_arr: tp.Array1d,
+                      end_idx_arr: tp.Array1d,
+                      status_arr: tp.Array2d,
+                      col_map: tp.ColMap,
+                      index_lens: tp.Array1d,
+                      overlapping: bool = False,
+                      normalize: bool = False) -> tp.Array1d:
+    """Get coverage of range records.
+
+    Set `overlapping` to True to get the number of overlapping steps.
+    Set `normalize` to True to get the number of steps in relation either to the total number of steps
+    (when `overlapping=False`) or to the number of covered steps (when `overlapping=True`).
+    """
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(col_lens.shape[0], np.nan, dtype=np.float_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        temp = np.full(index_lens[col], 0, dtype=np.int_)
+        for ridx in ridxs:
+            if status_arr[ridx] == RangeStatus.Open:
+                temp[start_idx_arr[ridx]:end_idx_arr[ridx] + 1] += 1
+            else:
+                temp[start_idx_arr[ridx]:end_idx_arr[ridx]] += 1
+        if overlapping:
+            if normalize:
+                out[col] = np.sum(temp > 1) / np.sum(temp > 0)
+            else:
+                out[col] = np.sum(temp > 1)
+        else:
+            if normalize:
+                out[col] = np.sum(temp > 0) / index_lens[col]
+            else:
+                out[col] = np.sum(temp > 0)
+    return out
+
+
 # ############# Drawdowns ############# #
 
 @njit(cache=True)
@@ -1441,11 +1566,11 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
 
     for col in range(ts.shape[1]):
         drawdown_started = False
-        peak_idx = np.nan
-        valley_idx = np.nan
+        peak_idx = -1
+        valley_idx = -1
         peak_val = ts[0, col]
         valley_val = ts[0, col]
-        store_drawdown = False
+        store_record = False
         status = -1
 
         for i in range(ts.shape[0]):
@@ -1462,7 +1587,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                         # If running, potential recovery
                         if cur_val >= peak_val:
                             drawdown_started = False
-                            store_drawdown = True
+                            store_record = True
                             status = DrawdownStatus.Recovered
                 else:
                     # Value decreased
@@ -1480,10 +1605,10 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                 if i == ts.shape[0] - 1 and drawdown_started:
                     # If still running, mark for save
                     drawdown_started = False
-                    store_drawdown = True
+                    store_record = True
                     status = DrawdownStatus.Active
 
-                if store_drawdown:
+                if store_record:
                     # Save drawdown to the records
                     out[ddidx]['id'] = ddidx
                     out[ddidx]['col'] = col
@@ -1498,7 +1623,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                     valley_idx = i
                     peak_val = cur_val
                     valley_val = cur_val
-                    store_drawdown = False
+                    store_record = False
                     status = -1
 
     return out[:ddidx]

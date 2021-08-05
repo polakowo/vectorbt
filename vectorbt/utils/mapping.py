@@ -59,7 +59,7 @@ def apply_mapping(obj: tp.Any,
         na_sentinel (any): Value to mark “not found”.
     """
     if mapping_like is None:
-        return na_sentinel
+        return obj
 
     if ignore_case and ignore_underscores:
         key_func = lambda x: x.lower().replace('_', '')

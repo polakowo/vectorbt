@@ -3572,12 +3572,6 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
 
 @njit(cache=True)
-def trade_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns trade duration."""
-    return record['exit_idx'] - record['entry_idx']
-
-
-@njit(cache=True)
 def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     """Return the current winning streak of each trade."""
     out = np.full(len(records), 0, dtype=np.int_)

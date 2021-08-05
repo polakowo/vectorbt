@@ -122,7 +122,7 @@ Partition Distance: Std                     NaT
 Name: a, dtype: object
 ```
 
-We can also return duration in absolute units rather than in time units:
+We can also return duration as a floating number rather than a timedelta:
 
 ```python-repl
 >>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))

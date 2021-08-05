@@ -154,8 +154,9 @@ class Orders(Records):
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
-        if not all(field in records_arr.dtype.names for field in order_dt.names):
-            raise TypeError("Records array must match order_dt")
+        for field in order_dt.names:
+            if field not in records_arr.dtype.names:
+                raise TypeError(f"Field '{field}' from order_dt cannot be found in records")
 
     def indexing_func_meta(self: OrdersT, pd_indexing_func: tp.PandasIndexingFunc,
                            **kwargs) -> tp.Tuple[OrdersT, tp.MaybeArray, tp.Array1d]:

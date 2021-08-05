@@ -153,6 +153,20 @@ Name: group, dtype: object
 ```
 """
 
+
+
+
+
+
+
+
+
+# TODO: fix end_idx
+
+
+
+
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -169,7 +183,7 @@ from vectorbt.utils.template import RepEval, Rep
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.records.base import Records
+from vectorbt.generic.ranges import Ranges
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.decorators import add_mapped_fields
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, position_dt, TradeType
@@ -203,9 +217,9 @@ mapped fields to be overridden in `Trades`.
 TradesT = tp.TypeVar("TradesT", bound="Trades")
 
 
-@add_mapped_fields(trade_dt, trades_mf_config)
-class Trades(Records):
-    """Extends `Records` for working with trade records.
+@add_mapped_fields(trade_dt, trades_mf_config, on_conflict='ignore')
+class Trades(Ranges):
+    """Extends `vectorbt.generic.ranges.Ranges` for working with trade records.
 
     In vectorbt, a trade is a partial closing operation; it's is a more fine-grained representation
     of a position. One position can incorporate multiple trades. Performance for this operation is
@@ -308,29 +322,35 @@ class Trades(Records):
                  records_arr: tp.RecordArray,
                  close: tp.ArrayLike,
                  idx_field: str = 'exit_idx',
+                 start_idx_field='entry_idx',
+                 end_idx_field='exit_idx',
                  **kwargs) -> None:
-        Records.__init__(
+        Ranges.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
+            start_idx_field=start_idx_field,
+            end_idx_field=end_idx_field,
             close=close,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if self.trade_type == TradeType.Trade:
-            if not all(field in records_arr.dtype.names for field in trade_dt.names):
-                raise TypeError("Records array must match trade_dt")
+            for field in trade_dt.names:
+                if field not in records_arr.dtype.names:
+                    raise TypeError(f"Field '{field}' from trade_dt cannot be found in records")
         else:
-            if not all(field in records_arr.dtype.names for field in position_dt.names):
-                raise TypeError("Records array must match position_dt")
+            for field in position_dt.names:
+                if field not in records_arr.dtype.names:
+                    raise TypeError(f"Field '{field}' from position_dt cannot be found in records")
 
     def indexing_func_meta(self: TradesT, pd_indexing_func: tp.PandasIndexingFunc,
                            **kwargs) -> tp.Tuple[TradesT, tp.MaybeArray, tp.Array1d]:
         """Perform indexing on `Trades` and also return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
-            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
+            Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
@@ -351,6 +371,11 @@ class Trades(Records):
     def is_positions(self) -> bool:
         """Whether this object stores positions."""
         return self.trade_type == TradeType.Position
+
+    @classmethod
+    def from_ts(cls: tp.Type[TradesT], ts: tp.ArrayLike,
+                wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> TradesT:
+        raise NotImplementedError
 
     @classmethod
     def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
@@ -384,11 +409,6 @@ class Trades(Records):
         if self.trade_type == TradeType.Trade:
             out['Position Id'] = records_df['position_id']
         return out
-
-    @cached_property
-    def duration(self) -> MappedArray:
-        """Duration of each trade (in raw format)."""
-        return self.map(nb.trade_duration_map_nb)
 
     # ############# PnL ############# #
 
@@ -577,6 +597,17 @@ class Trades(Records):
                 agg_func=None,
                 tags='wrapper'
             ),
+            total_records=dict(
+                title='Total Records',
+                calc_func='count',
+                tags='records'
+            ),
+            coverage=dict(
+                title='Coverage [%]',
+                calc_func='coverage',
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags=[Rep("trades_tag"), 'duration']
+            ),
             first_trade_start=dict(
                 title=RepEval("'First Position Start' if self.is_positions else 'First Trade Start'"),
                 calc_func='entry_idx.nth',
@@ -590,11 +621,6 @@ class Trades(Records):
                 n=-1,
                 wrap_kwargs=dict(to_index=True),
                 tags=[Rep("trades_tag"), 'index']
-            ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
             ),
             total_long_trades=dict(
                 title=RepEval("'Total Long Positions' if self.is_positions else 'Total Long Trades'"),
@@ -665,14 +691,14 @@ class Trades(Records):
             ),
             avg_winning_trade_duration=dict(
                 title=RepEval("'Avg Winning Position Duration' if self.is_positions else 'Avg Winning Trade Duration'"),
-                calc_func=RepEval("'winning.duration.mean' if incl_open else 'closed.winning.duration.mean'"),
-                apply_to_timedelta=True,
+                calc_func=RepEval("'winning.avg_duration' if incl_open else 'closed.winning.avg_duration'"),
+                fill_wrap_kwargs=True,
                 tags=RepEval("[trades_tag, *incl_open_tags, 'winning', 'duration']")
             ),
             avg_losing_trade_duration=dict(
                 title=RepEval("'Avg Losing Position Duration' if self.is_positions else 'Avg Losing Trade Duration'"),
-                calc_func=RepEval("'losing.duration.mean' if incl_open else 'closed.losing.duration.mean'"),
-                apply_to_timedelta=True,
+                calc_func=RepEval("'losing.avg_duration' if incl_open else 'closed.losing.avg_duration'"),
+                fill_wrap_kwargs=True,
                 tags=RepEval("[trades_tag, *incl_open_tags, 'losing', 'duration']")
             ),
             profit_factor=dict(
@@ -689,14 +715,7 @@ class Trades(Records):
                 title='SQN',
                 calc_func=RepEval("'sqn' if incl_open else 'closed.sqn'"),
                 tags=RepEval("[trades_tag, *incl_open_tags]")
-            ),
-            coverage=dict(
-                title='Coverage [%]',
-                calc_func='coverage',
-                post_calc_func=lambda self, out, settings: out * 100,
-                check_is_positions=True,
-                tags='positions'
-            ),
+            )
         ),
         copy_kwargs=dict(copy_mode='deep')
     )
@@ -1214,9 +1233,6 @@ class Positions(Trades):
     """
     trade_type: tp.ClassVar[int] = TradeType.Position
 
-    def __init__(self, *args, **kwargs) -> None:
-        Trades.__init__(self, *args, **kwargs)
-
     @classmethod
     def from_orders(cls: tp.Type[PositionsT], orders: Orders, **kwargs) -> PositionsT:
         raise NotImplementedError
@@ -1226,15 +1242,6 @@ class Positions(Trades):
         """Build `Positions` from `Trades`."""
         position_records_arr = nb.trades_to_positions_nb(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
-
-    @cached_method
-    def coverage(self, group_by: tp.GroupByLike = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Coverage, that is, total duration divided by the whole period."""
-        total_duration = to_1d_array(self.duration.sum(group_by=group_by))
-        total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
 
 
 Trades.override_metrics_doc(__pdoc__)

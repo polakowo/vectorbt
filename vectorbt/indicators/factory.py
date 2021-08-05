@@ -1974,9 +1974,12 @@ def run_pipeline(
            other_list
 
 
-def combine_objs(obj: tp.SeriesFrame, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
-                 *args, level_name: tp.Optional[str] = None, keys: tp.Optional[tp.IndexLike] = None,
-                 allow_multiple: bool = True, **kwargs) -> tp.SeriesFrame:
+def combine_objs(obj: tp.SeriesFrame,
+                 other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
+                 *args, level_name: tp.Optional[str] = None,
+                 keys: tp.Optional[tp.IndexLike] = None,
+                 allow_multiple: bool = True,
+                 **kwargs) -> tp.SeriesFrame:
     """Combines/compares `obj` to `other`, for example, to generate signals.
 
     Both will broadcast together.

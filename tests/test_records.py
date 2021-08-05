@@ -5,7 +5,7 @@ from numba import njit
 from datetime import datetime
 import pytest
 
-from vectorbt.generic.enums import drawdown_dt
+from vectorbt.generic.enums import range_dt, drawdown_dt
 from vectorbt.portfolio.enums import order_dt, trade_dt, position_dt, log_dt
 
 from tests.utils import record_arrays_close
@@ -1543,10 +1543,86 @@ class TestRecords:
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
 
+# ############# ranges.py ############# #
+
+ts = pd.DataFrame({
+    'a': [1, -1, 3, -1, 5, -1],
+    'b': [-1, -1, -1, 4, 5, 6],
+    'c': [1, 2, 3, -1, -1, -1],
+    'd': [-1, -1, -1, -1, -1, -1]
+}, index=[
+    datetime(2020, 1, 1),
+    datetime(2020, 1, 2),
+    datetime(2020, 1, 3),
+    datetime(2020, 1, 4),
+    datetime(2020, 1, 5),
+    datetime(2020, 1, 6)
+])
+
+ranges = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq='1 days'))
+ranges_grouped = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq='1 days', group_by=group_by))
+
+
+class TestRanges:
+    def test_mapped_fields(self):
+        for name in range_dt.names:
+            np.testing.assert_array_equal(
+                getattr(ranges, name).values,
+                ranges.values[name]
+            )
+
+    def test_from_ts(self):
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 0, 1), (1, 0, 2, 3), (2, 0, 4, 5), (3, 1, 3, 6), (4, 2, 0, 3)
+            ], dtype=range_dt)
+        )
+        assert ranges.wrapper.freq == day_dt
+        assert ranges.idx_field == 'end_idx'
+        assert ranges.start_idx_field == 'start_idx'
+        assert ranges.end_idx_field == 'end_idx'
+        pd.testing.assert_index_equal(
+            ranges_grouped.wrapper.grouper.group_by,
+            group_by
+        )
+
+    def test_records_readable(self):
+        records_readable = ranges.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Range Id'].values,
+            np.array([
+                0, 1, 2, 3, 4
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'b', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Start Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['End Date'].values,
+            np.array([
+                '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-04T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+
 # ############# drawdowns.py ############# #
 
 
-ts = pd.DataFrame({
+ts2 = pd.DataFrame({
     'a': [2, 1, 3, 1, 4, 1],
     'b': [1, 2, 1, 3, 1, 4],
     'c': [1, 2, 3, 2, 1, 2],
@@ -1560,8 +1636,8 @@ ts = pd.DataFrame({
     datetime(2020, 1, 6)
 ])
 
-drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
-drawdowns_grouped = vbt.Drawdowns.from_ts(ts, freq='1 days', group_by=group_by)
+drawdowns = vbt.Drawdowns.from_ts(ts, wrapper_kwargs=dict(freq='1 days'))
+drawdowns_grouped = vbt.Drawdowns.from_ts(ts, wrapper_kwargs=dict(freq='1 days', group_by=group_by))
 
 
 class TestDrawdowns:
@@ -1580,7 +1656,7 @@ class TestDrawdowns:
                 (4, 1, 3, 4, 5, 1), (5, 2, 2, 4, 5, 0)
             ], dtype=drawdown_dt)
         )
-        pd.testing.assert_frame_equal(drawdowns.ts, ts)
+        pd.testing.assert_frame_equal(drawdowns.ts2, ts2)
         assert drawdowns.wrapper.freq == day_dt
         assert drawdowns.idx_field == 'end_idx'
         pd.testing.assert_index_equal(
@@ -1684,8 +1760,8 @@ class TestDrawdowns:
                     [-0.66666669, np.nan, np.nan, np.nan],
                     [-0.75, -0.66666669, -0.66666669, np.nan]
                 ]),
-                index=ts.index,
-                columns=ts.columns
+                index=ts2.index,
+                columns=ts2.columns
             )
         )
 
@@ -1773,7 +1849,7 @@ class TestDrawdowns:
             drawdowns.coverage(),
             pd.Series(
                 np.array([0.83333333, 0.66666667, 0.5, 0.]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('coverage')
         )
         pd.testing.assert_series_equal(
@@ -1820,7 +1896,7 @@ class TestDrawdowns:
             drawdowns.active_rate(),
             pd.Series(
                 np.array([0.3333333333333333, 0., 1., np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('active_rate')
         )
         pd.testing.assert_series_equal(
@@ -1858,7 +1934,7 @@ class TestDrawdowns:
             drawdowns.recovered_rate(),
             pd.Series(
                 np.array([0.66666667, 1., 0., np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('recovered_rate')
         )
         pd.testing.assert_series_equal(
@@ -2555,7 +2631,7 @@ class TestTrades:
             trades.profit_factor(),
             pd.Series(
                 np.array([18.9, 0., 2.45853659, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('profit_factor')
         )
         pd.testing.assert_series_equal(
@@ -2572,7 +2648,7 @@ class TestTrades:
             trades.expectancy(),
             pd.Series(
                 np.array([0.716, -0.884, 0.3588, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('expectancy')
         )
         pd.testing.assert_series_equal(
@@ -2589,7 +2665,7 @@ class TestTrades:
             trades.sqn(),
             pd.Series(
                 np.array([1.63415552, -2.13007307, 0.71660403, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('sqn')
         )
         pd.testing.assert_series_equal(

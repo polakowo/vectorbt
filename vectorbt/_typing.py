@@ -152,4 +152,4 @@ Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
 
 # Mappings
 Enum = NamedTuple
-MappingLike = Union[Mapping, Enum, IndexLike]
+MappingLike = Union[str, Mapping, Enum, IndexLike]
