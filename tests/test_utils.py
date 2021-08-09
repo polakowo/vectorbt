@@ -48,6 +48,8 @@ def teardown_module():
 
 class TestConfig:
     def test_copy_dict(self):
+        assert config.copy_dict(None) == {}
+
         def _init_dict():
             return dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[4, 5, 6]))
 
@@ -142,6 +144,12 @@ class TestConfig:
         assert cfg['dct']['lst'] == [4, 5, 6]
 
     def test_update_dict(self):
+        dct = dict(a=1)
+        config.update_dict(dct, None)
+        assert dct == dct
+        config.update_dict(None, dct)
+        assert dct == dct
+
         def init_config_(**kwargs):
             return config.Config(dict(a=0, b=config.Config(dict(c=1), **kwargs)), **kwargs)
 
@@ -955,6 +963,17 @@ class TestDecorators:
         assert G.g()
         assert not G().g()
 
+    def test_class_or_instanceproperty(self):
+        class G:
+            @decorators.class_or_instanceproperty
+            def g(cls_or_self):
+                if isinstance(cls_or_self, type):
+                    return True  # class
+                return False  # instance
+
+        assert G.g
+        assert not G().g
+
     def test_custom_property(self):
         class G:
             @decorators.custom_property(some='key')
@@ -1510,6 +1529,12 @@ class TestAttr:
 # ############# checks.py ############# #
 
 class TestChecks:
+    def test_is_np_array(self):
+        assert not checks.is_np_array(0)
+        assert checks.is_np_array(np.array([0]))
+        assert not checks.is_np_array(pd.Series([1, 2, 3]))
+        assert not checks.is_np_array(pd.DataFrame([1, 2, 3]))
+
     def test_is_pandas(self):
         assert not checks.is_pandas(0)
         assert not checks.is_pandas(np.array([0]))
@@ -1533,6 +1558,18 @@ class TestChecks:
         assert checks.is_any_array(np.array([0]))
         assert checks.is_any_array(pd.Series([1, 2, 3]))
         assert checks.is_any_array(pd.DataFrame([1, 2, 3]))
+
+    def test_is_sequence(self):
+        assert checks.is_sequence([1, 2, 3])
+        assert checks.is_sequence('123')
+        assert not checks.is_sequence(0)
+        assert not checks.is_sequence(dict(a=2).items())
+
+    def test_is_iterable(self):
+        assert checks.is_iterable([1, 2, 3])
+        assert checks.is_iterable('123')
+        assert not checks.is_iterable(0)
+        assert checks.is_iterable(dict(a=2).items())
 
     def test_is_numba_func(self):
         def test_func(x):
@@ -1794,13 +1831,13 @@ class TestChecks:
             checks.assert_not_none(None)
 
     def test_assert_type(self):
-        checks.assert_type(0, int)
-        checks.assert_type(np.zeros(1), (np.ndarray, pd.Series))
-        checks.assert_type(pd.Series([1, 2, 3]), (np.ndarray, pd.Series))
+        checks.assert_instance_of(0, int)
+        checks.assert_instance_of(np.zeros(1), (np.ndarray, pd.Series))
+        checks.assert_instance_of(pd.Series([1, 2, 3]), (np.ndarray, pd.Series))
         with pytest.raises(Exception):
-            checks.assert_type(pd.DataFrame([1, 2, 3]), (np.ndarray, pd.Series))
+            checks.assert_instance_of(pd.DataFrame([1, 2, 3]), (np.ndarray, pd.Series))
 
-    def test_assert_subclass(self):
+    def test_assert_subclass_of(self):
         class A:
             pass
 
@@ -1810,17 +1847,17 @@ class TestChecks:
         class C(B):
             pass
 
-        checks.assert_subclass(B, A)
-        checks.assert_subclass(C, B)
-        checks.assert_subclass(C, A)
+        checks.assert_subclass_of(B, A)
+        checks.assert_subclass_of(C, B)
+        checks.assert_subclass_of(C, A)
         with pytest.raises(Exception):
-            checks.assert_subclass(A, B)
+            checks.assert_subclass_of(A, B)
 
     def test_assert_type_equal(self):
         checks.assert_type_equal(0, 1)
         checks.assert_type_equal(np.zeros(1), np.empty(1))
         with pytest.raises(Exception):
-            checks.assert_type(0, np.zeros(1))
+            checks.assert_instance_of(0, np.zeros(1))
 
     def test_assert_dtype(self):
         checks.assert_dtype(np.zeros(1), np.float_)
@@ -2163,6 +2200,35 @@ class TestMapping:
         assert mapping.to_mapping(pd.Index(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
         assert mapping.to_mapping(pd.Series(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
 
+    def test_apply_mapping(self):
+        assert mapping.apply_mapping('Attr1', mapping_like=Enum, reverse=True) == 0
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping('Attr3', mapping_like=Enum, reverse=True)
+        assert mapping.apply_mapping('attr1', mapping_like=Enum, reverse=True, ignore_case=True) == 0
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping('attr1', mapping_like=Enum, reverse=True, ignore_case=False)
+        assert mapping.apply_mapping('Attr_1', mapping_like=Enum, reverse=True, ignore_underscores=True) == 0
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping('Attr_1', mapping_like=Enum, reverse=True, ignore_underscores=False)
+        assert mapping.apply_mapping(
+            'attr_1', mapping_like=Enum, reverse=True, ignore_case=True,
+            ignore_underscores=True) == 0
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping(
+                'attr_1', mapping_like=Enum, reverse=True, ignore_case=True,
+                ignore_underscores=False)
+        assert mapping.apply_mapping(np.array([1]), mapping_like={1: 'hello'})[0] == 'hello'
+        assert mapping.apply_mapping(np.array([1]), mapping_like={1.: 'hello'})[0] == 'hello'
+        assert mapping.apply_mapping(np.array([1.]), mapping_like={1: 'hello'})[0] == 'hello'
+        assert mapping.apply_mapping(np.array([True]), mapping_like={1: 'hello'})[0] == 'hello'
+        assert mapping.apply_mapping(np.array([True]), mapping_like={True: 'hello'})[0] == 'hello'
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping(np.array([True]), mapping_like={'world': 'hello'})
+        with pytest.raises(Exception):
+            _ = mapping.apply_mapping(np.array([1]), mapping_like={'world': 'hello'})
+        assert mapping.apply_mapping(np.array(['world']), mapping_like={'world': 'hello'})[0] == 'hello'
+
+
 # ############# enum.py ############# #
 
 
@@ -2170,26 +2236,23 @@ class TestEnum:
     def test_map_enum_fields(self):
         assert enum.map_enum_fields(0, Enum) == 0
         assert enum.map_enum_fields(10, Enum) == 10
-        assert enum.map_enum_fields(10., Enum) == 10.
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(10., Enum)
         assert enum.map_enum_fields('Attr1', Enum) == 0
         assert enum.map_enum_fields('attr1', Enum) == 0
         with pytest.raises(Exception):
             _ = enum.map_enum_fields('hello', Enum)
-        assert enum.map_enum_fields('attr1', Enum, ignore_other_types=False) == 0
-        with pytest.raises(Exception):
-            _ = enum.map_enum_fields(0, Enum, ignore_other_types=False)
-        with pytest.raises(Exception):
-            _ = enum.map_enum_fields(0., Enum, ignore_other_types=False)
+        assert enum.map_enum_fields('attr1', Enum) == 0
         assert enum.map_enum_fields(('attr1', 'attr2'), Enum) == (0, 1)
         assert enum.map_enum_fields([['attr1', 'attr2']], Enum) == [[0, 1]]
         np.testing.assert_array_equal(
             enum.map_enum_fields(np.array([]), Enum),
             np.array([])
         )
-        np.testing.assert_array_equal(
-            enum.map_enum_fields(np.array([[0., 1.]]), Enum),
-            np.array([[0., 1.]])
-        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(np.array([[0., 1.]]), Enum)
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(np.array([[False, True]]), Enum)
         np.testing.assert_array_equal(
             enum.map_enum_fields(np.array([[0, 1]]), Enum),
             np.array([[0, 1]])
@@ -2204,10 +2267,10 @@ class TestEnum:
             enum.map_enum_fields(pd.Series([]), Enum),
             pd.Series([])
         )
-        pd.testing.assert_series_equal(
-            enum.map_enum_fields(pd.Series([0., 1.]), Enum),
-            pd.Series([0., 1.])
-        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(pd.Series([0., 1.]), Enum)
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(pd.Series([False, True]), Enum)
         pd.testing.assert_series_equal(
             enum.map_enum_fields(pd.Series([0, 1]), Enum),
             pd.Series([0, 1])
@@ -2222,10 +2285,8 @@ class TestEnum:
             enum.map_enum_fields(pd.DataFrame([]), Enum),
             pd.DataFrame([])
         )
-        pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum),
-            pd.DataFrame([[0., 1.]])
-        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum)
         pd.testing.assert_frame_equal(
             enum.map_enum_fields(pd.DataFrame([[0, 1]]), Enum),
             pd.DataFrame([[0, 1]])
@@ -2235,11 +2296,9 @@ class TestEnum:
             pd.DataFrame([[0, 1]])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([['attr1', 0]]), Enum),
-            pd.DataFrame([[0, 0]])
+            enum.map_enum_fields(pd.DataFrame([[0, 'attr2']]), Enum),
+            pd.DataFrame([[0, 1]])
         )
-        with pytest.raises(Exception):
-            _ = enum.map_enum_fields(pd.DataFrame([['attr1', 0]]), Enum, ignore_other_types=False)
 
     def test_map_enum_values(self):
         assert enum.map_enum_values(0, Enum) == 'Attr1'
@@ -2248,10 +2307,7 @@ class TestEnum:
             _ = enum.map_enum_values(-2, Enum)
         assert enum.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
         assert enum.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
-        assert enum.map_enum_values(0, Enum, ignore_other_types=False) == 'Attr1'
-        assert enum.map_enum_values(0., Enum, ignore_other_types=False) == 'Attr1'
-        with pytest.raises(Exception):
-            _ = enum.map_enum_values('hello', Enum, ignore_other_types=False)
+        assert enum.map_enum_values('hello', Enum) == 'hello'
         np.testing.assert_array_equal(
             enum.map_enum_values(np.array([]), Enum),
             np.array([])
@@ -2306,8 +2362,6 @@ class TestEnum:
             enum.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum),
             pd.DataFrame([['Attr1', 'Attr2']])
         )
-        with pytest.raises(Exception):
-            _ = enum.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum, ignore_other_types=False)
 
 
 # ############# params.py ############# #

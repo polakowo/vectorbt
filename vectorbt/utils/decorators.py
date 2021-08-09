@@ -191,7 +191,7 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
 
     def _get_condition_rank(cond: CacheCondition) -> int:
         # Perform initial checks
-        checks.assert_type(cond, CacheCondition)
+        checks.assert_instance_of(cond, CacheCondition)
 
         if cond.instance is not None:
             if instance is not cond.instance:
@@ -499,9 +499,8 @@ binary_magic_config = Config(
         '__ror__': dict(func=lambda x, y: np.bitwise_or(y, x)),
         '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -515,7 +514,7 @@ __pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added
 BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 
-def add_binary_magic_methods(translate_func: BinaryTranslateFuncT,
+def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
                              config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add binary magic methods to a class.
 
@@ -558,9 +557,8 @@ unary_magic_config = Config(
         '__abs__': dict(func=np.absolute),
         '__invert__': dict(func=np.invert)
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -574,7 +572,7 @@ __pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added t
 UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
 
 
-def add_unary_magic_methods(translate_func: UnaryTranslateFuncT,
+def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
                             config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add unary magic methods to a class.
 

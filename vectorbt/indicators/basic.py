@@ -54,7 +54,7 @@ Date
 
 >>> ohlcv.vbt.ohlcv.plot()
 ```
-![](/vectorbt/docs/img/basic_price.svg)"""
+![](/docs/img/basic_price.svg)"""
 
 import numpy as np
 import plotly.graph_objects as go
@@ -119,7 +119,7 @@ class _MA(MA):
         >>> vbt.MA.run(ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/MA.svg)
+        ![](/docs/img/MA.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
@@ -205,7 +205,7 @@ class _MSTD(MSTD):
         >>> vbt.MSTD.run(ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/MSTD.svg)
+        ![](/docs/img/MSTD.svg)
         """
         self_col = self.select_one(column=column)
 
@@ -296,7 +296,7 @@ class _BBANDS(BBANDS):
         >>> vbt.BBANDS.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/BBANDS.svg)
+        ![](/docs/img/BBANDS.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
@@ -414,7 +414,7 @@ class _RSI(RSI):
         >>> vbt.RSI.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/RSI.svg)
+        ![](/docs/img/RSI.svg)
         """
         self_col = self.select_one(column=column)
 
@@ -517,7 +517,7 @@ class _STOCH(STOCH):
         >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/STOCH.svg)
+        ![](/docs/img/STOCH.svg)
         """
         self_col = self.select_one(column=column)
 
@@ -630,7 +630,7 @@ class _MACD(MACD):
         >>> vbt.MACD.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/MACD.svg)"""
+        ![](/docs/img/MACD.svg)"""
         self_col = self.select_one(column=column)
 
         if fig is None:
@@ -741,7 +741,7 @@ class _ATR(ATR):
         >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/ATR.svg)
+        ![](/docs/img/ATR.svg)
         """
         self_col = self.select_one(column=column)
 
@@ -814,7 +814,7 @@ class _OBV(OBV):
         >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot()
         ```
 
-        ![](/vectorbt/docs/img/OBV.svg)
+        ![](/docs/img/OBV.svg)
         """
         self_col = self.select_one(column=column)
 

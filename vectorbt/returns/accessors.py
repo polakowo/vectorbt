@@ -240,7 +240,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def daily(self, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
-        checks.assert_type(self.wrapper.index, DatetimeIndexes)
+        checks.assert_instance_of(self.wrapper.index, DatetimeIndexes)
 
         if self.wrapper.freq == pd.Timedelta('1D'):
             return self.obj
@@ -248,7 +248,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def annual(self, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
-        checks.assert_type(self.obj.index, DatetimeIndexes)
+        checks.assert_instance_of(self.obj.index, DatetimeIndexes)
 
         if self.wrapper.freq == self.year_freq:
             return self.obj
@@ -781,13 +781,12 @@ class ReturnsAccessor(GenericAccessor):
         """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
-        return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Drawdowns.from_ts(self.cumulative(start_value=1.), wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Resolution ############# #
 
@@ -1044,7 +1043,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
         ```
 
-        ![](/vectorbt/docs/img/plot_cumulative.svg)
+        ![](/docs/img/plot_cumulative.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

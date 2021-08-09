@@ -254,7 +254,7 @@ class Data(Wrapping):
             **kwargs
         )
 
-        checks.assert_type(data, dict)
+        checks.assert_instance_of(data, dict)
         for k, v in data.items():
             checks.assert_meta_equal(v, data[list(data.keys())[0]])
         self._data = data

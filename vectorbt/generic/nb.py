@@ -31,7 +31,7 @@ from numba.typed import Dict
 from numba.core.types import Omitted
 
 from vectorbt import _typing as tp
-from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
+from vectorbt.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
 
 
 @njit(cache=True)
@@ -1406,6 +1406,171 @@ def any_squeeze_nb(col: int, group: int, a: tp.Array1d) -> bool:
     return np.any(a)
 
 
+# ############# Ranges ############# #
+
+@njit(cache=True)
+def find_ranges_nb(ts: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
+    """Find ranges and store their information as records to an array.
+
+    ## Example
+
+    Find ranges in time series:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.generic.nb import find_ranges_nb
+
+    >>> ts = np.asarray([
+    ...     [np.nan, np.nan, np.nan, np.nan],
+    ...     [     2, np.nan, np.nan, np.nan],
+    ...     [     3,      3, np.nan, np.nan],
+    ...     [np.nan,      4,      4, np.nan],
+    ...     [     5, np.nan,      5,      5],
+    ...     [     6,      6, np.nan,      6]
+    ... ])
+    >>> records = find_ranges_nb(ts, np.nan)
+
+    >>> pd.DataFrame.from_records(records)
+       id  col  start_idx  end_idx
+    0   0    0          1        3
+    1   1    0          4        6
+    2   2    1          2        4
+    3   3    1          5        6
+    4   4    2          3        5
+    5   5    3          4        6
+    ```
+    """
+    out = np.empty(ts.shape[0] * ts.shape[1], dtype=range_dt)
+    ridx = 0
+
+    for col in range(ts.shape[1]):
+        range_started = False
+        start_idx = -1
+        end_idx = -1
+        store_record = False
+        status = -1
+
+        for i in range(ts.shape[0]):
+            cur_val = ts[i, col]
+
+            if cur_val == gap_value or np.isnan(cur_val) and np.isnan(gap_value):
+                if range_started:
+                    # If stopped, save the current range
+                    end_idx = i
+                    range_started = False
+                    store_record = True
+                    status = RangeStatus.Closed
+            else:
+                if not range_started:
+                    # If started, register a new range
+                    start_idx = i
+                    range_started = True
+
+            if i == ts.shape[0] - 1 and range_started:
+                # If still running, mark for save
+                end_idx = ts.shape[0] - 1
+                range_started = False
+                store_record = True
+                status = RangeStatus.Open
+
+            if store_record:
+                # Save range to the records
+                out[ridx]['id'] = ridx
+                out[ridx]['col'] = col
+                out[ridx]['start_idx'] = start_idx
+                out[ridx]['end_idx'] = end_idx
+                out[ridx]['status'] = status
+                ridx += 1
+
+                # Reset running vars for a new range
+                store_record = False
+
+    return out[:ridx]
+
+
+@njit(cache=True)
+def range_duration_nb(start_idx_arr: tp.Array1d,
+                      end_idx_arr: tp.Array1d,
+                      status_arr: tp.Array2d) -> tp.Array1d:
+    """Get duration of each duration record."""
+    out = np.empty(start_idx_arr.shape[0], dtype=np.int_)
+    for ridx in range(out.shape[0]):
+        if status_arr[ridx] == RangeStatus.Open:
+            out[ridx] = end_idx_arr[ridx] - start_idx_arr[ridx] + 1
+        else:
+            out[ridx] = end_idx_arr[ridx] - start_idx_arr[ridx]
+    return out
+
+
+@njit(cache=True)
+def range_coverage_nb(start_idx_arr: tp.Array1d,
+                      end_idx_arr: tp.Array1d,
+                      status_arr: tp.Array2d,
+                      col_map: tp.ColMap,
+                      index_lens: tp.Array1d,
+                      overlapping: bool = False,
+                      normalize: bool = False) -> tp.Array1d:
+    """Get coverage of range records.
+
+    Set `overlapping` to True to get the number of overlapping steps.
+    Set `normalize` to True to get the number of steps in relation either to the total number of steps
+    (when `overlapping=False`) or to the number of covered steps (when `overlapping=True`).
+    """
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(col_lens.shape[0], np.nan, dtype=np.float_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        temp = np.full(index_lens[col], 0, dtype=np.int_)
+        for ridx in ridxs:
+            if status_arr[ridx] == RangeStatus.Open:
+                temp[start_idx_arr[ridx]:end_idx_arr[ridx] + 1] += 1
+            else:
+                temp[start_idx_arr[ridx]:end_idx_arr[ridx]] += 1
+        if overlapping:
+            if normalize:
+                out[col] = np.sum(temp > 1) / np.sum(temp > 0)
+            else:
+                out[col] = np.sum(temp > 1)
+        else:
+            if normalize:
+                out[col] = np.sum(temp > 0) / index_lens[col]
+            else:
+                out[col] = np.sum(temp > 0)
+    return out
+
+
+@njit(cache=True)
+def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
+                      end_idx_arr: tp.Array1d,
+                      status_arr: tp.Array2d,
+                      col_map: tp.ColMap,
+                      index_len: int) -> tp.Array2d:
+    """Convert ranges to 2-dim mask."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full((index_len, col_lens.shape[0]), False, dtype=np.bool_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        for ridx in ridxs:
+            if status_arr[ridx] == RangeStatus.Open:
+                out[start_idx_arr[ridx]:end_idx_arr[ridx] + 1, col] = True
+            else:
+                out[start_idx_arr[ridx]:end_idx_arr[ridx], col] = True
+
+    return out
+
+
 # ############# Drawdowns ############# #
 
 @njit(cache=True)
@@ -1430,10 +1595,15 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
     >>> records = find_drawdowns_nb(ts)
 
     >>> pd.DataFrame.from_records(records)
-       id  col  start_idx  valley_idx  end_idx  status
-    0   0    1          0           4        4       0
-    1   1    2          2           4        4       0
-    2   2    3          0           2        4       1
+       id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\
+    0   0    1         0          1           4        4       5.0         1.0
+    1   1    2         2          3           4        4       3.0         1.0
+    2   2    3         0          1           2        4       3.0         1.0
+
+       end_val  status
+    0      1.0       0
+    1      1.0       0
+    2      3.0       1
     ```
     """
     out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
@@ -1441,11 +1611,12 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
 
     for col in range(ts.shape[1]):
         drawdown_started = False
-        peak_idx = np.nan
-        valley_idx = np.nan
+        peak_idx = -1
+        valley_idx = -1
         peak_val = ts[0, col]
         valley_val = ts[0, col]
-        store_drawdown = False
+        end_val = np.nan
+        store_record = False
         status = -1
 
         for i in range(ts.shape[0]):
@@ -1462,7 +1633,8 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                         # If running, potential recovery
                         if cur_val >= peak_val:
                             drawdown_started = False
-                            store_drawdown = True
+                            store_record = True
+                            end_val = peak_val
                             status = DrawdownStatus.Recovered
                 else:
                     # Value decreased
@@ -1480,16 +1652,21 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                 if i == ts.shape[0] - 1 and drawdown_started:
                     # If still running, mark for save
                     drawdown_started = False
-                    store_drawdown = True
+                    store_record = True
+                    end_val = cur_val
                     status = DrawdownStatus.Active
 
-                if store_drawdown:
+                if store_record:
                     # Save drawdown to the records
                     out[ddidx]['id'] = ddidx
                     out[ddidx]['col'] = col
-                    out[ddidx]['start_idx'] = peak_idx
+                    out[ddidx]['peak_idx'] = peak_idx
+                    out[ddidx]['start_idx'] = peak_idx + 1
                     out[ddidx]['valley_idx'] = valley_idx
                     out[ddidx]['end_idx'] = i
+                    out[ddidx]['peak_val'] = peak_val
+                    out[ddidx]['valley_val'] = valley_val
+                    out[ddidx]['end_val'] = end_val
                     out[ddidx]['status'] = status
                     ddidx += 1
 
@@ -1498,67 +1675,42 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                     valley_idx = i
                     peak_val = cur_val
                     valley_val = cur_val
-                    store_drawdown = False
+                    store_record = False
                     status = -1
 
     return out[:ddidx]
 
 
 @njit(cache=True)
-def dd_start_value_map_nb(record: tp.Record, ts: tp.Array2d) -> float:
-    """`map_func_nb` that returns start value of a drawdown."""
-    return ts[record['start_idx'], record['col']]
+def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.Array1d:
+    """Return the drawdown of each drawdown record."""
+    return (valley_val_arr - peak_val_arr) / peak_val_arr
 
 
 @njit(cache=True)
-def dd_valley_value_map_nb(record: tp.Record, ts: tp.Array2d) -> float:
-    """`map_func_nb` that returns valley value of a drawdown."""
-    return ts[record['valley_idx'], record['col']]
+def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d) -> tp.Array1d:
+    """Return the duration of the peak-to-valley phase of each drawdown record."""
+    return valley_idx_arr - start_idx_arr + 1
 
 
 @njit(cache=True)
-def dd_end_value_map_nb(record: tp.Record, ts: tp.Array2d) -> float:
-    """`map_func_nb` that returns end value of a drawdown.
-
-    This can be either recovery value or last value of an active drawdown."""
-    return ts[record['end_idx'], record['col']]
-
-
-@njit(cache=True)
-def dd_drawdown_map_nb(record: tp.Record, ts: tp.Array2d) -> float:
-    """`map_func_nb` that returns drawdown value of a drawdown."""
-    valley_val = dd_valley_value_map_nb(record, ts)
-    start_val = dd_start_value_map_nb(record, ts)
-    return (valley_val - start_val) / start_val
+def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d,
+                            end_idx_arr: tp.Array1d) -> tp.Array1d:
+    """Return the duration of the valley-to-recovery phase of each drawdown record."""
+    return end_idx_arr - valley_idx_arr
 
 
 @njit(cache=True)
-def dd_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns total duration of a drawdown."""
-    return record['end_idx'] - record['start_idx']
+def dd_recovery_duration_ratio_nb(start_idx_arr: tp.Array1d,
+                                  valley_idx_arr: tp.Array1d,
+                                  end_idx_arr: tp.Array1d) -> tp.Array1d:
+    """Return the ratio of the recovery duration to the decline duration of each drawdown record."""
+    recovery_duration = dd_recovery_duration_nb(valley_idx_arr, end_idx_arr)
+    decline_duration = dd_decline_duration_nb(start_idx_arr, valley_idx_arr)
+    return recovery_duration / decline_duration
 
 
 @njit(cache=True)
-def dd_decline_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns duration of the peak-to-valley phase."""
-    return record['valley_idx'] - record['start_idx']
-
-
-@njit(cache=True)
-def dd_recovery_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns duration of the valley-to-recovery phase."""
-    return record['end_idx'] - record['valley_idx']
-
-
-@njit(cache=True)
-def dd_recovery_duration_ratio_map_nb(record: tp.Record) -> float:
-    """`map_func_nb` that returns ratio of recovery duration to total duration."""
-    return dd_recovery_duration_map_nb(record) / dd_duration_map_nb(record)
-
-
-@njit(cache=True)
-def dd_recovery_return_map_nb(record: tp.Record, ts: tp.Array2d) -> float:
-    """`map_func_nb` that returns recovery return of a drawdown."""
-    end_val = dd_end_value_map_nb(record, ts)
-    valley_val = dd_valley_value_map_nb(record, ts)
-    return (end_val - valley_val) / valley_val
+def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -> tp.Array1d:
+    """Return the recovery return of each drawdown record."""
+    return (end_val_arr - valley_val_arr) / valley_val_arr

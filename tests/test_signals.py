@@ -6,6 +6,9 @@ from datetime import datetime
 import pytest
 
 from vectorbt.generic import nb as generic_nb
+from vectorbt.generic.enums import range_dt
+
+from tests.utils import record_arrays_close
 
 seed = 42
 
@@ -125,7 +128,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate((5, 2), choice_func_nb, 1)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate(
@@ -505,7 +508,7 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.clean(entries, entries, entries)
 
     def test_generate_random(self):
@@ -518,7 +521,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -559,7 +562,7 @@ class TestAccessors:
                 name=mask['a'].name
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate_random((5, 2), prob=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -591,7 +594,7 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             pd.DataFrame.vbt.signals.generate_random((5, 3))
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -944,7 +947,7 @@ class TestAccessors:
             )
         )
         # none
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             pd.DataFrame.vbt.signals.generate_random((5, 3))
 
     def test_generate_random_exits(self):
@@ -1434,28 +1437,15 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
 
-    def test_map_between(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
-        mapped = mask.vbt.signals.map_between(
-            range_map_func_nb=distance_map_nb
+    def test_between_ranges(self):
+        ranges = mask.vbt.signals.between_ranges()
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 0, 3, 1), (1, 1, 1, 4, 1)
+            ], dtype=range_dt)
         )
-        np.testing.assert_array_equal(
-            mapped.values,
-            np.array([3., 3.])
-        )
-        np.testing.assert_array_equal(
-            mapped.col_arr,
-            np.array([0, 1])
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([3, 4])
-        )
-        assert mapped.wrapper == mask.vbt.wrapper
-        assert mapped == mask.vbt.signals.distance_mapped()
+        assert ranges.wrapper == mask.vbt.wrapper
 
         mask2 = pd.DataFrame([
             [True, True, True],
@@ -1473,59 +1463,27 @@ class TestAccessors:
             [False, False, True]
         ], index=mask.index, columns=mask.columns)
 
-        mapped = mask2.vbt.signals.map_between(
-            range_map_func_nb=distance_map_nb,
-            other=other_mask
+        ranges = mask2.vbt.signals.between_ranges(other=other_mask)
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 0, 1, 1), (1, 0, 1, 1, 1), (2, 1, 0, 2, 1),
+                (3, 1, 1, 2, 1), (4, 2, 0, 3, 1), (5, 2, 1, 3, 1)
+            ], dtype=range_dt)
         )
-        np.testing.assert_array_equal(
-            mapped.values,
-            np.array([1., 0., 2., 1., 3., 2.])
-        )
-        np.testing.assert_array_equal(
-            mapped.col_arr,
-            np.array([0, 0, 1, 1, 2, 2])
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([0, 1, 0, 1, 0, 1])
-        )
-        assert mapped.wrapper == mask2.vbt.wrapper
+        assert ranges.wrapper == mask2.vbt.wrapper
 
-        mapped = mask2.vbt.signals.map_between(
-            range_map_func_nb=distance_map_nb,
-            other=other_mask,
-            from_other=True
+        ranges = mask2.vbt.signals.between_ranges(other=other_mask, from_other=True)
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 1, 1, 1), (1, 0, 1, 2, 1), (2, 1, 1, 2, 1),
+                (3, 1, 1, 3, 1), (4, 2, 1, 3, 1), (5, 2, 1, 4, 1)
+            ], dtype=range_dt)
         )
-        np.testing.assert_array_equal(
-            mapped.values,
-            np.array([0., 1., 1., 2., 2., 3.])
-        )
-        np.testing.assert_array_equal(
-            mapped.col_arr,
-            np.array([0, 0, 1, 1, 2, 2])
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([1, 2, 2, 3, 3, 4])
-        )
-        assert mapped.wrapper == mask2.vbt.wrapper
+        assert ranges.wrapper == mask2.vbt.wrapper
 
-        mapped = mask2.vbt.signals.map_between(
-            range_map_func_nb=distance_map_nb,
-            other=other_mask,
-            from_other=True,
-            use_end_idxs=False
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([1, 1, 1, 1, 1, 1])
-        )
-
-    def test_map_partitions(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
+    def test_partition_ranges(self):
         mask2 = pd.DataFrame([
             [False, False, False],
             [True, False, False],
@@ -1534,38 +1492,16 @@ class TestAccessors:
             [True, False, True]
         ], index=mask.index, columns=mask.columns)
 
-        mapped = mask2.vbt.signals.map_partitions(
-            range_map_func_nb=distance_map_nb
+        ranges = mask2.vbt.signals.partition_ranges()
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 1, 3, 1), (1, 0, 4, 4, 0), (2, 1, 2, 4, 1), (3, 2, 3, 4, 0)
+            ], dtype=range_dt)
         )
-        np.testing.assert_array_equal(
-            mapped.values,
-            np.array([2., 1., 2., 2.])
-        )
-        np.testing.assert_array_equal(
-            mapped.col_arr,
-            np.array([0, 0, 1, 2])
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([2, 4, 3, 4])
-        )
-        assert mapped.wrapper == mask2.vbt.wrapper
-        assert mapped == mask2.vbt.signals.partition_len_mapped()
+        assert ranges.wrapper == mask2.vbt.wrapper
 
-        mapped = mask2.vbt.signals.map_partitions(
-            range_map_func_nb=distance_map_nb,
-            use_end_idxs=False
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([1, 4, 2, 3])
-        )
-
-    def test_map_between_partitions(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
+    def test_between_partition_ranges(self):
         mask2 = pd.DataFrame([
             [True, False, False],
             [True, True, False],
@@ -1574,189 +1510,14 @@ class TestAccessors:
             [False, True, False]
         ], index=mask.index, columns=mask.columns)
 
-        mapped = mask2.vbt.signals.map_between_partitions(
-            range_map_func_nb=distance_map_nb
+        ranges = mask2.vbt.signals.between_partition_ranges()
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 1, 3, 1), (1, 1, 2, 4, 1)
+            ], dtype=range_dt)
         )
-        np.testing.assert_array_equal(
-            mapped.values,
-            np.array([2., 2.])
-        )
-        np.testing.assert_array_equal(
-            mapped.col_arr,
-            np.array([0, 1])
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([3, 4])
-        )
-        assert mapped.wrapper == mask2.vbt.wrapper
-        assert mapped == mask2.vbt.signals.partition_distance_mapped()
-
-        mapped = mask2.vbt.signals.map_between_partitions(
-            range_map_func_nb=distance_map_nb,
-            use_end_idxs=False
-        )
-        np.testing.assert_array_equal(
-            mapped.idx_arr,
-            np.array([1, 2])
-        )
-
-    def test_map_reduce_between(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
-        @njit
-        def mean_reduce_nb(col, a):
-            return np.nanmean(a)
-
-        mask2 = pd.DataFrame([
-            [True, True, True],
-            [True, True, True],
-            [False, False, False],
-            [False, False, False],
-            [False, False, False]
-        ], index=mask.index, columns=mask.columns)
-
-        other_mask = pd.DataFrame([
-            [False, False, False],
-            [True, False, False],
-            [True, True, False],
-            [False, True, True],
-            [False, False, True]
-        ], index=mask.index, columns=mask.columns)
-
-        assert mask2['a'].vbt.signals.map_reduce_between(
-            range_map_func_nb=distance_map_nb,
-            reduce_func_nb=mean_reduce_nb
-        ) == mask2['a'].vbt.signals.map_between(
-            range_map_func_nb=distance_map_nb
-        ).reduce(reduce_func_nb=mean_reduce_nb)
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_between(
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb
-            ),
-            mask2.vbt.signals.map_between(
-                range_map_func_nb=distance_map_nb
-            ).reduce(reduce_func_nb=mean_reduce_nb, wrap_kwargs=dict(name_or_index="map_reduce_between"))
-        )
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_between(
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb,
-                wrap_kwargs=dict(name_or_index="avg_distance")
-            ),
-            mask2.vbt.signals.avg_distance()
-        )
-        assert mask2['a'].vbt.signals.map_reduce_between(
-            other=other_mask['a'],
-            range_map_func_nb=distance_map_nb,
-            reduce_func_nb=mean_reduce_nb
-        ) == mask2['a'].vbt.signals.map_between(
-            other=other_mask['a'],
-            range_map_func_nb=distance_map_nb
-        ).reduce(reduce_func_nb=mean_reduce_nb)
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_between(
-                other=other_mask,
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb
-            ),
-            mask2.vbt.signals.map_between(
-                other=other_mask,
-                range_map_func_nb=distance_map_nb
-            ).reduce(reduce_func_nb=mean_reduce_nb, wrap_kwargs=dict(name_or_index="map_reduce_between_two"))
-        )
-        assert mask2['a'].vbt.signals.map_reduce_between(
-            other=other_mask['a'],
-            range_map_func_nb=distance_map_nb,
-            reduce_func_nb=mean_reduce_nb,
-            from_other=True
-        ) == mask2['a'].vbt.signals.map_between(
-            other=other_mask['a'],
-            range_map_func_nb=distance_map_nb,
-            from_other=True
-        ).reduce(reduce_func_nb=mean_reduce_nb)
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_between(
-                other=other_mask,
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb,
-                from_other=True
-            ),
-            mask2.vbt.signals.map_between(
-                other=other_mask,
-                range_map_func_nb=distance_map_nb,
-                from_other=True
-            ).reduce(reduce_func_nb=mean_reduce_nb, wrap_kwargs=dict(name_or_index="map_reduce_between_two"))
-        )
-
-    def test_map_reduce_partitions(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
-        @njit
-        def mean_reduce_nb(col, a):
-            return np.nanmean(a)
-
-        mask2 = pd.DataFrame([
-            [False, False, False],
-            [True, False, False],
-            [True, True, False],
-            [False, True, True],
-            [True, False, True]
-        ], index=mask.index, columns=mask.columns)
-
-        assert mask2['a'].vbt.signals.map_reduce_partitions(
-            range_map_func_nb=distance_map_nb,
-            reduce_func_nb=mean_reduce_nb
-        ) == mask2['a'].vbt.signals.map_partitions(
-            range_map_func_nb=distance_map_nb
-        ).reduce(reduce_func_nb=mean_reduce_nb)
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_partitions(
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb
-            ),
-            mask2.vbt.signals.map_partitions(
-                range_map_func_nb=distance_map_nb
-            ).reduce(reduce_func_nb=mean_reduce_nb, wrap_kwargs=dict(name_or_index="map_reduce_partitions"))
-        )
-
-    def test_map_reduce_between_partitions(self):
-        @njit
-        def distance_map_nb(from_i, to_i, col):
-            return to_i - from_i
-
-        @njit
-        def mean_reduce_nb(col, a):
-            return np.nanmean(a)
-
-        mask2 = pd.DataFrame([
-            [True, False, False],
-            [True, True, False],
-            [False, True, True],
-            [True, False, True],
-            [False, True, False]
-        ], index=mask.index, columns=mask.columns)
-
-        assert mask2['a'].vbt.signals.map_reduce_between_partitions(
-            range_map_func_nb=distance_map_nb,
-            reduce_func_nb=mean_reduce_nb
-        ) == mask2['a'].vbt.signals.map_between_partitions(
-            range_map_func_nb=distance_map_nb
-        ).reduce(reduce_func_nb=mean_reduce_nb)
-        pd.testing.assert_series_equal(
-            mask2.vbt.signals.map_reduce_between_partitions(
-                range_map_func_nb=distance_map_nb,
-                reduce_func_nb=mean_reduce_nb
-            ),
-            mask2.vbt.signals.map_between_partitions(
-                range_map_func_nb=distance_map_nb
-            ).reduce(reduce_func_nb=mean_reduce_nb, wrap_kwargs=dict(name_or_index="map_reduce_between_partitions"))
-        )
+        assert ranges.wrapper == mask2.vbt.wrapper
 
     def test_pos_rank(self):
         pd.testing.assert_series_equal(

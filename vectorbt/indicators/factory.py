@@ -979,7 +979,7 @@ Another way of defining own properties and methods is subclassing:
 >>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()
 ```
 
-![](/vectorbt/docs/img/MyInd_plot.svg)
+![](/docs/img/MyInd_plot.svg)
 
 ## Helper properties and methods
 
@@ -1974,9 +1974,12 @@ def run_pipeline(
            other_list
 
 
-def combine_objs(obj: tp.SeriesFrame, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
-                 *args, level_name: tp.Optional[str] = None, keys: tp.Optional[tp.IndexLike] = None,
-                 allow_multiple: bool = True, **kwargs) -> tp.SeriesFrame:
+def combine_objs(obj: tp.SeriesFrame,
+                 other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
+                 *args, level_name: tp.Optional[str] = None,
+                 keys: tp.Optional[tp.IndexLike] = None,
+                 allow_multiple: bool = True,
+                 **kwargs) -> tp.SeriesFrame:
     """Combines/compares `obj` to `other`, for example, to generate signals.
 
     Both will broadcast together.
@@ -2076,7 +2079,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             checks.assert_len_equal(param_list[0], params)
         for mapper in mapper_list:
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
         checks.assert_len_equal(level_names, param_list)
 
         setattr(self, '_short_name', short_name)
@@ -2225,14 +2228,14 @@ class IndicatorFactory:
         """
         # Check and save parameters
         self.class_name = class_name
-        checks.assert_type(class_name, str)
+        checks.assert_instance_of(class_name, str)
 
         self.class_docstring = class_docstring
-        checks.assert_type(class_docstring, str)
+        checks.assert_instance_of(class_docstring, str)
 
         self.module_name = module_name
         if module_name is not None:
-            checks.assert_type(module_name, str)
+            checks.assert_instance_of(module_name, str)
 
         if short_name is None:
             if class_name == 'Indicator':
@@ -2240,10 +2243,10 @@ class IndicatorFactory:
             else:
                 short_name = class_name.lower()
         self.short_name = short_name
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
 
         self.prepend_name = prepend_name
-        checks.assert_type(prepend_name, bool)
+        checks.assert_instance_of(prepend_name, bool)
 
         if input_names is None:
             input_names = []
@@ -2279,19 +2282,19 @@ class IndicatorFactory:
 
         if output_flags is None:
             output_flags = {}
-        checks.assert_type(output_flags, dict)
+        checks.assert_instance_of(output_flags, dict)
         if len(output_flags) > 0:
             checks.assert_dict_valid(output_flags, all_output_names)
         self.output_flags = output_flags
 
         if custom_output_props is None:
             custom_output_props = {}
-        checks.assert_type(custom_output_props, dict)
+        checks.assert_instance_of(custom_output_props, dict)
         self.custom_output_props = custom_output_props
 
         if attr_settings is None:
             attr_settings = {}
-        checks.assert_type(attr_settings, dict)
+        checks.assert_instance_of(attr_settings, dict)
         all_attr_names = input_names + all_output_names + list(custom_output_props.keys())
         if len(attr_settings) > 0:
             checks.assert_dict_valid(attr_settings, all_attr_names)
@@ -3460,8 +3463,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         new_args = {c: test_df[c] for c in input_names}
         try:
             result = func(**new_args)
-        except:
-            raise ValueError("Couldn't parse the indicator")
+        except Exception as e:
+            raise ValueError("Couldn't parse the indicator: " + str(e))
 
         # Concatenate Series/DataFrames if the result is a tuple
         if isinstance(result, tuple):
@@ -3528,7 +3531,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:
-                    warnings.warn(str(e), stacklevel=2)
+                    warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
         return indicators
 
     @classmethod

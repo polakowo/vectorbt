@@ -212,10 +212,11 @@ from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import plotting, nb
+from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.decorators import add_nb_methods, add_transform_methods
+from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
@@ -276,9 +277,8 @@ nb_config = Config(
         'expanding_mean': dict(func=nb.expanding_mean_nb, path='vectorbt.generic.nb.expanding_mean_nb'),
         'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -324,9 +324,8 @@ transform_config = Config(
             docstring="See `sklearn.preprocessing.PowerTransformer`."
         )
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -338,20 +337,25 @@ __pdoc__['transform_config'] = f"""Config of transform methods to be added to `G
 """
 
 
-@add_nb_methods(nb_config)
-@add_transform_methods(transform_config)
+@attach_nb_methods(nb_config)
+@attach_transform_methods(transform_config)
 class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
     def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        if mapping is not None:
-            mapping = to_mapping(mapping)
-        self._mapping = mapping
-
         BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)
+
+        if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        self._mapping = mapping
 
     @property
     def sr_accessor_cls(self):
@@ -954,6 +958,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -1145,17 +1155,28 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
+    def ranges(self) -> Ranges:
+        """`GenericAccessor.get_ranges` with default arguments."""
+        return self.get_ranges()
+
+    def get_ranges(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Ranges:
+        """Generate range records.
+
+        See `vectorbt.generic.ranges.Ranges`."""
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+
+    @property
     def drawdowns(self) -> Drawdowns:
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
-        return Drawdowns.from_ts(self.obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(self,
                   dropna: bool = True,
@@ -1287,7 +1308,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/split_plot.svg)
+        ![](/docs/img/split_plot.svg)
         """
         total_range_sr = pd.Series(np.arange(len(self.wrapper.index)), index=self.wrapper.index)
         set_ranges = list(splitter.split(total_range_sr, **kwargs))
@@ -1435,7 +1456,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
          ... )
         ```
 
-        ![](/vectorbt/docs/img/range_split_plot.svg)
+        ![](/docs/img/range_split_plot.svg)
         """
         return self.split(RangeSplitter(), **kwargs)
 
@@ -1464,7 +1485,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         ...     plot=True, trace_names=['train', 'valid', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/rolling_split_plot.svg)
+        ![](/docs/img/rolling_split_plot.svg)
         """
         return self.split(RollingSplitter(), **kwargs)
 
@@ -1498,7 +1519,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         ...     plot=True, trace_names=['train', 'valid', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/expanding_split_plot.svg)
+        ![](/docs/img/expanding_split_plot.svg)
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
@@ -1517,7 +1538,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/df_plot.svg)
+        ![](/docs/img/df_plot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1543,7 +1564,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.lineplot()
         ```
 
-        ![](/vectorbt/docs/img/df_lineplot.svg)
+        ![](/docs/img/df_lineplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
 
@@ -1556,7 +1577,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.scatterplot()
         ```
 
-        ![](/vectorbt/docs/img/df_scatterplot.svg)
+        ![](/docs/img/df_scatterplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='markers')), kwargs))
 
@@ -1573,7 +1594,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.barplot()
         ```
 
-        ![](/vectorbt/docs/img/df_barplot.svg)
+        ![](/docs/img/df_barplot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1603,7 +1624,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.histplot()
         ```
 
-        ![](/vectorbt/docs/img/df_histplot.svg)
+        ![](/docs/img/df_histplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
@@ -1633,7 +1654,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         >>> df.vbt.boxplot()
         ```
 
-        ![](/vectorbt/docs/img/df_boxplot.svg)
+        ![](/docs/img/df_boxplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
@@ -1713,7 +1734,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> df['a'].vbt.plot_against(df['b'])
         ```
 
-        ![](/vectorbt/docs/img/sr_plot_against.svg)
+        ![](/docs/img/sr_plot_against.svg)
         """
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1726,7 +1747,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
@@ -1844,7 +1865,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> df['a'].vbt.overlay_with_heatmap(df['b'])
         ```
 
-        ![](/vectorbt/docs/img/sr_overlay_with_heatmap.svg)
+        ![](/docs/img/sr_overlay_with_heatmap.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
@@ -1857,7 +1878,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             add_trace_kwargs = {}
 
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             if 'width' in plotting_cfg['layout']:
@@ -1913,7 +1934,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> sr.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/sr_heatmap.svg)
+        ![](/docs/img/sr_heatmap.svg)
 
         Using one level as a slider:
 
@@ -1939,7 +1960,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> sr.vbt.heatmap(slider_level=0)
         ```
 
-        ![](/vectorbt/docs/img/sr_heatmap_slider.gif)
+        ![](/docs/img/sr_heatmap_slider.gif)
         """
         if not isinstance(self.wrapper.index, pd.MultiIndex):
             return self.obj.to_frame().vbt.heatmap(
@@ -2075,7 +2096,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> sr.vbt.volume().show()
         ```
 
-        ![](/vectorbt/docs/img/sr_volume.svg)
+        ![](/docs/img/sr_volume.svg)
         """
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
@@ -2210,7 +2231,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
         ```
 
-        ![](/vectorbt/docs/img/sr_qqplot.svg)
+        ![](/docs/img/sr_qqplot.svg)
         """
         qq = stats.probplot(self.obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
@@ -2355,7 +2376,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         >>> df.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/df_heatmap.svg)
+        ![](/docs/img/df_heatmap.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.columns

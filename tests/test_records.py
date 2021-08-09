@@ -5,7 +5,7 @@ from numba import njit
 from datetime import datetime
 import pytest
 
-from vectorbt.generic.enums import drawdown_dt
+from vectorbt.generic.enums import range_dt, drawdown_dt
 from vectorbt.portfolio.enums import order_dt, trade_dt, position_dt, log_dt
 
 from tests.utils import record_arrays_close
@@ -31,6 +31,11 @@ records_arr = np.asarray([
     (7, 1, 2, 11, 20),
     (8, 2, 2, 10, 21)
 ], dtype=example_dt)
+records_nosort_arr = np.concatenate((
+    records_arr[0::3],
+    records_arr[1::3],
+    records_arr[2::3]
+))
 
 group_by = pd.Index(['g1', 'g1', 'g2', 'g2'])
 
@@ -44,7 +49,8 @@ wrapper_grouped = wrapper.copy(group_by=group_by)
 
 records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
-records_nosort = records.copy(records_arr=records.records_arr[::-1])
+records_nosort = records.copy(records_arr=records_nosort_arr)
+records_nosort_grouped = vbt.records.Records(wrapper_grouped, records_nosort_arr)
 
 
 # ############# Global ############# #
@@ -177,14 +183,11 @@ class TestColumnMapper:
 
 mapped_array = records.map_field('some_field1')
 mapped_array_grouped = records_grouped.map_field('some_field1')
+mapped_array_nosort = records_nosort.map_field('some_field1')
+mapped_array_nosort_grouped = records_nosort_grouped.map_field('some_field1')
 mapping = {x: 'test_' + str(x) for x in pd.unique(mapped_array.values)}
 mp_mapped_array = mapped_array.copy(mapping=mapping)
 mp_mapped_array_grouped = mapped_array_grouped.copy(mapping=mapping)
-mapped_array_nosort = mapped_array.copy(
-    col_arr=mapped_array.col_arr[::-1],
-    id_arr=mapped_array.id_arr[::-1],
-    idx_arr=mapped_array.idx_arr[::-1]
-)
 
 
 class TestMappedArray:
@@ -244,25 +247,25 @@ class TestMappedArray:
         assert mapped_array.sort().is_sorted(incl_id=True)
         assert mapped_array.sort(incl_id=True).is_sorted(incl_id=True)
         assert mapped_array_nosort.sort().is_sorted()
-        assert not mapped_array_nosort.sort().is_sorted(incl_id=True)
+        assert mapped_array_nosort.sort().is_sorted(incl_id=True)
         assert mapped_array_nosort.sort(incl_id=True).is_sorted(incl_id=True)
 
-    def test_filter_by_mask(self):
+    def test_apply_mask(self):
         mask_a = mapped_array['a'].values >= mapped_array['a'].values.mean()
         np.testing.assert_array_equal(
-            mapped_array['a'].filter_by_mask(mask_a).id_arr,
+            mapped_array['a'].apply_mask(mask_a).id_arr,
             np.array([1, 2])
         )
         mask = mapped_array.values >= mapped_array.values.mean()
-        filtered = mapped_array.filter_by_mask(mask)
+        filtered = mapped_array.apply_mask(mask)
         np.testing.assert_array_equal(
             filtered.id_arr,
             np.array([2, 3, 4, 5, 6])
         )
         np.testing.assert_array_equal(filtered.col_arr, mapped_array.col_arr[mask])
         np.testing.assert_array_equal(filtered.idx_arr, mapped_array.idx_arr[mask])
-        assert mapped_array_grouped.filter_by_mask(mask).wrapper == mapped_array_grouped.wrapper
-        assert mapped_array_grouped.filter_by_mask(mask, group_by=False).wrapper.grouper.group_by is None
+        assert mapped_array_grouped.apply_mask(mask).wrapper == mapped_array_grouped.wrapper
+        assert mapped_array_grouped.apply_mask(mask, group_by=False).wrapper.grouper.group_by is None
 
     def test_map_to_mask(self):
         @njit
@@ -326,7 +329,7 @@ class TestMappedArray:
             records_arr['col'].tolist() + [2],
             idx_arr=records_arr['idx'].tolist() + [2]
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array2.to_pd()
         pd.testing.assert_series_equal(
             mapped_array['a'].to_pd(ignore_index=True),
@@ -598,7 +601,7 @@ class TestMappedArray:
             mapped_array.nth(-1),
             pd.Series(np.array([12., 13., 10., np.nan]), index=wrapper.columns).rename('nth')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array.nth(10)
         pd.testing.assert_series_equal(
             mapped_array_grouped.nth(0),
@@ -622,7 +625,7 @@ class TestMappedArray:
                 index=wrapper.columns
             ).rename('nth_index')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = mapped_array.nth_index(10)
         pd.testing.assert_series_equal(
             mapped_array_grouped.nth_index(0),
@@ -906,95 +909,105 @@ class TestMappedArray:
             )
         )
 
-    def test_indexing(self):
+    @pytest.mark.parametrize(
+        "test_nosort",
+        [False, True],
+    )
+    def test_indexing(self, test_nosort):
+        if test_nosort:
+            ma = mapped_array_nosort
+            ma_grouped = mapped_array_nosort_grouped
+        else:
+            ma = mapped_array
+            ma_grouped = mapped_array_grouped
         np.testing.assert_array_equal(
-            mapped_array['a'].id_arr,
+            ma['a'].id_arr,
             np.array([0, 1, 2])
         )
         np.testing.assert_array_equal(
-            mapped_array['a'].col_arr,
+            ma['a'].col_arr,
             np.array([0, 0, 0])
         )
         pd.testing.assert_index_equal(
-            mapped_array['a'].wrapper.columns,
+            ma['a'].wrapper.columns,
             pd.Index(['a'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array['b'].id_arr,
+            ma['b'].id_arr,
             np.array([3, 4, 5])
         )
         np.testing.assert_array_equal(
-            mapped_array['b'].col_arr,
+            ma['b'].col_arr,
             np.array([0, 0, 0])
         )
         pd.testing.assert_index_equal(
-            mapped_array['b'].wrapper.columns,
+            ma['b'].wrapper.columns,
             pd.Index(['b'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'a']].id_arr,
+            ma[['a', 'a']].id_arr,
             np.array([0, 1, 2, 0, 1, 2])
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'a']].col_arr,
+            ma[['a', 'a']].col_arr,
             np.array([0, 0, 0, 1, 1, 1])
         )
         pd.testing.assert_index_equal(
-            mapped_array[['a', 'a']].wrapper.columns,
+            ma[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'b']].id_arr,
+            ma[['a', 'b']].id_arr,
             np.array([0, 1, 2, 3, 4, 5])
         )
         np.testing.assert_array_equal(
-            mapped_array[['a', 'b']].col_arr,
+            ma[['a', 'b']].col_arr,
             np.array([0, 0, 0, 1, 1, 1])
         )
         pd.testing.assert_index_equal(
-            mapped_array[['a', 'b']].wrapper.columns,
+            ma[['a', 'b']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        with pytest.raises(Exception) as e_info:
-            _ = mapped_array.iloc[::2, :]  # changing time not supported
+        with pytest.raises(Exception):
+            _ = ma.iloc[::2, :]  # changing time not supported
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g1'].wrapper.columns,
+            ma_grouped['g1'].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert mapped_array_grouped['g1'].wrapper.ndim == 2
-        assert mapped_array_grouped['g1'].wrapper.grouped_ndim == 1
+        assert ma_grouped['g1'].wrapper.ndim == 2
+        assert ma_grouped['g1'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g1'].wrapper.grouper.group_by,
+            ma_grouped['g1'].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g2'].wrapper.columns,
+            ma_grouped['g2'].wrapper.columns,
             pd.Index(['c', 'd'], dtype='object')
         )
-        assert mapped_array_grouped['g2'].wrapper.ndim == 2
-        assert mapped_array_grouped['g2'].wrapper.grouped_ndim == 1
+        assert ma_grouped['g2'].wrapper.ndim == 2
+        assert ma_grouped['g2'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            mapped_array_grouped['g2'].wrapper.grouper.group_by,
+            ma_grouped['g2'].wrapper.grouper.group_by,
             pd.Index(['g2', 'g2'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1']].wrapper.columns,
+            ma_grouped[['g1']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert mapped_array_grouped[['g1']].wrapper.ndim == 2
-        assert mapped_array_grouped[['g1']].wrapper.grouped_ndim == 2
+        assert ma_grouped[['g1']].wrapper.ndim == 2
+        assert ma_grouped[['g1']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1']].wrapper.grouper.group_by,
+            ma_grouped[['g1']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1', 'g2']].wrapper.columns,
+            ma_grouped[['g1', 'g2']].wrapper.columns,
             pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
-        assert mapped_array_grouped[['g1', 'g2']].wrapper.ndim == 2
-        assert mapped_array_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
+        assert ma_grouped[['g1', 'g2']].wrapper.ndim == 2
+        assert ma_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['g1', 'g2']].wrapper.grouper.group_by,
+            ma_grouped[['g1', 'g2']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1', 'g2', 'g2'], dtype='object')
         )
 
@@ -1023,7 +1036,7 @@ class TestMappedArray:
         )
         b_bool = records_arr['some_field2'] > np.mean(records_arr['some_field2'])
         assert a ** a == a ** 2
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             _ = a * a_inv
 
         # binary ops
@@ -1204,6 +1217,16 @@ class TestRecords:
         np.testing.assert_array_equal(records['a'].recarray.some_field1, records['a'].values['some_field1'])
         np.testing.assert_array_equal(records.recarray.some_field1, records.values['some_field1'])
 
+    def test_records_readable(self):
+        pd.testing.assert_frame_equal(
+            records.records_readable,
+            pd.DataFrame([
+                [0, 'x', 'a', 10.0, 21.0], [1, 'y', 'a', 11.0, 20.0], [2, 'z', 'a', 12.0, 19.0],
+                [3, 'x', 'b', 13.0, 18.0], [4, 'y', 'b', 14.0, 17.0], [5, 'z', 'b', 13.0, 18.0],
+                [6, 'x', 'c', 12.0, 19.0], [7, 'y', 'c', 11.0, 20.0], [8, 'z', 'c', 10.0, 21.0]
+            ], columns=pd.Index(['Id', 'Date', 'Column', 'some_field1', 'some_field2'], dtype='object'))
+        )
+
     def test_is_sorted(self):
         assert records.is_sorted()
         assert records.is_sorted(incl_id=True)
@@ -1215,19 +1238,19 @@ class TestRecords:
         assert records.sort().is_sorted(incl_id=True)
         assert records.sort(incl_id=True).is_sorted(incl_id=True)
         assert records_nosort.sort().is_sorted()
-        assert not records_nosort.sort().is_sorted(incl_id=True)
+        assert records_nosort.sort().is_sorted(incl_id=True)
         assert records_nosort.sort(incl_id=True).is_sorted(incl_id=True)
 
-    def test_filter_by_mask(self):
+    def test_apply_mask(self):
         mask_a = records['a'].values['some_field1'] >= records['a'].values['some_field1'].mean()
         record_arrays_close(
-            records['a'].filter_by_mask(mask_a).values,
+            records['a'].apply_mask(mask_a).values,
             np.array([
                 (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.)
             ], dtype=example_dt)
         )
         mask = records.values['some_field1'] >= records.values['some_field1'].mean()
-        filtered = records.filter_by_mask(mask)
+        filtered = records.apply_mask(mask)
         record_arrays_close(
             filtered.values,
             np.array([
@@ -1235,7 +1258,7 @@ class TestRecords:
                 (5, 2, 1, 13., 18.), (6, 0, 2, 12., 19.)
             ], dtype=example_dt)
         )
-        assert records_grouped.filter_by_mask(mask).wrapper == records_grouped.wrapper
+        assert records_grouped.apply_mask(mask).wrapper == records_grouped.wrapper
 
     def test_map_field(self):
         np.testing.assert_array_equal(
@@ -1245,10 +1268,6 @@ class TestRecords:
         np.testing.assert_array_equal(
             records.map_field('some_field1').values,
             np.array([10., 11., 12., 13., 14., 13., 12., 11., 10.])
-        )
-        np.testing.assert_array_equal(
-            records.map_field('some_field1', idx_field='col').idx_arr,
-            records_arr['col']
         )
         assert records_grouped.map_field('some_field1').wrapper == \
                records.map_field('some_field1', group_by=group_by).wrapper
@@ -1267,10 +1286,6 @@ class TestRecords:
             records.map(map_func_nb).values,
             np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
         )
-        np.testing.assert_array_equal(
-            records.map(map_func_nb, idx_field='col').idx_arr,
-            records_arr['col']
-        )
         assert records_grouped.map(map_func_nb).wrapper == \
                records.map(map_func_nb, group_by=group_by).wrapper
         assert records_grouped.map(map_func_nb, group_by=False).wrapper.grouper.group_by is None
@@ -1284,10 +1299,6 @@ class TestRecords:
         np.testing.assert_array_equal(
             records.map_array(arr).values,
             np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
-        )
-        np.testing.assert_array_equal(
-            records.map_array(arr, idx_field='col').idx_arr,
-            records_arr['col']
         )
         assert records_grouped.map_array(arr).wrapper == \
                records.map_array(arr, group_by=group_by).wrapper
@@ -1336,89 +1347,93 @@ class TestRecords:
             ).rename('count')
         )
 
-    def test_indexing(self):
+    @pytest.mark.parametrize(
+        "test_nosort",
+        [False, True],
+    )
+    def test_indexing(self, test_nosort):
+        if test_nosort:
+            r = records_nosort
+            r_grouped = records_nosort_grouped
+        else:
+            r = records
+            r_grouped = records_grouped
         record_arrays_close(
-            records['a'].values,
+            r['a'].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records['a'].wrapper.columns,
+            r['a'].wrapper.columns,
             pd.Index(['a'], dtype='object')
         )
-        record_arrays_close(
-            records['b'].values,
-            np.array([
-                (3, 0, 0, 13., 18.), (4, 1, 0, 14., 17.), (5, 2, 0, 13., 18.)
-            ], dtype=example_dt)
-        )
         pd.testing.assert_index_equal(
-            records['b'].wrapper.columns,
+            r['b'].wrapper.columns,
             pd.Index(['b'], dtype='object')
         )
         record_arrays_close(
-            records[['a', 'a']].values,
+            r[['a', 'a']].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
                 (0, 0, 1, 10., 21.), (1, 1, 1, 11., 20.), (2, 2, 1, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records[['a', 'a']].wrapper.columns,
+            r[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
         record_arrays_close(
-            records[['a', 'b']].values,
+            r[['a', 'b']].values,
             np.array([
                 (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
                 (3, 0, 1, 13., 18.), (4, 1, 1, 14., 17.), (5, 2, 1, 13., 18.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records[['a', 'b']].wrapper.columns,
+            r[['a', 'b']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        with pytest.raises(Exception) as e_info:
-            _ = records.iloc[::2, :]  # changing time not supported
+        with pytest.raises(Exception):
+            _ = r.iloc[::2, :]  # changing time not supported
         pd.testing.assert_index_equal(
-            records_grouped['g1'].wrapper.columns,
+            r_grouped['g1'].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert records_grouped['g1'].wrapper.ndim == 2
-        assert records_grouped['g1'].wrapper.grouped_ndim == 1
+        assert r_grouped['g1'].wrapper.ndim == 2
+        assert r_grouped['g1'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            records_grouped['g1'].wrapper.grouper.group_by,
+            r_grouped['g1'].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped['g2'].wrapper.columns,
+            r_grouped['g2'].wrapper.columns,
             pd.Index(['c', 'd'], dtype='object')
         )
-        assert records_grouped['g2'].wrapper.ndim == 2
-        assert records_grouped['g2'].wrapper.grouped_ndim == 1
+        assert r_grouped['g2'].wrapper.ndim == 2
+        assert r_grouped['g2'].wrapper.grouped_ndim == 1
         pd.testing.assert_index_equal(
-            records_grouped['g2'].wrapper.grouper.group_by,
+            r_grouped['g2'].wrapper.grouper.group_by,
             pd.Index(['g2', 'g2'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['g1']].wrapper.columns,
+            r_grouped[['g1']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        assert records_grouped[['g1']].wrapper.ndim == 2
-        assert records_grouped[['g1']].wrapper.grouped_ndim == 2
+        assert r_grouped[['g1']].wrapper.ndim == 2
+        assert r_grouped[['g1']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            records_grouped[['g1']].wrapper.grouper.group_by,
+            r_grouped[['g1']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1'], dtype='object')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['g1', 'g2']].wrapper.columns,
+            r_grouped[['g1', 'g2']].wrapper.columns,
             pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
-        assert records_grouped[['g1', 'g2']].wrapper.ndim == 2
-        assert records_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
+        assert r_grouped[['g1', 'g2']].wrapper.ndim == 2
+        assert r_grouped[['g1', 'g2']].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            records_grouped[['g1', 'g2']].wrapper.grouper.group_by,
+            r_grouped[['g1', 'g2']].wrapper.grouper.group_by,
             pd.Index(['g1', 'g1', 'g2', 'g2'], dtype='object')
         )
 
@@ -1526,10 +1541,270 @@ class TestRecords:
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
 
+# ############# ranges.py ############# #
+
+ts = pd.DataFrame({
+    'a': [1, -1, 3, -1, 5, -1],
+    'b': [-1, -1, -1, 4, 5, 6],
+    'c': [1, 2, 3, -1, -1, -1],
+    'd': [-1, -1, -1, -1, -1, -1]
+}, index=[
+    datetime(2020, 1, 1),
+    datetime(2020, 1, 2),
+    datetime(2020, 1, 3),
+    datetime(2020, 1, 4),
+    datetime(2020, 1, 5),
+    datetime(2020, 1, 6)
+])
+
+ranges = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq='1 days'))
+ranges_grouped = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq='1 days', group_by=group_by))
+
+
+class TestRanges:
+    def test_mapped_fields(self):
+        for name in range_dt.names:
+            np.testing.assert_array_equal(
+                getattr(ranges, name).values,
+                ranges.values[name]
+            )
+
+    def test_from_ts(self):
+        record_arrays_close(
+            ranges.values,
+            np.array([
+                (0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1), (3, 1, 3, 5, 0), (4, 2, 0, 3, 1)
+            ], dtype=range_dt)
+        )
+        assert ranges.wrapper.freq == day_dt
+        pd.testing.assert_index_equal(
+            ranges_grouped.wrapper.grouper.group_by,
+            group_by
+        )
+
+    def test_records_readable(self):
+        records_readable = ranges.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Range Id'].values,
+            np.array([
+                0, 1, 2, 3, 4
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'b', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Start Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['End Date'].values,
+            np.array([
+                '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-04T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Status'].values,
+            np.array([
+                'Closed', 'Closed', 'Closed', 'Open', 'Closed'
+            ])
+        )
+
+    def test_to_mask(self):
+        pd.testing.assert_series_equal(
+            ranges['a'].to_mask(),
+            ts['a'] != -1
+        )
+        pd.testing.assert_frame_equal(
+            ranges.to_mask(),
+            ts != -1
+        )
+        pd.testing.assert_frame_equal(
+            ranges_grouped.to_mask(),
+            pd.DataFrame(
+                [
+                    [True, True],
+                    [False, True],
+                    [True, True],
+                    [True, False],
+                    [True, False],
+                    [True, False]
+                ],
+                index=ts.index,
+                columns=pd.Index(['g1', 'g2'], dtype='object')
+            )
+        )
+
+    def test_duration(self):
+        np.testing.assert_array_equal(
+            ranges['a'].duration.values,
+            np.array([1, 1, 1])
+        )
+        np.testing.assert_array_equal(
+            ranges.duration.values,
+            np.array([1, 1, 1, 3, 3])
+        )
+
+    def test_avg_duration(self):
+        assert ranges['a'].avg_duration() == pd.Timedelta('1 days 00:00:00')
+        pd.testing.assert_series_equal(
+            ranges.avg_duration(),
+            pd.Series(
+                np.array([86400000000000, 259200000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=wrapper.columns
+            ).rename('avg_duration')
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped.avg_duration(),
+            pd.Series(
+                np.array([129600000000000, 259200000000000], dtype='timedelta64[ns]'),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('avg_duration')
+        )
+
+    def test_max_duration(self):
+        assert ranges['a'].max_duration() == pd.Timedelta('1 days 00:00:00')
+        pd.testing.assert_series_equal(
+            ranges.max_duration(),
+            pd.Series(
+                np.array([86400000000000, 259200000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=wrapper.columns
+            ).rename('max_duration')
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped.max_duration(),
+            pd.Series(
+                np.array([259200000000000, 259200000000000], dtype='timedelta64[ns]'),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('max_duration')
+        )
+
+    def test_coverage(self):
+        assert ranges['a'].coverage() == 0.5
+        pd.testing.assert_series_equal(
+            ranges.coverage(),
+            pd.Series(
+                np.array([0.5, 0.5, 0.5, np.nan]),
+                index=ts2.columns
+            ).rename('coverage')
+        )
+        pd.testing.assert_series_equal(
+            ranges.coverage(),
+            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage()
+        )
+        pd.testing.assert_series_equal(
+            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True),
+            pd.Series(
+                np.array([1.0, 1.0, 1.0, np.nan]),
+                index=ts2.columns
+            ).rename('coverage')
+        )
+        pd.testing.assert_series_equal(
+            ranges.coverage(normalize=False),
+            pd.Series(
+                np.array([3.0, 3.0, 3.0, np.nan]),
+                index=ts2.columns
+            ).rename('coverage')
+        )
+        pd.testing.assert_series_equal(
+            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True, normalize=False),
+            pd.Series(
+                np.array([3.0, 3.0, 3.0, np.nan]),
+                index=ts2.columns
+            ).rename('coverage')
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped.coverage(),
+            pd.Series(
+                np.array([0.4166666666666667, 0.25]),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('coverage')
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped.coverage(),
+            ranges_grouped.copy(records_arr=np.repeat(ranges_grouped.values, 2)).coverage()
+        )
+
+    def test_stats(self):
+        stats_index = pd.Index([
+            'Start', 'End', 'Period', 'Coverage', 'Overlap Coverage',
+            'Total Records', 'Duration: Min', 'Duration: Median', 'Duration: Max',
+            'Duration: Mean', 'Duration: Std'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            ranges.stats(),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), pd.Timedelta('3 days 00:00:00'),
+                pd.Timedelta('0 days 00:00:00'), 1.25, pd.Timedelta('2 days 08:00:00'),
+                pd.Timedelta('2 days 08:00:00'), pd.Timedelta('2 days 08:00:00'),
+                pd.Timedelta('2 days 08:00:00'), pd.Timedelta('0 days 00:00:00')
+            ],
+                index=stats_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            ranges.stats(column='a'),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), pd.Timedelta('3 days 00:00:00'),
+                pd.Timedelta('0 days 00:00:00'), 3, pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('0 days 00:00:00')
+            ],
+                index=stats_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            ranges.stats(column='g1', group_by=group_by),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), pd.Timedelta('5 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), 4, pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('3 days 00:00:00'),
+                pd.Timedelta('1 days 12:00:00'), pd.Timedelta('1 days 00:00:00')
+            ],
+                index=stats_index,
+                name='g1'
+            )
+        )
+        pd.testing.assert_series_equal(
+            ranges['c'].stats(),
+            ranges.stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            ranges['c'].stats(),
+            ranges.stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped['g2'].stats(),
+            ranges_grouped.stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            ranges_grouped['g2'].stats(),
+            ranges.stats(column='g2', group_by=group_by)
+        )
+        stats_df = ranges.stats(agg_func=None)
+        assert stats_df.shape == (4, 11)
+        pd.testing.assert_index_equal(stats_df.index, ranges.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
 # ############# drawdowns.py ############# #
 
 
-ts = pd.DataFrame({
+ts2 = pd.DataFrame({
     'a': [2, 1, 3, 1, 4, 1],
     'b': [1, 2, 1, 3, 1, 4],
     'c': [1, 2, 3, 2, 1, 2],
@@ -1543,8 +1818,8 @@ ts = pd.DataFrame({
     datetime(2020, 1, 6)
 ])
 
-drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
-drawdowns_grouped = vbt.Drawdowns.from_ts(ts, freq='1 days', group_by=group_by)
+drawdowns = vbt.Drawdowns.from_ts(ts2, wrapper_kwargs=dict(freq='1 days'))
+drawdowns_grouped = vbt.Drawdowns.from_ts(ts2, wrapper_kwargs=dict(freq='1 days', group_by=group_by))
 
 
 class TestDrawdowns:
@@ -1555,17 +1830,31 @@ class TestDrawdowns:
                 drawdowns.values[name]
             )
 
+    def test_ts(self):
+        pd.testing.assert_frame_equal(
+            drawdowns.ts,
+            ts2
+        )
+        pd.testing.assert_series_equal(
+            drawdowns['a'].ts,
+            ts2['a']
+        )
+        pd.testing.assert_frame_equal(
+            drawdowns_grouped['g1'].ts,
+            ts2[['a', 'b']]
+        )
+        assert drawdowns.copy(ts=None)['a'].ts is None
+
     def test_from_ts(self):
         record_arrays_close(
             drawdowns.values,
             np.array([
-                (0, 0, 0, 1, 2, 1), (1, 0, 2, 3, 4, 1), (2, 0, 4, 5, 5, 0), (3, 1, 1, 2, 3, 1),
-                (4, 1, 3, 4, 5, 1), (5, 2, 2, 4, 5, 0)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1),
+                (2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (3, 1, 1, 2, 2, 3, 2.0, 1.0, 2.0, 1),
+                (4, 1, 3, 4, 4, 5, 3.0, 1.0, 3.0, 1), (5, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)
             ], dtype=drawdown_dt)
         )
-        pd.testing.assert_frame_equal(drawdowns.ts, ts)
         assert drawdowns.wrapper.freq == day_dt
-        assert drawdowns.idx_field == 'end_idx'
         pd.testing.assert_index_equal(
             drawdowns_grouped.wrapper.grouper.group_by,
             group_by
@@ -1587,11 +1876,19 @@ class TestDrawdowns:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Start Date'].values,
+            records_readable['Peak Date'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
                 '2020-01-05T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
                 '2020-01-04T00:00:00.000000000', '2020-01-03T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Start Date'].values,
+            np.array([
+                '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-04T00:00:00.000000000'
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
@@ -1611,40 +1908,28 @@ class TestDrawdowns:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
+            records_readable['Peak Value'].values,
+            np.array([
+                2., 3., 4., 2., 3., 3.
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Valley Value'].values,
+            np.array([
+                1., 1., 1., 1., 1., 1.
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['End Value'].values,
+            np.array([
+                2., 3., 1., 2., 3., 2.
+            ])
+        )
+        np.testing.assert_array_equal(
             records_readable['Status'].values,
             np.array([
                 'Recovered', 'Recovered', 'Active', 'Recovered', 'Recovered', 'Active'
             ])
-        )
-
-    def test_start_value(self):
-        np.testing.assert_array_equal(
-            drawdowns['a'].start_value.values,
-            np.array([2., 3., 4.])
-        )
-        np.testing.assert_array_equal(
-            drawdowns.start_value.values,
-            np.array([2., 3., 4., 2., 3., 3.])
-        )
-
-    def test_valley_value(self):
-        np.testing.assert_array_equal(
-            drawdowns['a'].valley_value.values,
-            np.array([1., 1., 1.])
-        )
-        np.testing.assert_array_equal(
-            drawdowns.valley_value.values,
-            np.array([1., 1., 1., 1., 1., 1.])
-        )
-
-    def test_end_value(self):
-        np.testing.assert_array_equal(
-            drawdowns['a'].end_value.values,
-            np.array([3., 4., 1.])
-        )
-        np.testing.assert_array_equal(
-            drawdowns.end_value.values,
-            np.array([3., 4., 1., 3., 4., 2.])
         )
 
     def test_drawdown(self):
@@ -1667,8 +1952,8 @@ class TestDrawdowns:
                     [-0.66666669, np.nan, np.nan, np.nan],
                     [-0.75, -0.66666669, -0.66666669, np.nan]
                 ]),
-                index=ts.index,
-                columns=ts.columns
+                index=ts2.index,
+                columns=ts2.columns
             )
         )
 
@@ -1706,63 +1991,122 @@ class TestDrawdowns:
             ).rename('max_drawdown')
         )
 
+    def test_recovery_return(self):
+        np.testing.assert_array_almost_equal(
+            drawdowns['a'].recovery_return.values,
+            np.array([1., 2., 0.])
+        )
+        np.testing.assert_array_almost_equal(
+            drawdowns.recovery_return.values,
+            np.array([1., 2., 0., 1., 2., 1.])
+        )
+        pd.testing.assert_frame_equal(
+            drawdowns.recovery_return.to_pd(),
+            pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [1.0, np.nan, np.nan, np.nan],
+                    [np.nan, 1.0, np.nan, np.nan],
+                    [2.0, np.nan, np.nan, np.nan],
+                    [0.0, 2.0, 1.0, np.nan]
+                ]),
+                index=ts2.index,
+                columns=ts2.columns
+            )
+        )
+
+    def test_avg_recovery_return(self):
+        assert drawdowns['a'].avg_recovery_return() == 1.0
+        pd.testing.assert_series_equal(
+            drawdowns.avg_recovery_return(),
+            pd.Series(
+                np.array([1.0, 1.5, 1.0, np.nan]),
+                index=wrapper.columns
+            ).rename('avg_recovery_return')
+        )
+        pd.testing.assert_series_equal(
+            drawdowns_grouped.avg_recovery_return(),
+            pd.Series(
+                np.array([1.2, 1.0]),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('avg_recovery_return')
+        )
+
+    def test_max_recovery_return(self):
+        assert drawdowns['a'].max_recovery_return() == 2.0
+        pd.testing.assert_series_equal(
+            drawdowns.max_recovery_return(),
+            pd.Series(
+                np.array([2.0, 2.0, 1.0, np.nan]),
+                index=wrapper.columns
+            ).rename('max_recovery_return')
+        )
+        pd.testing.assert_series_equal(
+            drawdowns_grouped.max_recovery_return(),
+            pd.Series(
+                np.array([2.0, 1.0]),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('max_recovery_return')
+        )
+
     def test_duration(self):
         np.testing.assert_array_almost_equal(
             drawdowns['a'].duration.values,
-            np.array([2., 2., 1.])
+            np.array([1, 1, 1])
         )
         np.testing.assert_array_almost_equal(
             drawdowns.duration.values,
-            np.array([2., 2., 1., 2., 2., 3.])
+            np.array([1, 1, 1, 1, 1, 3])
         )
 
     def test_avg_duration(self):
-        assert drawdowns['a'].avg_duration() == np.timedelta64(144000000000000)
+        assert drawdowns['a'].avg_duration() == pd.Timedelta('1 days 00:00:00')
         pd.testing.assert_series_equal(
             drawdowns.avg_duration(),
             pd.Series(
-                np.array([144000000000000, 172800000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
+                np.array([86400000000000, 86400000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=wrapper.columns
             ).rename('avg_duration')
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.avg_duration(),
             pd.Series(
-                np.array([155520000000000, 259200000000000], dtype='timedelta64[ns]'),
+                np.array([86400000000000, 259200000000000], dtype='timedelta64[ns]'),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('avg_duration')
         )
 
     def test_max_duration(self):
-        assert drawdowns['a'].max_duration() == np.timedelta64(172800000000000)
+        assert drawdowns['a'].max_duration() == pd.Timedelta('1 days 00:00:00')
         pd.testing.assert_series_equal(
             drawdowns.max_duration(),
             pd.Series(
-                np.array([172800000000000, 172800000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
+                np.array([86400000000000, 86400000000000, 259200000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=wrapper.columns
             ).rename('max_duration')
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.max_duration(),
             pd.Series(
-                np.array([172800000000000, 259200000000000], dtype='timedelta64[ns]'),
+                np.array([86400000000000, 259200000000000], dtype='timedelta64[ns]'),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('max_duration')
         )
 
     def test_coverage(self):
-        assert drawdowns['a'].coverage() == 0.8333333333333334
+        assert drawdowns['a'].coverage() == 0.5
         pd.testing.assert_series_equal(
             drawdowns.coverage(),
             pd.Series(
-                np.array([0.83333333, 0.66666667, 0.5, 0.]),
-                index=ts.columns
+                np.array([0.5, 0.3333333333333333, 0.5, np.nan]),
+                index=ts2.columns
             ).rename('coverage')
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.coverage(),
             pd.Series(
-                np.array([0.75, 0.25]),
+                np.array([0.4166666666666667, 0.25]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('coverage')
         )
@@ -1777,13 +2121,33 @@ class TestDrawdowns:
             np.array([1., 1., 1., 1., 1., 2.])
         )
 
+    def test_recovery_duration(self):
+        np.testing.assert_array_almost_equal(
+            drawdowns['a'].recovery_duration.values,
+            np.array([1, 1, 0])
+        )
+        np.testing.assert_array_almost_equal(
+            drawdowns.recovery_duration.values,
+            np.array([1, 1, 0, 1, 1, 1])
+        )
+
+    def test_recovery_duration_ratio(self):
+        np.testing.assert_array_almost_equal(
+            drawdowns['a'].recovery_duration_ratio.values,
+            np.array([1., 1., 0.])
+        )
+        np.testing.assert_array_almost_equal(
+            drawdowns.recovery_duration_ratio.values,
+            np.array([1., 1., 0., 1., 1., 0.5])
+        )
+
     def test_active_records(self):
         assert isinstance(drawdowns.active, vbt.Drawdowns)
         assert drawdowns.active.wrapper == drawdowns.wrapper
         record_arrays_close(
             drawdowns['a'].active.values,
             np.array([
-                (2, 0, 4, 5, 5, 0)
+                (2, 0, 4, 5, 5, 5, 4., 1., 1., 0)
             ], dtype=drawdown_dt)
         )
         record_arrays_close(
@@ -1793,25 +2157,8 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns.active.values,
             np.array([
-                (2, 0, 4, 5, 5, 0), (5, 2, 2, 4, 5, 0)
+                (2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (5, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)
             ], dtype=drawdown_dt)
-        )
-
-    def test_active_rate(self):
-        assert drawdowns['a'].active_rate() == 0.3333333333333333
-        pd.testing.assert_series_equal(
-            drawdowns.active_rate(),
-            pd.Series(
-                np.array([0.3333333333333333, 0., 1., np.nan]),
-                index=ts.columns
-            ).rename('active_rate')
-        )
-        pd.testing.assert_series_equal(
-            drawdowns_grouped.active_rate(),
-            pd.Series(
-                np.array([0.2, 1.0]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('active_rate')
         )
 
     def test_recovered_records(self):
@@ -1820,7 +2167,7 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns['a'].recovered.values,
             np.array([
-                (0, 0, 0, 1, 2, 1), (1, 0, 2, 3, 4, 1)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1)
             ], dtype=drawdown_dt)
         )
         record_arrays_close(
@@ -1830,26 +2177,9 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns.recovered.values,
             np.array([
-                (0, 0, 0, 1, 2, 1), (1, 0, 2, 3, 4, 1), (3, 1, 1, 2, 3, 1),
-                (4, 1, 3, 4, 5, 1)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1),
+                (3, 1, 1, 2, 2, 3, 2.0, 1.0, 2.0, 1), (4, 1, 3, 4, 4, 5, 3.0, 1.0, 3.0, 1)
             ], dtype=drawdown_dt)
-        )
-
-    def test_recovered_rate(self):
-        assert drawdowns['a'].recovered_rate() == 0.6666666666666666
-        pd.testing.assert_series_equal(
-            drawdowns.recovered_rate(),
-            pd.Series(
-                np.array([0.66666667, 1., 0., np.nan]),
-                index=ts.columns
-            ).rename('recovered_rate')
-        )
-        pd.testing.assert_series_equal(
-            drawdowns_grouped.recovered_rate(),
-            pd.Series(
-                np.array([0.8, 0.0]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('recovered_rate')
         )
 
     def test_active_drawdown(self):
@@ -1861,7 +2191,7 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_drawdown')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_drawdown()
 
     def test_active_duration(self):
@@ -1873,8 +2203,20 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_duration')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_duration()
+
+    def test_active_recovery(self):
+        assert drawdowns['a'].active_recovery() == 0.
+        pd.testing.assert_series_equal(
+            drawdowns.active_recovery(),
+            pd.Series(
+                np.array([0., np.nan, 0.5, np.nan]),
+                index=wrapper.columns
+            ).rename('active_recovery')
+        )
+        with pytest.raises(Exception):
+            drawdowns_grouped.active_recovery()
 
     def test_active_recovery_return(self):
         assert drawdowns['a'].active_recovery_return() == 0.
@@ -1885,59 +2227,41 @@ class TestDrawdowns:
                 index=wrapper.columns
             ).rename('active_recovery_return')
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             drawdowns_grouped.active_recovery_return()
 
-    def test_recovery_return(self):
-        np.testing.assert_array_almost_equal(
-            drawdowns['a'].recovered.recovery_return.values,
-            np.array([2., 3.])
+    def test_active_recovery_duration(self):
+        assert drawdowns['a'].active_recovery_duration() == pd.Timedelta('0 days 00:00:00')
+        pd.testing.assert_series_equal(
+            drawdowns.active_recovery_duration(),
+            pd.Series(
+                np.array([0, 'NaT', 86400000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=wrapper.columns
+            ).rename('active_recovery_duration')
         )
-        np.testing.assert_array_almost_equal(
-            drawdowns.recovered.recovery_return.values,
-            np.array([2., 3., 2., 3.])
-        )
-
-    def test_recovery_duration(self):
-        np.testing.assert_array_almost_equal(
-            drawdowns['a'].recovered.recovery_duration.values,
-            np.array([1., 1.])
-        )
-        np.testing.assert_array_almost_equal(
-            drawdowns.recovered.recovery_duration.values,
-            np.array([1., 1., 1., 1.])
-        )
-
-    def test_recovery_duration_ratio(self):
-        np.testing.assert_array_almost_equal(
-            drawdowns['a'].recovered.recovery_duration_ratio.values,
-            np.array([0.5, 0.5])
-        )
-        np.testing.assert_array_almost_equal(
-            drawdowns.recovered.recovery_duration_ratio.values,
-            np.array([0.5, 0.5, 0.5, 0.5])
-        )
+        with pytest.raises(Exception):
+            drawdowns_grouped.active_recovery_duration()
 
     def test_stats(self):
         stats_index = pd.Index([
-            'Start', 'End', 'Period', 'Total Records', 'Total Recovered Drawdowns',
-            'Total Active Drawdowns', 'Active Drawdown [%]', 'Active Duration',
-            'Active Recovery [%]', 'Active Recovery Return [%]',
-            'Active Recovery Duration', 'Max Drawdown [%]', 'Avg Drawdown [%]',
-            'Max Drawdown Duration', 'Avg Drawdown Duration',
-            'Max Recovery Return [%]', 'Avg Recovery Return [%]',
-            'Max Recovery Duration', 'Avg Recovery Duration',
-            'Avg Recovery Duration Ratio'
+            'Start', 'End', 'Period', 'Coverage [%]', 'Total Records',
+            'Total Recovered Drawdowns', 'Total Active Drawdowns',
+            'Active Drawdown [%]', 'Active Duration', 'Active Recovery [%]',
+            'Active Recovery Return [%]', 'Active Recovery Duration',
+            'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+            'Avg Drawdown Duration', 'Max Recovery Return [%]',
+            'Avg Recovery Return [%]', 'Max Recovery Duration',
+            'Avg Recovery Duration', 'Avg Recovery Duration Ratio'
         ], dtype='object')
         pd.testing.assert_series_equal(
             drawdowns.stats(),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                pd.Timedelta('6 days 00:00:00'), 1.5, 1.0, 0.5, 54.166666666666664,
-                pd.Timedelta('2 days 00:00:00'), 25.0, 50.0, pd.Timedelta('0 days 12:00:00'),
-                66.66666666666666, 58.33333333333333, pd.Timedelta('2 days 00:00:00'),
-                pd.Timedelta('2 days 00:00:00'), 300.0, 250.0, pd.Timedelta('1 days 00:00:00'),
-                pd.Timedelta('1 days 00:00:00'), 0.5
+                pd.Timedelta('6 days 00:00:00'), 44.444444444444436, 1.5, 1.0, 0.5,
+                54.166666666666664, pd.Timedelta('2 days 00:00:00'), 25.0, 50.0,
+                pd.Timedelta('0 days 12:00:00'), 66.66666666666666, 58.33333333333333,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -1947,11 +2271,11 @@ class TestDrawdowns:
             drawdowns.stats(settings=dict(incl_active=True)),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                pd.Timedelta('6 days 00:00:00'), 1.5, 1.0, 0.5, 54.166666666666664,
-                pd.Timedelta('2 days 00:00:00'), 25.0, 50.0, pd.Timedelta('0 days 12:00:00'),
-                69.44444444444444, 62.962962962962955, pd.Timedelta('2 days 08:00:00'),
-                pd.Timedelta('2 days 05:20:00'), 300.0, 250.0, pd.Timedelta('1 days 00:00:00'),
-                pd.Timedelta('1 days 00:00:00'), 0.5
+                pd.Timedelta('6 days 00:00:00'), 44.444444444444436, 1.5, 1.0, 0.5,
+                54.166666666666664, pd.Timedelta('2 days 00:00:00'), 25.0, 50.0,
+                pd.Timedelta('0 days 12:00:00'), 69.44444444444444, 62.962962962962955,
+                pd.Timedelta('1 days 16:00:00'), pd.Timedelta('1 days 16:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -1961,10 +2285,10 @@ class TestDrawdowns:
             drawdowns.stats(column='a'),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                pd.Timedelta('6 days 00:00:00'), 3, 2, 1, 75.0, pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), 50.0, 3, 2, 1, 75.0, pd.Timedelta('1 days 00:00:00'),
                 0.0, 0.0, pd.Timedelta('0 days 00:00:00'), 66.66666666666666, 58.33333333333333,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 300.0, 250.0,
-                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 0.5
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
                 name='a'
@@ -1974,17 +2298,17 @@ class TestDrawdowns:
             drawdowns.stats(column='g1', group_by=group_by),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                pd.Timedelta('6 days 00:00:00'), 5, 4, 1, 66.66666666666666, 58.33333333333333,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 300.0, 250.0,
-                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 0.5
+                pd.Timedelta('6 days 00:00:00'), 41.66666666666667, 5, 4, 1, 66.66666666666666,
+                58.33333333333333, pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
+                200.0, 150.0, pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=pd.Index([
-                    'Start', 'End', 'Period', 'Total Records', 'Total Recovered Drawdowns',
-                    'Total Active Drawdowns', 'Max Drawdown [%]', 'Avg Drawdown [%]',
-                    'Max Drawdown Duration', 'Avg Drawdown Duration',
-                    'Max Recovery Return [%]', 'Avg Recovery Return [%]',
-                    'Max Recovery Duration', 'Avg Recovery Duration',
-                    'Avg Recovery Duration Ratio'
+                    'Start', 'End', 'Period', 'Coverage [%]', 'Total Records',
+                    'Total Recovered Drawdowns', 'Total Active Drawdowns',
+                    'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+                    'Avg Drawdown Duration', 'Max Recovery Return [%]',
+                    'Avg Recovery Return [%]', 'Max Recovery Duration',
+                    'Avg Recovery Duration', 'Avg Recovery Duration Ratio'
                 ], dtype='object'),
                 name='g1'
             )
@@ -2006,7 +2330,7 @@ class TestDrawdowns:
             drawdowns.stats(column='g2', group_by=group_by)
         )
         stats_df = drawdowns.stats(agg_func=None)
-        assert stats_df.shape == (4, 20)
+        assert stats_df.shape == (4, 21)
         pd.testing.assert_index_equal(stats_df.index, drawdowns.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
@@ -2039,6 +2363,21 @@ class TestOrders:
                 getattr(orders, name).values,
                 orders.values[name]
             )
+
+    def test_close(self):
+        pd.testing.assert_frame_equal(
+            orders.close,
+            close
+        )
+        pd.testing.assert_series_equal(
+            orders['a'].close,
+            close['a']
+        )
+        pd.testing.assert_frame_equal(
+            orders_grouped['g1'].close,
+            close[['a', 'b']]
+        )
+        assert orders.copy(close=None)['a'].close is None
 
     def test_records_readable(self):
         records_readable = orders.records_readable
@@ -2129,23 +2468,6 @@ class TestOrders:
             ], dtype=order_dt)
         )
 
-    def test_buy_rate(self):
-        assert orders['a'].buy_rate() == 0.5714285714285714
-        pd.testing.assert_series_equal(
-            orders.buy_rate(),
-            pd.Series(
-                np.array([0.57142857, 0.42857143, 0.57142857, np.nan]),
-                index=close.columns
-            ).rename('buy_rate')
-        )
-        pd.testing.assert_series_equal(
-            orders_grouped.buy_rate(),
-            pd.Series(
-                np.array([0.5, 0.57142857]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('buy_rate')
-        )
-
     def test_sell_records(self):
         assert isinstance(orders.sell, vbt.Orders)
         assert orders.sell.wrapper == orders.wrapper
@@ -2169,23 +2491,6 @@ class TestOrders:
                 (13, 7, 1, 2., 8., 0.16, 1), (16, 2, 2, 1., 3., 0.03, 1),
                 (17, 3, 2, 0.1, 4., 0.004, 1), (19, 6, 2, 2., 7., 0.14, 1)
             ], dtype=order_dt)
-        )
-
-    def test_sell_rate(self):
-        assert orders['a'].sell_rate() == 0.42857142857142855
-        pd.testing.assert_series_equal(
-            orders.sell_rate(),
-            pd.Series(
-                np.array([0.42857143, 0.57142857, 0.42857143, np.nan]),
-                index=close.columns
-            ).rename('sell_rate')
-        )
-        pd.testing.assert_series_equal(
-            orders_grouped.sell_rate(),
-            pd.Series(
-                np.array([0.5, 0.42857143]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('sell_rate')
         )
 
     def test_stats(self):
@@ -2274,6 +2579,21 @@ class TestTrades:
                     trades.values[name]
                 )
 
+    def test_close(self):
+        pd.testing.assert_frame_equal(
+            trades.close,
+            close
+        )
+        pd.testing.assert_series_equal(
+            trades['a'].close,
+            close['a']
+        )
+        pd.testing.assert_frame_equal(
+            trades_grouped['g1'].close,
+            close[['a', 'b']]
+        )
+        assert trades.copy(close=None)['a'].close is None
+
     def test_records_arr(self):
         record_arrays_close(
             trades.values,
@@ -2338,7 +2658,7 @@ class TestTrades:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Avg. Entry Price'].values,
+            records_readable['Avg Entry Price'].values,
             np.array([
                 1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
                 1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
@@ -2366,7 +2686,7 @@ class TestTrades:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Avg. Exit Price'].values,
+            records_readable['Avg Exit Price'].values,
             np.array([
                 3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 8.0
             ])
@@ -2418,11 +2738,11 @@ class TestTrades:
     def test_duration(self):
         np.testing.assert_array_almost_equal(
             trades['a'].duration.values,
-            np.array([2., 3., 1., 0.])
+            np.array([2, 3, 1, 1])
         )
         np.testing.assert_array_almost_equal(
             trades.duration.values,
-            np.array([2., 3., 1., 0., 2., 3., 1., 0., 2., 3., 1., 1., 0.])
+            np.array([2, 3, 1, 1, 2, 3, 1, 1, 2, 3, 1, 1, 1])
         )
 
     def test_winning_records(self):
@@ -2452,23 +2772,6 @@ class TestTrades:
             ], dtype=trade_dt)
         )
 
-    def test_win_rate(self):
-        assert trades['a'].win_rate() == 0.75
-        pd.testing.assert_series_equal(
-            trades.win_rate(),
-            pd.Series(
-                np.array([0.75, 0., 0.6, np.nan]),
-                index=close.columns
-            ).rename('win_rate')
-        )
-        pd.testing.assert_series_equal(
-            trades_grouped.win_rate(),
-            pd.Series(
-                np.array([0.375, 0.6]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('win_rate')
-        )
-
     def test_losing_records(self):
         assert isinstance(trades.losing, vbt.Trades)
         assert trades.losing.wrapper == trades.wrapper
@@ -2495,21 +2798,21 @@ class TestTrades:
             ], dtype=trade_dt)
         )
 
-    def test_loss_rate(self):
-        assert trades['a'].loss_rate() == 0.25
+    def test_win_rate(self):
+        assert trades['a'].win_rate() == 0.75
         pd.testing.assert_series_equal(
-            trades.loss_rate(),
+            trades.win_rate(),
             pd.Series(
-                np.array([0.25, 1., 0.4, np.nan]),
+                np.array([0.75, 0., 0.6, np.nan]),
                 index=close.columns
-            ).rename('loss_rate')
+            ).rename('win_rate')
         )
         pd.testing.assert_series_equal(
-            trades_grouped.loss_rate(),
+            trades_grouped.win_rate(),
             pd.Series(
-                np.array([0.625, 0.4]),
+                np.array([0.375, 0.6]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('loss_rate')
+            ).rename('win_rate')
         )
 
     def test_winning_streak(self):
@@ -2538,7 +2841,7 @@ class TestTrades:
             trades.profit_factor(),
             pd.Series(
                 np.array([18.9, 0., 2.45853659, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('profit_factor')
         )
         pd.testing.assert_series_equal(
@@ -2555,7 +2858,7 @@ class TestTrades:
             trades.expectancy(),
             pd.Series(
                 np.array([0.716, -0.884, 0.3588, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('expectancy')
         )
         pd.testing.assert_series_equal(
@@ -2572,7 +2875,7 @@ class TestTrades:
             trades.sqn(),
             pd.Series(
                 np.array([1.63415552, -2.13007307, 0.71660403, np.nan]),
-                index=ts.columns
+                index=ts2.columns
             ).rename('sqn')
         )
         pd.testing.assert_series_equal(
@@ -2613,23 +2916,6 @@ class TestTrades:
             ], dtype=trade_dt)
         )
 
-    def test_long_rate(self):
-        assert trades['a'].long_rate() == 1.0
-        pd.testing.assert_series_equal(
-            trades.long_rate(),
-            pd.Series(
-                np.array([1., 0., 0.8, np.nan]),
-                index=close.columns
-            ).rename('long_rate')
-        )
-        pd.testing.assert_series_equal(
-            trades_grouped.long_rate(),
-            pd.Series(
-                np.array([0.5, 0.8]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('long_rate')
-        )
-
     def test_short_records(self):
         assert isinstance(trades.short, vbt.Trades)
         assert trades.short.wrapper == trades.wrapper
@@ -2652,23 +2938,6 @@ class TestTrades:
             ], dtype=trade_dt)
         )
 
-    def test_short_rate(self):
-        assert trades['a'].short_rate() == 0.
-        pd.testing.assert_series_equal(
-            trades.short_rate(),
-            pd.Series(
-                np.array([0., 1., 0.2, np.nan]),
-                index=close.columns
-            ).rename('short_rate')
-        )
-        pd.testing.assert_series_equal(
-            trades_grouped.short_rate(),
-            pd.Series(
-                np.array([0.5, 0.2]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('short_rate')
-        )
-
     def test_open_records(self):
         assert isinstance(trades.open, vbt.Trades)
         assert trades.open.wrapper == trades.wrapper
@@ -2689,23 +2958,6 @@ class TestTrades:
                 (7, 1, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 1, 0, 5),
                 (12, 2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 9)
             ], dtype=trade_dt)
-        )
-
-    def test_open_rate(self):
-        assert trades['a'].open_rate() == 0.25
-        pd.testing.assert_series_equal(
-            trades.open_rate(),
-            pd.Series(
-                np.array([0.25, 0.25, 0.2, np.nan]),
-                index=close.columns
-            ).rename('open_rate')
-        )
-        pd.testing.assert_series_equal(
-            trades_grouped.open_rate(),
-            pd.Series(
-                np.array([0.25, 0.2]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('open_rate')
         )
 
     def test_closed_records(self):
@@ -2739,39 +2991,23 @@ class TestTrades:
             ], dtype=trade_dt)
         )
 
-    def test_closed_rate(self):
-        assert trades['a'].closed_rate() == 0.75
-        pd.testing.assert_series_equal(
-            trades.closed_rate(),
-            pd.Series(
-                np.array([0.75, 0.75, 0.8, np.nan]),
-                index=close.columns
-            ).rename('closed_rate')
-        )
-        pd.testing.assert_series_equal(
-            trades_grouped.closed_rate(),
-            pd.Series(
-                np.array([0.75, 0.8]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('closed_rate')
-        )
-
     def test_stats(self):
         stats_index = pd.Index([
             'Start', 'End', 'Period', 'First Trade Start', 'Last Trade End',
-            'Total Records', 'Total Long Trades', 'Total Short Trades',
-            'Total Closed Trades', 'Total Open Trades', 'Open Trade P&L',
-            'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak', 'Best Trade [%]',
-            'Worst Trade [%]', 'Avg Winning Trade [%]', 'Avg Losing Trade [%]',
-            'Avg Winning Trade Duration', 'Avg Losing Trade Duration',
-            'Profit Factor', 'Expectancy', 'SQN'
+            'Coverage', 'Overlap Coverage', 'Total Records', 'Total Long Trades',
+            'Total Short Trades', 'Total Closed Trades', 'Total Open Trades',
+            'Open Trade PnL', 'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
+            'Best Trade [%]', 'Worst Trade [%]', 'Avg Winning Trade [%]',
+            'Avg Losing Trade [%]', 'Avg Winning Trade Duration',
+            'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy', 'SQN'
         ], dtype='object')
         pd.testing.assert_series_equal(
             trades.stats(),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 3.25, 2.0, 1.25, 2.5, 0.75, -0.1,
+                pd.Timestamp('2020-01-08 00:00:00'), pd.Timedelta('5 days 08:00:00'),
+                pd.Timedelta('2 days 00:00:00'), 3.25, 2.0, 1.25, 2.5, 0.75, -0.1,
                 58.333333333333336, 2.0, 1.3333333333333333, 168.38888888888889,
                 -91.08730158730158, 149.25, -86.3670634920635, pd.Timedelta('2 days 00:00:00'),
                 pd.Timedelta('1 days 12:00:00'), np.inf, 0.11705555555555548, 0.18931590012681135
@@ -2785,10 +3021,11 @@ class TestTrades:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 3.25, 2.0, 1.25, 2.5, 0.75, -0.1,
-                45.0, 2.0, 2.3333333333333335, 174.33333333333334, -96.25396825396825,
-                149.25, -42.39781746031746, pd.Timedelta('2 days 00:00:00'), pd.Timedelta('0 days 16:00:00'),
-                7.11951219512195, 0.06359999999999993, 0.07356215977397455
+                pd.Timestamp('2020-01-08 00:00:00'), pd.Timedelta('5 days 08:00:00'),
+                pd.Timedelta('2 days 00:00:00'), 3.25, 2.0, 1.25, 2.5, 0.75, -0.1,
+                58.333333333333336, 2.0, 2.3333333333333335, 174.33333333333334,
+                -96.25396825396825, 149.25, -42.39781746031746, pd.Timedelta('2 days 00:00:00'),
+                pd.Timedelta('1 days 06:00:00'), 7.11951219512195, 0.06359999999999993, 0.07356215977397455
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -2799,8 +3036,9 @@ class TestTrades:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 4, 4, 0, 3, 1, -0.16, 100.0, 3,
-                0, 262.0, 14.499999999999998, 149.25, np.nan, pd.Timedelta('2 days 00:00:00'),
+                pd.Timestamp('2020-01-08 00:00:00'), pd.Timedelta('5 days 00:00:00'),
+                pd.Timedelta('2 days 00:00:00'), 4, 4, 0, 3, 1, -0.16, 100.0, 3, 0,
+                262.0, 14.499999999999998, 149.25, np.nan, pd.Timedelta('2 days 00:00:00'),
                 pd.NaT, np.inf, 1.008, 2.181955050824476
             ],
                 index=stats_index,
@@ -2812,14 +3050,25 @@ class TestTrades:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 8, 4, 4, 6, 2, -0.32, 50.0, 3, 3,
-                262.0, -271.3333333333333, 149.25, -156.30555555555557,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 0.895734597156398,
-                -0.058666666666666756, -0.10439051512510047
+                pd.Timestamp('2020-01-08 00:00:00'), pd.Timedelta('5 days 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'), 8, 4, 4, 6, 2, -0.32, 50.0, 3, 3, 262.0,
+                -271.3333333333333, 149.25, -156.30555555555557, pd.Timedelta('2 days 00:00:00'),
+                pd.Timedelta('2 days 00:00:00'), 0.895734597156398, -0.058666666666666756, -0.10439051512510047
             ],
                 index=stats_index,
                 name='g1'
             )
+        )
+        pd.testing.assert_index_equal(
+            trades.stats(tags='trades').index,
+            pd.Index([
+                'First Trade Start', 'Last Trade End', 'Total Long Trades',
+                'Total Short Trades', 'Total Closed Trades', 'Total Open Trades',
+                'Open Trade PnL', 'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
+                'Best Trade [%]', 'Worst Trade [%]', 'Avg Winning Trade [%]',
+                'Avg Losing Trade [%]', 'Avg Winning Trade Duration',
+                'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy', 'SQN'
+            ], dtype='object')
         )
         pd.testing.assert_series_equal(
             trades['c'].stats(),
@@ -2838,21 +3087,9 @@ class TestTrades:
             trades.stats(column='g2', group_by=group_by)
         )
         stats_df = trades.stats(agg_func=None)
-        assert stats_df.shape == (4, 23)
+        assert stats_df.shape == (4, 25)
         pd.testing.assert_index_equal(stats_df.index, trades.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
-
-        pd.testing.assert_index_equal(
-            trades.stats(tags='trades').index,
-            pd.Index([
-                'First Trade Start', 'Last Trade End', 'Total Long Trades',
-                'Total Short Trades', 'Total Closed Trades', 'Total Open Trades',
-                'Open Trade P&L', 'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
-                'Best Trade [%]', 'Worst Trade [%]', 'Avg Winning Trade [%]',
-                'Avg Losing Trade [%]', 'Avg Winning Trade Duration',
-                'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy', 'SQN'
-            ], dtype='object')
-        )
 
 
 positions = vbt.Positions.from_trades(trades)
@@ -2872,6 +3109,21 @@ class TestPositions:
                     getattr(positions, name).values,
                     positions.values[name]
                 )
+
+    def test_close(self):
+        pd.testing.assert_frame_equal(
+            positions.close,
+            close
+        )
+        pd.testing.assert_series_equal(
+            positions['a'].close,
+            close['a']
+        )
+        pd.testing.assert_frame_equal(
+            positions_grouped['g1'].close,
+            close[['a', 'b']]
+        )
+        assert positions.copy(close=None)['a'].close is None
 
     def test_records_arr(self):
         record_arrays_close(
@@ -2931,7 +3183,7 @@ class TestPositions:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Avg. Entry Price'].values,
+            records_readable['Avg Entry Price'].values,
             np.array([
                 1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 7.0, 8.0
             ])
@@ -2953,7 +3205,7 @@ class TestPositions:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Avg. Exit Price'].values,
+            records_readable['Avg Exit Price'].values,
             np.array([
                 3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 8.0
             ])
@@ -2991,44 +3243,26 @@ class TestPositions:
             ])
         )
 
-    def test_coverage(self):
-        assert positions['a'].coverage() == 0.5
-        pd.testing.assert_series_equal(
-            positions.coverage(),
-            pd.Series(
-                np.array([0.5, 0.5, 0.625, 0.]),
-                index=close.columns
-            ).rename('coverage')
-        )
-        pd.testing.assert_series_equal(
-            positions_grouped.coverage(),
-            pd.Series(
-                np.array([0.5, 0.3125]),
-                index=pd.Index(['g1', 'g2'], dtype='object')
-            ).rename('coverage')
-        )
-
     def test_stats(self):
         stats_index = pd.Index([
-            'Start', 'End', 'Period', 'First Position Start', 'Last Position End',
+            'Start', 'End', 'Period', 'First Position Start', 'Last Position End', 'Coverage [%]',
             'Total Records', 'Total Long Positions', 'Total Short Positions',
-            'Total Closed Positions', 'Total Open Positions', 'Open Position P&L',
+            'Total Closed Positions', 'Total Open Positions', 'Open Position PnL',
             'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
             'Best Position [%]', 'Worst Position [%]', 'Avg Winning Position [%]',
             'Avg Losing Position [%]', 'Avg Winning Position Duration',
-            'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN',
-            'Coverage [%]'
+            'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN'
         ], dtype='object')
         pd.testing.assert_series_equal(
             positions.stats(),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
+                pd.Timestamp('2020-01-08 00:00:00'), 66.66666666666667, 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
                 55.55555555555555, 1.3333333333333333, 1.0, 113.38888888888891,
                 -63.031746031746046, 97.00000000000001, -59.714285714285715,
                 pd.Timedelta('2 days 00:00:00'), pd.Timedelta('1 days 12:00:00'), np.inf,
-                0.14955555555555547, -0.006787870702610184, 40.625
+                0.14955555555555547, -0.006787870702610184
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -3039,11 +3273,11 @@ class TestPositions:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
-                38.888888888888886, 1.3333333333333333, 2.0, 119.33333333333336,
+                pd.Timestamp('2020-01-08 00:00:00'), 66.66666666666667, 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
+                55.55555555555555, 1.3333333333333333, 2.0, 119.33333333333336,
                 -68.19841269841271, 97.00000000000001, -26.23809523809524,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('0 days 14:40:00'), 7.11951219512195,
-                0.0748333333333333, 0.036347069097538744, 40.625
+                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('1 days 05:20:00'), 7.11951219512195,
+                0.0748333333333333, 0.036347069097538744
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -3054,9 +3288,9 @@ class TestPositions:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 3, 3, 0, 2, 1, -0.16, 100.0, 2, 0,
+                pd.Timestamp('2020-01-08 00:00:00'), 62.5, 3, 3, 0, 2, 1, -0.16, 100.0, 2, 0,
                 179.50000000000003, 14.499999999999998, 97.00000000000001, np.nan,
-                pd.Timedelta('2 days 00:00:00'), pd.NaT, np.inf, 1.512, 2.355140186915887, 50.0
+                pd.Timedelta('2 days 00:00:00'), pd.NaT, np.inf, 1.512, 2.355140186915887
             ],
                 index=stats_index,
                 name='a'
@@ -3067,14 +3301,26 @@ class TestPositions:
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 6, 3, 3, 4, 2, -0.32, 50.0, 2, 2,
+                pd.Timestamp('2020-01-08 00:00:00'), 31.25, 6, 3, 3, 4, 2, -0.32, 50.0, 2, 2,
                 179.50000000000003, -187.16666666666669, 97.00000000000001, -103.0,
                 pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 0.895734597156398,
-                -0.08800000000000008, -0.08917040366737132, 50.0
+                -0.08800000000000008, -0.08917040366737132
             ],
                 index=stats_index,
                 name='g1'
             )
+        )
+        pd.testing.assert_index_equal(
+            positions.stats(tags='positions').index,
+            pd.Index([
+                'First Position Start', 'Last Position End', 'Total Long Positions',
+                'Total Short Positions', 'Total Closed Positions',
+                'Total Open Positions', 'Open Position PnL', 'Win Rate [%]',
+                'Max Win Streak', 'Max Loss Streak', 'Best Position [%]',
+                'Worst Position [%]', 'Avg Winning Position [%]',
+                'Avg Losing Position [%]', 'Avg Winning Position Duration',
+                'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN'
+            ], dtype='object')
         )
         pd.testing.assert_series_equal(
             positions['c'].stats(),
@@ -3097,22 +3343,9 @@ class TestPositions:
         pd.testing.assert_index_equal(stats_df.index, positions.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
-        pd.testing.assert_index_equal(
-            positions.stats(tags='positions').index,
-            pd.Index([
-                'First Position Start', 'Last Position End', 'Total Long Positions',
-                'Total Short Positions', 'Total Closed Positions',
-                'Total Open Positions', 'Open Position P&L', 'Win Rate [%]',
-                'Max Win Streak', 'Max Loss Streak', 'Best Position [%]',
-                'Worst Position [%]', 'Avg Winning Position [%]',
-                'Avg Losing Position [%]', 'Avg Winning Position Duration',
-                'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN',
-                'Coverage [%]'
-            ], dtype='object')
-        )
-
 
 # ############# logs.py ############# #
+
 logs = vbt.Portfolio.from_orders(close, size, fees=0.01, log=True, freq='1 days').logs
 logs_grouped = logs.regroup(group_by)
 
@@ -3129,14 +3362,14 @@ class TestLogs:
         records_readable = logs.records_readable
 
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Log Id')].values,
+            records_readable['Log Id'].values,
             np.array([
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
                 28, 29, 30, 31
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Date')].values,
+            records_readable['Date'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
                 '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
@@ -3157,20 +3390,20 @@ class TestLogs:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Column')].values,
+            records_readable['Column'].values,
             np.array([
                 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'c',
                 'c', 'c', 'c', 'd', 'd', 'd', 'd', 'd', 'd', 'd', 'd'
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Group')].values,
+            records_readable['Group'].values,
             np.array([
                 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Cash')].values,
+            records_readable['Cash'].values,
             np.array([
                 100.0, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 100.0, 100.99, 101.18799999999999,
                 98.15799999999999, 97.75399999999999, 97.75399999999999, 103.69399999999999, 96.624, 100.0, 98.99,
@@ -3179,7 +3412,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Position')].values,
+            records_readable['Position'].values,
             np.array([
                 0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
                 -1.0, 0.0, 0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -3187,14 +3420,14 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Debt')].values,
+            records_readable['Debt'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.2, 0.10909090909090913, 0.0, 0.0, 6.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Free Cash')].values,
+            records_readable['Free Cash'].values,
             np.array([
                 100.0, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 100.0, 98.99, 98.788,
                 97.93981818181818, 97.754, 97.754, 91.694, 96.624, 100.0, 98.99, 98.788, 101.758, 102.154, 102.154,
@@ -3202,14 +3435,14 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Val Price')].values,
+            records_readable['Val Price'].values,
             np.array([
                 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
                 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Value')].values,
+            records_readable['Value'].values,
             np.array([
                 100.0, 100.99, 102.088, 102.158, 102.154, 102.154, 103.094, 103.024, 100.0, 98.99, 97.88799999999999,
                 97.75799999999998, 97.75399999999999, 97.75399999999999, 96.69399999999999, 96.624, 100.0, 100.99,
@@ -3218,21 +3451,21 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Size')].values,
+            records_readable['Request Size'].values,
             np.array([
                 1.0, 0.1, -1.0, -0.1, np.nan, 1.0, -1.0, 2.0, -1.0, -0.1, 1.0, 0.1, np.nan, -1.0, 1.0, -2.0, 1.0, 0.1,
                 -1.0, -0.1, np.nan, 1.0, -2.0, 2.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Price')].values,
+            records_readable['Request Price'].values,
             np.array([
                 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
                 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Size Type')].values,
+            records_readable['Request Size Type'].values,
             np.array([
                 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount',
                 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount',
@@ -3241,7 +3474,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Direction')].values,
+            records_readable['Request Direction'].values,
             np.array([
                 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
                 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
@@ -3249,28 +3482,28 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Fees')].values,
+            records_readable['Request Fees'].values,
             np.array([
                 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01,
                 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Fixed Fees')].values,
+            records_readable['Request Fixed Fees'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Slippage')].values,
+            records_readable['Request Slippage'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Min Size')].values,
+            records_readable['Request Min Size'].values,
             np.array([
                 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08,
                 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08,
@@ -3278,7 +3511,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Max Size')].values,
+            records_readable['Request Max Size'].values,
             np.array([
                 np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
                 np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
@@ -3286,21 +3519,21 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Rejection Prob')].values,
+            records_readable['Request Rejection Prob'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Allow Partial')].values,
+            records_readable['Request Allow Partial'].values,
             np.array([
                 True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
                 True, True, True, True, True, True, True, True, True, True, True, True, True, True, True
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Raise Rejection')].values,
+            records_readable['Request Raise Rejection'].values,
             np.array([
                 False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
                 False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
@@ -3308,14 +3541,14 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order', 'Log')].values,
+            records_readable['Request Log'].values,
             np.array([
                 True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
                 True, True, True, True, True, True, True, True, True, True, True, True, True, True, True
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Cash')].values,
+            records_readable['New Cash'].values,
             np.array([
                 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 86.864, 100.99, 101.18799999999999,
                 98.15799999999999, 97.75399999999999, 97.75399999999999, 103.69399999999999, 96.624, 112.464, 98.99,
@@ -3324,7 +3557,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Position')].values,
+            records_readable['New Position'].values,
             np.array([
                 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 2.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
                 -1.0, 0.0, -2.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -3332,14 +3565,14 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Debt')].values,
+            records_readable['New Debt'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.2, 0.10909090909090913, 0.0, 0.0, 6.0, 0.0, 16.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Free Cash')].values,
+            records_readable['New Free Cash'].values,
             np.array([
                 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 86.864, 98.99, 98.788, 97.93981818181818,
                 97.754, 97.754, 91.694, 96.624, 80.464, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 95.954,
@@ -3347,14 +3580,14 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Val Price')].values,
+            records_readable['New Val Price'].values,
             np.array([
                 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
                 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Value')].values,
+            records_readable['New Value'].values,
             np.array([
                 100.0, 100.99, 102.088, 102.158, 102.154, 102.154, 103.094, 103.024, 100.0, 98.99, 97.88799999999999,
                 97.75799999999998, 97.75399999999999, 97.75399999999999, 96.69399999999999, 96.624, 100.0, 100.99,
@@ -3363,21 +3596,21 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Size')].values,
+            records_readable['Result Size'].values,
             np.array([
                 1.0, 0.1, 1.0, 0.1, np.nan, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0, 0.1, np.nan, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0,
                 0.1, np.nan, 1.0, 2.0, 2.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Price')].values,
+            records_readable['Result Price'].values,
             np.array([
                 1.0, 2.0, 3.0, 4.0, np.nan, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, np.nan, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0,
                 4.0, np.nan, 6.0, 7.0, 8.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Fees')].values,
+            records_readable['Result Fees'].values,
             np.array([
                 0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.07, 0.16,
                 0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.14, 0.16, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
@@ -3385,7 +3618,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Side')].values,
+            records_readable['Result Side'].values,
             np.array([
                 'Buy', 'Buy', 'Sell', 'Sell', None, 'Buy', 'Sell', 'Buy', 'Sell', 'Sell', 'Buy', 'Buy', None, 'Sell',
                 'Buy', 'Sell', 'Buy', 'Buy', 'Sell', 'Sell', None, 'Buy', 'Sell', 'Buy', None, None, None, None, None,
@@ -3393,7 +3626,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Status')].values,
+            records_readable['Result Status'].values,
             np.array([
                 'Filled', 'Filled', 'Filled', 'Filled', 'Ignored', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
                 'Filled', 'Filled', 'Ignored', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
@@ -3402,7 +3635,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Status Info')].values,
+            records_readable['Result Status Info'].values,
             np.array([
                 None, None, None, None, 'SizeNaN', None, None, None, None, None, None, None, 'SizeNaN', None, None,
                 None, None, None, None, None, 'SizeNaN', None, None, None, 'SizeNaN', 'SizeNaN', 'SizeNaN', 'SizeNaN',
@@ -3410,7 +3643,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Order Result', 'Order Id')].values,
+            records_readable['Order Id'].values,
             np.array([
                 0, 1, 2, 3, -1, 4, 5, 6, 7, 8, 9, 10, -1, 11, 12, 13, 14, 15, 16, 17, -1, 18, 19, 20, -1, -1, -1, -1,
                 -1, -1, -1, -1

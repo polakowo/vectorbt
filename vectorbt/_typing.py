@@ -133,9 +133,6 @@ GroupSqueezeFunc = Callable[[int, int, Array1d, VarArg()], R]
 
 # Signals
 ChoiceFunc = Callable[[int, int, int, VarArg()], Array1d]
-RangeMapMetaOutput = Tuple[Array1d, Array1d, Array1d]
-RangeMapMetaFunc = Callable[[VarArg()], RangeMapMetaOutput]
-RangeMapFunc = Callable[[int, int, int, VarArg()], float]
 RankFunc = Callable[[int, int, int, int, int, VarArg()], int]
 
 # Records
@@ -152,4 +149,4 @@ Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
 
 # Mappings
 Enum = NamedTuple
-MappingLike = Union[Mapping, Enum, IndexLike]
+MappingLike = Union[str, Mapping, Enum, IndexLike]

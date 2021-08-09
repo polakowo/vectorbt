@@ -30,7 +30,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
     def __init__(self):
-        checks.assert_type(self, Wrapping)
+        checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
         self._subplots = self.__class__._subplots.copy()
@@ -60,7 +60,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
     @property
     def subplots(self) -> Config:
-        """Subplots supported by `PlotBuilderMixin.plot`.
+        """Subplots supported by `${cls_name}`.
 
         ```json
         ${subplots}
@@ -663,6 +663,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         # Return the figure
         return fig
 
+    # ############# Docs ############# #
+
     @classmethod
     def build_subplots_doc(cls, source_cls: tp.Optional[type] = None) -> str:
         """Build subplots documentation."""
@@ -671,7 +673,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
         ).substitute(
-            {'subplots': cls.subplots.to_doc()}
+            {'subplots': cls.subplots.to_doc(), 'cls_name': cls.__name__}
         )
 
     @classmethod

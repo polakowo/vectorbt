@@ -65,7 +65,7 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import class_or_instancemethod, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.decorators import class_or_instancemethod, attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.column_grouper import ColumnGrouper
@@ -74,8 +74,8 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
-@add_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
-@add_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
+@attach_binary_magic_methods(lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
+@attach_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
 class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
 
@@ -88,7 +88,7 @@ class BaseAccessor(Wrapping):
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
-        checks.assert_type(obj, (pd.Series, pd.DataFrame))
+        checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
 
         self._obj = obj
 
@@ -342,7 +342,7 @@ class BaseAccessor(Wrapping):
         y  3  4  3  4
         ```
         """
-        checks.assert_type(other, (pd.Series, pd.DataFrame))
+        checks.assert_instance_of(other, (pd.Series, pd.DataFrame))
         obj = reshape_fns.to_2d(self.obj)
         other = reshape_fns.to_2d(other)
 
@@ -711,7 +711,7 @@ class BaseSRAccessor(BaseAccessor):
     Accessible through `pd.Series.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        checks.assert_type(obj, pd.Series)
+        checks.assert_instance_of(obj, pd.Series)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
@@ -730,7 +730,7 @@ class BaseDFAccessor(BaseAccessor):
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        checks.assert_type(obj, pd.DataFrame)
+        checks.assert_instance_of(obj, pd.DataFrame)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 

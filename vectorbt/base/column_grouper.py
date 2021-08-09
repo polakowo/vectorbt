@@ -127,7 +127,7 @@ class ColumnGrouper(Configured):
             allow_modify=allow_modify
         )
 
-        checks.assert_type(columns, pd.Index)
+        checks.assert_instance_of(columns, pd.Index)
         self._columns = columns
         if group_by is None or group_by is False:
             self._group_by = None

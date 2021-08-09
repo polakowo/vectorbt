@@ -4,7 +4,7 @@ RUN apt-get -y update && apt-get -y install gcc curl make
 
 RUN pip install --upgrade pip
 # Required by TA-Lib and numba
-RUN pip install numpy==1.19.4
+RUN pip install numpy>=1.19.4
 
 RUN curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz \
     && tar -xzf ta-lib-0.4.0-src.tar.gz \

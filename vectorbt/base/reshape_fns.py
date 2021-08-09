@@ -522,7 +522,7 @@ def broadcast(*args: tp.ArrayLike,
     if to_shape is not None:
         if isinstance(to_shape, int):
             to_shape = (to_shape,)
-        checks.assert_type(to_shape, tuple)
+        checks.assert_instance_of(to_shape, tuple)
         if len(to_shape) > 1:
             is_2d = True
 
@@ -725,7 +725,7 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
     """Get Series with a multi-index.
 
     If DataFrame has been passed, should at maximum have one row or column."""
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     if checks.is_frame(arg):
         if arg.shape[0] == 1:
             arg = arg.iloc[0, :]
@@ -733,7 +733,7 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
             arg = arg.iloc[:, 0]
         else:
             raise ValueError("Supported are either Series or DataFrame with one column/row")
-    checks.assert_type(arg.index, pd.MultiIndex)
+    checks.assert_instance_of(arg.index, pd.MultiIndex)
     return arg
 
 
@@ -819,11 +819,11 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
     d  2.0  4.0  NaN  NaN
     ```
     """
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     df: tp.Frame = to_2d(arg)
     if isinstance(df.index, pd.MultiIndex) or isinstance(df.columns, pd.MultiIndex):
-        checks.assert_type(df.index, pd.MultiIndex)
-        checks.assert_type(df.columns, pd.MultiIndex)
+        checks.assert_instance_of(df.index, pd.MultiIndex)
+        checks.assert_instance_of(df.columns, pd.MultiIndex)
         checks.assert_array_equal(df.index.nlevels, df.columns.nlevels)
         names1, names2 = tuple(df.index.names), tuple(df.columns.names)
     else:

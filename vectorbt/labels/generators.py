@@ -75,12 +75,13 @@ FMAX.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_max_a
 # ############# Label generators ############# #
 
 
-def _plot(self, **kwargs) -> tp.BaseFigure:  # pragma: no cover
-    """Plot `close` and overlay it with the heatmap of `labels`."""
-    if self.wrapper.ndim > 1:
-        raise TypeError("Select a column first. Use indexing.")
+def _plot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    """Plot `close` and overlay it with the heatmap of `labels`.
 
-    return self.close.rename('close').vbt.overlay_with_heatmap(self.labels.rename('labels'), **kwargs)
+    `**kwargs` are passed to `vectorbt.generic.accessors.GenericSRAccessor.overlay_with_heatmap`."""
+    self_col = self.select_one(column=column, group_by=False)
+
+    return self_col.close.rename('close').vbt.overlay_with_heatmap(self_col.labels.rename('labels'), **kwargs)
 
 
 FIXLB = IndicatorFactory(

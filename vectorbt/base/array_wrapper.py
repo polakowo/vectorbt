@@ -341,6 +341,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         index = index_fns.get_index(pd_obj, 0)
         columns = index_fns.get_index(pd_obj, 1)
         ndim = pd_obj.ndim
+        kwargs.pop('index', None)
+        kwargs.pop('columns', None)
+        kwargs.pop('ndim', None)
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod
@@ -427,8 +430,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return freq_to_timedelta(self.index.inferred_freq)
         return freq
 
-    def to_timedelta(self, a: tp.MaybeArray[float],
-                    silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, tp.Array]:
+    def to_timedelta(self, a: tp.MaybeArray[float], to_pd: bool = False,
+                     silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
@@ -441,6 +444,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
                               "define it globally under `settings.array_wrapper`.", stacklevel=2)
             return a
+        if to_pd:
+            return pd.to_timedelta(a * self.freq)
         return a * self.freq
 
     @property
@@ -507,8 +512,13 @@ class ArrayWrapper(Configured, PandasIndexer):
              silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
 
-        !!! note
-            Array will be converted to a NumPy array before wrapping."""
+        Runs the following pipeline:
+
+        1) Converts to NumPy array
+        2) Fills NaN (optional)
+        3) Wraps using index, columns, and dtype (optional)
+        4) Converts to index (optional)
+        5) Converts to timedelta using `ArrayWrapper.to_timedelta` (optional)"""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
 
@@ -577,7 +587,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
-        If `to_timedelta` is set, calls `ArrayWrapper.to_timedelta`."""
+        See `ArrayWrapper.wrap` for the pipeline."""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
 
@@ -656,6 +666,16 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
 
+    def fill(self, fill_value: tp.Scalar, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Fill a Series/DataFrame."""
+        _self = self.resolve(group_by=group_by)
+        return _self.wrap(np.full(_self.shape_2d, fill_value), **kwargs)
+
+    def fill_reduced(self, fill_value: tp.Scalar, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Fill a reduced Series/DataFrame."""
+        _self = self.resolve(group_by=group_by)
+        return _self.wrap(np.full(_self.shape_2d[1], fill_value), **kwargs)
+
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
@@ -664,7 +684,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
     """Class that uses `ArrayWrapper` globally."""
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
-        checks.assert_type(wrapper, ArrayWrapper)
+        checks.assert_instance_of(wrapper, ArrayWrapper)
         self._wrapper = wrapper
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
@@ -727,16 +747,40 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         return self
 
     def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
-        """Select one column/group."""
+        """Select one column/group.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
         _self = self.regroup(group_by, **kwargs)
+
+        def _check_out_dim(out: WrappingT) -> WrappingT:
+            if _self.wrapper.grouper.is_grouped():
+                if out.wrapper.grouped_ndim != 1:
+                    raise TypeError("Could not select one group: multiple groups returned")
+            else:
+                if out.wrapper.ndim != 1:
+                    raise TypeError("Could not select one column: multiple columns returned")
+            return out
+
         if column is not None:
             if _self.wrapper.grouper.is_grouped():
+                if _self.wrapper.grouped_ndim == 1:
+                    raise TypeError("This object already contains one group of data")
                 if column not in _self.wrapper.get_columns():
+                    if isinstance(column, int):
+                        if _self.wrapper.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Group '{column}' not found")
             else:
+                if _self.wrapper.ndim == 1:
+                    raise TypeError("This object already contains one column of data")
                 if column not in _self.wrapper.columns:
+                    if isinstance(column, int):
+                        if _self.wrapper.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Column '{column}' not found")
-            return _self[column]
+            return _check_out_dim(_self[column])
         if not _self.wrapper.grouper.is_grouped():
             if _self.wrapper.ndim == 1:
                 return _self
@@ -747,13 +791,25 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
     @staticmethod
     def select_one_from_obj(obj: tp.SeriesFrame, wrapper: ArrayWrapper, column: tp.Any = None) -> tp.MaybeSeries:
-        """Select one column/group from a pandas object."""
+        """Select one column/group from a pandas object.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
         if column is not None:
+            if wrapper.ndim == 1:
+                raise TypeError("This object already contains one column of data")
             if wrapper.grouper.is_grouped():
                 if column not in wrapper.get_columns():
+                    if isinstance(column, int):
+                        if isinstance(obj, pd.DataFrame):
+                            return obj.iloc[:, column]
+                        return obj.iloc[column]
                     raise KeyError(f"Group '{column}' not found")
             else:
                 if column not in wrapper.columns:
+                    if isinstance(column, int):
+                        if isinstance(obj, pd.DataFrame):
+                            return obj.iloc[:, column]
+                        return obj.iloc[column]
                     raise KeyError(f"Column '{column}' not found")
             return obj[column]
         if not wrapper.grouper.is_grouped():

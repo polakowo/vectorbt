@@ -126,11 +126,11 @@ z  12.0  15.0  18.0
 
 ## Filtering
 
-Use `MappedArray.filter_by_mask` to filter elements per column/group:
+Use `MappedArray.apply_mask` to filter elements per column/group:
 
 ```python-repl
 >>> mask = [True, False, True, False, True, False, True, False, True]
->>> filtered_ma = ma.filter_by_mask(mask)
+>>> filtered_ma = ma.apply_mask(mask)
 >>> filtered_ma.count()
 a    2
 b    1
@@ -149,7 +149,7 @@ You can build histograms and boxplots of `MappedArray` directly:
 >>> ma.boxplot()
 ```
 
-![](/vectorbt/docs/img/mapped_boxplot.svg)
+![](/docs/img/mapped_boxplot.svg)
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
@@ -157,7 +157,7 @@ To use scatterplots or any other plots that require index, convert to pandas fir
 >>> ma.to_pd().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/mapped_to_pd_plot.svg)
+![](/docs/img/mapped_to_pd_plot.svg)
 
 ## Grouping
 
@@ -338,7 +338,7 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.decorators import cached_method, attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.config import merge_dicts, Config, Configured
 from vectorbt.base.reshape_fns import to_1d_array, to_dict
@@ -373,8 +373,8 @@ def combine_mapped_with_other(self: MappedArrayT,
     return self.copy(mapped_arr=np_func(self.values, other))
 
 
-@add_binary_magic_methods(combine_mapped_with_other)
-@add_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
+@attach_binary_magic_methods(combine_mapped_with_other)
+@attach_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
 class MappedArray(Wrapping, StatsBuilderMixin):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
@@ -439,6 +439,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
         if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
 
         self._mapped_arr = mapped_arr
@@ -559,11 +564,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self: MappedArrayT,
-                       mask: tp.Array1d,
-                       idx_arr: tp.Optional[tp.Array1d] = None,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> MappedArrayT:
+    def apply_mask(self: MappedArrayT,
+                   mask: tp.Array1d,
+                   idx_arr: tp.Optional[tp.Array1d] = None,
+                   group_by: tp.GroupByLike = None,
+                   **kwargs) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
         `**kwargs` are passed to `MappedArray.copy`."""
@@ -598,12 +603,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter top N elements from each column/group."""
-        return self.filter_by_mask(self.top_n_mask(n), **kwargs)
+        return self.apply_mask(self.top_n_mask(n), **kwargs)
 
     @cached_method
     def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
-        return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
+        return self.apply_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
     def is_expandable(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
@@ -686,7 +691,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                returns_array: bool = False,
                returns_idx: bool = False,
                to_index: bool = True,
-               fill_value: float = np.nan,
+               fill_value: tp.Scalar = np.nan,
                group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column/group.
@@ -854,15 +859,15 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def sum(self, fill_value: float = 0., group_by: tp.GroupByLike = None,
+    def sum(self, fill_value: tp.Scalar = 0., group_by: tp.GroupByLike = None,
             wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         return self.reduce(
             generic_nb.sum_reduce_nb,
+            fill_value=fill_value,
             returns_array=False,
             returns_idx=False,
-            fill_value=fill_value,
             group_by=group_by,
             wrap_kwargs=wrap_kwargs,
             **kwargs
@@ -897,8 +902,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1,
-                 group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def describe(self,
+                 percentiles: tp.Optional[tp.ArrayLike] = None,
+                 ddof: int = 1,
+                 group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None,
+                 **kwargs) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
@@ -954,6 +963,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             Does not take into account missing values."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
@@ -993,6 +1008,23 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
+
+    @cached_method
+    def apply_mapping(self: MappedArrayT, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> MappedArrayT:
+        """Apply mapping on each element."""
+        if mapping is None:
+            mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        return self.copy(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
+
+    def to_index(self):
+        """Convert to index."""
+        return self.wrapper.index[self.values]
 
     # ############# Stats ############# #
 

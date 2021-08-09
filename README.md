@@ -3,7 +3,7 @@
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
 [![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
 [![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
-[![Website](https://img.shields.io/website?url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
+[![Website](https://img.shields.io/website?url=https://vectorbt.dev/)](https://vectorbt.dev/)
 [![Downloads](https://pepy.tech/badge/vectorbt)](https://pepy.tech/project/vectorbt)
 [![Binder](https://img.shields.io/badge/launch-binder-d6604a)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -171,7 +171,7 @@ Max Drawdown Duration                  760 days 00:00:00
 Total Trades                                          54
 Total Closed Trades                                   53
 Total Open Trades                                      1
-Open Trade P&L                              67287.940601
+Open Trade PnL                              67287.940601
 Win Rate [%]                                   52.830189
 Best Trade [%]                               1075.803607
 Worst Trade [%]                               -29.593414
@@ -208,7 +208,7 @@ def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
-        subplot_titles=(*symbols, '%B', 'Bandwidth'))
+        subplot_titles=('%B', 'Bandwidth'))
     fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=400)
     bbands.percent_b.vbt.ts_heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
@@ -437,6 +437,7 @@ sma_timeperiod    2    3
 Start                                        0
 End                                          7
 Period                         8 days 00:00:00
+Coverage [%]                              50.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
@@ -447,13 +448,13 @@ Active Recovery Return [%]               100.0
 Active Recovery Duration       1 days 00:00:00
 Max Drawdown [%]                     33.333333
 Avg Drawdown [%]                     33.333333
-Max Drawdown Duration          2 days 00:00:00
-Avg Drawdown Duration          2 days 00:00:00
+Max Drawdown Duration          1 days 00:00:00
+Avg Drawdown Duration          1 days 00:00:00
 Max Recovery Return [%]                   50.0
 Avg Recovery Return [%]                   50.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
-Avg Recovery Duration Ratio                0.5
+Avg Recovery Duration Ratio                1.0
 dtype: object
 ```
 
@@ -476,7 +477,7 @@ dtype: object
 
 ### Documentation
 
-Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
+Head over to the [documentation](https://vectorbt.dev/docs/index.html) to get started.
 
 ### Notebooks
 

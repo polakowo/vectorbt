@@ -28,8 +28,8 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
+from vectorbt.generic.enums import range_dt, RangeStatus
 from vectorbt.signals.enums import StopType
-from vectorbt.records import nb as records_nb
 
 
 # ############# Generation ############# #
@@ -1013,14 +1013,10 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
 
 
 @njit(cache=True)
-def map_meta_between_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two signals in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def between_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two signals in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -1028,28 +1024,26 @@ def map_meta_between_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                from_idxs_out[k] = from_i
-                to_idxs_out[k] = to_i
-                cols_out[k] = col
-                k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                range_records[ridx]['id'] = ridx
+                range_records[ridx]['col'] = col
+                range_records[ridx]['start_idx'] = from_i
+                range_records[ridx]['end_idx'] = to_i
+                range_records[ridx]['status'] = RangeStatus.Closed
+                ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_between_two_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two signals in `a` and `b`.
+def between_two_ranges_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two signals in `a` and `b`.
 
     If `from_other` is False, returns ranges from each in `a` to the succeeding in `b`.
     Otherwise, returns ranges from each in `b` to the preceding in `a`.
 
     When `a` and `b` overlap (two signals at the same time), the distance between overlapping
-    signals is still considered and `from_i` would match `to_i`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+    signals is still considered and `from_i` would match `to_i`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -1061,31 +1055,31 @@ def map_meta_between_two_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = Fal
                         valid_a_idxs = a_idxs[a_idxs <= to_i]
                         if len(valid_a_idxs) > 0:
                             from_i = valid_a_idxs[-1]  # preceding in a
-                            from_idxs_out[k] = from_i
-                            to_idxs_out[k] = to_i
-                            cols_out[k] = col
-                            k += 1
+                            range_records[ridx]['id'] = ridx
+                            range_records[ridx]['col'] = col
+                            range_records[ridx]['start_idx'] = from_i
+                            range_records[ridx]['end_idx'] = to_i
+                            range_records[ridx]['status'] = RangeStatus.Closed
+                            ridx += 1
                 else:
                     for j, from_i in enumerate(a_idxs):
                         valid_b_idxs = b_idxs[b_idxs >= from_i]
                         if len(valid_b_idxs) > 0:
                             to_i = valid_b_idxs[0]  # succeeding in b
-                            from_idxs_out[k] = from_i
-                            to_idxs_out[k] = to_i
-                            cols_out[k] = col
-                            k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                            range_records[ridx]['id'] = ridx
+                            range_records[ridx]['col'] = col
+                            range_records[ridx]['start_idx'] = from_i
+                            range_records[ridx]['end_idx'] = to_i
+                            range_records[ridx]['status'] = RangeStatus.Closed
+                            ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each partition of signals in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each partition of signals in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -1097,30 +1091,30 @@ def map_meta_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
                 is_partition = True
             elif is_partition:
                 to_i = i
-                from_idxs_out[k] = from_i
-                to_idxs_out[k] = to_i
-                cols_out[k] = col
-                k += 1
+                range_records[ridx]['id'] = ridx
+                range_records[ridx]['col'] = col
+                range_records[ridx]['start_idx'] = from_i
+                range_records[ridx]['end_idx'] = to_i
+                range_records[ridx]['status'] = RangeStatus.Closed
+                ridx += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
-                    to_i = a.shape[0]
-                    from_idxs_out[k] = from_i
-                    to_idxs_out[k] = to_i
-                    cols_out[k] = col
-                    k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                    to_i = a.shape[0] - 1
+                    range_records[ridx]['id'] = ridx
+                    range_records[ridx]['col'] = col
+                    range_records[ridx]['start_idx'] = from_i
+                    range_records[ridx]['end_idx'] = to_i
+                    range_records[ridx]['status'] = RangeStatus.Open
+                    ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_between_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two partitions in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def between_partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two partitions in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -1129,81 +1123,17 @@ def map_meta_between_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
             if a[i, col]:
                 if not is_partition and from_i != -1:
                     to_i = i
-                    from_idxs_out[k] = from_i
-                    to_idxs_out[k] = to_i
-                    cols_out[k] = col
-                    k += 1
+                    range_records[ridx]['id'] = ridx
+                    range_records[ridx]['col'] = col
+                    range_records[ridx]['start_idx'] = from_i
+                    range_records[ridx]['end_idx'] = to_i
+                    range_records[ridx]['status'] = RangeStatus.Closed
+                    ridx += 1
                 is_partition = True
                 from_i = i
             else:
                 is_partition = False
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
-
-
-@njit
-def range_map_meta_nb(from_idxs: tp.Array1d,
-                      to_idxs: tp.Array1d,
-                      cols: tp.Array2d,
-                      n_cols: int,
-                      range_map_func_nb: tp.RangeMapFunc,
-                      *args) -> tp.Array1d:
-    """Map meta of each range using `range_map_func_nb`.
-
-    Applies `range_map_func_nb` on each range `[from_i, to_i)`. Should accept index of the start of the
-    range `from_i`, index of the end of the range `to_i`, index of the column `col`, and `*range_map_args`.
-    """
-    out = np.full(cols.shape[0], np.nan, dtype=np.float_)
-    col_range = records_nb.col_range_nb(cols, n_cols)
-
-    for col in range(n_cols):
-        from_k = col_range[col, 0]
-        to_k = col_range[col, 1]
-        if from_k != -1 and to_k != -1:
-            for k in range(from_k, to_k):
-                out[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *args)
-    return out
-
-
-@njit
-def range_map_reduce_meta_nb(from_idxs: tp.Array1d,
-                             to_idxs: tp.Array1d,
-                             cols: tp.Array2d,
-                             n_cols: int,
-                             range_map_func_nb: tp.RangeMapFunc,
-                             range_map_args: tp.Args,
-                             reduce_func_nb: tp.ReduceFunc,
-                             reduce_args: tp.Args) -> tp.Array1d:
-    """Map meta of each range range_map_func_nb` and reduce per column using `reduce_func_nb`.
-
-    `range_map_func_nb` is the same as for `map_meta`.
-
-    Applies `reduce_func_nb` on all mapper results in a column. Should accept index of the column,
-    the array of results from `range_map_func_nb` for that column, and `*reduce_args`.
-    """
-    out = np.full(n_cols, np.nan, dtype=np.float_)
-    map_res = np.empty(cols.shape[0], dtype=np.float_)
-    col_range = records_nb.col_range_nb(cols, n_cols)
-
-    for col in range(n_cols):
-        from_k = col_range[col, 0]
-        to_k = col_range[col, 1]
-        if from_k != -1 and to_k != -1:
-            for k in range(from_k, to_k):
-                map_res[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *range_map_args)
-            out[col] = reduce_func_nb(col, map_res[from_k:to_k], *reduce_args)
-    return out
-
-
-@njit(cache=True)
-def range_len_map_nb(from_i: int, to_i: int, col: int) -> int:
-    """Range length mapper."""
-    return to_i - from_i
-
-
-@njit(cache=True)
-def range_count_map_nb(from_i: int, to_i: int, col: int) -> int:
-    """Range count mapper."""
-    return 1
+    return range_records[:ridx]
 
 
 # ############# Ranking ############# #

@@ -56,10 +56,10 @@ Consider the following example:
 >>> import vectorbt as vbt
 
 >>> example_dt = np.dtype([
-...     ('id', np.int64),
-...     ('idx', np.int64),
-...     ('col', np.int64),
-...     ('some_field', np.float64)
+...     ('id', np.int_),
+...     ('idx', np.int_),
+...     ('col', np.int_),
+...     ('some_field', np.float_)
 ... ])
 >>> records_arr = np.array([
 ...     (0, 0, 0, 10.),
@@ -147,11 +147,11 @@ Notice how cumsum resets at each column in the first example and at each group i
 
 ## Filtering
 
-Use `Records.filter_by_mask` to filter elements per column/group:
+Use `Records.apply_mask` to filter elements per column/group:
 
 ```python-repl
 >>> mask = [True, False, True, False, True, False, True, False, True]
->>> filtered_records = records.filter_by_mask(mask)
+>>> filtered_records = records.apply_mask(mask)
 >>> filtered_records.count()
 a    2
 b    1
@@ -283,15 +283,91 @@ Period           3 days 00:00:00
 Total Records                  6
 Name: first, dtype: object
 ```
+
+## Extending
+
+`Records` class can be extended by subclassing.
+
+In case some of our fields have the same meaning but different naming (such as the base field `idx`)
+or other properties, we can override `field_config` using `vectorbt.records.decorators.override_field_config`.
+It will look for configs of all base classes and merge our config on top of them. This preserves
+any base class property that is not explicitly listed in our config.
+
+```python-repl
+>>> import numpy as np
+>>> import pandas as pd
+>>> import vectorbt as vbt
+>>> from vectorbt.records.decorators import override_field_config
+
+>>> my_dt = np.dtype([
+...     ('my_id', np.int_),
+...     ('my_idx', np.int_),
+...     ('my_col', np.int_)
+... ])
+
+>>> my_fields_config = dict(
+...     dtype=my_dt,
+...     settings=dict(
+...         id=dict(name='my_id'),
+...         idx=dict(name='my_idx'),
+...         col=dict(name='my_col')
+...     )
+... )
+>>> @override_field_config(my_fields_config)
+... class MyRecords(vbt.Records):
+...     pass
+
+>>> records_arr = np.array([
+...     (0, 0, 0),
+...     (1, 1, 0),
+...     (2, 0, 1),
+...     (3, 1, 1)
+... ], dtype=my_dt)
+>>> wrapper = vbt.ArrayWrapper(index=['x', 'y'],
+...     columns=['a', 'b'], ndim=2, freq='1 day')
+>>> my_records = MyRecords(wrapper, records_arr)
+
+>>> my_records.id_arr
+array([0, 1, 2, 3])
+
+>>> my_records.col_arr
+array([0, 0, 1, 1])
+
+>>> my_records.idx_arr
+array([0, 1, 0, 1])
+```
+
+Alternatively, we can override the `_field_config` class attribute.
+
+```python-repl
+>>> @override_field_config
+... class MyRecords(vbt.Records):
+...     _field_config = dict(
+...         dtype=my_dt,
+...         settings=dict(
+...             id=dict(name='my_id'),
+...             idx=dict(name='my_idx'),
+...             col=dict(name='my_col')
+...         )
+...     )
+```
+
+!!! note
+    Don't forget to decorate the class with `@override_field_config` to inherit configs from base classes.
+
+    You can stop inheritance by not decorating or passing `merge_configs=False` to the decorator.
 """
 
 import numpy as np
 import pandas as pd
+import inspect
+import string
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.config import merge_dicts, Config, Configured
+from vectorbt.utils.attr import get_dict_attr
 from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.stats_builder import StatsBuilderMixin
@@ -299,13 +375,42 @@ from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.col_mapper import ColumnMapper
 
+__pdoc__ = {}
+
 RecordsT = tp.TypeVar("RecordsT", bound="Records")
 IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray, tp.Array1d]
 
 
-class Records(Wrapping, StatsBuilderMixin):
+class MetaFields(type):
+    """Meta class that exposes a read-only class property `MetaFields.field_config`."""
+
+    @property
+    def field_config(cls) -> Config:
+        """Field config."""
+        return cls._field_config
+
+
+class RecordsWithFields(metaclass=MetaFields):
+    """Class exposes a read-only class property `RecordsWithFields.field_config`."""
+
+    @property
+    def field_config(self) -> Config:
+        """Field config of `${cls_name}`.
+
+        ```json
+        ${field_config}
+        ```
+        """
+        return self._field_config
+
+
+class MetaRecords(type(StatsBuilderMixin), type(RecordsWithFields)):
+    pass
+
+
+class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaRecords):
     """Wraps the actual records array (such as trades) and exposes methods for mapping
-    it to some array of values (such as P&L of each trade).
+    it to some array of values (such as PnL of each trade).
 
     Args:
         wrapper (ArrayWrapper): Array wrapper.
@@ -314,10 +419,6 @@ class Records(Wrapping, StatsBuilderMixin):
         records_arr (array_like): A structured NumPy array of records.
 
             Must have the fields `id` (record index) and `col` (column index).
-        idx_field (str): The name of the field corresponding to the index. Optional.
-
-            Searches for a field with name 'idx' if `idx_field` is 'auto'.
-            Throws an error if the name was provided explicitly and the field cannot be found.
         col_mapper (ColumnMapper): Column mapper if already known.
 
             !!! note
@@ -329,36 +430,72 @@ class Records(Wrapping, StatsBuilderMixin):
 
             Useful if any subclass wants to extend the config.
     """
+
+    _field_config: tp.ClassVar[Config] = Config(
+        dict(
+            dtype=None,
+            settings=dict(
+                id=dict(
+                    name='id',
+                    title='Id'
+                ),
+                idx=dict(
+                    name='idx',
+                    title='Date',
+                    mapping='index'
+                ),
+                col=dict(
+                    name='col',
+                    title='Column',
+                    mapping='columns'
+                )
+            )
+        ),
+        readonly=True,
+        as_attrs=False
+    )
+
+    @property
+    def field_config(self) -> Config:
+        """Field config of `${cls_name}`.
+
+        ```json
+        ${field_config}
+        ```
+        """
+        return self._field_config
+
     def __init__(self,
                  wrapper: ArrayWrapper,
                  records_arr: tp.RecordArray,
-                 idx_field: str = 'auto',
                  col_mapper: tp.Optional[ColumnMapper] = None,
                  **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
             records_arr=records_arr,
-            idx_field=idx_field,
             col_mapper=col_mapper,
             **kwargs
         )
         StatsBuilderMixin.__init__(self)
 
+        # Check fields
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
-        checks.assert_in('id', records_arr.dtype.names)
-        checks.assert_in('col', records_arr.dtype.names)
-        if idx_field == 'auto':
-            if 'idx' in records_arr.dtype.names:
-                idx_field = 'idx'
-        elif idx_field is not None:
-            checks.assert_in(idx_field, records_arr.dtype.names)
+        field_names = {
+            dct.get('name', field_name)
+            for field_name, dct in self.field_config.get('settings', {}).items()
+        }
+        dtype = self.field_config.get('dtype', None)
+        if dtype is not None:
+            for field in dtype.names:
+                if field not in records_arr.dtype.names:
+                    if field not in field_names:
+                        raise TypeError(f"Field '{field}' from {dtype} cannot be found in records or config")
 
         self._records_arr = records_arr
-        self._idx_field = idx_field
         if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, records_arr['col'])
+            col_mapper = ColumnMapper(wrapper, self.col_arr)
         self._col_mapper = col_mapper
 
     def copy(self: RecordsT, **kwargs) -> RecordsT:
@@ -415,11 +552,6 @@ class Records(Wrapping, StatsBuilderMixin):
         return len(self.values)
 
     @property
-    def idx_field(self) -> str:
-        """Index field."""
-        return self._idx_field
-
-    @property
     def records(self) -> tp.Frame:
         """Records."""
         return pd.DataFrame.from_records(self.values)
@@ -435,12 +567,82 @@ class Records(Wrapping, StatsBuilderMixin):
         See `vectorbt.records.col_mapper.ColumnMapper`."""
         return self._col_mapper
 
+    @property
+    def records_readable(self) -> tp.Frame:
+        """Records in readable format."""
+        df = self.records.copy()
+        field_settings = self.field_config.get('settings', {})
+        for col_name in df.columns:
+            if col_name in field_settings:
+                dct = field_settings[col_name]
+                field_name = dct.get('name', col_name)
+                if 'title' in dct:
+                    title = dct['title']
+                    new_columns = dict()
+                    new_columns[field_name] = title
+                    df.rename(columns=new_columns, inplace=True)
+                else:
+                    title = field_name
+                if 'mapping' in dct:
+                    df[title] = self.map_field(col_name).apply_mapping(dct['mapping']).values
+        return df
+
+    def resolve_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
+        """Resolve any setting of the field. Uses `Records.field_config`."""
+        return self.field_config.get('settings', {}).get(field, {}).get(setting, default)
+
+    def resolve_field_name(self, field: str) -> str:
+        """Resolve the name of the field. Uses `Records.field_config`.."""
+        return self.resolve_field_setting(field, 'name', field)
+
+    def resolve_field_title(self, field: str) -> str:
+        """Resolve the title of the field. Uses `Records.field_config`."""
+        return self.resolve_field_setting(field, 'title', field)
+
+    def resolve_field_mapping(self, field: str) -> tp.Optional[tp.MappingLike]:
+        """Resolve the mapping of the field. Uses `Records.field_config`."""
+        return self.resolve_field_setting(field, 'mapping', None)
+
+    def resolve_field_arr(self, field: str) -> tp.Array1d:
+        """Resolve the array of the field. Uses `Records.field_config`."""
+        return self.values[self.resolve_field_name(field)]
+
+    def resolve_map_field(self, field: str, **kwargs) -> MappedArray:
+        """Resolve the mapped array of the field. Uses `Records.field_config`."""
+        return self.map_field(self.resolve_field_name(field), mapping=self.resolve_field_mapping(field), **kwargs)
+
+    def resolve_apply_mapping_arr(self, field: str, **kwargs) -> tp.Array1d:
+        """Resolve the mapped array on the field, with mapping applied. Uses `Records.field_config`."""
+        return self.resolve_map_field(field, **kwargs).apply_mapping().values
+
+    def resolve_map_field_to_index(self, field: str, **kwargs) -> tp.Index:
+        """Resolve the mapped array on the field, with index applied. Uses `Records.field_config`."""
+        return self.resolve_map_field(field, **kwargs).to_index()
+
+    @property
+    def id_arr(self) -> tp.Array1d:
+        """Get id array."""
+        return self.values[self.resolve_field_name('id')]
+
+    @property
+    def col_arr(self) -> tp.Array1d:
+        """Get column array."""
+        return self.values[self.resolve_field_name('col')]
+
+    @property
+    def idx_arr(self) -> tp.Optional[tp.Array1d]:
+        """Get index array."""
+        idx_field_name = self.resolve_field_name('idx')
+        if idx_field_name is None:
+            return None
+        return self.values[idx_field_name]
+
     @cached_method
     def is_sorted(self, incl_id: bool = False) -> bool:
         """Check whether records are sorted."""
         if incl_id:
-            return nb.is_col_idx_sorted_nb(self.values['col'], self.values['id'])
-        return nb.is_col_sorted_nb(self.values['col'])
+            return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
+        return nb.is_col_sorted_nb(self.col_arr)
 
     def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).
@@ -450,18 +652,18 @@ class Records(Wrapping, StatsBuilderMixin):
         if self.is_sorted(incl_id=incl_id):
             return self.copy(**kwargs).regroup(group_by)
         if incl_id:
-            ind = np.lexsort((self.values['id'], self.values['col']))  # expensive!
+            ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
-            ind = np.argsort(self.values['col'])
+            ind = np.argsort(self.col_arr)
         return self.copy(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
-    def filter_by_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
+    def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
         return self.copy(records_arr=self.values[mask], **kwargs).regroup(group_by)
 
     def map_array(self,
                   a: tp.ArrayLike,
-                  idx_field: tp.Optional[str] = None,
+                  idx_arr: tp.Optional[tp.ArrayLike] = None,
                   mapping: tp.Optional[tp.MappingLike] = None,
                   group_by: tp.GroupByLike = None,
                   **kwargs) -> MappedArray:
@@ -471,17 +673,13 @@ class Records(Wrapping, StatsBuilderMixin):
         if not isinstance(a, np.ndarray):
             a = np.asarray(a)
         checks.assert_shape_equal(a, self.values)
-        if idx_field is None:
-            idx_field = self.idx_field
-        if idx_field is not None:
-            idx_arr = self.values[idx_field]
-        else:
-            idx_arr = None
+        if idx_arr is None:
+            idx_arr = self.idx_arr
         return MappedArray(
             self.wrapper,
             a,
-            self.values['col'],
-            id_arr=self.values['id'],
+            self.col_arr,
+            id_arr=self.id_arr,
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=self.col_mapper,
@@ -589,6 +787,24 @@ class Records(Wrapping, StatsBuilderMixin):
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Docs ############# #
 
-__pdoc__ = dict()
+    @classmethod
+    def build_field_config_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build field config documentation."""
+        if source_cls is None:
+            source_cls = Records
+        return string.Template(
+            inspect.cleandoc(get_dict_attr(source_cls, 'field_config').__doc__)
+        ).substitute(
+            {'field_config': cls.field_config.to_doc(), 'cls_name': cls.__name__}
+        )
+
+    @classmethod
+    def override_field_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `field_config`."""
+        __pdoc__[cls.__name__ + '.field_config'] = cls.build_field_config_doc(source_cls=source_cls)
+
+
+Records.override_field_config_doc(__pdoc__)
 Records.override_metrics_doc(__pdoc__)

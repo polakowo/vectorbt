@@ -86,7 +86,7 @@ class ScheduleManager:
     def __init__(self, scheduler: tp.Optional[AsyncScheduler] = None) -> None:
         if scheduler is None:
             scheduler = AsyncScheduler()
-        checks.assert_type(scheduler, AsyncScheduler)
+        checks.assert_instance_of(scheduler, AsyncScheduler)
 
         self._scheduler = scheduler
         self._async_task = None

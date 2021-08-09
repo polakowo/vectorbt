@@ -39,6 +39,16 @@ def setup_module():
     vbt.settings.caching.enabled = False
     vbt.settings.caching.whitelist = []
     vbt.settings.caching.blacklist = []
+    vbt.settings.returns.defaults = dict(
+        start_value=0.,
+        window=ret.shape[0],
+        minp=1,
+        ddof=1,
+        risk_free=0.01,
+        levy_alpha=2.,
+        required_return=0.1,
+        cutoff=0.05
+    )
 
 
 def teardown_module():
@@ -61,7 +71,7 @@ class TestAccessors:
     def test_ann_factor(self):
         assert ret['a'].vbt.returns(year_freq='365 days').ann_factor == 365
         assert ret.vbt.returns(year_freq='365 days').ann_factor == 365
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
     def test_from_value(self):
@@ -164,7 +174,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_total(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_total(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -189,7 +199,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_annualized(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_annualized(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -214,7 +224,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_annualized_volatility(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_annualized_volatility(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -239,7 +249,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_calmar_ratio(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_calmar_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -264,7 +274,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_omega_ratio(ret.shape[0], risk_free=0.01, required_return=0.1, minp=1),
+            ret.vbt.returns.rolling_omega_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -289,7 +299,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_sharpe_ratio(ret.shape[0], risk_free=0.01, minp=1),
+            ret.vbt.returns.rolling_sharpe_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -324,7 +334,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_downside_risk(ret.shape[0], required_return=0.1, minp=1),
+            ret.vbt.returns.rolling_downside_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -349,7 +359,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_sortino_ratio(ret.shape[0], required_return=0.1, minp=1),
+            ret.vbt.returns.rolling_sortino_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -374,7 +384,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_information_ratio(benchmark_rets, ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_information_ratio(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -399,7 +409,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_beta(benchmark_rets, ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_beta(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -424,7 +434,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_alpha(benchmark_rets, ret.shape[0], minp=1, risk_free=0.01),
+            ret.vbt.returns.rolling_alpha(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -449,7 +459,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_tail_ratio(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_tail_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -474,7 +484,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_value_at_risk(ret.shape[0], minp=1, cutoff=0.05),
+            ret.vbt.returns.rolling_value_at_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -499,7 +509,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_cond_value_at_risk(ret.shape[0], minp=1, cutoff=0.05),
+            ret.vbt.returns.rolling_cond_value_at_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -524,7 +534,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_capture(benchmark_rets, ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -549,7 +559,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_up_capture(benchmark_rets, ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_up_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -574,7 +584,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_down_capture(benchmark_rets, ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_down_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -628,7 +638,7 @@ class TestAccessors:
             ret.vbt.returns.drawdowns.max_drawdown(fill_value=0.)
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_max_drawdown(ret.shape[0], minp=1),
+            ret.vbt.returns.rolling_max_drawdown(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -676,22 +686,11 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.stats(),
             pd.Series([
-                pd.Timestamp('2018-01-01 00:00:00'),
-                pd.Timestamp('2018-01-05 00:00:00'),
-                pd.Timedelta('5 days 00:00:00'),
-                106.66666666666667,
-                3.529303946892918e+52,
-                747.9800589021598,
-                73.33333333333333,
-                pd.Timedelta('3 days 00:00:00'),
-                -4.162985893115159, -0.625,
-                np.inf,
-                np.inf,
-                0.25687104876585726,
-                -0.25409565813913854,
-                1.9693400167084374,
-                1.2436594860479807e+51,
-                -0.2291666666666667
+                pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'), 106.66666666666667, 3.529303946892918e+52,
+                747.9800589021598, 73.33333333333333, pd.Timedelta('3 days 00:00:00'),
+                -4.926913414772034, -0.625, np.inf, np.inf, 0.25687104876585726, -0.25409565813913854,
+                1.9693400167084374, 1.2436594860479807e+51, -0.2291666666666667
             ],
                 index=stats_index,
                 name='agg_func_mean'
@@ -700,23 +699,10 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.stats(column='a'),
             pd.Series([
-                pd.Timestamp('2018-01-01 00:00:00'),
-                pd.Timestamp('2018-01-05 00:00:00'),
-                pd.Timedelta('5 days 00:00:00'),
-                400.0,
-                1.0587911840678753e+53,
-                641.7884083645566,
-                np.nan,
-                pd.NaT,
-                29.62100346297954,
-                np.nan,
-                np.inf,
-                np.inf,
-                1.4693345482106241,
-                2.030769230769236,
-                3.5238095238095237,
-                3.730978458143942e+51,
-                0.26249999999999996
+                pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'), 400.0, 1.0587911840678753e+53, 641.7884083645566,
+                np.nan, pd.NaT, 29.052280196490333, np.nan, np.inf, np.inf, 1.4693345482106241,
+                2.030769230769236, 3.5238095238095237, 3.730978458143942e+51, 0.26249999999999996
             ],
                 index=stats_index,
                 name='a'
@@ -725,23 +711,10 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.stats(column='a', settings=dict(freq='10 days', year_freq='200 days')),
             pd.Series([
-                pd.Timestamp('2018-01-01 00:00:00'),
-                pd.Timestamp('2018-01-05 00:00:00'),
-                pd.Timedelta('50 days 00:00:00'),
-                400.0,
-                62400.0,
-                150.23130314433288,
-                np.nan,
-                pd.NaT,
-                6.933752452815364,
-                np.nan,
-                np.inf,
-                np.inf,
-                1.4693345482106241,
-                2.030769230769236,
-                3.5238095238095237,
-                2202.3809523809523,
-                0.26249999999999996
+                pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('50 days 00:00:00'), 400.0, 62400.0, 150.23130314433288, np.nan, pd.NaT,
+                6.800624405721308, np.nan, np.inf, np.inf, 1.4693345482106241, 2.030769230769236,
+                3.5238095238095237, 2202.3809523809523, 0.26249999999999996
             ],
                 index=stats_index,
                 name='a'
@@ -750,26 +723,11 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.stats(column='a', settings=dict(benchmark_rets=benchmark_rets)),
             pd.Series([
-                pd.Timestamp('2018-01-01 00:00:00'),
-                pd.Timestamp('2018-01-05 00:00:00'),
-                pd.Timedelta('5 days 00:00:00'),
-                400.0,
-                451.8597134178033,
-                1.0587911840678753e+53,
-                641.7884083645566,
-                np.nan,
-                pd.NaT,
-                29.62100346297954,
-                np.nan,
-                np.inf,
-                np.inf,
-                1.4693345482106241,
-                2.030769230769236,
-                3.5238095238095237,
-                3.730978458143942e+51,
-                0.26249999999999996,
-                86941707686.49066,
-                0.7853755858374825
+                pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'), 400.0, 451.8597134178033, 1.0587911840678753e+53,
+                641.7884083645566, np.nan, pd.NaT, 29.052280196490333, np.nan, np.inf, np.inf,
+                1.4693345482106241, 2.030769230769236, 3.5238095238095237, 3.730978458143942e+51,
+                0.26249999999999996, 41819510790.213036, 0.7853755858374825
             ],
                 index=pd.Index([
                     'Start',

@@ -7,6 +7,7 @@ from numba.core.registry import CPUDispatcher
 from inspect import signature, getmro
 import dill
 from collections.abc import Hashable, Mapping
+from keyword import iskeyword
 
 from vectorbt import _typing as tp
 
@@ -260,6 +261,11 @@ def is_mapping_like(arg: tp.Any) -> bool:
     return is_mapping(arg) or is_series(arg) or is_index(arg) or is_namedtuple(arg)
 
 
+def is_valid_variable_name(arg: str) -> bool:
+    """Check whether the argument is a valid variable name."""
+    return arg.isidentifier() and not iskeyword(arg)
+
+
 # ############# Asserts ############# #
 
 def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
@@ -285,7 +291,7 @@ def assert_not_none(arg: tp.Any) -> None:
         raise AssertionError(f"Argument cannot be None")
 
 
-def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
+def assert_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is none of types `types`."""
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
@@ -294,7 +300,7 @@ def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
             raise AssertionError(f"Type must be {types}, not {type(arg)}")
 
 
-def assert_subclass(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
+def assert_subclass_of(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is not a subclass of classes `classes`."""
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):

@@ -1,4 +1,3 @@
-import vectorbt as vbt
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -372,7 +371,7 @@ class TestFactory:
             F.from_apply_func(apply_func_nb, numba_loop=True).run([0, 1]).out,
             target
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             F.from_apply_func(apply_func).run([0, 1], per_column=True)
 
     def test_input_shape(self):
@@ -575,7 +574,7 @@ class TestFactory:
             F.from_apply_func(apply_func_nb, numba_loop=True).run().out,
             pd.DataFrame(np.full((3, 3), 1))
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             F.from_apply_func(apply_func).run(per_column=True)
 
     def test_multiple_params(self):
@@ -645,9 +644,9 @@ class TestFactory:
             F.from_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), np.array([2]), per_column=True).out,
             target
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             F.from_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2, per_column=True)
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             F.from_apply_func(apply_func).run(ts, np.asarray([0, 1, 2, 3]), 2, per_column=True)
 
     def test_param_settings(self):
@@ -869,7 +868,7 @@ class TestFactory:
             F.from_apply_func(apply_func, hide_default=False)
                 .run(ts, ts, [1, 2], [1, 2]).out
         )
-        with pytest.raises(Exception) as e_info:
+        with pytest.raises(Exception):
             pd.testing.assert_frame_equal(
                 F.from_apply_func(apply_func, in_out1=1, in_out2=2)
                     .run(ts, ts, [1, 2], 3).in_out1,
@@ -2070,6 +2069,30 @@ class TestFactory:
             )
         )
 
+    def test_stats(self):
+        @njit
+        def apply_func_nb(ts):
+            return ts ** 2, ts ** 3
+
+        MyInd = vbt.IndicatorFactory(
+            input_names=['ts'],
+            output_names=['out1', 'out2'],
+            metrics=dict(
+                sum_diff=dict(
+                    calc_func=lambda self, const: self.out2.sum() * self.out1.sum() + const
+                )
+            ),
+            stats_defaults=dict(settings=dict(const=1000))
+        ).from_apply_func(
+            apply_func_nb
+        )
+
+        myind = MyInd.run(ts)
+        pd.testing.assert_series_equal(
+            myind.stats(),
+            pd.Series([9535.0], index=['sum_diff'], name='agg_func_mean')
+        )
+
     def test_dir(self):
         TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
         F = vbt.IndicatorFactory(
@@ -2313,22 +2336,6 @@ class TestFactory:
                     index=ts.index,
                     columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
                 )
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochk,
-                pd.Series([np.nan, np.nan, np.nan, 33.333333333333336, 0.0], index=ts.index, name=(2, 2))
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochd,
-                pd.Series([np.nan, np.nan, np.nan, np.nan, 16.666666666666668], index=ts.index, name=(2, 2))
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('PVR').run(ts['a'], ts['b']).pvr,
-                pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
-            )
-            pd.testing.assert_series_equal(
-                vbt.pandas_ta('ICHIMOKU').run(ts['a'], ts['b'], ts['c'], 2, 2, 2).isa,
-                pd.Series([np.nan, np.nan, np.nan, 3.0, 3.0], index=ts.index, name=(2, 2, 2))
             )
 
     def test_get_ta_indicators(self):
