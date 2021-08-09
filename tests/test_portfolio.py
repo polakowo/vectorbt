@@ -35,6 +35,7 @@ big_price_wide = big_price.vbt.tile(1000)
 
 def setup_module():
     vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.portfolio['attach_call_seq'] = True
     vbt.settings.caching.enabled = False
     vbt.settings.caching.whitelist = []
     vbt.settings.caching.blacklist = []
@@ -4895,21 +4896,21 @@ pf = vbt.Portfolio.from_orders(
     price_na, order_size_new, size_type='amount', direction=directions,
     fees=0.01, fixed_fees=0.1, slippage=0.01, log=True,
     call_seq='reversed', group_by=None,
-    init_cash=[100., 100., 100.], freq='1D'
+    init_cash=[100., 100., 100.], freq='1D', attach_call_seq=True
 )  # independent
 
 pf_grouped = vbt.Portfolio.from_orders(
     price_na, order_size_new, size_type='amount', direction=directions,
     fees=0.01, fixed_fees=0.1, slippage=0.01, log=True,
     call_seq='reversed', group_by=group_by, cash_sharing=False,
-    init_cash=[100., 100., 100.], freq='1D'
+    init_cash=[100., 100., 100.], freq='1D', attach_call_seq=True
 )  # grouped
 
 pf_shared = vbt.Portfolio.from_orders(
     price_na, order_size_new, size_type='amount', direction=directions,
     fees=0.01, fixed_fees=0.1, slippage=0.01, log=True,
     call_seq='reversed', group_by=group_by, cash_sharing=True,
-    init_cash=[200., 100.], freq='1D'
+    init_cash=[200., 100.], freq='1D', attach_call_seq=True
 )  # shared
 
 

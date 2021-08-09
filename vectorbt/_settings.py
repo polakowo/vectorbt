@@ -459,6 +459,7 @@ settings = SettingsConfig(
             use_numba=True,
             seed=None,
             freq=None,
+            attach_call_seq=False,
             fillna_close=True,
             stats=Config(  # flex
                 dict(
