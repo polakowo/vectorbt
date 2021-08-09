@@ -126,11 +126,11 @@ z  12.0  15.0  18.0
 
 ## Filtering
 
-Use `MappedArray.filter_by_mask` to filter elements per column/group:
+Use `MappedArray.apply_mask` to filter elements per column/group:
 
 ```python-repl
 >>> mask = [True, False, True, False, True, False, True, False, True]
->>> filtered_ma = ma.filter_by_mask(mask)
+>>> filtered_ma = ma.apply_mask(mask)
 >>> filtered_ma.count()
 a    2
 b    1
@@ -564,11 +564,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self: MappedArrayT,
-                       mask: tp.Array1d,
-                       idx_arr: tp.Optional[tp.Array1d] = None,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> MappedArrayT:
+    def apply_mask(self: MappedArrayT,
+                   mask: tp.Array1d,
+                   idx_arr: tp.Optional[tp.Array1d] = None,
+                   group_by: tp.GroupByLike = None,
+                   **kwargs) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
         `**kwargs` are passed to `MappedArray.copy`."""
@@ -603,12 +603,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter top N elements from each column/group."""
-        return self.filter_by_mask(self.top_n_mask(n), **kwargs)
+        return self.apply_mask(self.top_n_mask(n), **kwargs)
 
     @cached_method
     def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
-        return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
+        return self.apply_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
     def is_expandable(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
@@ -691,7 +691,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                returns_array: bool = False,
                returns_idx: bool = False,
                to_index: bool = True,
-               fill_value: float = np.nan,
+               fill_value: tp.Scalar = np.nan,
                group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column/group.
@@ -859,12 +859,13 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def sum(self, group_by: tp.GroupByLike = None,
+    def sum(self, fill_value: tp.Scalar = 0., group_by: tp.GroupByLike = None,
             wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         return self.reduce(
             generic_nb.sum_reduce_nb,
+            fill_value=fill_value,
             returns_array=False,
             returns_idx=False,
             group_by=group_by,
@@ -1020,6 +1021,10 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         return self.copy(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
+
+    def to_index(self):
+        """Convert to index."""
+        return self.wrapper.index[self.values]
 
     # ############# Stats ############# #
 

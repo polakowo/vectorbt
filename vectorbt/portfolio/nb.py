@@ -117,12 +117,12 @@ def buy_nb(exec_state: ExecuteOrderState,
 
     if direction == Direction.LongOnly or direction == Direction.All:
         if cash_limit == 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashLong)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashLong)
         if np.isinf(size) and np.isinf(cash_limit):
             raise ValueError("Attempt to go in long direction infinitely")
     else:
         if exec_state.position == 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
 
     # Get optimal order size
     if direction == Direction.ShortOnly:
@@ -131,11 +131,11 @@ def buy_nb(exec_state: ExecuteOrderState,
         adj_size = size
 
     if adj_size == 0:
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
 
     if adj_size > max_size:
         if not allow_partial:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
 
         adj_size = max_size
 
@@ -156,7 +156,7 @@ def buy_nb(exec_state: ExecuteOrderState,
         # to spend 100$ (cash_limit) in total
         new_req_cash = add_nb(cash_limit, -fixed_fees) / (1 + fees)
         if new_req_cash <= 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
 
         final_size = new_req_cash / adj_price
         fees_paid = cash_limit - new_req_cash
@@ -164,11 +164,11 @@ def buy_nb(exec_state: ExecuteOrderState,
 
     # Check against minimum size
     if is_less_nb(final_size, min_size):
-        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MinSizeNotReached)
 
     # Check against partial fill (np.inf doesn't count)
     if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
-        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
 
     # Update current cash balance and position
     new_cash = add_nb(exec_state.cash, -final_cash)
@@ -237,7 +237,7 @@ def sell_nb(exec_state: ExecuteOrderState,
             if total_free_cash <= 0:
                 if exec_state.position <= 0:
                     # There is nothing to sell, and no free cash to short sell
-                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashShort)
+                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashShort)
 
                 # There is position to close, but no free cash to short sell
                 max_size_limit = long_size
@@ -246,7 +246,7 @@ def sell_nb(exec_state: ExecuteOrderState,
                 max_short_size = add_nb(total_free_cash, -fixed_fees) / (adj_price * (1 + fees))
                 max_size_limit = add_nb(long_size, max_short_size)
                 if max_size_limit <= 0:
-                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
 
             if lock_cash:
                 # Size has upper limit
@@ -270,7 +270,7 @@ def sell_nb(exec_state: ExecuteOrderState,
 
     if size_limit > max_size:
         if not allow_partial:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
 
         size_limit = max_size
 
@@ -279,18 +279,18 @@ def sell_nb(exec_state: ExecuteOrderState,
             raise ValueError("Attempt to go in short direction infinitely")
     else:
         if exec_state.position == 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
 
     if is_close_nb(size_limit, 0):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
 
     # Check against minimum size
     if is_less_nb(size_limit, min_size):
-        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MinSizeNotReached)
 
     # Check against partial fill
     if np.isfinite(size) and is_less_nb(size_limit, size) and not allow_partial:  # np.inf doesn't count
-        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
 
     # Get acquired cash
     acq_cash = size_limit * adj_price
@@ -301,7 +301,7 @@ def sell_nb(exec_state: ExecuteOrderState,
     # Get final cash by subtracting costs
     final_cash = add_nb(acq_cash, -fees_paid)
     if final_cash < 0:
-        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
 
     # Update current cash balance and position
     new_cash = exec_state.cash + final_cash
@@ -381,9 +381,9 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
 
     # Ignore order
     if np.isnan(order.size):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeNaN)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeNaN)
     if np.isnan(order.price):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.PriceNaN)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.PriceNaN)
 
     # Check execution state
     if np.isnan(cash) or cash < 0:
@@ -429,9 +429,9 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
     if order_size_type == SizeType.TargetPercent:
         # Target percentage of current value
         if np.isnan(value):
-            return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValueNaN)
+            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN)
         if value <= 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.ValueZeroNeg)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
 
         order_size *= value
         order_size_type = SizeType.TargetValue
@@ -441,7 +441,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
         if np.isnan(val_price):
-            return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValPriceNaN)
+            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValPriceNaN)
 
         order_size /= val_price
         if order_size_type == SizeType.Value:
@@ -501,7 +501,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
 
     if order.reject_prob > 0:
         if np.random.uniform(0, 1) < order.reject_prob:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.RandomEvent)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.RandomEvent)
 
     return new_exec_state, order_result
 
@@ -539,20 +539,20 @@ def fill_log_record_nb(record: tp.Record,
     record['free_cash'] = free_cash
     record['val_price'] = val_price
     record['value'] = value
-    record['size'] = order.size
-    record['price'] = order.price
-    record['size_type'] = order.size_type
-    record['direction'] = order.direction
-    record['fees'] = order.fees
-    record['fixed_fees'] = order.fixed_fees
-    record['slippage'] = order.slippage
-    record['min_size'] = order.min_size
-    record['max_size'] = order.max_size
-    record['reject_prob'] = order.reject_prob
-    record['lock_cash'] = order.lock_cash
-    record['allow_partial'] = order.allow_partial
-    record['raise_reject'] = order.raise_reject
-    record['log'] = order.log
+    record['req_size'] = order.size
+    record['req_price'] = order.price
+    record['req_size_type'] = order.size_type
+    record['req_direction'] = order.direction
+    record['req_fees'] = order.fees
+    record['req_fixed_fees'] = order.fixed_fees
+    record['req_slippage'] = order.slippage
+    record['req_min_size'] = order.min_size
+    record['req_max_size'] = order.max_size
+    record['req_reject_prob'] = order.reject_prob
+    record['req_lock_cash'] = order.lock_cash
+    record['req_allow_partial'] = order.allow_partial
+    record['req_raise_reject'] = order.raise_reject
+    record['req_log'] = order.log
     record['new_cash'] = new_cash
     record['new_position'] = new_position
     record['new_debt'] = new_debt
@@ -589,33 +589,33 @@ def fill_order_record_nb(record: tp.Record,
 def raise_rejected_order_nb(order_result: OrderResult) -> None:
     """Raise an `vectorbt.portfolio.enums.RejectedOrderError`."""
 
-    if order_result.status_info == StatusInfo.SizeNaN:
+    if order_result.status_info == OrderStatusInfo.SizeNaN:
         raise RejectedOrderError("Size is NaN")
-    if order_result.status_info == StatusInfo.PriceNaN:
+    if order_result.status_info == OrderStatusInfo.PriceNaN:
         raise RejectedOrderError("Price is NaN")
-    if order_result.status_info == StatusInfo.ValPriceNaN:
+    if order_result.status_info == OrderStatusInfo.ValPriceNaN:
         raise RejectedOrderError("Asset valuation price is NaN")
-    if order_result.status_info == StatusInfo.ValueNaN:
+    if order_result.status_info == OrderStatusInfo.ValueNaN:
         raise RejectedOrderError("Asset/group value is NaN")
-    if order_result.status_info == StatusInfo.ValueZeroNeg:
+    if order_result.status_info == OrderStatusInfo.ValueZeroNeg:
         raise RejectedOrderError("Asset/group value is zero or negative")
-    if order_result.status_info == StatusInfo.SizeZero:
+    if order_result.status_info == OrderStatusInfo.SizeZero:
         raise RejectedOrderError("Size is zero")
-    if order_result.status_info == StatusInfo.NoCashShort:
+    if order_result.status_info == OrderStatusInfo.NoCashShort:
         raise RejectedOrderError("Not enough cash to short")
-    if order_result.status_info == StatusInfo.NoCashLong:
+    if order_result.status_info == OrderStatusInfo.NoCashLong:
         raise RejectedOrderError("Not enough cash to long")
-    if order_result.status_info == StatusInfo.NoOpenPosition:
+    if order_result.status_info == OrderStatusInfo.NoOpenPosition:
         raise RejectedOrderError("No open position to reduce/close")
-    if order_result.status_info == StatusInfo.MaxSizeExceeded:
+    if order_result.status_info == OrderStatusInfo.MaxSizeExceeded:
         raise RejectedOrderError("Size is greater than maximum allowed")
-    if order_result.status_info == StatusInfo.RandomEvent:
+    if order_result.status_info == OrderStatusInfo.RandomEvent:
         raise RejectedOrderError("Random event happened")
-    if order_result.status_info == StatusInfo.CantCoverFees:
+    if order_result.status_info == OrderStatusInfo.CantCoverFees:
         raise RejectedOrderError("Not enough cash to cover fees")
-    if order_result.status_info == StatusInfo.MinSizeNotReached:
+    if order_result.status_info == OrderStatusInfo.MinSizeNotReached:
         raise RejectedOrderError("Final size is less than minimum allowed")
-    if order_result.status_info == StatusInfo.PartialFill:
+    if order_result.status_info == OrderStatusInfo.PartialFill:
         raise RejectedOrderError("Final size is less than requested")
     raise RejectedOrderError
 
@@ -3643,7 +3643,7 @@ def fill_trade_record_nb(record: tp.Record,
     size_fraction = exit_size / entry_size_sum
     entry_fees = size_fraction * entry_fees_sum
 
-    # Get P&L and return
+    # Get PnL and return
     pnl, ret = get_trade_stats_nb(
         exit_size,
         entry_price,
@@ -3670,7 +3670,7 @@ def fill_trade_record_nb(record: tp.Record,
 
 
 @njit(cache=True)
-def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
+def trades_from_orders_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map: tp.ColMap) -> tp.RecordArray:
     """Find trades and store their information as records to an array.
 
     ## Example
@@ -3681,7 +3681,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     >>> import pandas as pd
     >>> from numba import njit
     >>> from vectorbt.records.nb import col_map_nb
-    >>> from vectorbt.portfolio.nb import simulate_nb, order_nb, orders_to_trades_nb
+    >>> from vectorbt.portfolio.nb import simulate_nb, order_nb, trades_from_orders_nb
 
     >>> @njit
     ... def order_func_nb(c, order_size, order_price):
@@ -3723,7 +3723,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     ... )
 
     >>> col_map = col_map_nb(order_records['col'], target_shape[1])
-    >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
+    >>> trade_records = trades_from_orders_nb(order_records, close, col_map)
     >>> pd.DataFrame.from_records(trade_records)
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0     1.101818    0.011018         2        2.97
@@ -3750,9 +3750,6 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     col_start_idxs = np.cumsum(col_lens) - col_lens
     records = np.empty(len(order_records), dtype=trade_dt)
     tidx = 0
-    entry_size_sum = 0.
-    entry_gross_sum = 0.
-    entry_fees_sum = 0.
     position_id = -1
 
     for col in range(col_lens.shape[0]):
@@ -3762,6 +3759,9 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
         entry_idx = -1
         direction = -1
         last_id = -1
+        entry_size_sum = 0.
+        entry_gross_sum = 0.
+        entry_fees_sum = 0.
 
         for i in range(col_len):
             oidx = col_idxs[col_start_idxs[col] + i]
@@ -3963,17 +3963,17 @@ def copy_trade_record_nb(position_record: tp.Record, trade_record: tp.Record) ->
 
 
 @njit(cache=True)
-def trades_to_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
+def positions_from_trades_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
     """Find positions and store their information as records to an array.
 
     ## Example
 
-    Building upon the example in `orders_to_trades_nb`, convert trades to positions:
+    Building upon the example in `trades_from_orders_nb`, convert trades to positions:
     ```python-repl
-    >>> from vectorbt.portfolio.nb import trades_to_positions_nb
+    >>> from vectorbt.portfolio.nb import positions_from_trades_nb
 
     >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
-    >>> position_records = trades_to_positions_nb(trade_records, col_map)
+    >>> position_records = positions_from_trades_nb(trade_records, col_map)
     >>> pd.DataFrame.from_records(position_records)
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.1          0     1.101818     0.01212         3    3.060000

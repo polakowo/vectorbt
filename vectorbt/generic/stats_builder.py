@@ -31,7 +31,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
     def __init__(self):
-        checks.assert_type(self, Wrapping)
+        checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
         self._metrics = self.__class__._metrics.copy()
@@ -591,6 +591,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         new_index = reself.wrapper.grouper.get_columns(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
+
+    # ############# Docs ############# #
 
     @classmethod
     def build_metrics_doc(cls, source_cls: tp.Optional[type] = None) -> str:

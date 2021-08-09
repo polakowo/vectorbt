@@ -291,7 +291,7 @@ def assert_not_none(arg: tp.Any) -> None:
         raise AssertionError(f"Argument cannot be None")
 
 
-def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
+def assert_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is none of types `types`."""
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
@@ -300,7 +300,7 @@ def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
             raise AssertionError(f"Type must be {types}, not {type(arg)}")
 
 
-def assert_subclass(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
+def assert_subclass_of(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is not a subclass of classes `classes`."""
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):

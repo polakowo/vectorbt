@@ -171,7 +171,7 @@ Max Drawdown Duration                  760 days 00:00:00
 Total Trades                                          54
 Total Closed Trades                                   53
 Total Open Trades                                      1
-Open Trade P&L                              67287.940601
+Open Trade PnL                              67287.940601
 Win Rate [%]                                   52.830189
 Best Trade [%]                               1075.803607
 Worst Trade [%]                               -29.593414
@@ -437,6 +437,7 @@ sma_timeperiod    2    3
 Start                                        0
 End                                          7
 Period                         8 days 00:00:00
+Coverage [%]                              50.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
@@ -447,13 +448,13 @@ Active Recovery Return [%]               100.0
 Active Recovery Duration       1 days 00:00:00
 Max Drawdown [%]                     33.333333
 Avg Drawdown [%]                     33.333333
-Max Drawdown Duration          2 days 00:00:00
-Avg Drawdown Duration          2 days 00:00:00
+Max Drawdown Duration          1 days 00:00:00
+Avg Drawdown Duration          1 days 00:00:00
 Max Recovery Return [%]                   50.0
 Avg Recovery Return [%]                   50.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
-Avg Recovery Duration Ratio                0.5
+Avg Recovery Duration Ratio                1.0
 dtype: object
 ```
 

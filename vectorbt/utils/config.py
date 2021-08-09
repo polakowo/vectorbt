@@ -108,7 +108,7 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     Set `nested` to True to copy all child dicts in recursive manner."""
     if dct is None:
         dct = {}
-    checks.assert_type(copy_mode, str)
+    checks.assert_instance_of(copy_mode, str)
     copy_mode = copy_mode.lower()
     if copy_mode not in ['shallow', 'hybrid', 'deep']:
         raise ValueError(f"Copy mode '{copy_mode}' not supported")
@@ -151,8 +151,8 @@ def update_dict(x: InConfigLikeT,
         return
     if y is None:
         return
-    checks.assert_type(x, dict)
-    checks.assert_type(y, dict)
+    checks.assert_instance_of(x, dict)
+    checks.assert_instance_of(y, dict)
 
     for k, v in y.items():
         if nested \
@@ -423,14 +423,14 @@ class Config(PickleableDict, Documented):
         dict.__init__(self, dct)
 
         # Store params in an instance variable
-        checks.assert_type(copy_kwargs, dict)
-        checks.assert_type(reset_dct, dict)
-        checks.assert_type(reset_dct_copy_kwargs, dict)
-        checks.assert_type(frozen_keys, bool)
-        checks.assert_type(readonly, bool)
-        checks.assert_type(nested, bool)
-        checks.assert_type(convert_dicts, (bool, type))
-        checks.assert_type(as_attrs, bool)
+        checks.assert_instance_of(copy_kwargs, dict)
+        checks.assert_instance_of(reset_dct, dict)
+        checks.assert_instance_of(reset_dct_copy_kwargs, dict)
+        checks.assert_instance_of(frozen_keys, bool)
+        checks.assert_instance_of(readonly, bool)
+        checks.assert_instance_of(nested, bool)
+        checks.assert_instance_of(convert_dicts, (bool, type))
+        checks.assert_instance_of(as_attrs, bool)
 
         self.__dict__['_copy_kwargs_'] = copy_kwargs
         self.__dict__['_reset_dct_'] = reset_dct

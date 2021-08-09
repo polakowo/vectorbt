@@ -30,7 +30,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
     def __init__(self):
-        checks.assert_type(self, Wrapping)
+        checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
         self._subplots = self.__class__._subplots.copy()
@@ -662,6 +662,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
         # Return the figure
         return fig
+
+    # ############# Docs ############# #
 
     @classmethod
     def build_subplots_doc(cls, source_cls: tp.Optional[type] = None) -> str:

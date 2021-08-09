@@ -404,20 +404,17 @@ settings = SettingsConfig(
         trades=dict(
             stats=Config(  # flex
                 dict(
-                    filters=dict(
-                        is_positions=dict(
-                            filter_func=lambda self, metric_settings: self.is_positions
-                        )
-                    ),
                     settings=dict(
                         incl_open=False
                     ),
                     template_mapping=dict(
-                        trades_tag=RepEval("'positions' if self.is_positions else 'trades'"),
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
             )
+        ),
+        positions=dict(
+            stats=Config()  # flex
         ),
         logs=dict(
             stats=Config()  # flex
@@ -485,21 +482,12 @@ settings = SettingsConfig(
             ),
             plot=Config(  # flex
                 dict(
-                    subplots=['orders', 'trade_returns', 'cum_returns'],
-                    filters=dict(
-                        has_year_freq=dict(
-                            filter_func=lambda self, subplot_settings:
-                            subplot_settings['year_freq'] is not None,
-                            warning_message=Sub("Subplot '$subplot_name' requires year frequency to be set")
-                        )
-                    ),
+                    subplots=['orders', 'trade_pnl', 'cum_returns'],
                     settings=dict(
                         use_asset_returns=False,
-                        use_positions=False,
                         incl_open=True
                     ),
                     template_mapping=dict(
-                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )

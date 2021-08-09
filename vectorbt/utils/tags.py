@@ -42,7 +42,7 @@ def match_tags(tags: tp.MaybeIterable[str], in_tags: tp.MaybeIterable[str]) -> b
     for t in tags:
         if not t.isidentifier():
             node_ids = [node.id for node in ast.walk(ast.parse(t)) if type(node) is ast.Name]
-            eval_mapping = {_id: _id in in_tags for _id in node_ids}
+            eval_mapping = {id_: id_ in in_tags for id_ in node_ids}
             eval_result = RepEval(t).eval(eval_mapping)
             if not isinstance(eval_result, bool):
                 raise TypeError(f"Tag expression '{t}' must produce a boolean")

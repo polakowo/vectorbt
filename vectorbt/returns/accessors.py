@@ -240,7 +240,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def daily(self, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
-        checks.assert_type(self.wrapper.index, DatetimeIndexes)
+        checks.assert_instance_of(self.wrapper.index, DatetimeIndexes)
 
         if self.wrapper.freq == pd.Timedelta('1D'):
             return self.obj
@@ -248,7 +248,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def annual(self, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
-        checks.assert_type(self.obj.index, DatetimeIndexes)
+        checks.assert_instance_of(self.obj.index, DatetimeIndexes)
 
         if self.wrapper.freq == self.year_freq:
             return self.obj

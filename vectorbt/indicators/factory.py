@@ -2079,7 +2079,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             checks.assert_len_equal(param_list[0], params)
         for mapper in mapper_list:
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
         checks.assert_len_equal(level_names, param_list)
 
         setattr(self, '_short_name', short_name)
@@ -2228,14 +2228,14 @@ class IndicatorFactory:
         """
         # Check and save parameters
         self.class_name = class_name
-        checks.assert_type(class_name, str)
+        checks.assert_instance_of(class_name, str)
 
         self.class_docstring = class_docstring
-        checks.assert_type(class_docstring, str)
+        checks.assert_instance_of(class_docstring, str)
 
         self.module_name = module_name
         if module_name is not None:
-            checks.assert_type(module_name, str)
+            checks.assert_instance_of(module_name, str)
 
         if short_name is None:
             if class_name == 'Indicator':
@@ -2243,10 +2243,10 @@ class IndicatorFactory:
             else:
                 short_name = class_name.lower()
         self.short_name = short_name
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
 
         self.prepend_name = prepend_name
-        checks.assert_type(prepend_name, bool)
+        checks.assert_instance_of(prepend_name, bool)
 
         if input_names is None:
             input_names = []
@@ -2282,19 +2282,19 @@ class IndicatorFactory:
 
         if output_flags is None:
             output_flags = {}
-        checks.assert_type(output_flags, dict)
+        checks.assert_instance_of(output_flags, dict)
         if len(output_flags) > 0:
             checks.assert_dict_valid(output_flags, all_output_names)
         self.output_flags = output_flags
 
         if custom_output_props is None:
             custom_output_props = {}
-        checks.assert_type(custom_output_props, dict)
+        checks.assert_instance_of(custom_output_props, dict)
         self.custom_output_props = custom_output_props
 
         if attr_settings is None:
             attr_settings = {}
-        checks.assert_type(attr_settings, dict)
+        checks.assert_instance_of(attr_settings, dict)
         all_attr_names = input_names + all_output_names + list(custom_output_props.keys())
         if len(attr_settings) > 0:
             checks.assert_dict_valid(attr_settings, all_attr_names)

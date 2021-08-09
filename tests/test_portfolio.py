@@ -5347,7 +5347,9 @@ class TestPortfolio:
         record_arrays_close(
             pf.drawdowns.values,
             np.array([
-                (0, 0, 0, 4, 4, 0), (1, 1, 0, 4, 4, 0), (2, 2, 2, 3, 4, 0)
+                (0, 0, 0, 1, 4, 4, 100.0, 99.68951, 99.68951, 0),
+                (1, 1, 0, 1, 4, 4, 99.8801, 95.26858, 95.26858, 0),
+                (2, 2, 2, 3, 3, 4, 101.71618000000001, 101.70822000000001, 101.70822000000001, 0)
             ], dtype=drawdown_dt)
         )
         result = pd.Series(
@@ -6574,7 +6576,7 @@ class TestPortfolio:
             'Total Return [%]', 'Benchmark Return [%]', 'Max Gross Exposure [%]',
             'Total Fees Paid', 'Max Drawdown [%]', 'Max Drawdown Duration',
             'Total Trades', 'Total Closed Trades', 'Total Open Trades',
-            'Open Trade P&L', 'Win Rate [%]', 'Best Trade [%]', 'Worst Trade [%]',
+            'Open Trade PnL', 'Win Rate [%]', 'Best Trade [%]', 'Worst Trade [%]',
             'Avg Winning Trade [%]', 'Avg Losing Trade [%]',
             'Avg Winning Trade Duration', 'Avg Losing Trade Duration',
             'Profit Factor', 'Expectancy', 'Sharpe Ratio', 'Calmar Ratio',
@@ -6639,7 +6641,7 @@ class TestPortfolio:
                     'Total Return [%]', 'Benchmark Return [%]', 'Max Gross Exposure [%]',
                     'Total Fees Paid', 'Max Drawdown [%]', 'Max Drawdown Duration',
                     'Total Positions', 'Total Closed Positions', 'Total Open Positions',
-                    'Open Position P&L', 'Win Rate [%]', 'Best Position [%]',
+                    'Open Position PnL', 'Win Rate [%]', 'Best Position [%]',
                     'Worst Position [%]', 'Avg Winning Position [%]',
                     'Avg Losing Position [%]', 'Avg Winning Position Duration',
                     'Avg Losing Position Duration', 'Profit Factor', 'Expectancy',
@@ -6683,7 +6685,7 @@ class TestPortfolio:
                     pd.Timedelta('5 days 00:00:00'), 100.0, 99.68951, -0.3104899999999997, 150.0,
                     5.015572852148637, 0.35549, 0.3104900000000015, pd.Timedelta('4 days 00:00:00'),
                     2, 1, 1, -0.20049999999999982, 0.0, -3.9702970297029667, -54.450495049504966,
-                    np.nan, -29.210396039603964, pd.NaT, pd.Timedelta('0 days 12:00:00'), 0.0,
+                    np.nan, -29.210396039603964, pd.NaT, pd.Timedelta('1 days 00:00:00'), 0.0,
                     -0.1552449999999999, -13.30804491478906, -65.40868619923044, 0.0, -11.738864633265454
                 ]),
                 index=stats_index,
@@ -6710,7 +6712,7 @@ class TestPortfolio:
                     1, -0.20049999999999982
                 ]),
                 index=pd.Index([
-                    'Total Open Trades', 'Open Trade P&L'
+                    'Total Open Trades', 'Open Trade PnL'
                 ], dtype='object'),
                 name='a')
         )
@@ -6774,8 +6776,8 @@ class TestPortfolio:
         trade_min_pnl_cnt = (
             'trade_min_pnl_cnt',
             dict(
-                title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
-                calc_func=lambda trades, min_pnl: trades.filter_by_mask(
+                title=vbt.Sub('Trades with PnL over $$${min_pnl}'),
+                calc_func=lambda trades, min_pnl: trades.apply_mask(
                     trades.pnl.values >= min_pnl).count(),
                 resolve_trades=True
             )
@@ -6784,7 +6786,7 @@ class TestPortfolio:
             pf.stats(
                 metrics=trade_min_pnl_cnt, column='a',
                 metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=0))),
-            pd.Series([0], index=['Trades with P&L over $0'], name='a')
+            pd.Series([0], index=['Trades with PnL over $0'], name='a')
         )
         pd.testing.assert_series_equal(
             pf.stats(
@@ -6800,9 +6802,9 @@ class TestPortfolio:
                     trade_min_pnl_cnt_2=dict(min_pnl=20))
             ),
             pd.Series([0, 0, 0], index=[
-                'Trades with P&L over $0',
-                'Trades with P&L over $10',
-                'Trades with P&L over $20'
+                'Trades with PnL over $0',
+                'Trades with PnL over $10',
+                'Trades with PnL over $20'
             ], name='a')
         )
         pd.testing.assert_series_equal(

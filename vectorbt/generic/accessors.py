@@ -277,9 +277,8 @@ nb_config = Config(
         'expanding_mean': dict(func=nb.expanding_mean_nb, path='vectorbt.generic.nb.expanding_mean_nb'),
         'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -325,9 +324,8 @@ transform_config = Config(
             docstring="See `sklearn.preprocessing.PowerTransformer`."
         )
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -1749,7 +1747,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
@@ -1880,7 +1878,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             add_trace_kwargs = {}
 
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             if 'width' in plotting_cfg['layout']:

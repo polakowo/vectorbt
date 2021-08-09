@@ -20,7 +20,7 @@ def attach_returns_acc_methods(config: Config) -> WrapperFuncT:
     """
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        checks.assert_subclass(cls, "Portfolio")
+        checks.assert_subclass_of(cls, "Portfolio")
 
         for target_name, settings in config.items():
             source_name = settings.get('source_name', target_name)

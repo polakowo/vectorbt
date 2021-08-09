@@ -27,7 +27,7 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         from vectorbt.base.array_wrapper import Wrapping
 
-        checks.assert_subclass(cls, Wrapping)
+        checks.assert_subclass_of(cls, Wrapping)
 
         for target_name, settings in config.items():
             func = settings['func']
@@ -87,7 +87,7 @@ def attach_transform_methods(config: Config) -> WrapperFuncT:
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         from vectorbt.generic.accessors import TransformerT
 
-        checks.assert_subclass(cls, "GenericAccessor")
+        checks.assert_subclass_of(cls, "GenericAccessor")
 
         for target_name, settings in config.items():
             transformer = settings['transformer']

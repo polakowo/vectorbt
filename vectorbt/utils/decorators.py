@@ -191,7 +191,7 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
 
     def _get_condition_rank(cond: CacheCondition) -> int:
         # Perform initial checks
-        checks.assert_type(cond, CacheCondition)
+        checks.assert_instance_of(cond, CacheCondition)
 
         if cond.instance is not None:
             if instance is not cond.instance:
@@ -499,9 +499,8 @@ binary_magic_config = Config(
         '__ror__': dict(func=lambda x, y: np.bitwise_or(y, x)),
         '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -558,9 +557,8 @@ unary_magic_config = Config(
         '__abs__': dict(func=np.absolute),
         '__invert__': dict(func=np.invert)
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 

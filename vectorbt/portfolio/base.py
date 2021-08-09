@@ -380,7 +380,7 @@ Max Drawdown Duration                             101.0
 Total Trades                                         10
 Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       60.0
 Best Trade [%]                                 15.31962
 Worst Trade [%]                               -9.904223
@@ -420,7 +420,7 @@ Max Drawdown Duration                 101 days 00:00:00
 Total Trades                                         10
 Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       60.0
 Best Trade [%]                                 15.31962
 Worst Trade [%]                               -9.904223
@@ -462,7 +462,7 @@ Max Drawdown Duration                  86 days 00:00:00
 Total Trades                                         30
 Total Closed Trades                                  30
 Total Open Trades                                     0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                  66.666667
 Best Trade [%]                                18.332559
 Worst Trade [%]                               -9.904223
@@ -506,7 +506,7 @@ Max Drawdown Duration                  93 days 00:00:00
 Total Trades                                       15.0
 Total Closed Trades                                15.0
 Total Open Trades                                   0.0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       65.0
 Best Trade [%]                                 16.82609
 Worst Trade [%]                               -9.701273
@@ -554,7 +554,7 @@ We can also select specific tags (see any metric from `Portfolio.metrics` that h
 >>> pf.stats(column=10, tags=['trades'])
 Total Trades                                10
 Total Open Trades                            0
-Open Trade P&L                               0
+Open Trade PnL                               0
 Long Trades [%]                            100
 Win Rate [%]                                60
 Best Trade [%]                         15.3196
@@ -573,7 +573,7 @@ Or provide a boolean expression:
 ```python-repl
 >>> pf.stats(column=10, tags='trades and open and not closed')
 Total Open Trades    0.0
-Open Trade P&L       0.0
+Open Trade PnL       0.0
 Name: 10, dtype: float64
 ```
 
@@ -602,7 +602,7 @@ Max Drawdown Duration                 101 days 00:00:00
 Total Trades                                         10
 Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       60.0
 Best Trade [%]                                 15.31962
 Worst Trade [%]                               -9.904223
@@ -753,7 +753,7 @@ Max Drawdown Duration                    101 days 00:00:00
 Total Positions                                         10
 Total Closed Positions                                  10
 Total Open Positions                                     0
-Open Position P&L                                      0.0
+Open Position PnL                                      0.0
 Win Rate [%]                                          60.0
 Best Position [%]                                 15.31962
 Worst Position [%]                               -9.904223
@@ -799,7 +799,7 @@ Max Drawdown Duration                 101 days 00:00:00  << here
 Total Trades                                       15.0
 Total Closed Trades                                15.0
 Total Open Trades                                   0.0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       65.0
 Best Trade [%]                                 16.82609
 Worst Trade [%]                               -9.701273
@@ -845,14 +845,14 @@ My Arg    400
 Name: 10, dtype: int64
 ```
 
-Here's an example of a parametrized metric. Let's get the number of trades with P&L over some amount:
+Here's an example of a parametrized metric. Let's get the number of trades with PnL over some amount:
 
 ```python-repl
 >>> trade_min_pnl_cnt = (
 ...     'trade_min_pnl_cnt',
 ...     dict(
-...         title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
-...         calc_func=lambda trades, min_pnl: trades.filter_by_mask(
+...         title=vbt.Sub('Trades with PnL over $$${min_pnl}'),
+...         calc_func=lambda trades, min_pnl: trades.apply_mask(
 ...             trades.pnl.values >= min_pnl).count(),
 ...         resolve_trades=True
 ...     )
@@ -860,13 +860,13 @@ Here's an example of a parametrized metric. Let's get the number of trades with 
 >>> pf.stats(
 ...     metrics=trade_min_pnl_cnt, column=10,
 ...     metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=0)))
-Trades with P&L over $0    6
+Trades with PnL over $0    6
 Name: stats, dtype: int64
 
 >>> pf.stats(
 ...     metrics=trade_min_pnl_cnt, column=10,
 ...     metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=10)))
-Trades with P&L over $10    1
+Trades with PnL over $10    1
 Name: stats, dtype: int64
 ```
 
@@ -886,9 +886,9 @@ underscore and its position, so we can pass keyword arguments to each metric sep
 ...         trade_min_pnl_cnt_1=dict(min_pnl=10),
 ...         trade_min_pnl_cnt_2=dict(min_pnl=20))
 ...     )
-Trades with P&L over $0     6
-Trades with P&L over $10    1
-Trades with P&L over $20    0
+Trades with PnL over $0     6
+Trades with PnL over $10    1
+Trades with PnL over $20    0
 Name: stats, dtype: int64
 ```
 
@@ -913,7 +913,7 @@ Max Drawdown Duration                 101 days 00:00:00
 Total Trades                                         10
 Total Closed Trades                                  10
 Total Open Trades                                     0
-Open Trade P&L                                      0.0
+Open Trade PnL                                      0.0
 Win Rate [%]                                       60.0
 Best Trade [%]                                 15.31962
 Worst Trade [%]                               -9.904223
@@ -1138,9 +1138,8 @@ returns_acc_config = Config(
         'drawdown': dict(),
         'max_drawdown': dict()
     },
-    as_attrs=False,
     readonly=True,
-    copy_kwargs=dict(copy_mode='deep')
+    as_attrs=False
 )
 """_"""
 
@@ -2063,7 +2062,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             close (array_like): Last asset price at each time step.
                 Will broadcast.
 
-                Used for calculating unrealized P&L and portfolio value.
+                Used for calculating unrealized PnL and portfolio value.
             size (float or array_like): Size to order.
                 See `vectorbt.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
@@ -2493,7 +2492,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             close (array_like): Last asset price at each time step.
                 Will broadcast to `target_shape`.
 
-                Used for calculating unrealized P&L and portfolio value.
+                Used for calculating unrealized PnL and portfolio value.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
@@ -3091,14 +3090,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     @cached_property
     def orders(self) -> Orders:
         """`Portfolio.get_orders` with default arguments."""
-        return Orders(self.wrapper, self.order_records, self.close)
+        return self.get_orders()
 
     @cached_method
-    def get_orders(self, group_by: tp.GroupByLike = None) -> Orders:
+    def get_orders(self, group_by: tp.GroupByLike = None, **kwargs) -> Orders:
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
-        return self.orders.regroup(group_by)
+        return Orders(self.wrapper, self.order_records, close=self.close, **kwargs).regroup(group_by)
 
     @property
     def log_records(self) -> tp.RecordArray:
@@ -3152,7 +3151,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs)
+        wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
         value = self.value(group_by=group_by, wrap_kwargs=wrap_kwargs)
         return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
@@ -3640,7 +3639,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 tags=['portfolio', Rep("trades_tag"), 'open']
             ),
             open_trade_pnl=dict(
-                title=RepEval("'Open Position P&L' if use_positions else 'Open Trade P&L'"),
+                title=RepEval("'Open Position PnL' if use_positions else 'Open Trade PnL'"),
                 calc_func='trades.open.pnl.sum',
                 incl_open=True,
                 tags=['portfolio', Rep("trades_tag"), 'open']
@@ -3760,6 +3759,31 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return getattr(returns_acc, 'stats')(settings=settings, **kwargs)
 
     # ############# Plotting ############# #
+
+    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of orders."""
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        return self.orders.regroup(False).plot(column=column, **kwargs)
+
+    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of trades."""
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        return self.trades.regroup(False).plot(column=column, **kwargs)
+
+    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of trade PnL."""
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
+
+    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of positions."""
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        return self.positions.regroup(False).plot(column=column, **kwargs)
+
+    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of position PnL."""
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
 
     def plot_asset_flow(self,
                         column: tp.Optional[tp.Label] = None,
@@ -4342,35 +4366,32 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 tags=['portfolio', 'orders']
             ),
             trades=dict(
-                title=RepEval("'Positions' if use_positions else 'Trades'"),
+                title="Trades",
                 yaxis_title="Price",
                 check_is_not_grouped=True,
                 plot_func='trades.plot',
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             trade_pnl=dict(
-                title=RepEval("'Position P&L' if use_positions else 'Trade P&L'"),
-                yaxis_title=RepEval("'Position P&L' if use_positions else 'Trade P&L'"),
+                title="Trade PnL",
+                yaxis_title="Trade PnL",
                 check_is_not_grouped=True,
                 plot_func='trades.plot_pnl',
-                pass_column=True,
-                pass_hline_shape_kwargs=True,
-                pass_add_trace_kwargs=True,
-                pass_xref=True,
-                pass_yref=True,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
-            trade_returns=dict(
-                title=RepEval("'Position Returns' if use_positions else 'Trade Returns'"),
-                yaxis_title=RepEval("'Position returns' if use_positions else 'Trade returns'"),
+            positions=dict(
+                title="Positions",
+                yaxis_title="Price",
                 check_is_not_grouped=True,
-                plot_func='trades.plot_returns',
-                pass_column=True,
-                pass_hline_shape_kwargs=True,
-                pass_add_trace_kwargs=True,
-                pass_xref=True,
-                pass_yref=True,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                plot_func='positions.plot',
+                tags=RepEval("['portfolio', 'positions', *incl_open_tags]")
+            ),
+            position_pnl=dict(
+                title="Position PnL",
+                yaxis_title="Position PnL",
+                check_is_not_grouped=True,
+                plot_func='positions.plot_pnl',
+                tags=RepEval("['portfolio', 'positions', *incl_open_tags]")
             ),
             asset_flow=dict(
                 title="Asset Flow",

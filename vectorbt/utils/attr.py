@@ -56,7 +56,7 @@ def deep_getattr(obj: tp.Any,
         If your chain includes only attributes and functions without arguments,
         you can represent this chain as a single (but probably long) string.
     """
-    checks.assert_type(attr_chain, (str, tuple, Iterable))
+    checks.assert_instance_of(attr_chain, (str, tuple, Iterable))
 
     if isinstance(attr_chain, str):
         if '.' in attr_chain:

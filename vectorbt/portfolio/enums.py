@@ -20,7 +20,7 @@ __all__ = [
     'Direction',
     'OrderStatus',
     'OrderSide',
-    'StatusInfo',
+    'OrderStatusInfo',
     'TradeDirection',
     'TradeStatus',
     'TradeType',
@@ -349,7 +349,7 @@ __pdoc__['OrderSide'] = f"""Order side.
 """
 
 
-class StatusInfoT(tp.NamedTuple):
+class OrderStatusInfoT(tp.NamedTuple):
     SizeNaN: int = 0
     PriceNaN: int = 1
     ValPriceNaN: int = 2
@@ -366,13 +366,13 @@ class StatusInfoT(tp.NamedTuple):
     PartialFill: int = 13
 
 
-StatusInfo = StatusInfoT()
+OrderStatusInfo = OrderStatusInfoT()
 """_"""
 
-__pdoc__['StatusInfo'] = f"""Order status information.
+__pdoc__['OrderStatusInfo'] = f"""Order status information.
 
 ```json
-{to_doc(StatusInfo)}
+{to_doc(OrderStatusInfo)}
 ```
 """
 
@@ -1200,6 +1200,8 @@ Note that 0.01 = 1%."""
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = """Slippage in percentage of `Order.price`. 
 
+Slippage is a penalty applied on the price.
+
 Note that 0.01 = 1%."""
 __pdoc__['Order.min_size'] = """Minimum size in both directions. 
 
@@ -1262,7 +1264,7 @@ __pdoc__['OrderResult.price'] = "Filled price per unit, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
-__pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
+__pdoc__['OrderResult.status_info'] = "See `OrderStatusInfo`."
 
 
 class AdjustSLContext(tp.NamedTuple):
@@ -1396,20 +1398,20 @@ _log_fields = [
     ('free_cash', np.float_),
     ('val_price', np.float_),
     ('value', np.float_),
-    ('size', np.float_),
-    ('price', np.float_),
-    ('size_type', np.int_),
-    ('direction', np.int_),
-    ('fees', np.float_),
-    ('fixed_fees', np.float_),
-    ('slippage', np.float_),
-    ('min_size', np.float_),
-    ('max_size', np.float_),
-    ('reject_prob', np.float_),
-    ('lock_cash', np.bool_),
-    ('allow_partial', np.bool_),
-    ('raise_reject', np.bool_),
-    ('log', np.bool_),
+    ('req_size', np.float_),
+    ('req_price', np.float_),
+    ('req_size_type', np.int_),
+    ('req_direction', np.int_),
+    ('req_fees', np.float_),
+    ('req_fixed_fees', np.float_),
+    ('req_slippage', np.float_),
+    ('req_min_size', np.float_),
+    ('req_max_size', np.float_),
+    ('req_reject_prob', np.float_),
+    ('req_lock_cash', np.bool_),
+    ('req_allow_partial', np.bool_),
+    ('req_raise_reject', np.bool_),
+    ('req_log', np.bool_),
     ('new_cash', np.float_),
     ('new_position', np.float_),
     ('new_debt', np.float_),

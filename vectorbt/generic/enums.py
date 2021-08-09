@@ -34,6 +34,7 @@ __pdoc__['RangeStatus'] = f"""Range status.
 ```
 """
 
+
 class DrawdownStatusT(tp.NamedTuple):
     Active: int
     Recovered: int
@@ -70,9 +71,13 @@ __pdoc__['range_dt'] = f"""`np.dtype` of range records.
 drawdown_dt = np.dtype([
     ('id', np.int_),
     ('col', np.int_),
+    ('peak_idx', np.int_),
     ('start_idx', np.int_),
     ('valley_idx', np.int_),
     ('end_idx', np.int_),
+    ('peak_val', np.float_),
+    ('valley_val', np.float_),
+    ('end_val', np.float_),
     ('status', np.int_),
 ], align=True)
 """_"""

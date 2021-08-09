@@ -88,7 +88,7 @@ class BaseAccessor(Wrapping):
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
-        checks.assert_type(obj, (pd.Series, pd.DataFrame))
+        checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
 
         self._obj = obj
 
@@ -342,7 +342,7 @@ class BaseAccessor(Wrapping):
         y  3  4  3  4
         ```
         """
-        checks.assert_type(other, (pd.Series, pd.DataFrame))
+        checks.assert_instance_of(other, (pd.Series, pd.DataFrame))
         obj = reshape_fns.to_2d(self.obj)
         other = reshape_fns.to_2d(other)
 
@@ -711,7 +711,7 @@ class BaseSRAccessor(BaseAccessor):
     Accessible through `pd.Series.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
-        checks.assert_type(obj, pd.Series)
+        checks.assert_instance_of(obj, pd.Series)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
@@ -730,7 +730,7 @@ class BaseDFAccessor(BaseAccessor):
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        checks.assert_type(obj, pd.DataFrame)
+        checks.assert_instance_of(obj, pd.DataFrame)
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
