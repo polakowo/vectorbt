@@ -271,15 +271,18 @@ class Drawdowns(Ranges):
         )
 
     @classmethod
-    def from_ts(cls: tp.Type[DrawdownsT], ts: tp.ArrayLike,
-                wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DrawdownsT:
+    def from_ts(cls: tp.Type[DrawdownsT],
+                ts: tp.ArrayLike,
+                attach_ts: bool = True,
+                wrapper_kwargs: tp.KwargsLike = None,
+                **kwargs) -> DrawdownsT:
         """Build `Drawdowns` from time series `ts`.
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
         ts_pd = to_pd_array(ts)
         records_arr = nb.find_drawdowns_nb(to_2d_array(ts_pd))
         wrapper = ArrayWrapper.from_obj(ts_pd, **merge_dicts({}, wrapper_kwargs))
-        return cls(wrapper, records_arr, ts=ts_pd, **kwargs)
+        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 
     @property
     def ts(self) -> tp.Optional[tp.SeriesFrame]:

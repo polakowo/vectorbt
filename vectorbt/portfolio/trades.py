@@ -470,24 +470,29 @@ class Trades(Ranges):
         )
 
     @property
-    def close(self) -> tp.SeriesFrame:
+    def close(self) -> tp.Optional[tp.SeriesFrame]:
         """Reference price such as close (optional)."""
         return self._close
 
     @classmethod
-    def from_ts(cls: tp.Type[TradesT], ts: tp.ArrayLike,
-                wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> TradesT:
+    def from_ts(cls: tp.Type[TradesT], *args, **kwargs) -> TradesT:
         raise NotImplementedError
 
     @classmethod
-    def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
+    def from_orders(cls: tp.Type[TradesT],
+                    orders: Orders,
+                    close: tp.Optional[tp.ArrayLike] = None,
+                    attach_close: bool = True,
+                    **kwargs) -> TradesT:
         """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
+        if close is None:
+            close = orders.close
         trade_records_arr = nb.trades_from_orders_nb(
             orders.values,
-            to_2d_array(orders.close),
+            to_2d_array(close),
             orders.col_mapper.col_map
         )
-        return cls(orders.wrapper, trade_records_arr, close=orders.close, **kwargs)
+        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
     @cached_property
     def winning(self: TradesT) -> TradesT:
@@ -1297,15 +1302,26 @@ class Positions(Trades):
         return self._field_config
 
     @classmethod
-    def from_trades(cls: tp.Type[PositionsT], trades: Trades, **kwargs) -> PositionsT:
+    def from_trades(cls: tp.Type[PositionsT],
+                    trades: Trades,
+                    close: tp.Optional[tp.ArrayLike] = None,
+                    attach_close: bool = True,
+                    **kwargs) -> PositionsT:
         """Build `Positions` from `Trades`."""
+        if close is None:
+            close = trades.close
         position_records_arr = nb.positions_from_trades_nb(trades.values, trades.col_mapper.col_map)
-        return cls(trades.wrapper, position_records_arr, close=trades.close, **kwargs)
+        return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)
 
     @classmethod
-    def from_orders(cls: tp.Type[PositionsT], orders: Orders, **kwargs) -> PositionsT:
+    def from_orders(cls: tp.Type[PositionsT],
+                    orders: Orders,
+                    close: tp.Optional[tp.ArrayLike] = None,
+                    attach_close: bool = True,
+                    **kwargs) -> PositionsT:
         """Build `Trades` from `vectorbt.portfolio.orders.Orders` and `close`."""
-        return cls.from_trades(Trades.from_orders(orders), **kwargs)
+        trades = Trades.from_orders(orders, close=close, attach_close=False)
+        return cls.from_trades(trades, close=close, attach_close=attach_close, **kwargs)
 
     # ############# Stats ############# #
 

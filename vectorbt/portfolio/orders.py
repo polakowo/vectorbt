@@ -198,7 +198,7 @@ class Orders(Records):
         )
 
     @property
-    def close(self) -> tp.SeriesFrame:
+    def close(self) -> tp.Optional[tp.SeriesFrame]:
         """Reference price such as close (optional)."""
         return self._close
 

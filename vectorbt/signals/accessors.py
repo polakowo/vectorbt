@@ -1043,12 +1043,70 @@ class SignalsAccessor(GenericAccessor):
                        from_other: bool = False,
                        broadcast_kwargs: tp.KwargsLike = None,
                        group_by: tp.GroupByLike = None,
+                       attach_ts: bool = True,
+                       attach_other: bool = False,
                        **kwargs) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.between_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
         If `other` specified, see `vectorbt.signals.nb.between_two_ranges_nb`.
-        Both will broadcast using `vectorbt.base.reshape_fns.broadcast` and `broadcast_kwargs`."""
+        Both will broadcast using `vectorbt.base.reshape_fns.broadcast` and `broadcast_kwargs`.
+
+        ## Example
+
+        One array:
+
+        ```python-repl
+        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+        >>> ranges = mask_sr.vbt.signals.between_ranges()
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29ea7c7b8>
+
+        >>> ranges.records_readable
+           Range Id  Column  Start Date  End Date  Status
+        0         0       0           0         3  Closed
+        1         1       0           3         5  Closed
+        2         2       0           5         6  Closed
+
+        >>> ranges.duration.values
+        array([3, 2, 1])
+        ```
+
+        Two arrays, traversing the signals of the first array:
+
+        ```python-repl
+        >>> mask_sr = pd.Series([True, True, True, False, False])
+        >>> mask_sr2 = pd.Series([False, False, True, False, True])
+        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29e3b80f0>
+
+        >>> ranges.records_readable
+           Range Id  Column  Start Date  End Date  Status
+        0         0       0           0         2  Closed
+        1         1       0           1         2  Closed
+        2         2       0           2         2  Closed
+
+        >>> ranges.duration.values
+        array([2, 1, 0])
+        ```
+
+        Two arrays, traversing the signals of the second array:
+
+        ```python-repl
+        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29eccbd68>
+
+        >>> ranges.records_readable
+           Range Id  Column  Start Date  End Date  Status
+        0         0       0           2         2  Closed
+        1         1       0           2         4  Closed
+
+        >>> ranges.duration.values
+        array([0, 2])
+        ```
+        """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1056,6 +1114,7 @@ class SignalsAccessor(GenericAccessor):
             # One input array
             range_records = nb.between_ranges_nb(self.to_2d_array())
             wrapper = self.wrapper
+            to_attach = self.obj
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
@@ -1065,32 +1124,56 @@ class SignalsAccessor(GenericAccessor):
                 from_other=from_other
             )
             wrapper = ArrayWrapper.from_obj(obj)
+            to_attach = other if attach_other else obj
         return Ranges(
             wrapper,
             range_records,
+            ts=to_attach if attach_ts else None,
             **kwargs
         ).regroup(group_by)
 
-    def partition_ranges(self, group_by: tp.GroupByLike = None, **kwargs) -> Ranges:
+    def partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.partition_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
         If `use_end_idxs` is True, uses the index of the last signal in each partition as `idx_arr`.
-        Otherwise, uses the index of the first signal."""
+        Otherwise, uses the index of the first signal.
+
+        ## Example
+
+        ```python-repl
+        >>> mask_sr = pd.Series([True, True, True, False, True, True])
+        >>> mask_sr.vbt.signals.partition_ranges().records_readable
+           Range Id  Column  Start Date  End Date  Status
+        0         0       0           0         3  Closed
+        1         1       0           4         5    Open
+        ```"""
         range_records = nb.partition_ranges_nb(self.to_2d_array())
         return Ranges(
             self.wrapper,
             range_records,
+            ts=self.obj if attach_ts else None,
             **kwargs
         ).regroup(group_by)
 
-    def between_partition_ranges(self, group_by: tp.GroupByLike = None, **kwargs) -> Ranges:
+    def between_partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.between_partition_ranges_nb`
-         with `vectorbt.generic.ranges.Ranges`."""
+        with `vectorbt.generic.ranges.Ranges`.
+
+        ## Example
+
+        ```python-repl
+        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+        >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+           Range Id  Column  Start Date  End Date  Status
+        0         0       0           0         3  Closed
+        1         1       0           3         5  Closed
+         ```"""
         range_records = nb.between_partition_ranges_nb(self.to_2d_array())
         return Ranges(
             self.wrapper,
             range_records,
+            ts=self.obj if attach_ts else None,
             **kwargs
         ).regroup(group_by)
 

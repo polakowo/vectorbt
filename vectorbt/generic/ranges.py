@@ -216,6 +216,7 @@ class Ranges(Records):
     def from_ts(cls: tp.Type[RangesT],
                 ts: tp.ArrayLike,
                 gap_value: tp.Optional[tp.Scalar] = None,
+                attach_ts: bool = True,
                 wrapper_kwargs: tp.KwargsLike = None,
                 **kwargs) -> RangesT:
         """Build `Ranges` from time series `ts`.
@@ -241,7 +242,7 @@ class Ranges(Records):
                 gap_value = np.nan
         records_arr = nb.find_ranges_nb(ts_arr, gap_value)
         wrapper = ArrayWrapper.from_obj(ts_pd, **wrapper_kwargs)
-        return cls(wrapper, records_arr, ts=ts_pd, **kwargs)
+        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 
     @property
     def ts(self) -> tp.Optional[tp.SeriesFrame]:
