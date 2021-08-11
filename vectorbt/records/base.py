@@ -26,25 +26,18 @@ attr2 =  1  10.0   NaN
          3  12.0  16.0
             |
             v
-      id  idx  col  attr1  attr2
+      id  col  idx  attr1  attr2
 0      0    0    0      1      9
-1      1    1    0      2     10
-2      2    3    0      4     12
-3      3    0    1      5     13
+1      1    0    1      2     10
+2      2    0    3      4     12
+3      3    1    0      5     13
 4      4    1    1      7     15
-5      5    3    1      8     16
+5      5    1    3      8     16
 ```
 
 Another advantage of records is that they are not constrained by size. Multiple records can map
 to a single element in a matrix. For example, one can define multiple orders at the same time step,
 which is impossible to represent in a matrix form without using complex data types.
-
-## Mapping
-
-`Records` are just [structured arrays](https://numpy.org/doc/stable/user/basics.rec.html) with a bunch
-of methods and properties for processing them. Their main feature is to map the records array and
-to reduce it by column (similar to the MapReduce paradigm). The main advantage is that it all happens
-without conversion to the matrix form and wasting memory resources.
 
 Consider the following example:
 
@@ -57,37 +50,68 @@ Consider the following example:
 
 >>> example_dt = np.dtype([
 ...     ('id', np.int_),
-...     ('idx', np.int_),
 ...     ('col', np.int_),
+...     ('idx', np.int_),
 ...     ('some_field', np.float_)
 ... ])
 >>> records_arr = np.array([
 ...     (0, 0, 0, 10.),
-...     (1, 1, 0, 11.),
-...     (2, 2, 0, 12.),
-...     (3, 0, 1, 13.),
+...     (1, 0, 1, 11.),
+...     (2, 0, 2, 12.),
+...     (3, 1, 0, 13.),
 ...     (4, 1, 1, 14.),
-...     (5, 2, 1, 15.),
-...     (6, 0, 2, 16.),
-...     (7, 1, 2, 17.),
+...     (5, 1, 2, 15.),
+...     (6, 2, 0, 16.),
+...     (7, 2, 1, 17.),
 ...     (8, 2, 2, 18.)
 ... ], dtype=example_dt)
 >>> wrapper = vbt.ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
 >>> records = vbt.Records(wrapper, records_arr)
+```
 
+## Printing
+
+There are two ways to print records:
+
+* Raw dataframe that preserves field names and data types:
+
+```python-repl
 >>> records.records
-   id  idx  col  some_field
+   id  col  idx  some_field
 0   0    0    0        10.0
-1   1    1    0        11.0
-2   2    2    0        12.0
-3   3    0    1        13.0
+1   1    0    1        11.0
+2   2    0    2        12.0
+3   3    1    0        13.0
 4   4    1    1        14.0
-5   5    2    1        15.0
-6   6    0    2        16.0
-7   7    1    2        17.0
+5   5    1    2        15.0
+6   6    2    0        16.0
+7   7    2    1        17.0
 8   8    2    2        18.0
 ```
+
+* Readable dataframe that takes into consideration `Records.field_config`:
+
+```python-repl
+>>> records.records_readable
+   Id Column Timestamp  some_field
+0   0      a         x        10.0
+1   1      a         y        11.0
+2   2      a         z        12.0
+3   3      b         x        13.0
+4   4      b         y        14.0
+5   5      b         z        15.0
+6   6      c         x        16.0
+7   7      c         y        17.0
+8   8      c         z        18.0
+```
+
+## Mapping
+
+`Records` are just [structured arrays](https://numpy.org/doc/stable/user/basics.rec.html) with a bunch
+of methods and properties for processing them. Their main feature is to map the records array and
+to reduce it by column (similar to the MapReduce paradigm). The main advantage is that it all happens
+without conversion to the matrix form and wasting memory resources.
 
 `Records` can be mapped to `vectorbt.records.mapped_array.MappedArray` in several ways:
 
@@ -221,19 +245,19 @@ on a `Records` instance, which forwards indexing operation to each object with c
 
 ```python-repl
 >>> records['a'].records
-   id  idx  col  some_field
+   id  col  idx  some_field
 0   0    0    0        10.0
-1   1    1    0        11.0
-2   2    2    0        12.0
+1   1    0    1        11.0
+2   2    0    2        12.0
 
 >>> grouped_records['first'].records
-   id  idx  col  some_field
+   id  col  idx  some_field
 0   0    0    0        10.0
-1   1    1    0        11.0
-2   2    2    0        12.0
-3   3    0    1        13.0
+1   1    0    1        11.0
+2   2    0    2        12.0
+3   3    1    0        13.0
 4   4    1    1        14.0
-5   5    2    1        15.0
+5   5    1    2        15.0
 ```
 
 !!! note
@@ -294,23 +318,20 @@ It will look for configs of all base classes and merge our config on top of them
 any base class property that is not explicitly listed in our config.
 
 ```python-repl
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbt as vbt
 >>> from vectorbt.records.decorators import override_field_config
 
 >>> my_dt = np.dtype([
 ...     ('my_id', np.int_),
-...     ('my_idx', np.int_),
-...     ('my_col', np.int_)
+...     ('my_col', np.int_),
+...     ('my_idx', np.int_)
 ... ])
 
 >>> my_fields_config = dict(
 ...     dtype=my_dt,
 ...     settings=dict(
 ...         id=dict(name='my_id'),
-...         idx=dict(name='my_idx'),
-...         col=dict(name='my_col')
+...         col=dict(name='my_col'),
+...         idx=dict(name='my_idx')
 ...     )
 ... )
 >>> @override_field_config(my_fields_config)
@@ -319,8 +340,8 @@ any base class property that is not explicitly listed in our config.
 
 >>> records_arr = np.array([
 ...     (0, 0, 0),
-...     (1, 1, 0),
-...     (2, 0, 1),
+...     (1, 0, 1),
+...     (2, 1, 0),
 ...     (3, 1, 1)
 ... ], dtype=my_dt)
 >>> wrapper = vbt.ArrayWrapper(index=['x', 'y'],
@@ -439,15 +460,15 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
                     name='id',
                     title='Id'
                 ),
-                idx=dict(
-                    name='idx',
-                    title='Date',
-                    mapping='index'
-                ),
                 col=dict(
                     name='col',
                     title='Column',
                     mapping='columns'
+                ),
+                idx=dict(
+                    name='idx',
+                    title='Timestamp',
+                    mapping='index'
                 )
             )
         ),
@@ -584,7 +605,10 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
                 else:
                     title = field_name
                 if 'mapping' in dct:
-                    df[title] = self.map_field(col_name).apply_mapping(dct['mapping']).values
+                    if isinstance(dct['mapping'], str) and dct['mapping'] == 'index':
+                        df[title] = self.resolve_map_field_to_index(col_name)
+                    else:
+                        df[title] = self.resolve_apply_mapping_arr(col_name)
         return df
 
     def resolve_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:

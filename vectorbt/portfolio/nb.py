@@ -530,9 +530,9 @@ def fill_log_record_nb(record: tp.Record,
     """Fill a log record."""
 
     record['id'] = record_id
-    record['idx'] = i
-    record['col'] = col
     record['group'] = group
+    record['col'] = col
+    record['idx'] = i
     record['cash'] = cash
     record['position'] = position
     record['debt'] = debt
@@ -577,8 +577,8 @@ def fill_order_record_nb(record: tp.Record,
     """Fill an order record."""
 
     record['id'] = record_id
-    record['idx'] = i
     record['col'] = col
+    record['idx'] = i
     record['size'] = order_result.size
     record['price'] = order_result.price
     record['fees'] = order_result.fees
@@ -807,7 +807,7 @@ def close_position_nb(price: float = np.inf,
 
 
 @njit(cache=True)
-def order_nothing() -> Order:
+def order_nothing_nb() -> Order:
     """Convenience function to order nothing."""
     return NoOrder
 
@@ -816,14 +816,14 @@ def order_nothing() -> Order:
 
 
 @njit(cache=True)
-def check_group_lens(group_lens: tp.Array1d, n_cols: int) -> None:
+def check_group_lens_nb(group_lens: tp.Array1d, n_cols: int) -> None:
     """Check `group_lens`."""
     if np.sum(group_lens) != n_cols:
         raise ValueError("group_lens has incorrect total number of columns")
 
 
 @njit(cache=True)
-def check_group_init_cash(group_lens: tp.Array1d, n_cols: int, init_cash: tp.Array1d, cash_sharing: bool) -> None:
+def check_group_init_cash_nb(group_lens: tp.Array1d, n_cols: int, init_cash: tp.Array1d, cash_sharing: bool) -> None:
     """Check `init_cash`."""
     if cash_sharing:
         if len(init_cash) != len(group_lens):
@@ -896,60 +896,6 @@ def build_call_seq(target_shape: tp.Shape,
     return require_call_seq(call_seq)
 
 
-@njit(cache=True)
-def sort_call_seq_nb(seg_ctx: SegmentContext,
-                     size: float,
-                     size_type: int,
-                     direction: int,
-                     order_value_out: tp.Array1d) -> None:
-    """Sort call sequence based on order value dynamically, for example, to rebalance.
-
-    Accepts `vectorbt.portfolio.enums.SegmentContext`.
-
-    `size`, `size_type` and `direction` utilize flexible broadcasting.
-
-    Arrays `size`, `size_type`, `direction` and `order_value_out` should match the number
-    of columns in the group. Array `order_value_out` should be empty and will contain
-    sorted order values after execution.
-
-    Best called once from `pre_segment_func_nb`.
-
-    !!! note
-        Cash sharing must be enabled and `call_seq_now` should follow `CallSeqType.Default`."""
-    if not seg_ctx.cash_sharing:
-        raise ValueError("Cash sharing must be enabled")
-    size_arr = np.asarray(size)
-    size_type_arr = np.asarray(size_type)
-    direction_arr = np.asarray(direction)
-
-    group_value_now = get_group_value_ctx_nb(seg_ctx)
-    group_len = seg_ctx.to_col - seg_ctx.from_col
-    for k in range(group_len):
-        if seg_ctx.call_seq_now[k] != k:
-            raise ValueError("call_seq_now should follow CallSeqType.Default")
-        col = seg_ctx.from_col + k
-        if seg_ctx.cash_sharing:
-            cash_now = seg_ctx.last_cash[seg_ctx.group]
-        else:
-            cash_now = seg_ctx.last_cash[col]
-        if seg_ctx.cash_sharing:
-            free_cash_now = seg_ctx.last_free_cash[seg_ctx.group]
-        else:
-            free_cash_now = seg_ctx.last_free_cash[col]
-        order_value_out[k] = approx_order_value_nb(
-            flex_select_auto_nb(k, 0, size_arr, False),
-            flex_select_auto_nb(k, 0, size_type_arr, False),
-            cash_now,
-            seg_ctx.last_position[col],
-            free_cash_now,
-            seg_ctx.last_val_price[col],
-            group_value_now,
-            flex_select_auto_nb(k, 0, direction_arr, False)
-        )
-    # Sort by order value
-    insert_argsort_nb(order_value_out, seg_ctx.call_seq_now)
-
-
 # ############# Helper functions ############# #
 
 
@@ -962,8 +908,8 @@ def get_group_value_nb(from_col: int,
     """Get group value."""
     group_value = cash_now
     group_len = to_col - from_col
-    for k in range(group_len):
-        col = from_col + k
+    for call_idx in range(group_len):
+        col = from_col + call_idx
         if last_position[col] != 0:
             group_value += last_position[col] * last_val_price[col]
     return group_value
@@ -1022,6 +968,88 @@ def approx_order_value_nb(size: float,
     if size_type == SizeType.TargetPercent:
         return size * value_now - asset_value_now
     return np.nan
+
+
+@njit(cache=True)
+def sort_call_seq_out_nb(seg_ctx: SegmentContext,
+                         size: tp.ArrayLike,
+                         size_type: tp.ArrayLike,
+                         direction: tp.ArrayLike,
+                         order_value_out: tp.Array1d,
+                         call_seq_out: tp.Array1d) -> None:
+    """Sort call sequence `call_seq_out` based on order value dynamically, for example, to rebalance.
+
+    Accepts `vectorbt.portfolio.enums.SegmentContext` and other arguments, sorts `call_seq_out` in place,
+    and returns nothing.
+
+    Arrays `size`, `size_type`, and `direction` utilize flexible broadcasting.
+    Arrays `size`, `size_type`, `direction`, `order_value_out`, and `call_seq_out` should match the number
+    of columns in the group. Array `order_value_out` should be empty and will contain
+    sorted order values after execution. Array `call_seq_out` should be filled with integers ranging
+    from 0 to the number of columns in the group (in this exact order).
+
+    Best called once from `pre_segment_func_nb`.
+
+    !!! note
+        Cash sharing must be enabled and `call_seq_out` should follow `CallSeqType.Default`.
+
+        Should be used in flexible simulation functions."""
+    if not seg_ctx.cash_sharing:
+        raise ValueError("Cash sharing must be enabled")
+    size_arr = np.asarray(size)
+    size_type_arr = np.asarray(size_type)
+    direction_arr = np.asarray(direction)
+
+    group_value_now = get_group_value_ctx_nb(seg_ctx)
+    group_len = seg_ctx.to_col - seg_ctx.from_col
+    for call_idx in range(group_len):
+        if call_seq_out[call_idx] != call_idx:
+            raise ValueError("call_seq_out should follow CallSeqType.Default")
+        col = seg_ctx.from_col + call_idx
+        if seg_ctx.cash_sharing:
+            cash_now = seg_ctx.last_cash[seg_ctx.group]
+        else:
+            cash_now = seg_ctx.last_cash[col]
+        if seg_ctx.cash_sharing:
+            free_cash_now = seg_ctx.last_free_cash[seg_ctx.group]
+        else:
+            free_cash_now = seg_ctx.last_free_cash[col]
+        order_value_out[call_idx] = approx_order_value_nb(
+            flex_select_auto_nb(call_idx, 0, size_arr, False),
+            flex_select_auto_nb(call_idx, 0, size_type_arr, False),
+            cash_now,
+            seg_ctx.last_position[col],
+            free_cash_now,
+            seg_ctx.last_val_price[col],
+            group_value_now,
+            flex_select_auto_nb(call_idx, 0, direction_arr, False)
+        )
+    # Sort by order value
+    insert_argsort_nb(order_value_out, call_seq_out)
+
+
+@njit(cache=True)
+def sort_call_seq_nb(seg_ctx: SegmentContext,
+                     size: tp.ArrayLike,
+                     size_type: tp.ArrayLike,
+                     direction: tp.ArrayLike,
+                     order_value_out: tp.Array1d) -> None:
+    """Sort call sequence attached to `vectorbt.portfolio.enums.SegmentContext`.
+
+    See `sort_call_seq_out_nb`.
+
+    !!! note
+        Can only be used in non-flexible simulation functions."""
+    if seg_ctx.call_seq_now is None:
+        raise ValueError("Call sequence array is None. Use sort_call_seq_out_nb to sort a custom array.")
+    sort_call_seq_out_nb(
+        seg_ctx,
+        size,
+        size_type,
+        direction,
+        order_value_out,
+        seg_ctx.call_seq_now
+    )
 
 
 @njit(cache=True)
@@ -1273,9 +1301,9 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
            [  0.],
            [  0.]])
     ```"""
-    check_group_lens(group_lens, target_shape[1])
+    check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
-    check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float_)
@@ -1295,8 +1323,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
         free_cash_now = init_cash[group]
 
         for i in range(target_shape[0]):
-            for k in range(group_len):
-                col = from_col + k
+            for call_idx in range(group_len):
+                col = from_col + call_idx
 
                 # Resolve order price
                 _price = flex_select_auto_nb(i, col, price, flex_2d)
@@ -1325,8 +1353,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
             if cash_sharing:
                 # Same as get_group_value_ctx_nb but with flexible indexing
                 value_now = cash_now
-                for k in range(group_len):
-                    col = from_col + k
+                for call_idx in range(group_len):
+                    col = from_col + call_idx
 
                     if last_position[col] != 0:
                         value_now += last_position[col] * last_val_price[col]
@@ -1334,9 +1362,9 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 # Dynamically sort by order value -> selling comes first to release funds early
                 if auto_call_seq:
                     # Same as sort_by_order_value_ctx_nb but with flexible indexing
-                    for k in range(group_len):
-                        col = from_col + k
-                        temp_order_value[k] = approx_order_value_nb(
+                    for call_idx in range(group_len):
+                        col = from_col + call_idx
+                        temp_order_value[call_idx] = approx_order_value_nb(
                             flex_select_auto_nb(i, col, size, flex_2d),
                             flex_select_auto_nb(i, col, size_type, flex_2d),
                             cash_now,
@@ -1350,8 +1378,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                     # Sort by order value
                     insert_argsort_nb(temp_order_value[:group_len], call_seq[i, from_col:to_col])
 
-            for k in range(group_len):
-                col = from_col + k
+            for call_idx in range(group_len):
+                col = from_col + call_idx
                 if cash_sharing:
                     col_i = call_seq[i, col]
                     if col_i >= group_len:
@@ -1703,9 +1731,9 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
            [  0.],
            [  0.]])
     ```"""
-    check_group_lens(group_lens, target_shape[1])
+    check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
-    check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float_)
@@ -1748,8 +1776,8 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
         free_cash_now = init_cash[group]
 
         for i in range(target_shape[0]):
-            for k in range(group_len):
-                col = from_col + k
+            for call_idx in range(group_len):
+                col = from_col + call_idx
 
                 # Resolve order price
                 _price = flex_select_auto_nb(i, col, price, flex_2d)
@@ -1781,8 +1809,8 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     last_val_price[col] = _val_price
 
             # Get size and value of each order
-            for k in range(group_len):
-                col = from_col + k  # order doesn't matter
+            for call_idx in range(group_len):
+                col = from_col + call_idx  # order doesn't matter
 
                 stop_price_hit = False
                 if use_stops:
@@ -1904,24 +1932,24 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                 if cash_sharing:
                     if _order_size == 0:
-                        temp_order_value[k] = 0.
+                        temp_order_value[call_idx] = 0.
                     else:
                         # Approximate order value
                         _direction = flex_select_auto_nb(i, col, direction, flex_2d)
                         if _order_size_type == SizeType.Amount:
-                            temp_order_value[k] = _order_size * last_val_price[col]
+                            temp_order_value[call_idx] = _order_size * last_val_price[col]
                         elif _order_size_type == SizeType.Value:
-                            temp_order_value[k] = _order_size
+                            temp_order_value[call_idx] = _order_size
                         else:  # SizeType.Percent
                             if _order_size >= 0:
-                                temp_order_value[k] = _order_size * cash_now
+                                temp_order_value[call_idx] = _order_size * cash_now
                             else:
                                 asset_value_now = last_position[col] * last_val_price[col]
                                 if _direction == Direction.LongOnly:
-                                    temp_order_value[k] = _order_size * asset_value_now
+                                    temp_order_value[call_idx] = _order_size * asset_value_now
                                 else:
                                     max_exposure = (2 * max(asset_value_now, 0) + max(free_cash_now, 0))
-                                    temp_order_value[k] = _order_size * max_exposure
+                                    temp_order_value[call_idx] = _order_size * max_exposure
 
             if cash_sharing:
                 # Dynamically sort by order value -> selling comes first to release funds early
@@ -1930,13 +1958,13 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                 # Same as get_group_value_ctx_nb but with flexible indexing
                 value_now = cash_now
-                for k in range(group_len):
-                    col = from_col + k
+                for call_idx in range(group_len):
+                    col = from_col + call_idx
                     if last_position[col] != 0:
                         value_now += last_position[col] * last_val_price[col]
 
-            for k in range(group_len):
-                col = from_col + k
+            for call_idx in range(group_len):
+                col = from_col + call_idx
                 if cash_sharing:
                     col_i = call_seq[i, col]
                     if col_i >= group_len:
@@ -2131,7 +2159,7 @@ def simulate_nb(target_shape: tp.Shape,
                 fill_pos_record: bool = True,
                 max_orders: tp.Optional[int] = None,
                 max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
-    """Simulate a portfolio by generating and filling orders.
+    """Fill order and log records by iterating over a shape and calling a range of user-defined functions.
 
     Starting with initial cash `init_cash`, iterates over each group and column over shape `target_shape`,
     and for each data point, generates an order using `order_func_nb`. Tries then to fulfill that
@@ -2242,6 +2270,8 @@ def simulate_nb(target_shape: tp.Shape,
             !!! note
                 If the returned order has been rejected, there is no way of issuing a new order.
                 You should make sure that the order passes, for example, by using `try_order_nb`.
+
+                To have a greater freedom in order management, use `flex_simulate_nb`.
         order_args (tuple): Arguments passed to `order_func_nb`.
         post_order_func_nb (callable): Callback that is called after the order has been processed.
 
@@ -2431,21 +2461,14 @@ def simulate_nb(target_shape: tp.Shape,
     ...     call_seq=call_seq,
     ...     segment_mask=segment_mask,
     ...     pre_sim_func_nb=pre_sim_func_nb,
-    ...     pre_sim_args=(),
     ...     post_sim_func_nb=post_sim_func_nb,
-    ...     post_sim_args=(),
     ...     pre_group_func_nb=pre_group_func_nb,
-    ...     pre_group_args=(),
     ...     post_group_func_nb=post_group_func_nb,
-    ...     post_group_args=(),
     ...     pre_segment_func_nb=pre_segment_func_nb,
-    ...     pre_segment_args=(),
     ...     post_segment_func_nb=post_segment_func_nb,
-    ...     post_segment_args=(),
     ...     order_func_nb=order_func_nb,
     ...     order_args=(fees, fixed_fees, slippage),
-    ...     post_order_func_nb=post_order_func_nb,
-    ...     post_order_args=()
+    ...     post_order_func_nb=post_order_func_nb
     ... )
     before simulation
         before group 0
@@ -2477,16 +2500,16 @@ def simulate_nb(target_shape: tp.Shape,
     after simulation
 
     >>> pd.DataFrame.from_records(order_records)
-       id  idx  col       size     price      fees  side
+       id  col  idx       size     price      fees  side
     0   0    0    0   7.626262  4.375232  1.033367     0
-    1   1    0    1   3.488053  9.565985  1.033367     0
-    2   2    0    2   3.972040  7.595533  1.030170     0
-    3   3    2    1   0.920352  8.786790  1.008087     1
+    1   1    1    0   3.488053  9.565985  1.033367     0
+    2   2    2    0   3.972040  7.595533  1.030170     0
+    3   3    1    2   0.920352  8.786790  1.008087     1
     4   4    2    2   0.448747  6.403625  1.002874     1
-    5   5    2    0   5.210115  1.524275  1.007942     0
-    6   6    4    0   7.899568  8.483492  1.067016     1
-    7   7    4    2  12.378281  2.639061  1.032667     0
-    8   8    4    1  10.713236  2.913963  1.031218     0
+    5   5    0    2   5.210115  1.524275  1.007942     0
+    6   6    0    4   7.899568  8.483492  1.067016     1
+    7   7    2    4  12.378281  2.639061  1.032667     0
+    8   8    1    4  10.713236  2.913963  1.031218     0
 
     >>> call_seq
     array([[0, 1, 2],
@@ -2508,8 +2531,8 @@ def simulate_nb(target_shape: tp.Shape,
     as it has a bit less funds than the previous orders due to costs, which are not
     included when valuating the group.
     """
-    check_group_lens(group_lens, target_shape[1])
-    check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
+    check_group_lens_nb(group_lens, target_shape[1])
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float_)
@@ -2660,8 +2683,8 @@ def simulate_nb(target_shape: tp.Shape,
             # Is this segment active?
             if segment_mask[i, group]:
 
-                for k in range(group_len):
-                    col_i = call_seq_now[k]
+                for call_idx in range(group_len):
+                    col_i = call_seq_now[call_idx]
                     if col_i >= group_len:
                         raise ValueError("Call index exceeds bounds of the group")
                     col = from_col + col_i
@@ -2713,7 +2736,7 @@ def simulate_nb(target_shape: tp.Shape,
                         i=i,
                         call_seq_now=call_seq_now,
                         col=col,
-                        call_idx=k,
+                        call_idx=call_idx,
                         cash_now=cash_now,
                         position_now=position_now,
                         debt_now=debt_now,
@@ -2827,7 +2850,7 @@ def simulate_nb(target_shape: tp.Shape,
                         i=i,
                         call_seq_now=call_seq_now,
                         col=col,
-                        call_idx=k,
+                        call_idx=call_idx,
                         cash_before=state.cash,
                         position_before=state.position,
                         debt_before=state.debt,
@@ -3113,8 +3136,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     after simulation
     ```
     """
-    check_group_lens(group_lens, target_shape[1])
-    check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
+    check_group_lens_nb(group_lens, target_shape[1])
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float_)
@@ -3262,8 +3285,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
             # Is this segment active?
             if segment_mask[i, group]:
 
-                for k in range(group_len):
-                    col_i = call_seq_now[k]
+                for call_idx in range(group_len):
+                    col_i = call_seq_now[call_idx]
                     if col_i >= group_len:
                         raise ValueError("Call index exceeds bounds of the group")
                     col = from_col + col_i
@@ -3315,7 +3338,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         i=i,
                         call_seq_now=call_seq_now,
                         col=col,
-                        call_idx=k,
+                        call_idx=call_idx,
                         cash_now=cash_now,
                         position_now=position_now,
                         debt_now=debt_now,
@@ -3429,7 +3452,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         i=i,
                         call_seq_now=call_seq_now,
                         col=col,
-                        call_idx=k,
+                        call_idx=call_idx,
                         cash_before=state.cash,
                         position_before=state.position,
                         debt_before=state.debt,
@@ -3558,6 +3581,1164 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         init_cash=init_cash,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    post_sim_func_nb(post_sim_ctx, *post_sim_args)
+
+    return order_records[:oidx], log_records[:lidx]
+
+
+@njit
+def no_flex_order_func_nb(context: FlexOrderContext, *args) -> tp.Tuple[int, Order]:
+    """Placeholder flexible order function that returns break column and no order."""
+    return -1, NoOrder
+
+
+FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Order]]
+
+
+@njit
+def flex_simulate_nb(target_shape: tp.Shape,
+                     close: tp.Array2d,
+                     group_lens: tp.Array1d,
+                     init_cash: tp.Array1d,
+                     cash_sharing: bool,
+                     segment_mask: tp.Array2d,
+                     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+                     pre_sim_args: tp.Args = (),
+                     post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+                     post_sim_args: tp.Args = (),
+                     pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
+                     pre_group_args: tp.Args = (),
+                     post_group_func_nb: PostGroupFuncT = no_post_func_nb,
+                     post_group_args: tp.Args = (),
+                     pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+                     pre_segment_args: tp.Args = (),
+                     post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+                     post_segment_args: tp.Args = (),
+                     flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+                     flex_order_args: tp.Args = (),
+                     post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+                     post_order_args: tp.Args = (),
+                     call_pre_segment: bool = False,
+                     call_post_segment: bool = False,
+                     ffill_val_price: bool = True,
+                     update_value: bool = False,
+                     fill_pos_record: bool = True,
+                     max_orders: tp.Optional[int] = None,
+                     max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+    """Same as `simulate_nb`, but with no predefined call sequence.
+
+    In contrast to `order_func_nb` in`simulate_nb`, `post_order_func_nb` is a segment-level order function
+    that returns a column along with the order, and gets repeatedly called until some condition is met.
+    This allows multiple orders to be issued within a single element and in an arbitrary order.
+
+    The order function should accept `vectorbt.portfolio.enums.FlexOrderContext`, unpacked tuple from
+    `pre_segment_func_nb`, and `*flex_order_args`. Should return column and `vectorbt.portfolio.enums.Order`.
+    To break out of the loop, return column of -1.
+
+    !!! note
+        Since one element can now accommodate multiple orders, you may run into "order_records index out of range"
+        exception. In this case, you should increase `max_orders`. This cannot be done automatically and
+        dynamically to avoid performance degradation.
+
+    ## Example
+
+    The same example as in `simulate_nb`:
+
+    ```python-repl
+    >>> import numpy as np
+    >>> from numba import njit
+    >>> from vectorbt.portfolio.enums import SizeType, Direction
+    >>> from vectorbt.portfolio.nb import (
+    ...     order_nb,
+    ...     order_nothing_nb,
+    ...     flex_simulate_nb,
+    ...     flex_simulate_row_wise_nb,
+    ...     sort_call_seq_out_nb
+    ... )
+
+    >>> @njit
+    ... def pre_sim_func_nb(c):
+    ...     print('before simulation')
+    ...     return ()
+
+    >>> @njit
+    ... def pre_group_func_nb(c):
+    ...     print('\\tbefore group', c.group)
+    ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
+    ...     call_seq_out = np.empty(c.group_len, dtype=np.int_)
+    ...     # Forward down the stack
+    ...     return (order_value_out, call_seq_out)
+
+    >>> @njit
+    ... def pre_segment_func_nb(c, order_value_out, call_seq_out):
+    ...     print('\\t\\tbefore segment', c.i)
+    ...     # Reorder call sequence such that selling orders come first and buying last
+    ...     for col in range(c.from_col, c.to_col):
+    ...         # Here we use order price for group valuation (just for illustration!)
+    ...         c.last_val_price[col] = close[c.i, col]
+    ...     size = 1 / c.group_len
+    ...     size_type = SizeType.TargetPercent
+    ...     direction = Direction.LongOnly
+    ...     call_seq_out[:] = np.arange(c.group_len)
+    ...     sort_call_seq_out_nb(c, size, size_type, direction, order_value_out, call_seq_out)
+    ...     return (call_seq_out, size, size_type, direction)
+
+    >>> @njit
+    ... def flex_order_func_nb(c, call_seq_out, size, size_type, direction, fees, fixed_fees, slippage):
+    ...     if c.call_idx < c.group_len:
+    ...         col = c.from_col + call_seq_out[c.call_idx]
+    ...         print('\\t\\t\\tcreating order', c.call_idx, 'at column', col)
+    ...         # Create an order
+    ...         return col, order_nb(
+    ...             size=size,
+    ...             price=close[c.i, col],
+    ...             size_type=size_type,
+    ...             direction=direction,
+    ...             fees=fees,
+    ...             fixed_fees=fixed_fees,
+    ...             slippage=slippage
+    ...         )
+    ...     # All columns already processed
+    ...     print('\\t\\t\\tbreaking out of the loop')
+    ...     return -1, order_nothing_nb()
+
+    >>> @njit
+    ... def post_order_func_nb(c, call_seq_out, size, size_type, direction):
+    ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
+
+    >>> @njit
+    ... def post_segment_func_nb(c, order_value_out, call_seq_out):
+    ...     print('\\t\\tafter segment', c.i)
+    ...     return None
+
+    >>> @njit
+    ... def post_group_func_nb(c):
+    ...     print('\\tafter group', c.group)
+    ...     return None
+
+    >>> @njit
+    ... def post_sim_func_nb(c):
+    ...     print('after simulation')
+    ...     return None
+
+    >>> target_shape = (5, 3)
+    >>> np.random.seed(42)
+    >>> close = np.random.uniform(1, 10, size=target_shape)
+    >>> group_lens = np.array([3])  # one group of three columns
+    >>> init_cash = np.array([100.])  # one capital per group
+    >>> cash_sharing = True
+    >>> segment_mask = np.array([True, False, True, False, True])[:, None]
+    >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
+    >>> fees = 0.001
+    >>> fixed_fees = 1.
+    >>> slippage = 0.001
+
+    >>> order_records, log_records = flex_simulate_nb(
+    ...     target_shape=target_shape,
+    ...     close=close,
+    ...     group_lens=group_lens,
+    ...     init_cash=init_cash,
+    ...     cash_sharing=cash_sharing,
+    ...     segment_mask=segment_mask,
+    ...     pre_sim_func_nb=pre_sim_func_nb,
+    ...     post_sim_func_nb=post_sim_func_nb,
+    ...     pre_group_func_nb=pre_group_func_nb,
+    ...     post_group_func_nb=post_group_func_nb,
+    ...     pre_segment_func_nb=pre_segment_func_nb,
+    ...     post_segment_func_nb=post_segment_func_nb,
+    ...     flex_order_func_nb=flex_order_func_nb,
+    ...     flex_order_args=(fees, fixed_fees, slippage),
+    ...     post_order_func_nb=post_order_func_nb
+    ... )
+    before simulation
+        before group 0
+            before segment 0
+                creating order 0 at column 0
+                    order status: 0
+                creating order 1 at column 1
+                    order status: 0
+                creating order 2 at column 2
+                    order status: 0
+                breaking out of the loop
+            after segment 0
+            before segment 2
+                creating order 0 at column 1
+                    order status: 0
+                creating order 1 at column 2
+                    order status: 0
+                creating order 2 at column 0
+                    order status: 0
+                breaking out of the loop
+            after segment 2
+            before segment 4
+                creating order 0 at column 0
+                    order status: 0
+                creating order 1 at column 2
+                    order status: 0
+                creating order 2 at column 1
+                    order status: 0
+                breaking out of the loop
+            after segment 4
+        after group 0
+    after simulation
+    ```
+    """
+
+    check_group_lens_nb(group_lens, target_shape[1])
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
+
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    init_cash = init_cash.astype(np.float_)
+    last_cash = init_cash.copy()
+    last_position = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_free_cash = init_cash.copy()
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_value = init_cash.copy()
+    second_last_value = init_cash.copy()
+    temp_value = init_cash.copy()
+    last_return = np.full_like(last_value, np.nan)
+    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record['id'][:] = -1
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    oidx = 0
+    lidx = 0
+
+    # Call function before the simulation
+    pre_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=None,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
+
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        group_len = to_col - from_col
+
+        # Call function before the group
+        pre_group_ctx = GroupContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=None,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            group=group,
+            group_len=group_len,
+            from_col=from_col,
+            to_col=to_col
+        )
+        pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
+
+        for i in range(target_shape[0]):
+            # Is this segment active?
+            if call_pre_segment or segment_mask[i, group]:
+                # Call function before the segment
+                pre_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=None,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=None
+                )
+                pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_group_out, *pre_segment_args)
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Update value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
+
+            # Is this segment active?
+            if segment_mask[i, group]:
+
+                call_idx = -1
+                while True:
+                    call_idx += 1
+
+                    # Generate the next order
+                    flex_order_ctx = FlexOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=None,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=None,
+                        call_idx=call_idx
+                    )
+                    col, order = flex_order_func_nb(flex_order_ctx, *pre_segment_out, *flex_order_args)
+
+                    if col == -1:
+                        break
+                    if col < from_col or col >= to_col:
+                        raise ValueError("Column exceeds bounds of the group")
+
+                    # Get current values
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    val_price_now = last_val_price[col]
+                    pos_record_now = last_pos_record[col]
+                    if cash_sharing:
+                        cash_now = last_cash[group]
+                        free_cash_now = last_free_cash[group]
+                        value_now = last_value[group]
+                        return_now = last_return[group]
+                    else:
+                        cash_now = last_cash[col]
+                        free_cash_now = last_free_cash[col]
+                        value_now = last_value[col]
+                        return_now = last_return[col]
+
+                    if np.isinf(order.price):
+                        if i > 0:
+                            _prev_close = close[i - 1, col]
+                        else:
+                            _prev_close = np.nan
+                        _close = close[i, col]
+                        order = replace_inf_price_nb(_prev_close, _close, order)
+
+                    # Process the order
+                    state = ProcessOrderState(
+                        cash=cash_now,
+                        position=position_now,
+                        debt=debt_now,
+                        free_cash=free_cash_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                        oidx=oidx,
+                        lidx=lidx
+                    )
+
+                    order_result, new_state = process_order_nb(
+                        i, col, group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records
+                    )
+
+                    # Update state
+                    cash_now = new_state.cash
+                    position_now = new_state.position
+                    debt_now = new_state.debt
+                    free_cash_now = new_state.free_cash
+                    val_price_now = new_state.val_price
+                    value_now = new_state.value
+                    if cash_sharing:
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
+                    else:
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
+                    oidx = new_state.oidx
+                    lidx = new_state.lidx
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    if cash_sharing:
+                        last_cash[group] = cash_now
+                        last_free_cash[group] = free_cash_now
+                        last_value[group] = value_now
+                        last_return[group] = return_now
+                    else:
+                        last_cash[col] = cash_now
+                        last_free_cash[col] = free_cash_now
+                        last_value[col] = value_now
+                        last_return[col] = return_now
+                    if state.oidx != new_state.oidx:
+                        last_oidx[col] = state.oidx
+                    if state.lidx != new_state.lidx:
+                        last_lidx[col] = state.lidx
+
+                    # Update position record
+                    if fill_pos_record:
+                        update_pos_record_nb(
+                            pos_record_now,
+                            i, col,
+                            state.position, position_now,
+                            order_result
+                        )
+
+                    # Post-order callback
+                    post_order_ctx = PostOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=None,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=None,
+                        col=col,
+                        call_idx=call_idx,
+                        cash_before=state.cash,
+                        position_before=state.position,
+                        debt_before=state.debt,
+                        free_cash_before=state.free_cash,
+                        val_price_before=state.val_price,
+                        value_before=state.value,
+                        order_result=order_result,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
+                    )
+                    post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
+
+            # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
+            # Update valuation price
+            for col in range(from_col, to_col):
+                if not np.isnan(close[i, col]) or not ffill_val_price:
+                    last_val_price[col] = close[i, col]
+
+            # Update previous value, current value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                second_last_value[group] = temp_value[group]
+                temp_value[group] = last_value[group]
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    second_last_value[col] = temp_value[col]
+                    temp_value[col] = last_value[col]
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Is this segment active?
+            if call_post_segment or segment_mask[i, group]:
+                # Call function before the segment
+                post_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=None,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=None
+                )
+                post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
+
+        # Call function after the group
+        post_group_ctx = GroupContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=None,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            group=group,
+            group_len=group_len,
+            from_col=from_col,
+            to_col=to_col
+        )
+        post_group_func_nb(post_group_ctx, *pre_sim_out, *post_group_args)
+
+        from_col = to_col
+
+    # Call function after the simulation
+    post_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=None,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    post_sim_func_nb(post_sim_ctx, *post_sim_args)
+
+    return order_records[:oidx], log_records[:lidx]
+
+
+@njit
+def flex_simulate_row_wise_nb(target_shape: tp.Shape,
+                              close: tp.Array2d,
+                              group_lens: tp.Array1d,
+                              init_cash: tp.Array1d,
+                              cash_sharing: bool,
+                              segment_mask: tp.Array2d,
+                              pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+                              pre_sim_args: tp.Args = (),
+                              post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+                              post_sim_args: tp.Args = (),
+                              pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
+                              pre_row_args: tp.Args = (),
+                              post_row_func_nb: PostRowFuncT = no_post_func_nb,
+                              post_row_args: tp.Args = (),
+                              pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+                              pre_segment_args: tp.Args = (),
+                              post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+                              post_segment_args: tp.Args = (),
+                              flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+                              flex_order_args: tp.Args = (),
+                              post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+                              post_order_args: tp.Args = (),
+                              call_pre_segment: bool = False,
+                              call_post_segment: bool = False,
+                              ffill_val_price: bool = True,
+                              update_value: bool = False,
+                              fill_pos_record: bool = True,
+                              max_orders: tp.Optional[int] = None,
+                              max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+    """Same as `flex_simulate_nb`, but iterates using row-major order, with the rows
+    changing fastest, and the columns/groups changing slowest."""
+
+    check_group_lens_nb(group_lens, target_shape[1])
+    check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
+
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    init_cash = init_cash.astype(np.float_)
+    last_cash = init_cash.copy()
+    last_position = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_free_cash = init_cash.copy()
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_value = init_cash.copy()
+    second_last_value = init_cash.copy()
+    temp_value = init_cash.copy()
+    last_return = np.full_like(last_value, np.nan)
+    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record['id'][:] = -1
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    oidx = 0
+    lidx = 0
+
+    # Call function before the simulation
+    pre_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=None,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
+
+    for i in range(target_shape[0]):
+
+        # Call function before the row
+        pre_row_ctx = RowContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=None,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            i=i
+        )
+        pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
+
+        from_col = 0
+        for group in range(len(group_lens)):
+            to_col = from_col + group_lens[group]
+            group_len = to_col - from_col
+
+            # Is this segment active?
+            if call_pre_segment or segment_mask[i, group]:
+                # Call function before the segment
+                pre_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=None,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=None
+                )
+                pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_row_out, *pre_segment_args)
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Update value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
+
+            # Is this segment active?
+            if segment_mask[i, group]:
+
+                call_idx = -1
+                while True:
+                    call_idx += 1
+
+                    # Generate the next order
+                    flex_order_ctx = FlexOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=None,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=None,
+                        call_idx=call_idx
+                    )
+                    col, order = flex_order_func_nb(flex_order_ctx, *pre_segment_out, *flex_order_args)
+
+                    if col == -1:
+                        break
+                    if col < from_col or col >= to_col:
+                        raise ValueError("Column exceeds bounds of the group")
+
+                    # Get current values
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    val_price_now = last_val_price[col]
+                    pos_record_now = last_pos_record[col]
+                    if cash_sharing:
+                        cash_now = last_cash[group]
+                        free_cash_now = last_free_cash[group]
+                        value_now = last_value[group]
+                        return_now = last_return[group]
+                    else:
+                        cash_now = last_cash[col]
+                        free_cash_now = last_free_cash[col]
+                        value_now = last_value[col]
+                        return_now = last_return[col]
+
+                    if np.isinf(order.price):
+                        if i > 0:
+                            _prev_close = close[i - 1, col]
+                        else:
+                            _prev_close = np.nan
+                        _close = close[i, col]
+                        order = replace_inf_price_nb(_prev_close, _close, order)
+
+                    # Process the order
+                    state = ProcessOrderState(
+                        cash=cash_now,
+                        position=position_now,
+                        debt=debt_now,
+                        free_cash=free_cash_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                        oidx=oidx,
+                        lidx=lidx
+                    )
+
+                    order_result, new_state = process_order_nb(
+                        i, col, group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records
+                    )
+
+                    # Update state
+                    cash_now = new_state.cash
+                    position_now = new_state.position
+                    debt_now = new_state.debt
+                    free_cash_now = new_state.free_cash
+                    val_price_now = new_state.val_price
+                    value_now = new_state.value
+                    if cash_sharing:
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
+                    else:
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
+                    oidx = new_state.oidx
+                    lidx = new_state.lidx
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    if cash_sharing:
+                        last_cash[group] = cash_now
+                        last_free_cash[group] = free_cash_now
+                        last_value[group] = value_now
+                        last_return[group] = return_now
+                    else:
+                        last_cash[col] = cash_now
+                        last_free_cash[col] = free_cash_now
+                        last_value[col] = value_now
+                        last_return[col] = return_now
+                    if state.oidx != new_state.oidx:
+                        last_oidx[col] = state.oidx
+                    if state.lidx != new_state.lidx:
+                        last_lidx[col] = state.lidx
+
+                    # Update position record
+                    if fill_pos_record:
+                        update_pos_record_nb(
+                            pos_record_now,
+                            i, col,
+                            state.position, position_now,
+                            order_result
+                        )
+
+                    # Post-order callback
+                    post_order_ctx = PostOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=None,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=None,
+                        col=col,
+                        call_idx=call_idx,
+                        cash_before=state.cash,
+                        position_before=state.position,
+                        debt_before=state.debt,
+                        free_cash_before=state.free_cash,
+                        val_price_before=state.val_price,
+                        value_before=state.value,
+                        order_result=order_result,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
+                    )
+                    post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
+
+            # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
+            # Update valuation price
+            for col in range(from_col, to_col):
+                if not np.isnan(close[i, col]) or not ffill_val_price:
+                    last_val_price[col] = close[i, col]
+
+            # Update previous value, current value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                second_last_value[group] = temp_value[group]
+                temp_value[group] = last_value[group]
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    second_last_value[col] = temp_value[col]
+                    temp_value[col] = last_value[col]
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Is this segment active?
+            if call_post_segment or segment_mask[i, group]:
+                # Call function after the segment
+                post_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=None,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=None
+                )
+                post_segment_func_nb(post_seg_ctx, *pre_row_out, *post_segment_args)
+
+            from_col = to_col
+
+        # Call function after the row
+        post_row_ctx = RowContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=None,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            i=i
+        )
+        post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
+
+    # Call function after the simulation
+    post_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=None,
         segment_mask=segment_mask,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
@@ -4257,7 +5438,7 @@ def cash_flow_nb(target_shape: tp.Shape,
 @njit(cache=True)
 def sum_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
     """Squeeze each group of columns into a single column using sum operation."""
-    check_group_lens(group_lens, a.shape[1])
+    check_group_lens_nb(group_lens, a.shape[1])
 
     out = np.empty((a.shape[0], len(group_lens)), dtype=np.float_)
     from_col = 0
@@ -4320,7 +5501,7 @@ def cash_in_sim_order_nb(cash_flow: tp.Array2d,
                          init_cash_grouped: tp.Array1d,
                          call_seq: tp.Array2d) -> tp.Array2d:
     """Get cash series in simulation order."""
-    check_group_lens(group_lens, cash_flow.shape[1])
+    check_group_lens_nb(group_lens, cash_flow.shape[1])
 
     out = np.empty_like(cash_flow)
     from_col = 0
@@ -4329,8 +5510,8 @@ def cash_in_sim_order_nb(cash_flow: tp.Array2d,
         group_len = to_col - from_col
         cash_now = init_cash_grouped[group]
         for i in range(cash_flow.shape[0]):
-            for k in range(group_len):
-                col = from_col + call_seq[i, from_col + k]
+            for call_idx in range(group_len):
+                col = from_col + call_seq[i, from_col + call_idx]
                 cash_now = add_nb(cash_now, cash_flow[i, col])
                 out[i, col] = cash_now
         from_col = to_col
@@ -4343,7 +5524,7 @@ def cash_grouped_nb(target_shape: tp.Shape,
                     group_lens: tp.Array1d,
                     init_cash_grouped: tp.Array1d) -> tp.Array2d:
     """Get cash series per group."""
-    check_group_lens(group_lens, target_shape[1])
+    check_group_lens_nb(group_lens, target_shape[1])
 
     out = np.empty_like(cash_flow_grouped)
     from_col = 0
@@ -4379,7 +5560,7 @@ def value_in_sim_order_nb(cash: tp.Array2d,
                           group_lens: tp.Array1d,
                           call_seq: tp.Array2d) -> tp.Array2d:
     """Get portfolio value series in simulation order."""
-    check_group_lens(group_lens, cash.shape[1])
+    check_group_lens_nb(group_lens, cash.shape[1])
 
     out = np.empty_like(cash)
     from_col = 0
@@ -4471,7 +5652,7 @@ def total_profit_nb(target_shape: tp.Shape,
 @njit(cache=True)
 def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) -> tp.Array1d:
     """Get total profit per group."""
-    check_group_lens(group_lens, total_profit.shape[0])
+    check_group_lens_nb(group_lens, total_profit.shape[0])
 
     out = np.empty(len(group_lens), dtype=np.float_)
     from_col = 0
@@ -4500,7 +5681,7 @@ def returns_in_sim_order_nb(value_iso: tp.Array2d,
                             init_cash_grouped: tp.Array1d,
                             call_seq: tp.Array2d) -> tp.Array2d:
     """Get portfolio return series in simulation order."""
-    check_group_lens(group_lens, value_iso.shape[1])
+    check_group_lens_nb(group_lens, value_iso.shape[1])
 
     out = np.empty_like(value_iso)
     from_col = 0
@@ -4539,7 +5720,7 @@ def benchmark_value_nb(close: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
 @njit(cache=True)
 def benchmark_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d) -> tp.Array2d:
     """Get market value per group."""
-    check_group_lens(group_lens, close.shape[1])
+    check_group_lens_nb(group_lens, close.shape[1])
 
     out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
     from_col = 0

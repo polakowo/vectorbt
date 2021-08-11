@@ -14,21 +14,21 @@ day_dt = np.timedelta64(86400000000000)
 
 example_dt = np.dtype([
     ('id', np.int64),
-    ('idx', np.int64),
     ('col', np.int64),
+    ('idx', np.int64),
     ('some_field1', np.float64),
     ('some_field2', np.float64)
 ], align=True)
 
 records_arr = np.asarray([
     (0, 0, 0, 10, 21),
-    (1, 1, 0, 11, 20),
-    (2, 2, 0, 12, 19),
-    (3, 0, 1, 13, 18),
+    (1, 0, 1, 11, 20),
+    (2, 0, 2, 12, 19),
+    (3, 1, 0, 13, 18),
     (4, 1, 1, 14, 17),
-    (5, 2, 1, 13, 18),
-    (6, 0, 2, 12, 19),
-    (7, 1, 2, 11, 20),
+    (5, 1, 2, 13, 18),
+    (6, 2, 0, 12, 19),
+    (7, 2, 1, 11, 20),
     (8, 2, 2, 10, 21)
 ], dtype=example_dt)
 records_nosort_arr = np.concatenate((
@@ -1221,10 +1221,10 @@ class TestRecords:
         pd.testing.assert_frame_equal(
             records.records_readable,
             pd.DataFrame([
-                [0, 'x', 'a', 10.0, 21.0], [1, 'y', 'a', 11.0, 20.0], [2, 'z', 'a', 12.0, 19.0],
-                [3, 'x', 'b', 13.0, 18.0], [4, 'y', 'b', 14.0, 17.0], [5, 'z', 'b', 13.0, 18.0],
-                [6, 'x', 'c', 12.0, 19.0], [7, 'y', 'c', 11.0, 20.0], [8, 'z', 'c', 10.0, 21.0]
-            ], columns=pd.Index(['Id', 'Date', 'Column', 'some_field1', 'some_field2'], dtype='object'))
+                [0, 'a', 'x', 10.0, 21.0], [1, 'a', 'y', 11.0, 20.0], [2, 'a', 'z', 12.0, 19.0],
+                [3, 'b', 'x', 13.0, 18.0], [4, 'b', 'y', 14.0, 17.0], [5, 'b', 'z', 13.0, 18.0],
+                [6, 'c', 'x', 12.0, 19.0], [7, 'c', 'y', 11.0, 20.0], [8, 'c', 'z', 10.0, 21.0]
+            ], columns=pd.Index(['Id', 'Column', 'Timestamp', 'some_field1', 'some_field2'], dtype='object'))
         )
 
     def test_is_sorted(self):
@@ -1246,7 +1246,7 @@ class TestRecords:
         record_arrays_close(
             records['a'].apply_mask(mask_a).values,
             np.array([
-                (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.)
+                (1, 0, 1, 11., 20.), (2, 0, 2, 12., 19.)
             ], dtype=example_dt)
         )
         mask = records.values['some_field1'] >= records.values['some_field1'].mean()
@@ -1254,8 +1254,8 @@ class TestRecords:
         record_arrays_close(
             filtered.values,
             np.array([
-                (2, 2, 0, 12., 19.), (3, 0, 1, 13., 18.), (4, 1, 1, 14., 17.),
-                (5, 2, 1, 13., 18.), (6, 0, 2, 12., 19.)
+                (2, 0, 2, 12., 19.), (3, 1, 0, 13., 18.), (4, 1, 1, 14., 17.),
+                (5, 1, 2, 13., 18.), (6, 2, 0, 12., 19.)
             ], dtype=example_dt)
         )
         assert records_grouped.apply_mask(mask).wrapper == records_grouped.wrapper
@@ -1361,7 +1361,7 @@ class TestRecords:
         record_arrays_close(
             r['a'].values,
             np.array([
-                (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.)
+                (0, 0, 0, 10., 21.), (1, 0, 1, 11., 20.), (2, 0, 2, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
@@ -1375,8 +1375,8 @@ class TestRecords:
         record_arrays_close(
             r[['a', 'a']].values,
             np.array([
-                (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
-                (0, 0, 1, 10., 21.), (1, 1, 1, 11., 20.), (2, 2, 1, 12., 19.)
+                (0, 0, 0, 10., 21.), (1, 0, 1, 11., 20.), (2, 0, 2, 12., 19.),
+                (0, 1, 0, 10., 21.), (1, 1, 1, 11., 20.), (2, 1, 2, 12., 19.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
@@ -1386,8 +1386,8 @@ class TestRecords:
         record_arrays_close(
             r[['a', 'b']].values,
             np.array([
-                (0, 0, 0, 10., 21.), (1, 1, 0, 11., 20.), (2, 2, 0, 12., 19.),
-                (3, 0, 1, 13., 18.), (4, 1, 1, 14., 17.), (5, 2, 1, 13., 18.)
+                (0, 0, 0, 10., 21.), (1, 0, 1, 11., 20.), (2, 0, 2, 12., 19.),
+                (3, 1, 0, 13., 18.), (4, 1, 1, 14., 17.), (5, 1, 2, 13., 18.)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
@@ -1468,7 +1468,7 @@ class TestRecords:
         # c
         record_arrays_close(
             filtered_records['c'].values,
-            np.array([(8, 2, 0, 10., 21.)], dtype=example_dt)
+            np.array([(8, 0, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
             filtered_records['c'].map_field('some_field1').id_arr,
@@ -1598,7 +1598,7 @@ class TestRanges:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Start Date'].values,
+            records_readable['Start Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
                 '2020-01-05T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
@@ -1606,7 +1606,7 @@ class TestRanges:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['End Date'].values,
+            records_readable['End Timestamp'].values,
             np.array([
                 '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
                 '2020-01-06T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
@@ -1876,7 +1876,7 @@ class TestDrawdowns:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Peak Date'].values,
+            records_readable['Peak Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
                 '2020-01-05T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
@@ -1884,7 +1884,7 @@ class TestDrawdowns:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Start Date'].values,
+            records_readable['Start Timestamp'].values,
             np.array([
                 '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
                 '2020-01-06T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
@@ -1892,7 +1892,7 @@ class TestDrawdowns:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['Valley Date'].values,
+            records_readable['Valley Timestamp'].values,
             np.array([
                 '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
                 '2020-01-06T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
@@ -1900,7 +1900,7 @@ class TestDrawdowns:
             ], dtype='datetime64[ns]')
         )
         np.testing.assert_array_equal(
-            records_readable['End Date'].values,
+            records_readable['End Timestamp'].values,
             np.array([
                 '2020-01-03T00:00:00.000000000', '2020-01-05T00:00:00.000000000',
                 '2020-01-06T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
@@ -2389,7 +2389,7 @@ class TestOrders:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Date'].values,
+            records_readable['Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
                 '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
@@ -2448,8 +2448,8 @@ class TestOrders:
         record_arrays_close(
             orders['a'].buy.values,
             np.array([
-                (0, 0, 0, 1., 1., 0.01, 0), (1, 1, 0, 0.1, 2., 0.002, 0),
-                (4, 5, 0, 1., 6., 0.06, 0), (6, 7, 0, 2., 8., 0.16, 0)
+                (0, 0, 0, 1., 1., 0.01, 0), (1, 0, 1, 0.1, 2., 0.002, 0),
+                (4, 0, 5, 1., 6., 0.06, 0), (6, 0, 7, 2., 8., 0.16, 0)
             ], dtype=order_dt)
         )
         record_arrays_close(
@@ -2459,12 +2459,12 @@ class TestOrders:
         record_arrays_close(
             orders.buy.values,
             np.array([
-                (0, 0, 0, 1., 1., 0.01, 0), (1, 1, 0, 0.1, 2., 0.002, 0),
-                (4, 5, 0, 1., 6., 0.06, 0), (6, 7, 0, 2., 8., 0.16, 0),
-                (9, 2, 1, 1., 3., 0.03, 0), (10, 3, 1, 0.1, 4., 0.004, 0),
-                (12, 6, 1, 1., 7., 0.07, 0), (14, 0, 2, 1., 1., 0.01, 0),
-                (15, 1, 2, 0.1, 2., 0.002, 0), (18, 5, 2, 1., 6., 0.06, 0),
-                (20, 7, 2, 2., 8., 0.16, 0)
+                (0, 0, 0, 1., 1., 0.01, 0), (1, 0, 1, 0.1, 2., 0.002, 0),
+                (4, 0, 5, 1., 6., 0.06, 0), (6, 0, 7, 2., 8., 0.16, 0),
+                (9, 1, 2, 1., 3., 0.03, 0), (10, 1, 3, 0.1, 4., 0.004, 0),
+                (12, 1, 6, 1., 7., 0.07, 0), (14, 2, 0, 1., 1., 0.01, 0),
+                (15, 2, 1, 0.1, 2., 0.002, 0), (18, 2, 5, 1., 6., 0.06, 0),
+                (20, 2, 7, 2., 8., 0.16, 0)
             ], dtype=order_dt)
         )
 
@@ -2474,8 +2474,8 @@ class TestOrders:
         record_arrays_close(
             orders['a'].sell.values,
             np.array([
-                (2, 2, 0, 1., 3., 0.03, 1), (3, 3, 0, 0.1, 4., 0.004, 1),
-                (5, 6, 0, 1., 7., 0.07, 1)
+                (2, 0, 2, 1., 3., 0.03, 1), (3, 0, 3, 0.1, 4., 0.004, 1),
+                (5, 0, 6, 1., 7., 0.07, 1)
             ], dtype=order_dt)
         )
         record_arrays_close(
@@ -2485,11 +2485,11 @@ class TestOrders:
         record_arrays_close(
             orders.sell.values,
             np.array([
-                (2, 2, 0, 1., 3., 0.03, 1), (3, 3, 0, 0.1, 4., 0.004, 1),
-                (5, 6, 0, 1., 7., 0.07, 1), (7, 0, 1, 1., 1., 0.01, 1),
-                (8, 1, 1, 0.1, 2., 0.002, 1), (11, 5, 1, 1., 6., 0.06, 1),
-                (13, 7, 1, 2., 8., 0.16, 1), (16, 2, 2, 1., 3., 0.03, 1),
-                (17, 3, 2, 0.1, 4., 0.004, 1), (19, 6, 2, 2., 7., 0.14, 1)
+                (2, 0, 2, 1., 3., 0.03, 1), (3, 0, 3, 0.1, 4., 0.004, 1),
+                (5, 0, 6, 1., 7., 0.07, 1), (7, 1, 0, 1., 1., 0.01, 1),
+                (8, 1, 1, 0.1, 2., 0.002, 1), (11, 1, 5, 1., 6., 0.06, 1),
+                (13, 1, 7, 2., 8., 0.16, 1), (16, 2, 2, 1., 3., 0.03, 1),
+                (17, 2, 3, 0.1, 4., 0.004, 1), (19, 2, 6, 2., 7., 0.14, 1)
             ], dtype=order_dt)
         )
 
@@ -2646,7 +2646,7 @@ class TestTrades:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Entry Date'].values,
+            records_readable['Entry Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
                 '2020-01-06T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
@@ -2674,7 +2674,7 @@ class TestTrades:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Exit Date'].values,
+            records_readable['Exit Timestamp'].values,
             np.array([
                 '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
                 '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
@@ -3173,7 +3173,7 @@ class TestPositions:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Entry Date'].values,
+            records_readable['Entry Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
                 '2020-01-08T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
@@ -3195,7 +3195,7 @@ class TestPositions:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Exit Date'].values,
+            records_readable['Exit Timestamp'].values,
             np.array([
                 '2020-01-04T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
                 '2020-01-08T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
@@ -3369,7 +3369,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Date'].values,
+            records_readable['Timestamp'].values,
             np.array([
                 '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
                 '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',

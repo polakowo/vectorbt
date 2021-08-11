@@ -47,7 +47,7 @@ in 2020 against every single pattern found in TA-Lib, and translates them into s
 >>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
 >>> ohlcv['Open']
 
-symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \
+symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \\
 Date
 2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
 2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
@@ -202,14 +202,14 @@ simulation from the beginning to the end, you can turn on logging.
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
 >>> pf.logs.records
-        id  idx  col  group  cash    position  debt  free_cash    val_price  \\
-0        0    0    0      0   inf    0.000000   0.0        inf  7194.892090
-1        1    1    0      0   inf    0.000000   0.0        inf  7202.551270
-2        2    2    0      0   inf    0.000000   0.0        inf  6984.428711
-...    ...  ...  ...    ...   ...         ...   ...        ...          ...
-1461  1461  241    5      5   inf  272.389644   0.0        inf    57.207737
-1462  1462  242    5      5   inf  274.137659   0.0        inf    62.844059
-1463  1463  243    5      5   inf  282.093860   0.0        inf    61.105076
+        id  group  col  idx  cash    position  debt  free_cash    val_price  \\
+0        0      0    0    0   inf    0.000000   0.0        inf  7194.892090
+1        1      0    0    1   inf    0.000000   0.0        inf  7202.551270
+2        2      0    0    2   inf    0.000000   0.0        inf  6984.428711
+...    ...    ...  ...  ...   ...         ...   ...        ...          ...
+1461  1461      5    5  241   inf  272.389644   0.0        inf    57.207737
+1462  1462      5    5  242   inf  274.137659   0.0        inf    62.844059
+1463  1463      5    5  243   inf  282.093860   0.0        inf    61.105076
 
       value  ...  new_free_cash  new_val_price  new_value  res_size  \\
 0       inf  ...            inf    7194.892090        inf       NaN
@@ -235,12 +235,10 @@ simulation from the beginning to the end, you can turn on logging.
 Just as orders, logs are also records and thus can be easily analyzed:
 
 ```python-repl
->>> from vectorbt.portfolio.enums import OrderStatus
-
->>> pf.logs.map_field('res_status', mapping=OrderStatus).value_counts()
+>>> pf.logs.res_status.value_counts()
 symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
-Ignored       60       72       67       66       67       59
 Filled       184      172      177      178      177      185
+Ignored       60       72       67       66       67       59
 ```
 
 Logging can also be turned on just for one order, row, or column, since as many other
@@ -1446,7 +1444,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ## Example
 
-        Buy 10 units each tick:
+        * Buy 10 units each tick:
 
         ```python-repl
         >>> import pandas as pd
@@ -1471,7 +1469,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Reverse each position by first closing it:
+        * Reverse each position by first closing it:
 
         ```python-repl
         >>> size = [1, 0, -1, 0, 1]
@@ -1493,8 +1491,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
-        It's more compact but has less control over execution:
+        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example
+        (it's more compact but has less control over execution):
 
         ```python-repl
         >>> import numpy as np
@@ -1887,7 +1885,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ## Example
 
-        Entry opens long, exit closes long:
+        * Entry opens long, exit closes long:
 
         ```python-repl
         >>> import pandas as pd
@@ -1908,7 +1906,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Entry opens short, exit closes short:
+        * Entry opens short, exit closes short:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -1922,7 +1920,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Reversal within one tick. Entry opens long and closes short, exit closes long and opens short:
+        * Reversal within one tick. Entry opens long and closes short, exit closes long and opens short:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -1936,7 +1934,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Reversal within two ticks. First signal closes position, second signal opens the opposite one:
+        * Reversal within two ticks. First signal closes position, second signal opens the opposite one:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -1951,7 +1949,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        If entry and exit, chooses exit:
+        * If entry and exit, chooses exit:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -1966,7 +1964,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Entry means long order, exit means short order (acts similar to `from_orders`):
+        * Entry means long order, exit means short order (acts similar to `from_orders`):
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -1981,7 +1979,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Testing multiple parameters (via broadcasting):
+        * Testing multiple parameters (via broadcasting):
 
         ```python-repl
         >>> from vectorbt.portfolio.enums import Direction
@@ -1998,7 +1996,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         4    0.0    0.0    0.0
         ```
 
-        Specifying information in a more granular way thanks to broadcasting.
+        * Specifying information in a more granular way thanks to broadcasting.
         Reverse the first long position by first closing it, and all other immediately:
 
         ```python-repl
@@ -2017,7 +2015,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
+        * Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
 
         ```python-repl
         >>> close = pd.Series([10, 11, 12, 11, 10, 9])
@@ -2060,7 +2058,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        We can implement our own stop loss or take profit, or adjust the existing one at each time step.
+        * We can implement our own stop loss or take profit, or adjust the existing one at each time step.
         Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
 
         ```python-repl
@@ -2088,7 +2086,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
+        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
         ```python-repl
         >>> close = pd.Series([10, 11, 12, 13, 14, 15])
@@ -2459,8 +2457,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     @classmethod
     def from_order_func(cls: tp.Type[PortfolioT],
                         close: tp.ArrayLike,
-                        order_func_nb: nb.OrderFuncT,
+                        order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
                         *order_args,
+                        flexible: tp.Optional[bool] = None,
                         target_shape: tp.Optional[tp.RelaxedShape] = None,
                         keys: tp.Optional[tp.IndexLike] = None,
                         init_cash: tp.Optional[tp.ArrayLike] = None,
@@ -2514,6 +2513,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 Used for calculating unrealized PnL and portfolio value.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
+            flexible (bool): Whether to simulate using `vectorbt.portfolio.nb.flex_simulate_nb`.
+
+                This lifts the limit of one order per tick and symbol.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
             keys (sequence): Outermost column level.
 
@@ -2635,7 +2637,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ## Example
 
-        Buy 10 units each tick using closing price:
+        * Buy 10 units each tick using closing price:
 
         ```python-repl
         >>> import pandas as pd
@@ -2666,7 +2668,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Reverse each position by first closing it. Keep state of last position to determine
+        * Reverse each position by first closing it. Keep state of last position to determine
         which position to open next (just as an example, there are easier ways to do this):
 
         ```python-repl
@@ -2710,7 +2712,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
 
         ```python-repl
         >>> from vectorbt.portfolio.nb import sort_call_seq_nb
@@ -2767,7 +2769,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ![](/docs/img/simulate_nb.svg)
 
-        Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
+        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
 
         ```python-repl
@@ -2864,12 +2866,63 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         This can be changed by replacing the statement "elif" with "if", which would execute
         an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
         `Portfolio.from_signals`).
+
+        * Let's illustrate how to generate multiple orders per symbol and bar.
+        For each bar, buy at open and sell at close:
+
+        ```python-repl
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from numba import njit
+        >>> import vectorbt as vbt
+        >>> from vectorbt.base.reshape_fns import to_2d_array
+        >>> from vectorbt.portfolio.nb import order_nb, order_nothing_nb, close_position_nb
+
+        >>> @njit
+        ... def flex_order_func_nb(c, open, size):
+        ...     if c.call_idx == 0:
+        ...         return c.from_col, order_nb(size=size, price=open[c.i, c.from_col])
+        ...     if c.call_idx == 1:
+        ...         return c.from_col, close_position_nb(price=c.close[c.i, c.from_col])
+        ...     return -1, order_nothing_nb()
+
+        >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
+        >>> close = pd.DataFrame({'a': [2, 3, 4], 'b': [3, 4, 5]})
+        >>> size = 1
+        >>> pf = vbt.Portfolio.from_order_func(
+        ...     close,
+        ...     flex_order_func_nb,
+        ...     to_2d_array(open), size,
+        ...     flexible=True, max_orders=close.shape[0] * close.shape[1] * 2)
+
+        >>> pf.orders.records_readable
+            Order Id  Timestamp Column  Size  Price  Fees  Side
+        0          0          0      a   1.0    1.0   0.0   Buy
+        1          1          0      a   1.0    2.0   0.0  Sell
+        2          2          1      a   1.0    2.0   0.0   Buy
+        3          3          1      a   1.0    3.0   0.0  Sell
+        4          4          2      a   1.0    3.0   0.0   Buy
+        5          5          2      a   1.0    4.0   0.0  Sell
+        6          6          0      b   1.0    4.0   0.0   Buy
+        7          7          0      b   1.0    3.0   0.0  Sell
+        8          8          1      b   1.0    5.0   0.0   Buy
+        9          9          1      b   1.0    4.0   0.0  Sell
+        10        10          2      b   1.0    6.0   0.0   Buy
+        11        11          2      b   1.0    5.0   0.0  Sell
+        ```
+
+        !!! warning
+            Each bar is a black box - we don't know how the price moves inside.
+            Since trades must come in an order that replicates the real world, the only reliable
+            pieces of data are opening and closing prices.
         """
         # Get defaults
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
         close = to_pd_array(close)
+        if flexible is None:
+            flexible = portfolio_cfg['flexible']
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
@@ -2885,13 +2938,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             cash_sharing = portfolio_cfg['cash_sharing']
         if cash_sharing and group_by is None:
             group_by = True
-        if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
-        call_seq = map_enum_fields(call_seq, CallSeqType)
-        if isinstance(call_seq, int):
-            if call_seq == CallSeqType.Auto:
-                raise ValueError("CallSeqType.Auto should be implemented manually. "
-                                 "Use sort_call_seq_nb in pre_segment_func_nb.")
+        if not flexible:
+            if call_seq is None:
+                call_seq = portfolio_cfg['call_seq']
+            call_seq = map_enum_fields(call_seq, CallSeqType)
+            if isinstance(call_seq, int):
+                if call_seq == CallSeqType.Auto:
+                    raise ValueError("CallSeqType.Auto must be implemented manually. "
+                                     "Use sort_call_seq_nb in pre_segment_func_nb.")
         if segment_mask is None:
             segment_mask = True
         if call_pre_segment is None:
@@ -2954,10 +3008,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 to_pd=False,
                 **require_kwargs
             )
-        if checks.is_any_array(call_seq):
-            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-        else:
-            call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if not flexible:
+            if checks.is_any_array(call_seq):
+                call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+            else:
+                call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
         if max_orders is None:
             max_orders = target_shape_2d[0] * target_shape_2d[1]
         if max_logs is None:
@@ -2965,77 +3020,167 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         # Perform calculation
         if row_wise:
-            simulate_func = nb.simulate_row_wise_nb
-            if not use_numba and hasattr(simulate_func, 'py_func'):
-                simulate_func = simulate_func.py_func
-            order_records, log_records = simulate_func(
-                target_shape=target_shape_2d,
-                close=to_2d_array(close),
-                group_lens=group_lens,
-                init_cash=init_cash,
-                cash_sharing=cash_sharing,
-                call_seq=call_seq,
-                segment_mask=segment_mask,
-                pre_sim_func_nb=pre_sim_func_nb,
-                pre_sim_args=pre_sim_args,
-                post_sim_func_nb=post_sim_func_nb,
-                post_sim_args=post_sim_args,
-                pre_row_func_nb=pre_row_func_nb,
-                pre_row_args=pre_row_args,
-                post_row_func_nb=post_row_func_nb,
-                post_row_args=post_row_args,
-                pre_segment_func_nb=pre_segment_func_nb,
-                pre_segment_args=pre_segment_args,
-                post_segment_func_nb=post_segment_func_nb,
-                post_segment_args=post_segment_args,
-                order_func_nb=order_func_nb,
-                order_args=order_args,
-                post_order_func_nb=post_order_func_nb,
-                post_order_args=post_order_args,
-                call_pre_segment=call_pre_segment,
-                call_post_segment=call_post_segment,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_record=fill_pos_record,
-                max_orders=max_orders,
-                max_logs=max_logs
-            )
+            if use_numba:
+                checks.assert_numba_func(pre_sim_func_nb)
+                checks.assert_numba_func(post_sim_func_nb)
+                checks.assert_numba_func(pre_row_func_nb)
+                checks.assert_numba_func(post_row_func_nb)
+                checks.assert_numba_func(pre_segment_func_nb)
+                checks.assert_numba_func(post_segment_func_nb)
+                checks.assert_numba_func(order_func_nb)
+                checks.assert_numba_func(post_order_func_nb)
+            if flexible:
+                simulate_func = nb.flex_simulate_row_wise_nb
+                if not use_numba and hasattr(simulate_func, 'py_func'):
+                    simulate_func = simulate_func.py_func
+                order_records, log_records = simulate_func(
+                    target_shape=target_shape_2d,
+                    close=to_2d_array(close),
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    segment_mask=segment_mask,
+                    pre_sim_func_nb=pre_sim_func_nb,
+                    pre_sim_args=pre_sim_args,
+                    post_sim_func_nb=post_sim_func_nb,
+                    post_sim_args=post_sim_args,
+                    pre_row_func_nb=pre_row_func_nb,
+                    pre_row_args=pre_row_args,
+                    post_row_func_nb=post_row_func_nb,
+                    post_row_args=post_row_args,
+                    pre_segment_func_nb=pre_segment_func_nb,
+                    pre_segment_args=pre_segment_args,
+                    post_segment_func_nb=post_segment_func_nb,
+                    post_segment_args=post_segment_args,
+                    flex_order_func_nb=order_func_nb,
+                    flex_order_args=order_args,
+                    post_order_func_nb=post_order_func_nb,
+                    post_order_args=post_order_args,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    fill_pos_record=fill_pos_record,
+                    max_orders=max_orders,
+                    max_logs=max_logs
+                )
+            else:
+                simulate_func = nb.simulate_row_wise_nb
+                if not use_numba and hasattr(simulate_func, 'py_func'):
+                    simulate_func = simulate_func.py_func
+                order_records, log_records = simulate_func(
+                    target_shape=target_shape_2d,
+                    close=to_2d_array(close),
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    pre_sim_func_nb=pre_sim_func_nb,
+                    pre_sim_args=pre_sim_args,
+                    post_sim_func_nb=post_sim_func_nb,
+                    post_sim_args=post_sim_args,
+                    pre_row_func_nb=pre_row_func_nb,
+                    pre_row_args=pre_row_args,
+                    post_row_func_nb=post_row_func_nb,
+                    post_row_args=post_row_args,
+                    pre_segment_func_nb=pre_segment_func_nb,
+                    pre_segment_args=pre_segment_args,
+                    post_segment_func_nb=post_segment_func_nb,
+                    post_segment_args=post_segment_args,
+                    order_func_nb=order_func_nb,
+                    order_args=order_args,
+                    post_order_func_nb=post_order_func_nb,
+                    post_order_args=post_order_args,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    fill_pos_record=fill_pos_record,
+                    max_orders=max_orders,
+                    max_logs=max_logs
+                )
         else:
-            simulate_func = nb.simulate_nb
-            if not use_numba and hasattr(simulate_func, 'py_func'):
-                simulate_func = simulate_func.py_func
-            order_records, log_records = simulate_func(
-                target_shape=target_shape_2d,
-                close=to_2d_array(close),
-                group_lens=group_lens,
-                init_cash=init_cash,
-                cash_sharing=cash_sharing,
-                call_seq=call_seq,
-                segment_mask=segment_mask,
-                pre_sim_func_nb=pre_sim_func_nb,
-                pre_sim_args=pre_sim_args,
-                post_sim_func_nb=post_sim_func_nb,
-                post_sim_args=post_sim_args,
-                pre_group_func_nb=pre_group_func_nb,
-                pre_group_args=pre_group_args,
-                post_group_func_nb=post_group_func_nb,
-                post_group_args=post_group_args,
-                pre_segment_func_nb=pre_segment_func_nb,
-                pre_segment_args=pre_segment_args,
-                post_segment_func_nb=post_segment_func_nb,
-                post_segment_args=post_segment_args,
-                order_func_nb=order_func_nb,
-                order_args=order_args,
-                post_order_func_nb=post_order_func_nb,
-                post_order_args=post_order_args,
-                call_pre_segment=call_pre_segment,
-                call_post_segment=call_post_segment,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_record=fill_pos_record,
-                max_orders=max_orders,
-                max_logs=max_logs
-            )
+            if use_numba:
+                checks.assert_numba_func(pre_sim_func_nb)
+                checks.assert_numba_func(post_sim_func_nb)
+                checks.assert_numba_func(pre_group_func_nb)
+                checks.assert_numba_func(post_group_func_nb)
+                checks.assert_numba_func(pre_segment_func_nb)
+                checks.assert_numba_func(post_segment_func_nb)
+                checks.assert_numba_func(order_func_nb)
+                checks.assert_numba_func(post_order_func_nb)
+            if flexible:
+                simulate_func = nb.flex_simulate_nb
+                if not use_numba and hasattr(simulate_func, 'py_func'):
+                    simulate_func = simulate_func.py_func
+                order_records, log_records = simulate_func(
+                    target_shape=target_shape_2d,
+                    close=to_2d_array(close),
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    segment_mask=segment_mask,
+                    pre_sim_func_nb=pre_sim_func_nb,
+                    pre_sim_args=pre_sim_args,
+                    post_sim_func_nb=post_sim_func_nb,
+                    post_sim_args=post_sim_args,
+                    pre_group_func_nb=pre_group_func_nb,
+                    pre_group_args=pre_group_args,
+                    post_group_func_nb=post_group_func_nb,
+                    post_group_args=post_group_args,
+                    pre_segment_func_nb=pre_segment_func_nb,
+                    pre_segment_args=pre_segment_args,
+                    post_segment_func_nb=post_segment_func_nb,
+                    post_segment_args=post_segment_args,
+                    flex_order_func_nb=order_func_nb,
+                    flex_order_args=order_args,
+                    post_order_func_nb=post_order_func_nb,
+                    post_order_args=post_order_args,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    fill_pos_record=fill_pos_record,
+                    max_orders=max_orders,
+                    max_logs=max_logs
+                )
+            else:
+                simulate_func = nb.simulate_nb
+                if not use_numba and hasattr(simulate_func, 'py_func'):
+                    simulate_func = simulate_func.py_func
+                order_records, log_records = simulate_func(
+                    target_shape=target_shape_2d,
+                    close=to_2d_array(close),
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    pre_sim_func_nb=pre_sim_func_nb,
+                    pre_sim_args=pre_sim_args,
+                    post_sim_func_nb=post_sim_func_nb,
+                    post_sim_args=post_sim_args,
+                    pre_group_func_nb=pre_group_func_nb,
+                    pre_group_args=pre_group_args,
+                    post_group_func_nb=post_group_func_nb,
+                    post_group_args=post_group_args,
+                    pre_segment_func_nb=pre_segment_func_nb,
+                    pre_segment_args=pre_segment_args,
+                    post_segment_func_nb=post_segment_func_nb,
+                    post_segment_args=post_segment_args,
+                    order_func_nb=order_func_nb,
+                    order_args=order_args,
+                    post_order_func_nb=post_order_func_nb,
+                    post_order_args=post_order_args,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    fill_pos_record=fill_pos_record,
+                    max_orders=max_orders,
+                    max_logs=max_logs
+                )
 
         # Create an instance
         return cls(
@@ -3045,7 +3190,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
-            call_seq=call_seq if attach_call_seq else None,
+            call_seq=call_seq if not flexible and attach_call_seq else None,
             **kwargs
         )
 
@@ -3317,7 +3462,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
                 if self.call_seq is None:
                     raise ValueError("No call sequence attached. "
-                                     "Pass `attach_call_seq=True` to the class method (if supported).")
+                                     "Pass `attach_call_seq=True` to the class method "
+                                     "(flexible simulations are not supported)")
                 group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = to_1d_array(self.init_cash)
                 call_seq = to_2d_array(self.call_seq)
@@ -3384,7 +3530,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             if self.call_seq is None:
                 raise ValueError("No call sequence attached. "
-                                 "Pass `attach_call_seq=True` to the class method (if supported).")
+                                 "Pass `attach_call_seq=True` to the class method "
+                                 "(flexible simulations are not supported)")
             group_lens = self.wrapper.grouper.get_group_lens()
             call_seq = to_2d_array(self.call_seq)
             value = nb.value_in_sim_order_nb(cash, asset_value, group_lens, call_seq)
@@ -3448,7 +3595,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             if self.call_seq is None:
                 raise ValueError("No call sequence attached. "
-                                 "Pass `attach_call_seq=True` to the class method (if supported).")
+                                 "Pass `attach_call_seq=True` to the class method "
+                                 "(flexible simulations are not supported)")
             group_lens = self.wrapper.grouper.get_group_lens()
             init_cash_grouped = to_1d_array(self.init_cash)
             call_seq = to_2d_array(self.call_seq)

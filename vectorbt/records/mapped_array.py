@@ -4,11 +4,7 @@ This class takes the mapped array and the corresponding column and (optionally) 
 and offers features to directly process the mapped array without converting it to pandas;
 for example, to compute various statistics by column, such as standard deviation.
 
-## Reducing
-
-Using `MappedArray`, you can then reduce by column as follows:
-
-* Use already provided reducers such as `MappedArray.mean`:
+Consider the following example:
 
 ```python-repl
 >>> import numpy as np
@@ -22,7 +18,15 @@ Using `MappedArray`, you can then reduce by column as follows:
 >>> wrapper = vbt.ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
 >>> ma = vbt.MappedArray(wrapper, a, col_arr, idx_arr=idx_arr)
+```
 
+## Reducing
+
+Using `MappedArray`, you can then reduce by column as follows:
+
+* Use already provided reducers such as `MappedArray.mean`:
+
+```python-repl
 >>> ma.mean()
 a    11.0
 b    14.0

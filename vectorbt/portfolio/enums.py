@@ -32,6 +32,7 @@ __all__ = [
     'SegmentContext',
     'OrderContext',
     'PostOrderContext',
+    'FlexOrderContext',
     'Order',
     'NoOrder',
     'OrderResult',
@@ -495,7 +496,7 @@ class SimulationContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -803,7 +804,7 @@ class GroupContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -877,7 +878,7 @@ class RowContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -920,7 +921,7 @@ class SegmentContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -942,7 +943,7 @@ class SegmentContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
 
 
 __pdoc__['SegmentContext'] = """A named tuple representing the context of a segment.
@@ -983,7 +984,7 @@ class OrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -1005,7 +1006,7 @@ class OrderContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
     col: int
     call_idx: int
     cash_now: float
@@ -1057,7 +1058,7 @@ class PostOrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
     segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
@@ -1079,7 +1080,7 @@ class PostOrderContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
     col: int
     call_idx: int
     cash_before: float
@@ -1141,6 +1142,56 @@ If `SimulationContext.update_value`, gets updated with the new cash and value of
 """
 __pdoc__['PostOrderContext.return_now'] = "`OrderContext.return_now` after execution."
 __pdoc__['PostOrderContext.pos_record_now'] = "`OrderContext.pos_record_now` after execution."
+
+
+class FlexOrderContext(tp.NamedTuple):
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: None
+    segment_mask: tp.Array2d
+    ffill_val_price: bool
+    update_value: bool
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_position: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
+    last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
+    last_oidx: tp.Array1d
+    last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    call_seq_now: None
+    call_idx: int
+
+
+__pdoc__['FlexOrderContext'] = """A named tuple representing the context of a flexible order.
+
+Contains all fields from `SegmentContext` plus the current call index.
+
+Passed to `flex_order_func_nb`.
+"""
+for field in FlexOrderContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `SimulationContext.{field}`."
+    elif field in GroupContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `GroupContext.{field}`."
+    elif field in RowContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `RowContext.{field}`."
+    elif field in SegmentContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `SegmentContext.{field}`."
+__pdoc__['FlexOrderContext.call_idx'] = "Index of the current call."
 
 
 class Order(tp.NamedTuple):
@@ -1332,8 +1383,8 @@ __pdoc__['AdjustTPContext.curr_stop'] = "See `AdjustSLContext.curr_stop`."
 
 order_dt = np.dtype([
     ('id', np.int_),
-    ('idx', np.int_),
     ('col', np.int_),
+    ('idx', np.int_),
     ('size', np.float_),
     ('price', np.float_),
     ('fees', np.float_),
@@ -1389,9 +1440,9 @@ __pdoc__['position_dt'] = f"""`np.dtype` of position records.
 
 _log_fields = [
     ('id', np.int_),
-    ('idx', np.int_),
-    ('col', np.int_),
     ('group', np.int_),
+    ('col', np.int_),
+    ('idx', np.int_),
     ('cash', np.float_),
     ('position', np.float_),
     ('debt', np.float_),

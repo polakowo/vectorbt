@@ -1063,10 +1063,10 @@ class SignalsAccessor(GenericAccessor):
         <vectorbt.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
         >>> ranges.records_readable
-           Range Id  Column  Start Date  End Date  Status
-        0         0       0           0         3  Closed
-        1         1       0           3         5  Closed
-        2         2       0           5         6  Closed
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                3              5  Closed
+        2         2       0                5              6  Closed
 
         >>> ranges.duration.values
         array([3, 2, 1])
@@ -1082,10 +1082,10 @@ class SignalsAccessor(GenericAccessor):
         <vectorbt.generic.ranges.Ranges at 0x7ff29e3b80f0>
 
         >>> ranges.records_readable
-           Range Id  Column  Start Date  End Date  Status
-        0         0       0           0         2  Closed
-        1         1       0           1         2  Closed
-        2         2       0           2         2  Closed
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              2  Closed
+        1         1       0                1              2  Closed
+        2         2       0                2              2  Closed
 
         >>> ranges.duration.values
         array([2, 1, 0])
@@ -1099,9 +1099,9 @@ class SignalsAccessor(GenericAccessor):
         <vectorbt.generic.ranges.Ranges at 0x7ff29eccbd68>
 
         >>> ranges.records_readable
-           Range Id  Column  Start Date  End Date  Status
-        0         0       0           2         2  Closed
-        1         1       0           2         4  Closed
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                2              2  Closed
+        1         1       0                2              4  Closed
 
         >>> ranges.duration.values
         array([0, 2])
@@ -1144,9 +1144,9 @@ class SignalsAccessor(GenericAccessor):
         ```python-repl
         >>> mask_sr = pd.Series([True, True, True, False, True, True])
         >>> mask_sr.vbt.signals.partition_ranges().records_readable
-           Range Id  Column  Start Date  End Date  Status
-        0         0       0           0         3  Closed
-        1         1       0           4         5    Open
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                4              5    Open
         ```"""
         range_records = nb.partition_ranges_nb(self.to_2d_array())
         return Ranges(
@@ -1165,9 +1165,9 @@ class SignalsAccessor(GenericAccessor):
         ```python-repl
         >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
         >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
-           Range Id  Column  Start Date  End Date  Status
-        0         0       0           0         3  Closed
-        1         1       0           3         5  Closed
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                3              5  Closed
          ```"""
         range_records = nb.between_partition_ranges_nb(self.to_2d_array())
         return Ranges(

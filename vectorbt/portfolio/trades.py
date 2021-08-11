@@ -353,7 +353,7 @@ trades_field_config = Config(
                 title='Size'
             ),
             'entry_idx': dict(
-                title='Entry Date',
+                title='Entry Timestamp',
                 mapping='index'
             ),
             'entry_price': dict(
@@ -363,7 +363,7 @@ trades_field_config = Config(
                 title='Entry Fees'
             ),
             'exit_idx': dict(
-                title='Exit Date',
+                title='Exit Timestamp',
                 mapping='index'
             ),
             'exit_price': dict(

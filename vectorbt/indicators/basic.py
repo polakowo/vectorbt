@@ -30,7 +30,7 @@ Run for the examples below:
 >>> cols = ['Open', 'High', 'Low', 'Close', 'Volume']
 >>> ohlcv = vbt.YFData.download("BTC-USD", start=start, end=end).get(cols)
 >>> ohlcv
-                                   Open          High          Low  \
+                                   Open          High          Low  \\
 Date
 2019-03-01 00:00:00+00:00   3853.757080   3907.795410  3851.692383
 2019-03-02 00:00:00+00:00   3855.318115   3874.607422  3832.127930

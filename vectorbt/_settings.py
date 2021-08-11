@@ -456,6 +456,7 @@ settings = SettingsConfig(
             update_value=False,
             fill_pos_record=True,
             row_wise=False,
+            flexible=False,
             use_numba=True,
             seed=None,
             freq=None,

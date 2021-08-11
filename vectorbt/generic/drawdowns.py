@@ -22,12 +22,12 @@ Using `Drawdowns.from_ts`, you can generate drawdown records for any time series
 >>> drawdowns = vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='d'))
 
 >>> drawdowns.records_readable
-   Drawdown Id  Column                 Peak Date                Start Date  \
+   Drawdown Id  Column            Peak Timestamp           Start Timestamp  \\
 0            0       0 2019-10-02 00:00:00+00:00 2019-10-03 00:00:00+00:00
 1            1       0 2019-10-09 00:00:00+00:00 2019-10-10 00:00:00+00:00
 2            2       0 2019-10-27 00:00:00+00:00 2019-10-28 00:00:00+00:00
 
-                Valley Date                  End Date   Peak Value  \
+           Valley Timestamp             End Timestamp   Peak Value  \\
 0 2019-10-06 00:00:00+00:00 2019-10-09 00:00:00+00:00  8393.041992
 1 2019-10-24 00:00:00+00:00 2019-10-25 00:00:00+00:00  8595.740234
 2 2019-12-17 00:00:00+00:00 2020-01-01 00:00:00+00:00  9551.714844
@@ -177,11 +177,11 @@ dd_field_config = Config(
                 title='Drawdown Id'
             ),
             peak_idx=dict(
-                title='Peak Date',
+                title='Peak Timestamp',
                 mapping='index'
             ),
             valley_idx=dict(
-                title='Valley Date',
+                title='Valley Timestamp',
                 mapping='index'
             ),
             peak_val=dict(

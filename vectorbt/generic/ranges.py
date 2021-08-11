@@ -26,15 +26,15 @@ are 0 and 20 (not 19!) respectively.
 >>> ranges = vbt.Ranges.from_ts(fast_below_slow, wrapper_kwargs=dict(freq='d'))
 
 >>> ranges.records_readable
-   Range Id  Column                Start Date                  End Date  \\
-0         0       0 2019-07-25 00:00:00+00:00 2019-08-08 00:00:00+00:00
-1         1       0 2019-08-19 00:00:00+00:00 2019-11-01 00:00:00+00:00
-2         2       0 2019-11-20 00:00:00+00:00 2020-01-01 00:00:00+00:00
+   Range Id  Column           Start Timestamp             End Timestamp  \\
+0         0       0 2019-02-19 00:00:00+00:00 2019-07-25 00:00:00+00:00
+1         1       0 2019-08-08 00:00:00+00:00 2019-08-19 00:00:00+00:00
+2         2       0 2019-11-01 00:00:00+00:00 2019-11-20 00:00:00+00:00
 
    Status
 0  Closed
 1  Closed
-2    Open
+2  Closed
 
 >>> ranges.duration.max(wrap_kwargs=dict(to_timedelta=True))
 Timedelta('74 days 00:00:00')
@@ -127,11 +127,11 @@ ranges_field_config = Config(
                 name='end_idx'  # remap field of Records
             ),
             start_idx=dict(
-                title='Start Date',
+                title='Start Timestamp',
                 mapping='index'
             ),
             end_idx=dict(
-                title='End Date',
+                title='End Timestamp',
                 mapping='index'
             ),
             status=dict(
