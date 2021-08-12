@@ -3,40 +3,22 @@
 Provides the class `vectorbt.portfolio.base.Portfolio` for modeling portfolio performance
 and calculating various risk and performance metrics. It uses Numba-compiled
 functions from `vectorbt.portfolio.nb` for most computations and record classes based on
-`vectorbt.records.base.Records` for evaluating events such as orders, logs, trades, positions and drawdowns.
+`vectorbt.records.base.Records` for evaluating events such as orders, logs, trades, positions, and drawdowns.
 
 The job of the `Portfolio` class is to create a series of positions allocated 
 against a cash component, produce an equity curve, incorporate basic transaction costs
-and produce a set of statistics about its performance. In particular it outputs
+and produce a set of statistics about its performance. In particular, it outputs
 position/profit metrics and drawdown information.
 
-## Workflow
-
-The workflow of `Portfolio` is simple:
-
-1. Receives a set of inputs, such as entry and exit signals
-2. Uses them to generate and fill orders in form of records (simulation part)
-3. Calculates a broad range of risk & performance metrics based on these records (analysis part)
-
-It basically builds upon the `vectorbt.portfolio.orders.Orders` class. To simplify creation of order
-records and keep track of balances, it exposes several convenience methods with prefix `from_`.
-For example, you can use `Portfolio.from_signals` method to generate orders from entry and exit signals.
-Alternatively, you can use `Portfolio.from_order_func` to run a custom order function on each tick.
-The results are then automatically passed to the constructor method of `Portfolio` and you will
-receive a portfolio instance ready to be used for performance analysis.
-
-This way, one can simulate and analyze his/her strategy in a couple of lines.
-
-### Example
-
-The following example does something crazy: it checks candlestick data of 6 major cryptocurrencies
-in 2020 against every single pattern found in TA-Lib, and translates them into signals:
+The following example checks candlestick data of 6 major cryptocurrencies
+in 2020 against every single pattern found in TA-Lib, and translates them into orders:
 
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
 >>> from datetime import datetime
 >>> import talib
+>>> from numba import njit
 >>> import vectorbt as vbt
 
 >>> # Fetch price history
@@ -69,14 +51,14 @@ Date
 
 [244 rows x 6 columns]
 
->>> # Run every single pattern recognition indicator and combine results
+>>> # Run every single pattern recognition indicator and combine the results
 >>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
 >>> for pattern in talib.get_function_groups()['Pattern Recognition']:
 ...     PRecognizer = vbt.IndicatorFactory.from_talib(pattern)
 ...     pr = PRecognizer.run(ohlcv['Open'], ohlcv['High'], ohlcv['Low'], ohlcv['Close'])
 ...     result = result + pr.integer
 
->>> # Don't look into future
+>>> # Don't look into the future
 >>> result = result.vbt.fshift(1)
 
 >>> # Treat each number as order value in USD
@@ -93,6 +75,160 @@ Date
 
 ![](/docs/img/portfolio_value.svg)
 
+## Workflow
+
+`Portfolio` class does quite a few things to simulate your strategy.
+
+**Preparation** phase (in the particular class method):
+
+* Receives a set of inputs, such as signal arrays and other parameters
+* Resolves parameter defaults by searching for them in the global settings
+* Brings input arrays to a single shape
+* Does some basic validation of inputs and converts Pandas objects to NumPy arrays
+* Passes everything to a Numba-compiled simulation function
+
+**Simulation** phase (in the particular simulation function using Numba):
+
+* The simulation function traverses the broadcasted shape element by element, row by row (time dimension),
+    column by column (asset dimension)
+* For each asset and timestamp (= element):
+    * Gets all available information related to this element and executes the logic
+    * Generates an order or skips the element altogether
+    * If an order has been issued, processes the order and fills/ignores/rejects it
+    * If the order has been filled, registers the result by appending it to the order records
+    * Updates the current state such as the cash and asset balances
+
+**Construction** phase (in the particular class method):
+
+* Receives the returned order records and initializes a new `Portfolio` object
+
+**Analysis** phase (in the `Portfolio` object)
+
+* Offers a broad range of risk & performance metrics based on order records
+
+## Simulation modes
+
+There are three main simulation modes.
+
+### From orders
+
+`Portfolio.from_orders` is the most straightforward and the fastest out of all simulation modes.
+
+An order is a simple instruction that contains size, price, fees, and other information
+(see `vectorbt.portfolio.enums.Order` for details about what information a typical order requires).
+Instead of creating a `vectorbt.portfolio.enums.Order` tuple for each asset and timestamp (which may
+waste a lot of memory) and appending it to a (potentially huge) list for processing, `Portfolio.from_orders`
+takes each of those information pieces as an array, broadcasts them against each other, and creates a
+`vectorbt.portfolio.enums.Order` tuple out of each element for us.
+
+Thanks to broadcasting, we can pass any of the information as a 2-dim array, as a 1-dim array
+per column or row, and as a constant. And we don't even need to provide every piece of information -
+vectorbt fills the missing data with default constants, without wasting memory.
+
+Here's an example:
+
+```python-repl
+>>> size = pd.Series([1, -1, 1, -1])  # per row
+>>> price = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [4, 3, 2, 1]})  # per element
+>>> direction = ['longonly', 'shortonly']  # per column
+>>> fees = 0.01  # per frame
+
+>>> pf = vbt.Portfolio.from_orders(price, size, direction=direction, fees=fees)
+>>> pf.orders.records_readable
+   Order Id Column  Timestamp  Size  Price  Fees  Side
+0         0      a          0   1.0    1.0  0.01   Buy
+1         1      a          1   1.0    2.0  0.02  Sell
+2         2      a          2   1.0    3.0  0.03   Buy
+3         3      a          3   1.0    4.0  0.04  Sell
+4         4      b          0   1.0    4.0  0.04  Sell
+5         5      b          1   1.0    3.0  0.03   Buy
+6         6      b          2   1.0    2.0  0.02  Sell
+7         7      b          3   1.0    1.0  0.01   Buy
+```
+
+This method is particularly useful in situations where you don't need any further logic
+apart from filling orders at predefined timestamps. If you want to issue orders depending
+upon the previous performance, the current state, or other custom conditions, head over to
+`Portfolio.from_signals` or `Portfolio.from_order_func`.
+
+### From signals
+
+`Portfolio.from_signals` is centered around signals. It adds an abstraction layer on top of `Portfolio.from_orders`
+to automate some signaling processes. For example, by default, it won't let us execute another entry signal
+if we are already in the position. It also implements stop loss and take profit orders for exiting positions.
+Nevertheless, this method behaves similarly to `Portfolio.from_orders` and accepts most of its arguments;
+in fact, by setting `accumulate=True`, it behaves exactly like `Portfolio.from_orders`.
+
+Let's replicate the example above using signals:
+
+```python-repl
+>>> entries = pd.Series([True, False, True, False])
+>>> exits = pd.Series([False, True, False, True])
+
+>>> pf = vbt.Portfolio.from_signals(price, entries, exits, size=1, direction=direction, fees=fees)
+>>> pf.orders.records_readable
+   Order Id Column  Timestamp  Size  Price  Fees  Side
+0         0      a          0   1.0    1.0  0.01   Buy
+1         1      a          1   1.0    2.0  0.02  Sell
+2         2      a          2   1.0    3.0  0.03   Buy
+3         3      a          3   1.0    4.0  0.04  Sell
+4         4      b          0   1.0    4.0  0.04  Sell
+5         5      b          1   1.0    3.0  0.03   Buy
+6         6      b          2   1.0    2.0  0.02  Sell
+7         7      b          3   1.0    1.0  0.01   Buy
+```
+
+In a nutshell: this method automates some procedures that otherwise would be only possible by using
+`Portfolio.from_order_func` while following the same broadcasting principles as `Portfolio.from_orders` -
+the best of both worlds, given you can express your strategy as a sequence of signals. But as soon as
+your strategy requires any signal to be set dynamically or upon more complex conditions, switch to
+`Portfolio.from_order_func`.
+
+### From order function
+
+`Portfolio.from_order_func` is the most powerful form of simulation. Instead of pulling information
+from predefined arrays, it lets us define an arbitrary logic through callbacks. There are multiple
+kinds of callbacks, each called at some point while the simulation function traverses the shape.
+For example, apart from the main callback that returns an order (`order_func_nb`), there is a callback
+that does preprocessing on the entire group of columns at once. For more details on the general procedure
+and the callback zoo, see `vectorbt.portfolio.nb.simulate_nb`.
+
+Let's replicate our example using an order function:
+
+```python-repl
+>>> from vectorbt.utils.enum import map_enum_fields
+>>> from vectorbt.portfolio.nb import order_nb
+>>> from vectorbt.portfolio.enums import Direction
+
+>>> @njit
+>>> def order_func_nb(c, size, direction, fees):
+...     return order_nb(
+...         price=c.close[c.i, c.col],
+...         size=size[c.i],
+...         direction=direction[c.col],
+...         fees=fees
+... )
+
+>>> direction_num = map_enum_fields(direction, Direction)
+>>> pf = vbt.Portfolio.from_order_func(
+...     price,
+...     order_func_nb,
+...     np.asarray(size), np.asarray(direction_num), fees)
+>>> pf.orders.records_readable
+   Order Id Column  Timestamp  Size  Price  Fees  Side
+0         0      a          0   1.0    1.0  0.01   Buy
+1         1      a          1   1.0    2.0  0.02  Sell
+2         2      a          2   1.0    3.0  0.03   Buy
+3         3      a          3   1.0    4.0  0.04  Sell
+4         4      b          0   1.0    4.0  0.04  Sell
+5         5      b          1   1.0    3.0  0.03   Buy
+6         6      b          2   1.0    2.0  0.02  Sell
+7         7      b          3   1.0    1.0  0.01   Buy
+```
+
+There is an even more flexible version available - `vectorbt.portfolio.nb.flex_simulate_nb` (activated by
+passing `flexible=True` to `Portfolio.from_order_func`) - that allows creating multiple orders per symbol and bar.
+
 ## Broadcasting
 
 `Portfolio` is very flexible towards inputs:
@@ -102,12 +238,59 @@ Date
 * Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
 * Implements flexible indexing wherever possible to save memory
 
+### Flexible indexing
+
+Instead of expensive broadcasting, most methods keep the original shape and do indexing in a smart way.
+A nice feature of this is that it has almost no memory footprint and can broadcast in
+any direction indefinitely.
+
+For example, let's broadcast three inputs and select the last element using both approaches:
+
+```python-repl
+>>> from vectorbt.base.reshape_fns import broadcast, flex_select_auto_nb
+
+>>> # Classic way
+>>> a = np.array([1, 2, 3])
+>>> b = np.array([[4], [5], [6]])
+>>> c = np.array(10)
+>>> a_, b_, c_ = broadcast(a, b, c)
+
+>>> a_
+array([[1, 2, 3],
+       [1, 2, 3],
+       [1, 2, 3]])
+>>> a_[2, 2]
+3
+
+>>> b_
+array([[4, 4, 4],
+       [5, 5, 5],
+       [6, 6, 6]])
+>>> b_[2, 2]
+6
+
+>>> c_
+array([[10, 10, 10],
+       [10, 10, 10],
+       [10, 10, 10]])
+>>> c_[2, 2]
+10
+
+>>> # Flexible indexing being done during simulation
+>>> flex_select_auto_nb(a, 2, 2, True)
+3
+>>> flex_select_auto_nb(b, 2, 2, True)
+6
+>>> flex_select_auto_nb(c, 2, 2, True)
+10
+```
+
 ## Grouping
 
 One of the key features of `Portfolio` is the ability to group columns. Groups can be specified by
 `group_by`, which can be anything from positions or names of column levels, to a NumPy array with
-actual groups. Groups can be formed to share capital between columns or to compute metrics
-for a combined portfolio of multiple independent columns.
+actual groups. Groups can be formed to share capital between columns (make sure to pass `cash_sharing=True`)
+or to compute metrics for a combined portfolio of multiple independent columns.
 
 For example, let's divide our portfolio into two groups sharing the same cash balance:
 
@@ -1280,7 +1463,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     freq: tp.Optional[tp.FrequencyLike] = None,
                     attach_call_seq: tp.Optional[bool] = None,
                     **kwargs) -> PortfolioT:
-        """Simulate portfolio from orders.
+        """Simulate portfolio from orders - size, price, fees, and other information.
 
         Args:
             close (array_like): Last asset price at each time step.
@@ -1667,15 +1850,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             call_seq=call_seq if attach_call_seq else None,
             **kwargs
         )
-
-    @classmethod
-    def from_holding(cls: tp.Type[PortfolioT], close: tp.ArrayLike, **kwargs) -> PortfolioT:
-        """Simulate portfolio from holding.
-
-        Based on `Portfolio.from_orders`."""
-        size = pd.DataFrame.vbt.empty_like(close, fill_value=np.nan)
-        size.iloc[0] = np.inf
-        return cls.from_orders(close, size, **kwargs)
 
     @classmethod
     def from_signals(cls: tp.Type[PortfolioT],
@@ -2386,6 +2560,22 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         )
 
     @classmethod
+    def from_holding(cls: tp.Type[PortfolioT], close: tp.ArrayLike, **kwargs) -> PortfolioT:
+        """Simulate portfolio from holding.
+
+        Based on `Portfolio.from_signals`.
+
+        ```python-repl
+        >>> import vectorbt as vbt
+
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> pf = vbt.Portfolio.from_holding(close)
+        >>> pf.final_value()
+        500.0
+        ```"""
+        return cls.from_signals(close, entries=True, exits=False, **kwargs)
+
+    @classmethod
     def from_random_signals(cls: tp.Type[PortfolioT],
                             close: tp.ArrayLike,
                             n: tp.Optional[tp.ArrayLike] = None,
@@ -2401,14 +2591,56 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         Generates signals based either on the number of signals `n` or the probability
         of encountering a signal `prob`.
 
-        If `n` is set, see `vectorbt.signals.generators.RANDNX`.
-        If `prob` is set, see `vectorbt.signals.generators.RPROBNX`.
+        * If `n` is set, see `vectorbt.signals.generators.RANDNX`.
+        * If `prob` is set, see `vectorbt.signals.generators.RPROBNX`.
 
         Based on `Portfolio.from_signals`.
 
         !!! note
             To generate random signals, the shape of `close` is used. Broadcasting with other
-            arrays happens after the generation."""
+            arrays happens after the generation.
+
+        ## Example
+
+        * Test multiple combinations of random entries and exits:
+
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> pf = vbt.Portfolio.from_random_signals(close, n=[2, 1, 0], seed=42)
+        >>> pf.orders.count()
+        randnx_n
+        2    4
+        1    2
+        0    0
+        Name: count, dtype: int64
+        ```
+
+        * Test the Cartesian product of entry and exit encounter probabilities:
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_random_signals(
+        ...     close,
+        ...     entry_prob=[0, 0.5, 1],
+        ...     exit_prob=[0, 0.5, 1],
+        ...     param_product=True,
+        ...     seed=42)
+        >>> pf.orders.count()
+        rprobnx_entry_prob  rprobnx_exit_prob
+        0.0                 0.0                  0
+                            0.5                  0
+                            1.0                  0
+        0.5                 0.0                  1
+                            0.5                  4
+                            1.0                  3
+        1.0                 0.0                  1
+                            0.5                  4
+                            1.0                  5
+        Name: count, dtype: int64
+        ```
+        """
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
@@ -2502,9 +2734,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         **kwargs) -> PortfolioT:
         """Build portfolio from a custom order function.
 
-        For details, see `vectorbt.portfolio.nb.simulate_nb`.
-
-        if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+        * not `row_wise` and not `flexible`: See `vectorbt.portfolio.nb.simulate_nb`
+        * not `row_wise` and `flexible`: See `vectorbt.portfolio.nb.flex_simulate_nb`
+        * `row_wise` and not `flexible`: See `vectorbt.portfolio.nb.simulate_row_wise_nb`
+        * `row_wise` and `flexible`: See `vectorbt.portfolio.nb.flex_simulate_row_wise_nb`
 
         Args:
             close (array_like): Last asset price at each time step.
@@ -2513,7 +2746,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 Used for calculating unrealized PnL and portfolio value.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
-            flexible (bool): Whether to simulate using `vectorbt.portfolio.nb.flex_simulate_nb`.
+            flexible (bool): Whether to simulate using a flexible order function.
 
                 This lifts the limit of one order per tick and symbol.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
@@ -2595,8 +2828,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
                 Disable this to make simulation a bit faster for simple use cases.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
-
-                See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
             use_numba (bool): Whether to run the main simulation function using Numba.
 
                 !!! note
@@ -2787,7 +3018,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ...     # Select info related to this order
         ...     # flex_select_auto_nb allows us to pass size as single number, 1-dim or 2-dim array
         ...     # If flex_2d is True, 1-dim array will be per column, otherwise per row
-        ...     size_now = flex_select_auto_nb(c.i, c.col, np.asarray(size), flex_2d)
+        ...     size_now = flex_select_auto_nb(np.asarray(size), c.i, c.col, flex_2d)
         ...     price_now = c.close[c.i, c.col]  # close is always 2-dim array
         ...     stop_price_now = stop_price[c.col]
         ...
@@ -2809,7 +3040,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         >>> @njit
         ... def post_order_func_nb(c, stop_price, stop, flex_2d):
         ...     # Same broadcasting as for size
-        ...     stop_now = flex_select_auto_nb(c.i, c.col, np.asarray(stop), flex_2d)
+        ...     stop_now = flex_select_auto_nb(np.asarray(stop), c.i, c.col, flex_2d)
         ...
         ...     if c.order_result.status == OrderStatus.Filled:
         ...         if c.order_result.side == OrderSide.Buy:
@@ -2871,20 +3102,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         For each bar, buy at open and sell at close:
 
         ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from numba import njit
-        >>> import vectorbt as vbt
-        >>> from vectorbt.base.reshape_fns import to_2d_array
-        >>> from vectorbt.portfolio.nb import order_nb, order_nothing_nb, close_position_nb
-
         >>> @njit
         ... def flex_order_func_nb(c, open, size):
         ...     if c.call_idx == 0:
         ...         return c.from_col, order_nb(size=size, price=open[c.i, c.from_col])
         ...     if c.call_idx == 1:
         ...         return c.from_col, close_position_nb(price=c.close[c.i, c.from_col])
-        ...     return -1, order_nothing_nb()
+        ...     return -1, NoOrder
 
         >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
         >>> close = pd.DataFrame({'a': [2, 3, 4], 'b': [3, 4, 5]})

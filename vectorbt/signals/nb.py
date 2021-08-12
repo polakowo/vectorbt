@@ -298,7 +298,7 @@ def rand_choice_nb(from_i: int, to_i: int, col: int, n: tp.MaybeArray[int]) -> t
 
     `n` uses flexible indexing."""
     ns = np.asarray(n)
-    size = min(to_i - from_i, flex_select_auto_nb(0, col, ns, True))
+    size = min(to_i - from_i, flex_select_auto_nb(ns, 0, col, True))
     return from_i + np.random.choice(to_i - from_i, size=size, replace=False)
 
 
@@ -332,7 +332,7 @@ def rand_by_prob_choice_nb(from_i: int,
     probs = np.asarray(prob)
     j = 0
     for i in range(from_i, to_i):
-        if np.random.uniform(0, 1) < flex_select_auto_nb(i, col, probs, flex_2d):  # [0, 1)
+        if np.random.uniform(0, 1) < flex_select_auto_nb(probs, i, col, flex_2d):  # [0, 1)
             temp_idx_arr[j] = i
             j += 1
             if pick_first:
@@ -445,7 +445,7 @@ def generate_rand_enex_nb(shape: tp.Shape,
             exits[both_idxs[1::2], col] = True
     else:
         for col in range(shape[1]):
-            _n = flex_select_auto_nb(0, col, ns, True)
+            _n = flex_select_auto_nb(ns, 0, col, True)
             if _n == 1:
                 entry_idx = np.random.randint(0, shape[0] - exit_wait)
                 entries[entry_idx, col] = True
@@ -598,9 +598,9 @@ def stop_choice_nb(from_i: int,
 
     j = 0
     init_i = from_i - wait
-    init_ts = flex_select_auto_nb(init_i, col, ts, flex_2d)
-    init_stop = flex_select_auto_nb(init_i, col, stops, flex_2d)
-    init_trailing = flex_select_auto_nb(init_i, col, trailings, flex_2d)
+    init_ts = flex_select_auto_nb(ts, init_i, col, flex_2d)
+    init_stop = flex_select_auto_nb(stops, init_i, col, flex_2d)
+    init_trailing = flex_select_auto_nb(trailings, init_i, col, flex_2d)
     max_high = min_low = init_ts
 
     for i in range(from_i, to_i):
@@ -616,7 +616,7 @@ def stop_choice_nb(from_i: int,
                 curr_stop_price = init_ts * (1 + init_stop)
 
         # Check if stop price is within bar
-        curr_ts = flex_select_auto_nb(i, col, ts, flex_2d)
+        curr_ts = flex_select_auto_nb(ts, i, col, flex_2d)
         if not np.isnan(init_stop):
             if init_stop >= 0:
                 exit_signal = curr_ts >= curr_stop_price
@@ -789,19 +789,19 @@ def ohlc_stop_choice_nb(from_i: int,
     tp_stops = np.asarray(tp_stop)
 
     init_i = from_i - wait
-    init_open = flex_select_auto_nb(init_i, col, open, flex_2d)
-    init_sl_stop = abs(flex_select_auto_nb(init_i, col, sl_stops, flex_2d))
-    init_sl_trail = abs(flex_select_auto_nb(init_i, col, sl_trails, flex_2d))
-    init_tp_stop = abs(flex_select_auto_nb(init_i, col, tp_stops, flex_2d))
+    init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
+    init_sl_stop = abs(flex_select_auto_nb(sl_stops, init_i, col, flex_2d))
+    init_sl_trail = abs(flex_select_auto_nb(sl_trails, init_i, col, flex_2d))
+    init_tp_stop = abs(flex_select_auto_nb(tp_stops, init_i, col, flex_2d))
     max_p = init_open
     j = 0
 
     for i in range(from_i, to_i):
         # Resolve current bar
-        _open = flex_select_auto_nb(i, col, open, flex_2d)
-        _high = flex_select_auto_nb(i, col, high, flex_2d)
-        _low = flex_select_auto_nb(i, col, low, flex_2d)
-        _close = flex_select_auto_nb(i, col, close, flex_2d)
+        _open = flex_select_auto_nb(open, i, col, flex_2d)
+        _high = flex_select_auto_nb(high, i, col, flex_2d)
+        _low = flex_select_auto_nb(low, i, col, flex_2d)
+        _close = flex_select_auto_nb(close, i, col, flex_2d)
         if np.isnan(_open):
             _open = _close
         if np.isnan(_low):

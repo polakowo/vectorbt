@@ -2255,7 +2255,7 @@ class TestReshapeFns:
             for col in range(bc_arg_2d.shape[1]):
                 for i in range(bc_arg_2d.shape[0]):
                     assert bc_arg_2d[i, col] == reshape_fns.flex_select_nb(
-                        i, col, raw_arg, def_i, def_col, bc_arg.ndim == 2)
+                        raw_arg, i, col, def_i, def_col, bc_arg.ndim == 2)
 
 
 # ############# indexing.py ############# #

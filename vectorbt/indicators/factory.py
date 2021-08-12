@@ -392,10 +392,10 @@ broadcasting and one for element-wise broadcasting:
 ... def apply_func_nb(price, window, lower, upper, flex_2d):
 ...     output = np.full(price.shape, np.nan, dtype=np.float_)
 ...     for col in range(price.shape[1]):
-...         _window = flex_select_auto_nb(0, col, window, flex_2d)
+...         _window = flex_select_auto_nb(window, 0, col, flex_2d)
 ...         for i in range(_window, price.shape[0]):
-...             _lower = flex_select_auto_nb(i, col, lower, flex_2d)
-...             _upper = flex_select_auto_nb(i, col, upper, flex_2d)
+...             _lower = flex_select_auto_nb(lower, i, col, flex_2d)
+...             _upper = flex_select_auto_nb(upper, i, col, flex_2d)
 ...             mean = np.mean(price[i - _window:i, col])
 ...             output[i, col] = _lower < mean < _upper
 ...     return output

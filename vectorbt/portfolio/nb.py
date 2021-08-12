@@ -1015,14 +1015,14 @@ def sort_call_seq_out_nb(seg_ctx: SegmentContext,
         else:
             free_cash_now = seg_ctx.last_free_cash[col]
         order_value_out[call_idx] = approx_order_value_nb(
-            flex_select_auto_nb(call_idx, 0, size_arr, False),
-            flex_select_auto_nb(call_idx, 0, size_type_arr, False),
+            flex_select_auto_nb(size_arr, call_idx, 0, False),
+            flex_select_auto_nb(size_type_arr, call_idx, 0, False),
             cash_now,
             seg_ctx.last_position[col],
             free_cash_now,
             seg_ctx.last_val_price[col],
             group_value_now,
-            flex_select_auto_nb(call_idx, 0, direction_arr, False)
+            flex_select_auto_nb(direction_arr, call_idx, 0, False)
         )
     # Sort by order value
     insert_argsort_nb(order_value_out, call_seq_out)
@@ -1327,23 +1327,23 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 col = from_col + call_idx
 
                 # Resolve order price
-                _price = flex_select_auto_nb(i, col, price, flex_2d)
+                _price = flex_select_auto_nb(price, i, col, flex_2d)
                 if np.isinf(_price):
                     if _price > 0:
-                        _price = flex_select_auto_nb(i, col, close, flex_2d)  # upper bound is close
+                        _price = flex_select_auto_nb(close, i, col, flex_2d)  # upper bound is close
                     elif i > 0:
-                        _price = flex_select_auto_nb(i - 1, col, close, flex_2d)  # lower bound is prev close
+                        _price = flex_select_auto_nb(close, i - 1, col, flex_2d)  # lower bound is prev close
                     else:
                         _price = np.nan  # first timestamp has no prev close
                 order_price[col] = _price
 
                 # Resolve valuation price
-                _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
+                _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
                 if np.isinf(_val_price):
                     if _val_price > 0:
                         _val_price = _price  # upper bound is order price
                     elif i > 0:
-                        _val_price = flex_select_auto_nb(i - 1, col, close, flex_2d)  # lower bound is prev close
+                        _val_price = flex_select_auto_nb(close, i - 1, col, flex_2d)  # lower bound is prev close
                     else:
                         _val_price = np.nan  # first timestamp has no prev close
                 if not np.isnan(_val_price) or not ffill_val_price:
@@ -1365,14 +1365,14 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                     for call_idx in range(group_len):
                         col = from_col + call_idx
                         temp_order_value[call_idx] = approx_order_value_nb(
-                            flex_select_auto_nb(i, col, size, flex_2d),
-                            flex_select_auto_nb(i, col, size_type, flex_2d),
+                            flex_select_auto_nb(size, i, col, flex_2d),
+                            flex_select_auto_nb(size_type, i, col, flex_2d),
                             cash_now,
                             last_position[col],
                             free_cash_now,
                             last_val_price[col],
                             value_now,
-                            flex_select_auto_nb(i, col, direction, flex_2d)
+                            flex_select_auto_nb(direction, i, col, flex_2d)
                         )
 
                     # Sort by order value
@@ -1397,20 +1397,20 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
                 # Generate the next order
                 order = order_nb(
-                    size=flex_select_auto_nb(i, col, size, flex_2d),
+                    size=flex_select_auto_nb(size, i, col, flex_2d),
                     price=order_price[col],
-                    size_type=flex_select_auto_nb(i, col, size_type, flex_2d),
-                    direction=flex_select_auto_nb(i, col, direction, flex_2d),
-                    fees=flex_select_auto_nb(i, col, fees, flex_2d),
-                    fixed_fees=flex_select_auto_nb(i, col, fixed_fees, flex_2d),
-                    slippage=flex_select_auto_nb(i, col, slippage, flex_2d),
-                    min_size=flex_select_auto_nb(i, col, min_size, flex_2d),
-                    max_size=flex_select_auto_nb(i, col, max_size, flex_2d),
-                    reject_prob=flex_select_auto_nb(i, col, reject_prob, flex_2d),
-                    lock_cash=flex_select_auto_nb(i, col, lock_cash, flex_2d),
-                    allow_partial=flex_select_auto_nb(i, col, allow_partial, flex_2d),
-                    raise_reject=flex_select_auto_nb(i, col, raise_reject, flex_2d),
-                    log=flex_select_auto_nb(i, col, log, flex_2d)
+                    size_type=flex_select_auto_nb(size_type, i, col, flex_2d),
+                    direction=flex_select_auto_nb(direction, i, col, flex_2d),
+                    fees=flex_select_auto_nb(fees, i, col, flex_2d),
+                    fixed_fees=flex_select_auto_nb(fixed_fees, i, col, flex_2d),
+                    slippage=flex_select_auto_nb(slippage, i, col, flex_2d),
+                    min_size=flex_select_auto_nb(min_size, i, col, flex_2d),
+                    max_size=flex_select_auto_nb(max_size, i, col, flex_2d),
+                    reject_prob=flex_select_auto_nb(reject_prob, i, col, flex_2d),
+                    lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
+                    allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
+                    raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
+                    log=flex_select_auto_nb(log, i, col, flex_2d)
                 )
 
                 # Process the order
@@ -1780,29 +1780,29 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                 col = from_col + call_idx
 
                 # Resolve order price
-                _price = flex_select_auto_nb(i, col, price, flex_2d)
-                _slippage = flex_select_auto_nb(i, col, slippage, flex_2d)
+                _price = flex_select_auto_nb(price, i, col, flex_2d)
+                _slippage = flex_select_auto_nb(slippage, i, col, flex_2d)
                 if np.isinf(_price):
                     if _price > 0:
-                        _price = flex_select_auto_nb(i, col, close, flex_2d)  # upper bound is close
+                        _price = flex_select_auto_nb(close, i, col, flex_2d)  # upper bound is close
                     else:
-                        _open = flex_select_auto_nb(i, col, open, flex_2d)
+                        _open = flex_select_auto_nb(open, i, col, flex_2d)
                         if not np.isnan(_open):
                             _price = _open  # lower bound is open
                         elif i > 0:
-                            _price = flex_select_auto_nb(i - 1, col, close, flex_2d)  # lower bound is prev close
+                            _price = flex_select_auto_nb(close, i - 1, col, flex_2d)  # lower bound is prev close
                         else:
                             _price = np.nan  # first timestamp has no prev close
                 order_price[col] = _price
                 order_slippage[col] = _slippage
 
                 # Resolve valuation price
-                _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
+                _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
                 if np.isinf(_val_price):
                     if _val_price > 0:
                         _val_price = _price  # upper bound is order price
                     elif i > 0:
-                        _val_price = flex_select_auto_nb(i - 1, col, close, flex_2d)  # lower bound is prev close
+                        _val_price = flex_select_auto_nb(close, i - 1, col, flex_2d)  # lower bound is prev close
                     else:
                         _val_price = np.nan  # first timestamp has no prev close
                 if not np.isnan(_val_price) or not ffill_val_price:
@@ -1841,10 +1841,10 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                     if not np.isnan(sl_curr_stop[col]) or not np.isnan(tp_curr_stop[col]):
                         # Resolve current bar
-                        _open = flex_select_auto_nb(i, col, open, flex_2d)
-                        _high = flex_select_auto_nb(i, col, high, flex_2d)
-                        _low = flex_select_auto_nb(i, col, low, flex_2d)
-                        _close = flex_select_auto_nb(i, col, close, flex_2d)
+                        _open = flex_select_auto_nb(open, i, col, flex_2d)
+                        _high = flex_select_auto_nb(high, i, col, flex_2d)
+                        _low = flex_select_auto_nb(low, i, col, flex_2d)
+                        _close = flex_select_auto_nb(close, i, col, flex_2d)
                         if np.isnan(_open):
                             _open = _close
                         if np.isnan(_low):
@@ -1886,7 +1886,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         if not np.isnan(stop_price):
                             # Stop price has been hit
                             stop_price_hit = True
-                            _stop_exit_price = flex_select_auto_nb(i, col, stop_exit_price, flex_2d)
+                            _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                             if _stop_exit_price == StopExitPrice.StopMarket:
                                 order_price[col] = stop_price
                             elif _stop_exit_price == StopExitPrice.StopLimit:
@@ -1898,20 +1898,20 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                 # Resolve any signal conflict
                 if use_stops and stop_price_hit:
                     is_exit = True
-                    _conflict_mode = flex_select_auto_nb(i, col, stop_conflict_mode, flex_2d)
+                    _conflict_mode = flex_select_auto_nb(stop_conflict_mode, i, col, flex_2d)
                 else:
-                    is_exit = flex_select_auto_nb(i, col, exits, flex_2d)
-                    _conflict_mode = flex_select_auto_nb(i, col, conflict_mode, flex_2d)
+                    is_exit = flex_select_auto_nb(exits, i, col, flex_2d)
+                    _conflict_mode = flex_select_auto_nb(conflict_mode, i, col, flex_2d)
                 is_entry, is_exit = resolve_signal_conflict_nb(
                     last_position[col],
-                    flex_select_auto_nb(i, col, entries, flex_2d),
+                    flex_select_auto_nb(entries, i, col, flex_2d),
                     is_exit,
-                    flex_select_auto_nb(i, col, direction, flex_2d),
+                    flex_select_auto_nb(direction, i, col, flex_2d),
                     _conflict_mode
                 )
 
                 # Convert both signals to size
-                _stop_exit_mode = flex_select_auto_nb(i, col, stop_exit_mode, flex_2d)
+                _stop_exit_mode = flex_select_auto_nb(stop_exit_mode, i, col, flex_2d)
                 if stop_price_hit and is_exit and _stop_exit_mode == StopExitMode.Close:
                     _order_size = -last_position[col]
                     _order_size_type = SizeType.Amount
@@ -1920,11 +1920,11 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         last_position[col],
                         is_entry,
                         is_exit,
-                        flex_select_auto_nb(i, col, size, flex_2d),
-                        flex_select_auto_nb(i, col, size_type, flex_2d),
-                        flex_select_auto_nb(i, col, direction, flex_2d),
-                        flex_select_auto_nb(i, col, accumulate, flex_2d),
-                        flex_select_auto_nb(i, col, close_first, flex_2d),
+                        flex_select_auto_nb(size, i, col, flex_2d),
+                        flex_select_auto_nb(size_type, i, col, flex_2d),
+                        flex_select_auto_nb(direction, i, col, flex_2d),
+                        flex_select_auto_nb(accumulate, i, col, flex_2d),
+                        flex_select_auto_nb(close_first, i, col, flex_2d),
                         last_val_price[col]
                     )  # already takes into account direction
                 order_size[col] = _order_size
@@ -1935,7 +1935,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         temp_order_value[call_idx] = 0.
                     else:
                         # Approximate order value
-                        _direction = flex_select_auto_nb(i, col, direction, flex_2d)
+                        _direction = flex_select_auto_nb(direction, i, col, flex_2d)
                         if _order_size_type == SizeType.Amount:
                             temp_order_value[call_idx] = _order_size * last_val_price[col]
                         elif _order_size_type == SizeType.Value:
@@ -1983,12 +1983,11 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                 # Generate the next order
                 _order_size = order_size[col]  # already takes into account direction
                 if _order_size != 0:
+                    _direction = flex_select_auto_nb(direction, i, col, flex_2d)
                     if _order_size > 0:  # long order
-                        _direction = flex_select_auto_nb(i, col, direction, flex_2d)
                         if _direction == Direction.ShortOnly:
                             _order_size *= -1  # must reverse for process_order_nb
                     else:  # short order
-                        _direction = flex_select_auto_nb(i, col, direction, flex_2d)
                         if _direction == Direction.ShortOnly:
                             _order_size *= -1
                     order = order_nb(
@@ -1996,16 +1995,16 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         price=order_price[col],
                         size_type=order_size_type[col],
                         direction=_direction,
-                        fees=flex_select_auto_nb(i, col, fees, flex_2d),
-                        fixed_fees=flex_select_auto_nb(i, col, fixed_fees, flex_2d),
+                        fees=flex_select_auto_nb(fees, i, col, flex_2d),
+                        fixed_fees=flex_select_auto_nb(fixed_fees, i, col, flex_2d),
                         slippage=order_slippage[col],
-                        min_size=flex_select_auto_nb(i, col, min_size, flex_2d),
-                        max_size=flex_select_auto_nb(i, col, max_size, flex_2d),
-                        reject_prob=flex_select_auto_nb(i, col, reject_prob, flex_2d),
-                        lock_cash=flex_select_auto_nb(i, col, lock_cash, flex_2d),
-                        allow_partial=flex_select_auto_nb(i, col, allow_partial, flex_2d),
-                        raise_reject=flex_select_auto_nb(i, col, raise_reject, flex_2d),
-                        log=flex_select_auto_nb(i, col, log, flex_2d)
+                        min_size=flex_select_auto_nb(min_size, i, col, flex_2d),
+                        max_size=flex_select_auto_nb(max_size, i, col, flex_2d),
+                        reject_prob=flex_select_auto_nb(reject_prob, i, col, flex_2d),
+                        lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
+                        allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
+                        raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
+                        log=flex_select_auto_nb(log, i, col, flex_2d)
                     )
 
                     # Process the order
@@ -2052,7 +2051,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                                 tp_init_price[col] = np.nan
                                 tp_curr_stop[col] = np.nan
                             else:
-                                _stop_entry_price = flex_select_auto_nb(i, col, stop_entry_price, flex_2d)
+                                _stop_entry_price = flex_select_auto_nb(stop_entry_price, i, col, flex_2d)
                                 if _stop_entry_price == StopEntryPrice.ValPrice:
                                     new_init_price = val_price_now
                                 elif _stop_entry_price == StopEntryPrice.Price:
@@ -2060,11 +2059,11 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                                 elif _stop_entry_price == StopEntryPrice.FillPrice:
                                     new_init_price = order_result.price
                                 else:
-                                    new_init_price = flex_select_auto_nb(i, col, close, flex_2d)
-                                _stop_update_mode = flex_select_auto_nb(i, col, stop_update_mode, flex_2d)
-                                _sl_stop = flex_select_auto_nb(i, col, sl_stop, flex_2d)
-                                _sl_trail = flex_select_auto_nb(i, col, sl_trail, flex_2d)
-                                _tp_stop = flex_select_auto_nb(i, col, tp_stop, flex_2d)
+                                    new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
+                                _stop_update_mode = flex_select_auto_nb(stop_update_mode, i, col, flex_2d)
+                                _sl_stop = flex_select_auto_nb(sl_stop, i, col, flex_2d)
+                                _sl_trail = flex_select_auto_nb(sl_trail, i, col, flex_2d)
+                                _tp_stop = flex_select_auto_nb(tp_stop, i, col, flex_2d)
 
                                 if state.position == 0 or np.sign(position_now) != np.sign(state.position):
                                     # Position opened/reversed -> set stops

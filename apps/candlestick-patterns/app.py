@@ -81,16 +81,6 @@ directions = Direction._fields
 conflict_modes = ConflictMode._fields
 plot_types = ['OHLC', 'Candlestick']
 
-# Populate subplots
-all_subplots = {}
-for k, v in Portfolio.subplots.items():
-    trades_sub_v = deep_substitute(v, mapping=dict(use_positions=False), safe=True)
-    all_subplots[k] = trades_sub_v
-    positions_sub_v = deep_substitute(v, mapping=dict(use_positions=True), safe=True)
-    if positions_sub_v['title'] != v['title']:
-        positions_sub_v['use_positions'] = True
-        all_subplots[k.replace('trade', 'position')] = positions_sub_v
-
 # Colors
 color_schema = settings['plotting']['color_schema']
 bgcolor = "#272a32"
@@ -296,7 +286,7 @@ app.layout = html.Div(
                                                                     id="subplot_dropdown",
                                                                     options=[
                                                                         {"value": k, "label": v['title']}
-                                                                        for k, v in all_subplots.items()
+                                                                        for k, v in Portfolio.subplots.items()
                                                                     ],
                                                                     multi=True,
                                                                     value=default_subplots,
@@ -1387,7 +1377,7 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         )
     height = int(6 / 21 * 2 / 3 * window_width)
     fig = main_portfolio.plot(
-        subplots={k: all_subplots[k] for k in subplots},
+        subplots=subplots,
         subplot_settings=subplot_settings,
         **merge_dicts(
             default_layout,
