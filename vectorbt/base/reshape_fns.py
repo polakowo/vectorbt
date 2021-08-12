@@ -917,7 +917,7 @@ def unstack_to_df(arg: tp.SeriesFrame,
 
 
 @njit(cache=True)
-def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool) -> tp.Tuple[int, int]:
+def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int, int]:
     """Choose selection index and column based on the array's shape.
 
     Instead of expensive broadcasting, keep the original shape and do indexing in a smart way.
@@ -950,7 +950,7 @@ def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool) -> tp.Tuple[int, int]:
 
 
 @njit(cache=True)
-def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, flex_2d: bool) -> tp.Any:
+def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, flex_2d: bool = True) -> tp.Any:
     """Select element of `a` as if it has been broadcast."""
     if flex_i == -1:
         flex_i = i
@@ -966,7 +966,7 @@ def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, fl
 
 
 @njit(cache=True)
-def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool) -> tp.Any:
+def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool = True) -> tp.Any:
     """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`.
 
     !!! note

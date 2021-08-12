@@ -10,8 +10,7 @@ against a cash component, produce an equity curve, incorporate basic transaction
 and produce a set of statistics about its performance. In particular, it outputs
 position/profit metrics and drawdown information.
 
-The following example checks candlestick data of 6 major cryptocurrencies
-in 2020 against every single pattern found in TA-Lib, and translates them into orders:
+Run for the examples below:
 
 ```python-repl
 >>> import numpy as np
@@ -19,61 +18,14 @@ in 2020 against every single pattern found in TA-Lib, and translates them into o
 >>> from datetime import datetime
 >>> import talib
 >>> from numba import njit
+
 >>> import vectorbt as vbt
-
->>> # Fetch price history
->>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
->>> start = '2020-01-01 UTC'  # crypto is UTC
->>> end = '2020-09-01 UTC'
->>> # OHLCV by column
->>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
->>> ohlcv['Open']
-
-symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \\
-Date
-2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
-2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
-2020-01-03 00:00:00+00:00   6984.428711  127.411263  0.187948  13.035329
-...                                 ...         ...       ...        ...
-2020-08-30 00:00:00+00:00  11508.713867  399.616699  0.274568  23.009060
-2020-08-31 00:00:00+00:00  11713.306641  428.509003  0.283065  23.647858
-2020-09-01 00:00:00+00:00  11679.316406  434.874451  0.281612  23.185047
-
-symbol                        BCH-USD    LTC-USD
-Date
-2020-01-01 00:00:00+00:00  204.671295  41.326534
-2020-01-02 00:00:00+00:00  204.354538  42.018085
-2020-01-03 00:00:00+00:00  196.007690  39.863129
-...                               ...        ...
-2020-08-30 00:00:00+00:00  268.842865  57.207737
-2020-08-31 00:00:00+00:00  279.280426  62.844059
-2020-09-01 00:00:00+00:00  274.480865  61.105076
-
-[244 rows x 6 columns]
-
->>> # Run every single pattern recognition indicator and combine the results
->>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
->>> for pattern in talib.get_function_groups()['Pattern Recognition']:
-...     PRecognizer = vbt.IndicatorFactory.from_talib(pattern)
-...     pr = PRecognizer.run(ohlcv['Open'], ohlcv['High'], ohlcv['Low'], ohlcv['Close'])
-...     result = result + pr.integer
-
->>> # Don't look into the future
->>> result = result.vbt.fshift(1)
-
->>> # Treat each number as order value in USD
->>> size = result / ohlcv['Open']
-
->>> # Simulate portfolio
->>> pf = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001)
-
->>> # Visualize portfolio value
->>> pf.value().vbt.plot()
+>>> from vectorbt.utils.colors import adjust_opacity
+>>> from vectorbt.utils.enum import map_enum_fields
+>>> from vectorbt.base.reshape_fns import broadcast, flex_select_auto_nb, to_2d_array
+>>> from vectorbt.portfolio.enums import SizeType, Direction, NoOrder, OrderStatus, OrderSide
+>>> from vectorbt.portfolio.nb import order_nb, close_position_nb, sort_call_seq_nb
 ```
-
-![](/docs/img/portfolio_value.svg)
 
 ## Workflow
 
@@ -181,8 +133,8 @@ Let's replicate the example above using signals:
 In a nutshell: this method automates some procedures that otherwise would be only possible by using
 `Portfolio.from_order_func` while following the same broadcasting principles as `Portfolio.from_orders` -
 the best of both worlds, given you can express your strategy as a sequence of signals. But as soon as
-your strategy requires any signal to be set dynamically or upon more complex conditions, switch to
-`Portfolio.from_order_func`.
+your strategy requires any signal to be set dynamically or to depend upon more complex conditions,
+switch to `Portfolio.from_order_func`.
 
 ### From order function
 
@@ -196,10 +148,6 @@ and the callback zoo, see `vectorbt.portfolio.nb.simulate_nb`.
 Let's replicate our example using an order function:
 
 ```python-repl
->>> from vectorbt.utils.enum import map_enum_fields
->>> from vectorbt.portfolio.nb import order_nb
->>> from vectorbt.portfolio.enums import Direction
-
 >>> @njit
 >>> def order_func_nb(c, size, direction, fees):
 ...     return order_nb(
@@ -229,6 +177,79 @@ Let's replicate our example using an order function:
 There is an even more flexible version available - `vectorbt.portfolio.nb.flex_simulate_nb` (activated by
 passing `flexible=True` to `Portfolio.from_order_func`) - that allows creating multiple orders per symbol and bar.
 
+This method has many advantages:
+
+* Realistic simulation as it follows the event-driven approach - less risk of exposure to the look-ahead bias
+* Provides a lot of useful information during the runtime, such as the current position's PnL
+* Enables putting all logic including custom indicators into a single place, and running it as the data
+ comes in, in a memory-friendly manner
+
+But there are drawbacks too:
+
+* Doesn't broadcast arrays - needs to be done by the user prior to the execution
+* Requires at least a basic knowledge of NumPy and Numba
+* Requires at least an intermediate knowledge of both to optimize for efficiency
+
+## Example
+
+To showcase the features of `Portfolio`, run the following example: it checks candlestick data of 6 major
+cryptocurrencies in 2020 against every single pattern found in TA-Lib, and translates them into orders.
+
+```python-repl
+>>> # Fetch price history
+>>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
+>>> start = '2020-01-01 UTC'  # crypto is UTC
+>>> end = '2020-09-01 UTC'
+>>> # OHLCV by column
+>>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
+>>> ohlcv['Open']
+
+symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \\
+Date
+2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
+2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
+2020-01-03 00:00:00+00:00   6984.428711  127.411263  0.187948  13.035329
+...                                 ...         ...       ...        ...
+2020-08-30 00:00:00+00:00  11508.713867  399.616699  0.274568  23.009060
+2020-08-31 00:00:00+00:00  11713.306641  428.509003  0.283065  23.647858
+2020-09-01 00:00:00+00:00  11679.316406  434.874451  0.281612  23.185047
+
+symbol                        BCH-USD    LTC-USD
+Date
+2020-01-01 00:00:00+00:00  204.671295  41.326534
+2020-01-02 00:00:00+00:00  204.354538  42.018085
+2020-01-03 00:00:00+00:00  196.007690  39.863129
+...                               ...        ...
+2020-08-30 00:00:00+00:00  268.842865  57.207737
+2020-08-31 00:00:00+00:00  279.280426  62.844059
+2020-09-01 00:00:00+00:00  274.480865  61.105076
+
+[244 rows x 6 columns]
+
+>>> # Run every single pattern recognition indicator and combine the results
+>>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
+>>> for pattern in talib.get_function_groups()['Pattern Recognition']:
+...     PRecognizer = vbt.IndicatorFactory.from_talib(pattern)
+...     pr = PRecognizer.run(ohlcv['Open'], ohlcv['High'], ohlcv['Low'], ohlcv['Close'])
+...     result = result + pr.integer
+
+>>> # Don't look into the future
+>>> result = result.vbt.fshift(1)
+
+>>> # Treat each number as order value in USD
+>>> size = result / ohlcv['Open']
+
+>>> # Simulate portfolio
+>>> pf = vbt.Portfolio.from_orders(
+...     ohlcv['Close'], size, price=ohlcv['Open'],
+...     init_cash='autoalign', fees=0.001, slippage=0.001)
+
+>>> # Visualize portfolio value
+>>> pf.value().vbt.plot()
+```
+
+![](/docs/img/portfolio_value.svg)
+
 ## Broadcasting
 
 `Portfolio` is very flexible towards inputs:
@@ -247,8 +268,6 @@ any direction indefinitely.
 For example, let's broadcast three inputs and select the last element using both approaches:
 
 ```python-repl
->>> from vectorbt.base.reshape_fns import broadcast, flex_select_auto_nb
-
 >>> # Classic way
 >>> a = np.array([1, 2, 3])
 >>> b = np.array([[4], [5], [6]])
@@ -277,11 +296,11 @@ array([[10, 10, 10],
 10
 
 >>> # Flexible indexing being done during simulation
->>> flex_select_auto_nb(a, 2, 2, True)
+>>> flex_select_auto_nb(a, 2, 2)
 3
->>> flex_select_auto_nb(b, 2, 2, True)
+>>> flex_select_auto_nb(b, 2, 2)
 6
->>> flex_select_auto_nb(c, 2, 2, True)
+>>> flex_select_auto_nb(c, 2, 2)
 10
 ```
 
@@ -313,7 +332,7 @@ second    10141.952674
 Name: total_profit, dtype: float64
 ```
 
-Not only can you analyze each group, but also each column in the group:
+Not only can we analyze each group, but also each column in the group:
 
 ```python-repl
 >>> # Get total profit per column
@@ -328,7 +347,7 @@ LTC-USD     3660.125705
 Name: total_profit, dtype: float64
 ```
 
-In the same way, you can introduce new grouping to the method itself:
+In the same way, we can introduce new grouping to the method itself:
 
 ```python-repl
 >>> # Get total profit per group
@@ -376,7 +395,7 @@ Combined portfolio is indexed by group:
 ## Logging
 
 To collect more information on how a specific order was processed or to be able to track the whole
-simulation from the beginning to the end, you can turn on logging.
+simulation from the beginning to the end, we can turn on logging:
 
 ```python-repl
 >>> # Simulate portfolio with logging
@@ -440,14 +459,8 @@ respectively. Caching can be disabled globally via `caching` in `vectorbt._setti
     Because of caching, class is meant to be immutable and all properties are read-only.
     To change any attribute, use the `copy` method and pass the attribute as keyword argument.
 
-If you're running out of memory when working with large arrays, make sure to disable caching
-and then store most important time series manually. For example, if you're interested in Sharpe
-ratio or other metrics based on returns, run and save `Portfolio.returns` and then use the
-`vectorbt.returns.accessors.ReturnsAccessor` to analyze them. Do not use methods akin to
-`Portfolio.sharpe_ratio` because they will re-calculate returns each time.
-
-Alternatively, you can precisely point at attributes and methods that should or shouldn't
-be cached. For example, you can blacklist the entire `Portfolio` class except a few most called
+Alternatively, we can precisely point at attributes and methods that should or shouldn't
+be cached. For example, we can blacklist the entire `Portfolio` class except a few most called
 methods such as `Portfolio.cash_flow` and `Portfolio.asset_flow`:
 
 ```python-repl
@@ -480,6 +493,60 @@ To reset caching:
 >>> vbt.settings.caching.reset()
 ```
 
+## Performance and memory
+
+If you're running out of memory when working with large arrays, make sure to disable caching
+and then store most important time series manually. For example, if you're interested in Sharpe
+ratio or other metrics based on returns, run and save `Portfolio.returns` in a variable and then use the
+`vectorbt.returns.accessors.ReturnsAccessor` to analyze them. Do not use methods akin to
+`Portfolio.sharpe_ratio` because they will re-calculate returns each time.
+
+Alternatively, you can track portfolio value and returns using `Portfolio.from_order_func` and its callbacks
+(preferably in `post_segment_func_nb`):
+
+```python-repl
+>>> @njit
+... def order_func_nb(c, size, price, fees, slippage):
+...     return order_nb(
+...         size=flex_select_auto_nb(size, c.i, c.col),
+...         price=flex_select_auto_nb(price, c.i, c.col),
+...         fees=flex_select_auto_nb(fees, c.i, c.col),
+...         slippage=flex_select_auto_nb(slippage, c.i, c.col),
+...     )
+
+>>> @njit
+... def post_segment_func_nb(c, returns_out):
+...     returns_out[c.i, c.group] = c.last_return[c.group]
+
+>>> returns_out = np.empty_like(ohlcv['Close'], dtype=np.float_)
+>>> pf = vbt.Portfolio.from_order_func(
+...     ohlcv['Close'],
+...     order_func_nb,
+...     np.asarray(size),
+...     np.asarray(ohlcv['Open']),
+...     np.asarray(0.001),
+...     np.asarray(0.001),
+...     post_segment_func_nb=post_segment_func_nb,
+...     post_segment_args=(returns_out,),
+...     init_cash='autoalign'
+... )
+
+>>> returns = pf.wrapper.wrap(returns_out)
+>>> del pf
+>>> returns.vbt.returns(freq='d').sharpe_ratio()
+symbol
+BTC-USD   -2.261443
+ETH-USD    0.059538
+XRP-USD    2.159093
+BNB-USD    1.555386
+BCH-USD    0.784214
+LTC-USD    1.460077
+Name: sharpe_ratio, dtype: float64
+```
+
+The only drawback of this approach is that you cannot use `init_cash='auto'` or `init_cash='autoalign'`
+because then, during the simulation, the portfolio value is `np.inf` and the returns are `np.nan`.
+
 ## Saving and loading
 
 Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `Portfolio`
@@ -488,7 +555,7 @@ instance to the disk with `Portfolio.save` and load it with `Portfolio.load`:
 ```python-repl
 >>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='1D')
+...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
 >>> pf.sharpe_ratio()
 symbol
 BTC-USD    1.743437
@@ -1153,8 +1220,6 @@ You can choose any of the subplots in `Portfolio.subplots`, in any order, and
 control their appearance using keyword arguments:
 
 ```python-repl
->>> from vectorbt.utils.colors import adjust_opacity
-
 >>> pf.plot(
 ...     subplots=['drawdowns', 'underwater'],
 ...     column=10,
@@ -1630,9 +1695,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Buy 10 units each tick:
 
         ```python-repl
-        >>> import pandas as pd
-        >>> import vectorbt as vbt
-
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> pf = vbt.Portfolio.from_orders(close, 10)
 
@@ -1678,8 +1740,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         (it's more compact but has less control over execution):
 
         ```python-repl
-        >>> import numpy as np
-
         >>> np.random.seed(42)
         >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
         >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
@@ -2062,9 +2122,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Entry opens long, exit closes long:
 
         ```python-repl
-        >>> import pandas as pd
-        >>> import vectorbt as vbt
-
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> entries = pd.Series([True, True, True, False, False])
         >>> exits = pd.Series([False, False, True, True, True])
@@ -2156,8 +2213,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Testing multiple parameters (via broadcasting):
 
         ```python-repl
-        >>> from vectorbt.portfolio.enums import Direction
-
         >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, direction=[list(Direction)],
         ...     broadcast_kwargs=dict(columns_from=Direction._fields))
@@ -2236,8 +2291,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
 
         ```python-repl
-        >>> from numba import njit
-
         >>> @njit
         ... def adjust_sl_func_nb(c):
         ...     current_profit = (c.val_price_now - c.init_price) / c.init_price
@@ -2566,8 +2619,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         Based on `Portfolio.from_signals`.
 
         ```python-repl
-        >>> import vectorbt as vbt
-
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> pf = vbt.Portfolio.from_holding(close)
         >>> pf.final_value()
@@ -2605,9 +2656,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Test multiple combinations of random entries and exits:
 
         ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
-
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> pf = vbt.Portfolio.from_random_signals(close, n=[2, 1, 0], seed=42)
         >>> pf.orders.count()
@@ -2871,11 +2919,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Buy 10 units each tick using closing price:
 
         ```python-repl
-        >>> import pandas as pd
-        >>> from numba import njit
-        >>> import vectorbt as vbt
-        >>> from vectorbt.portfolio.nb import order_nb
-
         >>> @njit
         ... def order_func_nb(c, size):
         ...     return order_nb(size=size)
@@ -2903,9 +2946,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         which position to open next (just as an example, there are easier ways to do this):
 
         ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.portfolio.nb import close_position_nb
-
         >>> @njit
         ... def pre_group_func_nb(c):
         ...     last_pos_state = np.array([-1])
@@ -2946,9 +2986,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
 
         ```python-repl
-        >>> from vectorbt.portfolio.nb import sort_call_seq_nb
-        >>> from vectorbt.portfolio.enums import SizeType, Direction
-
         >>> @njit
         ... def pre_group_func_nb(c):
         ...     '''Define empty arrays for each group.'''
@@ -3004,9 +3041,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
 
         ```python-repl
-        >>> from vectorbt.base.reshape_fns import flex_select_auto_nb, to_2d_array
-        >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
-
         >>> @njit
         ... def pre_sim_func_nb(c):
         ...     # We need to define stop price per column once
