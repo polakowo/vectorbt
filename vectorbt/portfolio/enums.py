@@ -11,7 +11,10 @@ __all__ = [
     'RejectedOrderError',
     'InitCashMode',
     'CallSeqType',
+    'AccumulationMode',
     'ConflictMode',
+    'DirectionConflictMode',
+    'OppositeEntryMode',
     'StopEntryPrice',
     'StopExitPrice',
     'StopExitMode',
@@ -38,6 +41,7 @@ __all__ = [
     'OrderResult',
     'AdjustSLContext',
     'AdjustTPContext',
+    'SignalContext',
     'order_dt',
     'trade_dt',
     'position_dt',
@@ -102,11 +106,45 @@ Attributes:
 """
 
 
+class AccumulationModeT(tp.NamedTuple):
+    Disabled: int = 0
+    Both: int = 1
+    AddOnly: int = 2
+    RemoveOnly: int = 3
+
+
+AccumulationMode = AccumulationModeT()
+"""_"""
+
+__pdoc__['AccumulationMode'] = f"""Accumulation mode.
+
+```json
+{to_doc(AccumulationMode)}
+```
+
+Accumulation allows gradually increasing and decreasing positions by a size.
+
+Attributes:
+    Disabled: Disable accumulation.
+    Both: Allow both adding to and removing from the position.
+    AddOnly: Allow accumulation to only add to the position.
+    RemoveOnly: Allow accumulation to only remove from the position.
+    
+!!! note
+    Accumulation acts differently for exits and opposite entries: exits reduce the current position
+    but won't enter the opposite one, while opposite entries reduce the position by the same amount,
+    but as soon as this position is closed, they begin to increase the opposite position.
+
+    The behavior for opposite entries can be changed by `OppositeEntryMode` and for stop orders by `StopExitMode`.
+"""
+
+
 class ConflictModeT(tp.NamedTuple):
     Ignore: int = 0
     Entry: int = 1
     Exit: int = 2
-    Opposite: int = 3
+    Adjacent: int = 3
+    Opposite: int = 4
 
 
 ConflictMode = ConflictModeT()
@@ -122,9 +160,74 @@ What should happen if both entry and exit signals occur simultaneously?
 
 Attributes:
     Ignore: Ignore both signals.
-    Entry: Execute entry signal.
-    Exit: Execute exit signal.
-    Opposite: Execute opposite signal. Takes effect only when in position.
+    Entry: Execute the entry signal.
+    Exit: Execute the exit signal.
+    Adjacent: Execute the adjacent signal.
+    
+        Takes effect only when in position, otherwise ignores.
+    Opposite: Execute the opposite signal.
+    
+        Takes effect only when in position, otherwise ignores.
+"""
+
+
+class DirectionConflictModeT(tp.NamedTuple):
+    Ignore: int = 0
+    Long: int = 1
+    Short: int = 2
+    Adjacent: int = 3
+    Opposite: int = 4
+
+
+DirectionConflictMode = DirectionConflictModeT()
+"""_"""
+
+__pdoc__['DirectionConflictMode'] = f"""Direction conflict mode.
+
+```json
+{to_doc(DirectionConflictMode)}
+```
+
+What should happen if both long and short entry signals occur simultaneously?
+
+Attributes:
+    Ignore: Ignore both entry signals.
+    Long: Execute the long entry signal.
+    Short: Execute the short entry signal.
+    Adjacent: Execute the adjacent entry signal. 
+    
+        Takes effect only when in position, otherwise ignores.
+    Opposite: Execute the opposite entry signal. 
+    
+        Takes effect only when in position, otherwise ignores.
+"""
+
+
+class OppositeEntryModeT(tp.NamedTuple):
+    Ignore: int = 0
+    Close: int = 1
+    CloseReduce: int = 2
+    Reverse: int = 3
+    ReverseReduce: int = 4
+
+
+OppositeEntryMode = OppositeEntryModeT()
+"""_"""
+
+__pdoc__['OppositeEntryMode'] = f"""Opposite entry mode.
+
+```json
+{to_doc(OppositeEntryMode)}
+```
+
+What should happen if an entry signal of opposite direction occurs before an exit signal?
+
+Attributes:
+    Ignore: Ignore the opposite entry signal.
+    Close: Close the current position.
+    CloseReduce: Close the current position or reduce it if accumulation is enabled.
+    Reverse: Reverse the current position.
+    ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
 """
 
 
@@ -175,28 +278,40 @@ Which price to use when exiting a position upon a stop signal?
 Attributes:
     StopLimit: Stop price as from a limit order.
     
-        If the stop was hit before, it becomes the opening price.
+        If the stop was hit before, the opening price at the next bar is used.
         User-defined slippage is not applied.
     StopMarket: Stop price as from a market order.
     
-        If the stop was hit before, it becomes the opening price.
+        If the stop was hit before, the opening price at the next bar is used.
         User-defined slippage is applied.
     Price: Default price.
                 
         User-defined slippage is applied.
     
-        !!! warning
+        !!! note
             Make sure to use `StopExitPrice.Price` only together with `StopEntryPrice.Close`.
             Otherwise, there is no proof that the price comes after the stop price.
     Close: Closing price.
     
         User-defined slippage is applied.
+        
+!!! note
+    We can execute only one signal per asset and bar. This means the following:
+    
+    1) Stop signal cannot be processed at the same bar as the entry signal.
+    
+    2) When dealing with stop orders, we have another signal - stop signal - that may be in a conflict 
+    with the signals placed by the user. To choose between both, we assume that any stop signal comes 
+    before any other signal in time. Thus, make sure to always execute ordinary signals using the 
+    closing price when using stop orders. Otherwise, you're looking into the future.
 """
 
 
 class StopExitModeT(tp.NamedTuple):
     Close: int = 0
-    Exit: int = 1
+    CloseReduce: int = 1
+    Reverse: int = 2
+    ReverseReduce: int = 3
 
 
 StopExitMode = StopExitModeT()
@@ -211,8 +326,11 @@ __pdoc__['StopExitMode'] = f"""Stop exit mode.
 How to exit the current position upon a stop signal?
 
 Attributes:
-    Close: Close the position (regardless of accumulation or direction).
-    Exit: Handle as an exit signal.
+    Close: Close the current position.
+    CloseReduce: Close the current position or reduce it if accumulation is enabled.
+    Reverse: Reverse the current position.
+    ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
+            
 """
 
 
@@ -293,7 +411,7 @@ Attributes:
 class DirectionT(tp.NamedTuple):
     LongOnly: int = 0
     ShortOnly: int = 1
-    All: int = 2
+    Both: int = 2
 
 
 Direction = DirectionT()
@@ -308,7 +426,7 @@ __pdoc__['Direction'] = f"""Position direction.
 Attributes:
     LongOnly: Only long positions.
     ShortOnly: Only short positions.
-    All: Both long and short positions.
+    Both: Both long and short positions.
 """
 
 
@@ -1198,7 +1316,7 @@ class Order(tp.NamedTuple):
     size: float = np.inf
     price: float = np.inf
     size_type: int = SizeType.Amount
-    direction: int = Direction.All
+    direction: int = Direction.Both
     fees: float = 0.0
     fixed_fees: float = 0.0
     slippage: float = 0.0
@@ -1225,7 +1343,7 @@ For any fixed size:
 * Set to any number to buy/sell some fixed amount or value.
     Longs are limited by the current cash balance, while shorts are only limited if `Order.lock_cash`.
 * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
-    If `Order.direction` is not `Direction.All`, `-np.inf` will close the position.
+    If `Order.direction` is not `Direction.Both`, `-np.inf` will close the position.
 * Set to `np.nan` or 0 to skip.
 
 For any target size:
@@ -1378,6 +1496,26 @@ __pdoc__['AdjustTPContext.val_price_now'] = "See `AdjustSLContext.val_price_now`
 __pdoc__['AdjustTPContext.init_i'] = "See `AdjustSLContext.init_i`."
 __pdoc__['AdjustTPContext.init_price'] = "See `AdjustSLContext.curr_price`."
 __pdoc__['AdjustTPContext.curr_stop'] = "See `AdjustSLContext.curr_stop`."
+
+
+class SignalContext(tp.NamedTuple):
+    i: int
+    col: int
+    position_now: float
+    val_price_now: float
+    flex_2d: bool
+
+
+__pdoc__['AdjustSLContext'] = "A named tuple representing the context for generation of signals."
+__pdoc__['AdjustSLContext.i'] = """Index of the current row.
+
+Has range `[0, target_shape[0])`."""
+__pdoc__['AdjustSLContext.col'] = """Current column.
+
+Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
+__pdoc__['AdjustSLContext.position_now'] = "Latest position."
+__pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
+__pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."
 
 # ############# Records ############# #
 

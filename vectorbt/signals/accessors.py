@@ -508,7 +508,7 @@ class SignalsAccessor(GenericAccessor):
             shape = (shape[0], 1)
 
         if n is not None and prob is not None:
-            raise ValueError("Either n or prob should be set")
+            raise ValueError("Either n or prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
             result = nb.generate_rand_nb(shape, n, seed=seed)
@@ -598,6 +598,8 @@ class SignalsAccessor(GenericAccessor):
             flex_2d = False
             shape = (shape[0], 1)
 
+        if n is not None and (entry_prob is not None or exit_prob is not None):
+            raise ValueError("Either n or any of the entry_prob and exit_prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
             entries, exits = nb.generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)

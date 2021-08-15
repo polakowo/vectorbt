@@ -311,16 +311,6 @@ def wrap_broadcasted(old_arg: tp.AnyArray,
     return new_arg
 
 
-def broadcast_shape(*args) -> tp.Shape:
-    """Returns the shape of the arrays that would result from broadcasting the
-    supplied arrays against each other."""
-    b = np.broadcast(*args[:32])
-    for pos in range(32, len(args), 31):
-        b = broadcast_to(0, b.shape)
-        b = np.broadcast(b, *args[pos:(pos + 31)])
-    return b.shape
-
-
 BCRT = tp.Union[
     tp.MaybeTuple[tp.AnyArray],
     tp.Tuple[tp.MaybeTuple[tp.AnyArray], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]]
@@ -566,7 +556,7 @@ def broadcast(*args: tp.ArrayLike,
 
     # Get final shape
     if to_shape is None:
-        to_shape = broadcast_shape(*arr_args_2d)
+        to_shape = np.broadcast_shapes(*map(lambda x: np.asarray(x).shape, arr_args_2d))
 
     # Perform broadcasting
     new_args = []

@@ -109,7 +109,7 @@ upon the previous performance, the current state, or other custom conditions, he
 to automate some signaling processes. For example, by default, it won't let us execute another entry signal
 if we are already in the position. It also implements stop loss and take profit orders for exiting positions.
 Nevertheless, this method behaves similarly to `Portfolio.from_orders` and accepts most of its arguments;
-in fact, by setting `accumulate=True`, it behaves exactly like `Portfolio.from_orders`.
+in fact, by setting `accumulate=True`, it behaves quite similarly to `Portfolio.from_orders`.
 
 Let's replicate the example above using signals:
 
@@ -133,8 +133,8 @@ Let's replicate the example above using signals:
 In a nutshell: this method automates some procedures that otherwise would be only possible by using
 `Portfolio.from_order_func` while following the same broadcasting principles as `Portfolio.from_orders` -
 the best of both worlds, given you can express your strategy as a sequence of signals. But as soon as
-your strategy requires any signal to be set dynamically or to depend upon more complex conditions,
-switch to `Portfolio.from_order_func`.
+your strategy requires any signal to depend upon more complex conditions or to generate multiple orders at once,
+it's best to run your custom signaling logic using `Portfolio.from_order_func`.
 
 ### From order function
 
@@ -1330,6 +1330,8 @@ You can also replace templates across all subplots by using the global template 
 
 ![](/docs/img/portfolio_plot_path.svg)
 """
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -1916,9 +1918,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                      close: tp.ArrayLike,
                      entries: tp.Optional[tp.ArrayLike] = None,
                      exits: tp.Optional[tp.ArrayLike] = None,
+                     short_entries: tp.Optional[tp.ArrayLike] = None,
+                     short_exits: tp.Optional[tp.ArrayLike] = None,
+                     signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
+                     signal_args: tp.ArgsLike = (),
                      size: tp.Optional[tp.ArrayLike] = None,
                      size_type: tp.Optional[tp.ArrayLike] = None,
-                     direction: tp.Optional[tp.ArrayLike] = None,
                      price: tp.Optional[tp.ArrayLike] = None,
                      fees: tp.Optional[tp.ArrayLike] = None,
                      fixed_fees: tp.Optional[tp.ArrayLike] = None,
@@ -1931,8 +1936,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                      raise_reject: tp.Optional[tp.ArrayLike] = None,
                      log: tp.Optional[tp.ArrayLike] = None,
                      accumulate: tp.Optional[tp.ArrayLike] = None,
-                     conflict_mode: tp.Optional[tp.ArrayLike] = None,
-                     close_first: tp.Optional[tp.ArrayLike] = None,
+                     upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
+                     upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
+                     upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
+                     upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
+                     direction: tp.Optional[tp.ArrayLike] = None,
                      val_price: tp.Optional[tp.ArrayLike] = None,
                      open: tp.Optional[tp.ArrayLike] = None,
                      high: tp.Optional[tp.ArrayLike] = None,
@@ -1942,9 +1950,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                      tp_stop: tp.Optional[tp.ArrayLike] = None,
                      stop_entry_price: tp.Optional[tp.ArrayLike] = None,
                      stop_exit_price: tp.Optional[tp.ArrayLike] = None,
-                     stop_conflict_mode: tp.Optional[tp.ArrayLike] = None,
-                     stop_exit_mode: tp.Optional[tp.ArrayLike] = None,
-                     stop_update_mode: tp.Optional[tp.ArrayLike] = None,
+                     upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
+                     upon_stop_update: tp.Optional[tp.ArrayLike] = None,
                      adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
                      adjust_sl_args: tp.Args = (),
                      adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
@@ -1966,16 +1973,56 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                      **kwargs) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
+        See `vectorbt.portfolio.nb.simulate_from_signal_func_nb`.
+
+        You have three options to provide signals:
+
+        1) `entries` and `exits`: The direction of each pair of signals is taken from `direction` argument.
+            Best to use when the direction doesn't change throughout time.
+
+            Uses `vectorbt.portfolio.nb.dir_enex_signal_func_nb` as `signal_func_nb`.
+
+            !!! hint
+                `entries` and `exits` can be easily translated to direction-aware signals:
+
+                * (True, True, 'longonly') -> True, True, False, False
+                * (True, True, 'shortonly') -> False, False, True, True
+                * (True, True, 'both') -> True, False, True, False
+        2) `entries` (acting as long), `exits` (acting as long), `short_entries`, and `short_exits`:
+            The direction is already built into the arrays. Best to use when the direction changes frequently
+            (for example, if you have one indicator providing long signals and one providing short signals).
+
+            Uses `vectorbt.portfolio.nb.ls_enex_signal_func_nb` as `signal_func_nb`.
+        3) `signal_func_nb` and `signal_args`: Custom signal function that returns direction-aware signals.
+            Best to use when signals should be placed dynamically based on custom conditions.
+
         Args:
             close (array_like): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
-                Defaults to True. Will broadcast.
+                Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
-                Becomes a long signal if `direction` is `all` or `longonly`, otherwise short.
+                * If `short_entries` and `short_exits` are not set: Acts as a long signal if `direction`
+                    is `all` or `longonly`, otherwise short.
+                * If `short_entries` or `short_exits` are set: Acts as `long_entries`.
             exits (array_like of bool): Boolean array of exit signals.
                 Defaults to False. Will broadcast.
 
-                Becomes a short signal if `direction` is `all` or `longonly`, otherwise long.
+                * If `short_entries` and `short_exits` are not set: Acts as a short signal if `direction`
+                    is `all` or `longonly`, otherwise long.
+                * If `short_entries` or `short_exits` are set: Acts as `long_exits`.
+            short_entries (array_like of bool): Boolean array of short entry signals.
+                Defaults to False. Will broadcast.
+            short_exits (array_like of bool): Boolean array of short exit signals.
+                Defaults to False. Will broadcast.
+            signal_func_nb (callable): Function called to generate signals.
+
+                Should accept `vectorbt.portfolio.enums.SignalContext` and `*signal_args`.
+                Should return long entry signal, long exit signal, short entry signal, and short exit signal.
+
+                !!! note
+                    Stop signal has priority: `signal_func_nb` is executed only if there is no stop signal.
+            signal_args (tuple): Packed arguments passed to `signal_func_nb`.
+                Defaults to `()`.
             size (float or array_like): See `Portfolio.from_orders`.
 
                 !!! note
@@ -1988,10 +2035,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
                 !!! note
                     `SizeType.Percent` does not support position reversal. Switch to a single
-                    direction or use `close_first`.
+                    direction or use `vectorbt.portfolio.enums.OppositeEntryMode.Close` to close the position first.
 
                 See warning in `Portfolio.from_orders`.
-            direction (Direction or array_like): See `Portfolio.from_orders`.
             price (array_like of float): See `Portfolio.from_orders`.
             fees (float or array_like): See `Portfolio.from_orders`.
             fixed_fees (float or array_like): See `Portfolio.from_orders`.
@@ -2006,20 +2052,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             allow_partial (bool or array_like): See `Portfolio.from_orders`.
             raise_reject (bool or array_like): See `Portfolio.from_orders`.
             log (bool or array_like): See `Portfolio.from_orders`.
-            accumulate (bool or array_like): Whether to accumulate signals.
-                Will broadcast.
+            accumulate (bool, AccumulationMode or array_like): See `vectorbt.portfolio.enums.AccumulationMode`.
+                If True, becomes 'both'. If False, becomes 'disabled'. Will broadcast.
 
-                Allows gradually increasing and decreasing positions using `size`.
-                When enabled, `Portfolio.from_signals` behaves like `Portfolio.from_orders`.
-            conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
-                Will broadcast.
-            close_first (bool or array_like): Whether to close the position first before reversal.
-                Will broadcast.
+                When enabled, `Portfolio.from_signals` behaves similarly to `Portfolio.from_orders`.
+            upon_long_conflict (ConflictMode or array_like): Conflict mode for long signals.
+                See `vectorbt.portfolio.enums.ConflictMode`. Will broadcast.
+            upon_short_conflict (ConflictMode or array_like): Conflict mode for short signals.
+                See `vectorbt.portfolio.enums.ConflictMode`. Will broadcast.
+            upon_dir_conflict (DirectionConflictMode or array_like):
+                See `vectorbt.portfolio.enums.DirectionConflictMode`. Will broadcast.
+            upon_opposite_entry (OppositeEntryMode or array_like):
+                See `vectorbt.portfolio.enums.OppositeEntryMode`. Will broadcast.
+            direction (Direction or array_like): See `Portfolio.from_orders`.
 
-                Otherwise reverses the position with a single order and within the same tick.
-                Takes only effect under `Direction.All`. Requires a second signal to enter
-                the opposite position. This allows to define parameters such as `fixed_fees` for long
-                and short positions separately.
+                Takes only effect if `short_entries` and `short_exits` are not set.
             val_price (array_like of float): See `Portfolio.from_orders`.
             open (array_like of float): First asset price at each time step.
                 Defaults to `np.nan`, which gets replaced by `close`. Will broadcast.
@@ -2053,18 +2100,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 Will broadcast.
 
                 If provided on per-element basis, gets applied upon exit.
-            stop_conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
+            upon_stop_exit (StopExitMode or array_like): See `vectorbt.portfolio.enums.StopExitMode`.
                 Will broadcast.
 
                 If provided on per-element basis, gets applied upon exit.
-            stop_exit_mode (StopExitMode or array_like): See `vectorbt.portfolio.enums.StopExitMode`.
+            upon_stop_update (StopUpdateMode or array_like): See `vectorbt.portfolio.enums.StopUpdateMode`.
                 Will broadcast.
 
-                If provided on per-element basis, gets applied upon exit.
-            stop_update_mode (StopUpdateMode or array_like): See `vectorbt.portfolio.enums.StopUpdateMode`.
-                Will broadcast.
-
-                Only has effect is `accumulate` is True.
+                Only has effect if accumulation is enabled.
 
                 If provided on per-element basis, gets applied upon repeated entry.
             adjust_sl_func_nb (callable): Function to adjust stop loss.
@@ -2110,6 +2153,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
+        !!! note
+            Stop signal has priority - it's executed before other signals within the same bar.
+            That is, if a stop signal is present, no other signals are generated and executed
+            since there is a limit of one order per symbol and bar.
+
         !!! hint
             If you generated signals using close price, don't forget to shift your signals by one tick
             forward, for example, with `signals.vbt.fshift(1)`. In general, make sure to use a price
@@ -2119,15 +2167,48 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ## Example
 
-        * Entry opens long, exit closes long:
+        * By default, if all signal arrays are None, `entries` becomes True,
+            which opens a position at the very first tick and does nothing else:
 
         ```python-repl
         >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> entries = pd.Series([True, True, True, False, False])
-        >>> exits = pd.Series([False, False, True, True, True])
+        >>> pf = vbt.Portfolio.from_signals(close, size=1)
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3    0.0
+        4    0.0
+        dtype: float64
+        ```
 
+        * Entry opens long, exit closes long:
+
+        ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='longonly')
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1,
+        ...     direction='longonly'
+        ... )
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3   -1.0
+        4    0.0
+        dtype: float64
+
+        >>> # Using direction-aware arrays instead of `direction`
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
+        ...     exits=pd.Series([False, False, True, True, True]),  # long_exits
+        ...     short_entries=False,
+        ...     short_exits=False,
+        ...     size=1
+        ... )
         >>> pf.asset_flow()
         0    1.0
         1    0.0
@@ -2137,11 +2218,36 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
+        Notice how both `short_entries` and `short_exits` are provided as constants - as any other
+        broadcastable argument, they are treated as arrays where each element is False.
+
         * Entry opens short, exit closes short:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='shortonly')
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1,
+        ...     direction='shortonly'
+        ... )
+        >>> pf.asset_flow()
+        0   -1.0
+        1    0.0
+        2    0.0
+        3    1.0
+        4    0.0
+        dtype: float64
+
+        >>> # Using direction-aware arrays instead of `direction`
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=False,  # long_entries
+        ...     exits=False,  # long_exits
+        ...     short_entries=pd.Series([True, True, True, False, False]),
+        ...     short_exits=pd.Series([False, False, True, True, True]),
+        ...     size=1
+        ... )
         >>> pf.asset_flow()
         0   -1.0
         1    0.0
@@ -2151,11 +2257,33 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        * Reversal within one tick. Entry opens long and closes short, exit closes long and opens short:
+        * Entry opens long and closes short, exit closes long and opens short:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='all')
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1,
+        ...     direction='both'
+        ... )
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3   -2.0
+        4    0.0
+        dtype: float64
+
+        >>> # Using direction-aware arrays instead of `direction`
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
+        ...     exits=False,  # long_exits
+        ...     short_entries=pd.Series([False, False, True, True, True]),
+        ...     short_exits=False,
+        ...     size=1
+        ... )
         >>> pf.asset_flow()
         0    1.0
         1    0.0
@@ -2165,12 +2293,39 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        * Reversal within two ticks. First signal closes position, second signal opens the opposite one:
+        * More complex signal combinations are best expressed using direction-aware arrays.
+            For example, ignore opposite signals as long as the current position is open:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='all',
-        ...     close_first=True)
+        ...     close,
+        ...     entries      =pd.Series([True, False, False, False, False]),  # long_entries
+        ...     exits        =pd.Series([False, False, True, False, False]),  # long_exits
+        ...     short_entries=pd.Series([False, True, False, True, False]),
+        ...     short_exits  =pd.Series([False, False, False, False, True]),
+        ...     size=1,
+        ...     upon_opposite_entry='ignore'
+        ... )
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2   -1.0
+        3   -1.0
+        4    1.0
+        dtype: float64
+        ```
+
+        * First opposite signal closes the position, second one opens a new position:
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1,
+        ...     direction='both',
+        ...     upon_opposite_entry='close'
+        ... )
         >>> pf.asset_flow()
         0    1.0
         1    0.0
@@ -2180,26 +2335,81 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        * If entry and exit, chooses exit:
+        * If both long entry and exit signals are True (a signal conflict), choose exit:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='all',
-        ...     close_first=True, conflict_mode='exit')
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1.,
+        ...     direction='longonly',
+        ...     upon_long_conflict='exit')
         >>> pf.asset_flow()
         0    1.0
         1    0.0
         2   -1.0
-        3   -1.0
+        3    0.0
         4    0.0
         dtype: float64
         ```
 
-        * Entry means long order, exit means short order (acts similar to `from_orders`):
+        * If both long entry and short entry signal are True (a direction conflict), choose short:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='all',
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1.,
+        ...     direction='both',
+        ...     upon_dir_conflict='short')
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2   -2.0
+        3    0.0
+        4    0.0
+        dtype: float64
+        ```
+
+        !!! note
+            Remember that when direction is set to 'both', entries become `long_entries` and exits become
+            `short_entries`, so this becomes a conflict of directions rather than signals.
+
+        * If there are both signal and direction conflicts:
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=True,  # long_entries
+        ...     exits=True,  # long_exits
+        ...     short_entries=True,
+        ...     short_exits=True,
+        ...     size=1,
+        ...     upon_long_conflict='entry',
+        ...     upon_short_conflict='entry',
+        ...     upon_dir_conflict='short'
+        ... )
+        >>> pf.asset_flow()
+        0   -1.0
+        1    0.0
+        2    0.0
+        3    0.0
+        4    0.0
+        dtype: float64
+        ```
+
+        * Turn on accumulation of signals. Entry means long order, exit means short order
+            (acts similar to `from_orders`):
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1.,
+        ...     direction='both',
         ...     accumulate=True)
         >>> pf.asset_flow()
         0    1.0
@@ -2210,11 +2420,33 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
+        * Allow increasing a position (of any direction), deny decreasing a position:
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     size=1.,
+        ...     direction='both',
+        ...     accumulate='addonly')
+        >>> pf.asset_flow()
+        0    1.0  << open a long position
+        1    1.0  << add to the position
+        2    0.0
+        3   -3.0  << close and open a short position
+        4   -1.0  << add to the position
+        dtype: float64
+        ```
+
         * Testing multiple parameters (via broadcasting):
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, direction=[list(Direction)],
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     direction=[list(Direction)],
         ...     broadcast_kwargs=dict(columns_from=Direction._fields))
         >>> pf.asset_flow()
             Long  Short    All
@@ -2223,25 +2455,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         2    0.0    0.0    0.0
         3 -100.0   50.0 -200.0
         4    0.0    0.0    0.0
-        ```
-
-        * Specifying information in a more granular way thanks to broadcasting.
-        Reverse the first long position by first closing it, and all other immediately:
-
-        ```python-repl
-        >>> entries = pd.Series([True, False, False, True, False])
-        >>> exits = pd.Series([False, True, True, False, True])
-        >>> close_first = pd.Series([False, True, False, False, False])
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits, size=1., direction='all',
-        ...     close_first=close_first)
-        >>> pf.asset_flow()
-        0    1.0
-        1   -1.0
-        2   -1.0
-        3    2.0
-        4   -2.0
-        dtype: float64
         ```
 
         * Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
@@ -2287,6 +2500,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
+        !!! note
+            When the stop price is hit, the stop signal invalidates any other signal defined for this bar.
+            Thus, make sure that your signaling logic happens at the very end of the bar
+            (for example, by using the closing price), otherwise you may expose yourself to a look-ahead bias.
+
+            See `vectorbt.portfolio.enums.StopExitPrice` for more details.
+
         * We can implement our own stop loss or take profit, or adjust the existing one at each time step.
         Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
 
@@ -2312,101 +2532,36 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         4    11.0
         dtype: float64
         ```
-
-        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
-
-        ```python-repl
-        >>> close = pd.Series([10, 11, 12, 13, 14, 15])
-        >>> entries = pd.Series([True, True, True, False, False, False])
-        >>> exits = pd.Series([False, False, False, True, True, True])
-
-        >>> # 1. Remove adjacent entries and exits
-        >>> # since stop condition refers only to the first signal
-        >>> entries, exits = entries.vbt.signals.clean(exits)
-        >>> entries
-        0     True
-        1    False
-        2    False
-        3    False
-        4    False
-        5    False
-        dtype: bool
-        >>> exits
-        0    False
-        1    False
-        2    False
-        3     True
-        4    False
-        5    False
-        dtype: bool
-
-        >>> # 2. Find stop exits
-        >>> stop_exits = entries.vbt.signals.generate_stop_exits(close, 0.1)
-        >>> stop_exits
-        0    False
-        1     True
-        2    False
-        3    False
-        4    False
-        5    False
-        dtype: bool
-
-        >>> # 3. Combine exits
-        >>> exits = exits | stop_exits
-        >>> exits
-        0    False
-        1     True
-        2    False
-        3     True
-        4    False
-        5    False
-        dtype: bool
-
-        >>> # 4. Pick the first exit after each entry
-        >>> exits = exits.vbt.signals.first(reset_by=entries, allow_gaps=True)
-        >>> exits
-        0    False
-        1     True
-        2    False
-        3    False
-        4    False
-        5    False
-        dtype: bool
-
-        >>> # 5. Simulate portfolio
-        >>> pf = vbt.Portfolio.from_signals(close, entries, exits)
-        >>> pf.asset_flow()
-        0    10.0
-        1   -10.0
-        2     0.0
-        3     0.0
-        4     0.0
-        5     0.0
-        dtype: float64
-        ```
-
-        !!! note
-            By cleaning signals, we lose information. Moreover, this automatically assumes
-            that each entry/signal signal succeeds (= order gets filled). Use this with caution,
-            and consider rewriting your strategy with `Portfolio.from_order_func`, which is a
-            preferred way of defining a complex logic in vectorbt.
         """
         # Get defaults
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
+        ls_mode = short_entries is not None or short_exits is not None
+        signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
+        if (entries is not None or exits is not None or ls_mode) and signal_func_mode:
+            raise ValueError("Either any of the signal arrays or signal_func_nb should be set, not both")
         if entries is None:
-            entries = True
+            if exits is None and not ls_mode:
+                entries = True
+            else:
+                entries = False
         if exits is None:
             exits = False
+        if short_entries is None:
+            short_entries = False
+        if short_exits is None:
+            short_exits = False
+        if signal_func_nb is nb.no_signal_func_nb:
+            if ls_mode:
+                signal_func_nb = nb.ls_enex_signal_func_nb
+            else:
+                signal_func_nb = nb.dir_enex_signal_func_nb
         if size is None:
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
         size_type = map_enum_fields(size_type, SizeType)
-        if direction is None:
-            direction = portfolio_cfg['signal_direction']
-        direction = map_enum_fields(direction, Direction)
         if price is None:
             price = np.inf
         if fees is None:
@@ -2431,11 +2586,24 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             log = portfolio_cfg['log']
         if accumulate is None:
             accumulate = portfolio_cfg['accumulate']
-        if conflict_mode is None:
-            conflict_mode = portfolio_cfg['conflict_mode']
-        conflict_mode = map_enum_fields(conflict_mode, ConflictMode)
-        if close_first is None:
-            close_first = portfolio_cfg['close_first']
+        accumulate = map_enum_fields(accumulate, AccumulationMode, ignore_type=(int, bool))
+        if upon_long_conflict is None:
+            upon_long_conflict = portfolio_cfg['upon_long_conflict']
+        upon_long_conflict = map_enum_fields(upon_long_conflict, ConflictMode)
+        if upon_short_conflict is None:
+            upon_short_conflict = portfolio_cfg['upon_short_conflict']
+        upon_short_conflict = map_enum_fields(upon_short_conflict, ConflictMode)
+        if upon_dir_conflict is None:
+            upon_dir_conflict = portfolio_cfg['upon_dir_conflict']
+        upon_dir_conflict = map_enum_fields(upon_dir_conflict, DirectionConflictMode)
+        if upon_opposite_entry is None:
+            upon_opposite_entry = portfolio_cfg['upon_opposite_entry']
+        upon_opposite_entry = map_enum_fields(upon_opposite_entry, OppositeEntryMode)
+        if direction is not None and ls_mode:
+            warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
+        if direction is None:
+            direction = portfolio_cfg['signal_direction']
+        direction = map_enum_fields(direction, Direction)
         if val_price is None:
             val_price = portfolio_cfg['val_price']
         if open is None:
@@ -2456,15 +2624,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg['stop_exit_price']
         stop_exit_price = map_enum_fields(stop_exit_price, StopExitPrice)
-        if stop_conflict_mode is None:
-            stop_conflict_mode = portfolio_cfg['stop_conflict_mode']
-        stop_conflict_mode = map_enum_fields(stop_conflict_mode, ConflictMode)
-        if stop_exit_mode is None:
-            stop_exit_mode = portfolio_cfg['stop_exit_mode']
-        stop_exit_mode = map_enum_fields(stop_exit_mode, StopExitMode)
-        if stop_update_mode is None:
-            stop_update_mode = portfolio_cfg['stop_update_mode']
-        stop_update_mode = map_enum_fields(stop_update_mode, StopUpdateMode)
+        if upon_stop_exit is None:
+            upon_stop_exit = portfolio_cfg['upon_stop_exit']
+        upon_stop_exit = map_enum_fields(upon_stop_exit, StopExitMode)
+        if upon_stop_update is None:
+            upon_stop_update = portfolio_cfg['upon_stop_update']
+        upon_stop_update = map_enum_fields(upon_stop_update, StopUpdateMode)
         if use_stops is None:
             use_stops = portfolio_cfg['use_stops']
         if use_stops is None:
@@ -2520,15 +2685,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Broadcast inputs
-        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcastable_args = (
+        fix_broadcastable_args = (
             close,
-            entries,
-            exits,
             size,
             price,
             size_type,
-            direction,
             fees,
             fixed_fees,
             slippage,
@@ -2540,8 +2701,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             raise_reject,
             log,
             accumulate,
-            conflict_mode,
-            close_first,
+            upon_long_conflict,
+            upon_short_conflict,
+            upon_dir_conflict,
+            upon_opposite_entry,
             val_price,
             open,
             high,
@@ -2551,10 +2714,27 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             tp_stop,
             stop_entry_price,
             stop_exit_price,
-            stop_conflict_mode,
-            stop_exit_mode,
-            stop_update_mode
+            upon_stop_exit,
+            upon_stop_update
         )
+        if not signal_func_mode:
+            if ls_mode:
+                opt_broadcastable_args = (
+                    entries,
+                    exits,
+                    short_entries,
+                    short_exits
+                )
+            else:
+                opt_broadcastable_args = (
+                    entries,
+                    exits,
+                    direction
+                )
+        else:
+            opt_broadcastable_args = ()
+        broadcastable_args = (*fix_broadcastable_args, *opt_broadcastable_args)
+        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcast_kwargs = merge_dicts(dict(
             keep_raw=[False] + [True] * (len(broadcastable_args) - 1),
             require_kwargs=dict(requirements='W')
@@ -2580,13 +2760,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             max_logs = 1
 
         # Perform calculation
-        order_records, log_records = nb.simulate_from_signals_nb(
+        if not signal_func_mode:
+            signal_args = (*map(np.asarray, broadcasted_args[-len(opt_broadcastable_args):]),)
+        order_records, log_records = nb.simulate_from_signal_func_nb(
             target_shape_2d,
             to_2d_array(close),
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            *map(np.asarray, broadcasted_args[1:]),
+            signal_func_nb,
+            signal_args,
+            *map(np.asarray, broadcasted_args[1:len(fix_broadcastable_args)]),
             adjust_sl_func_nb,
             adjust_sl_args,
             adjust_tp_func_nb,
@@ -3037,8 +3221,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         ![](/docs/img/simulate_nb.svg)
 
-        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
-        (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
+        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
         ```python-repl
         >>> @njit
@@ -3585,7 +3768,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     # ############# Assets ############# #
 
     @cached_method
-    def asset_flow(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def asset_flow(self, direction: str = 'both', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
@@ -3599,12 +3782,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return self.wrapper.wrap(asset_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def assets(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def assets(self, direction: str = 'both', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset series per column.
 
         Returns the current position at each time step."""
         direction = map_enum_fields(direction, Direction)
-        asset_flow = to_2d_array(self.asset_flow(direction='all'))
+        asset_flow = to_2d_array(self.asset_flow(direction='both'))
         assets = nb.assets_nb(asset_flow)
         if direction == Direction.LongOnly:
             assets = np.where(assets > 0, assets, 0.)
@@ -3613,7 +3796,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return self.wrapper.wrap(assets, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def position_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+    def position_mask(self, direction: str = 'both', group_by: tp.GroupByLike = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position mask per column/group.
 
@@ -3629,7 +3812,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return self.wrapper.wrap(position_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def position_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+    def position_coverage(self, direction: str = 'both', group_by: tp.GroupByLike = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
         direction = map_enum_fields(direction, Direction)
@@ -3734,7 +3917,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     # ############# Performance ############# #
 
     @cached_method
-    def asset_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+    def asset_value(self, direction: str = 'both', group_by: tp.GroupByLike = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
         direction = map_enum_fields(direction, Direction)
@@ -3753,7 +3936,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return self.wrapper.wrap(asset_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def gross_exposure(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+    def gross_exposure(self, direction: str = 'both', group_by: tp.GroupByLike = None,
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get gross exposure."""
         asset_value = to_2d_array(self.asset_value(group_by=group_by, direction=direction))
@@ -4226,7 +4409,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
     def plot_asset_flow(self,
                         column: tp.Optional[tp.Label] = None,
-                        direction: str = 'all',
+                        direction: str = 'both',
                         xref: str = 'x',
                         yref: str = 'y',
                         hline_shape_kwargs: tp.KwargsLike = None,
@@ -4322,7 +4505,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
     def plot_assets(self,
                     column: tp.Optional[tp.Label] = None,
-                    direction: str = 'all',
+                    direction: str = 'both',
                     xref: str = 'x',
                     yref: str = 'y',
                     hline_shape_kwargs: tp.KwargsLike = None,
@@ -4435,7 +4618,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     def plot_asset_value(self,
                          column: tp.Optional[tp.Label] = None,
                          group_by: tp.GroupByLike = None,
-                         direction: str = 'all',
+                         direction: str = 'both',
                          xref: str = 'x',
                          yref: str = 'y',
                          hline_shape_kwargs: tp.KwargsLike = None,
@@ -4667,7 +4850,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     def plot_gross_exposure(self,
                             column: tp.Optional[tp.Label] = None,
                             group_by: tp.GroupByLike = None,
-                            direction: str = 'all',
+                            direction: str = 'both',
                             xref: str = 'x',
                             yref: str = 'y',
                             hline_shape_kwargs: tp.KwargsLike = None,

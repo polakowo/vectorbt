@@ -3476,9 +3476,9 @@ class TestLogs:
         np.testing.assert_array_equal(
             records_readable['Request Direction'].values,
             np.array([
-                'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
-                'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
-                'All', 'All'
+                'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both',
+                'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both',
+                'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both', 'Both'
             ])
         )
         np.testing.assert_array_equal(
