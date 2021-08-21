@@ -66,7 +66,7 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: Financial and Insurance Industry',
-        'License :: OSI Approved :: Apache Software License',
+        'License :: Free for non-commercial use',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
