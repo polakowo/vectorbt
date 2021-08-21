@@ -912,7 +912,7 @@ def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int,
 
     Instead of expensive broadcasting, keep the original shape and do indexing in a smart way.
     A nice feature of this is that it has almost no memory footprint and can broadcast in
-    any direction indefinitely.
+    any direction infinitely.
 
     Call it once before using `flex_select_nb`.
 
@@ -957,9 +957,6 @@ def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, fl
 
 @njit(cache=True)
 def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool = True) -> tp.Any:
-    """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`.
-
-    !!! note
-        Slower since it must call `flex_choose_i_and_col_nb` each time."""
+    """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
     return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d)

@@ -24,7 +24,7 @@ Run for the examples below:
 >>> from vectorbt.utils.enum import map_enum_fields
 >>> from vectorbt.base.reshape_fns import broadcast, flex_select_auto_nb, to_2d_array
 >>> from vectorbt.portfolio.enums import SizeType, Direction, NoOrder, OrderStatus, OrderSide
->>> from vectorbt.portfolio.nb import order_nb, close_position_nb, sort_call_seq_nb
+>>> from vectorbt.portfolio import nb
 ```
 
 ## Workflow
@@ -150,7 +150,7 @@ Let's replicate our example using an order function:
 ```python-repl
 >>> @njit
 >>> def order_func_nb(c, size, direction, fees):
-...     return order_nb(
+...     return nb.order_nb(
 ...         price=c.close[c.i, c.col],
 ...         size=size[c.i],
 ...         direction=direction[c.col],
@@ -161,7 +161,8 @@ Let's replicate our example using an order function:
 >>> pf = vbt.Portfolio.from_order_func(
 ...     price,
 ...     order_func_nb,
-...     np.asarray(size), np.asarray(direction_num), fees)
+...     np.asarray(size), np.asarray(direction_num), fees
+... )
 >>> pf.orders.records_readable
    Order Id Column  Timestamp  Size  Price  Fees  Side
 0         0      a          0   1.0    1.0  0.01   Buy
@@ -505,13 +506,26 @@ Alternatively, you can track portfolio value and returns using `Portfolio.from_o
 (preferably in `post_segment_func_nb`):
 
 ```python-repl
+>>> pf_baseline = vbt.Portfolio.from_orders(
+...     ohlcv['Close'], size, price=ohlcv['Open'],
+...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
+>>> pf_baseline.sharpe_ratio()
+symbol
+BTC-USD    1.743437
+ETH-USD    2.800903
+XRP-USD    1.607904
+BNB-USD    1.805373
+BCH-USD    0.269392
+LTC-USD    1.040494
+Name: sharpe_ratio, dtype: float64
+
 >>> @njit
 ... def order_func_nb(c, size, price, fees, slippage):
-...     return order_nb(
-...         size=flex_select_auto_nb(size, c.i, c.col),
-...         price=flex_select_auto_nb(price, c.i, c.col),
-...         fees=flex_select_auto_nb(fees, c.i, c.col),
-...         slippage=flex_select_auto_nb(slippage, c.i, c.col),
+...     return nb.order_nb(
+...         size=nb.get_elem_nb(c, size),
+...         price=nb.get_elem_nb(c, price),
+...         fees=nb.get_elem_nb(c, fees),
+...         slippage=nb.get_elem_nb(c, slippage),
 ...     )
 
 >>> @njit
@@ -528,7 +542,7 @@ Alternatively, you can track portfolio value and returns using `Portfolio.from_o
 ...     np.asarray(0.001),
 ...     post_segment_func_nb=post_segment_func_nb,
 ...     post_segment_args=(returns_out,),
-...     init_cash='autoalign'
+...     init_cash=pf_baseline.init_cash
 ... )
 
 >>> returns = pf.wrapper.wrap(returns_out)
@@ -1340,7 +1354,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import map_enum_fields
 from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.template import RepEval, Rep
+from vectorbt.utils.template import RepEval, Rep, deep_substitute
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import get_domain
@@ -1841,10 +1855,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Broadcast inputs
+        # Prepare the simulation
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcastable_args = (
-            close,
             size,
             price,
             size_type,
@@ -1859,14 +1872,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             allow_partial,
             raise_reject,
             log,
-            val_price
+            val_price,
+            close
         )
+        keep_raw = [True] * len(broadcastable_args)
+        keep_raw[-1] = False
         broadcast_kwargs = merge_dicts(dict(
-            keep_raw=[False] + [True] * (len(broadcastable_args) - 1),
+            keep_raw=keep_raw,
             require_kwargs=dict(requirements='W')
         ), broadcast_kwargs)
         broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs)
-        close = broadcasted_args[0]
+        close = broadcasted_args[-1]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -1885,14 +1901,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         if not np.any(log):
             max_logs = 1
 
-        # Perform calculation
+        # Perform the simulation
         order_records, log_records = nb.simulate_from_orders_nb(
             target_shape_2d,
-            to_2d_array(close),
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            *map(np.asarray, broadcasted_args[1:]),
+            *map(np.asarray, broadcasted_args),
             auto_call_seq,
             ffill_val_price,
             update_value,
@@ -1966,7 +1981,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                      max_logs: tp.Optional[int] = None,
                      seed: tp.Optional[int] = None,
                      group_by: tp.GroupByLike = None,
+                     broadcast_named_args: tp.KwargsLike = None,
                      broadcast_kwargs: tp.KwargsLike = None,
+                     template_mapping: tp.Optional[tp.Mapping] = None,
                      wrapper_kwargs: tp.KwargsLike = None,
                      freq: tp.Optional[tp.FrequencyLike] = None,
                      attach_call_seq: tp.Optional[bool] = None,
@@ -2142,7 +2159,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             max_logs (int): See `Portfolio.from_orders`.
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
+            broadcast_named_args (dict): Dictionary with named arguments to broadcast.
+
+                You can then pass argument names to the functions and this method will substitute
+                them by their corresponding broadcasted objects.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
+            template_mapping (mapping): Mapping to replace templates in arguments.
             wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
             attach_call_seq (bool): See `Portfolio.from_orders`.
@@ -2532,6 +2554,45 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         4    11.0
         dtype: float64
         ```
+
+        * Sometimes there is a need to provide or transform signals dynamically. For this, we can implement
+        a custom signal function `signal_func_nb`. For example, let's implement a signal function that
+        takes two numerical arrays - long and short one - and transforms them into 4 direction-aware boolean
+        arrays that vectorbt understands:
+
+        ```python-repl
+        >>> @njit
+        ... def signal_func_nb(c, long_num_arr, short_num_arr):
+        ...     long_num = nb.get_elem_nb(c, long_num_arr)
+        ...     short_num = nb.get_elem_nb(c, short_num_arr)
+        ...     is_long_entry = long_num > 0
+        ...     is_long_exit = long_num < 0
+        ...     is_short_entry = short_num > 0
+        ...     is_short_exit = short_num < 0
+        ...     return is_long_entry, is_long_exit, is_short_entry, is_short_exit
+
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     signal_func_nb=signal_func_nb,
+        ...     signal_args=(vbt.Rep('long_num_arr'), vbt.Rep('short_num_arr')),
+        ...     broadcast_named_args=dict(
+        ...         long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+        ...         short_num_arr=pd.Series([0, 1, 0, 1, -1])
+        ...     ),
+        ...     size=1,
+        ...     upon_opposite_entry='ignore'
+        ... )
+        >>> pf.asset_flow()
+        0    1.0
+        1    0.0
+        2   -1.0
+        3   -1.0
+        4    1.0
+        dtype: float64
+        ```
+
+        Passing both arrays as `broadcast_named_args` broadcasts them internally as any other array,
+        so we don't have to worry about their dimensions every time we change our data.
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -2677,72 +2738,75 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             freq = portfolio_cfg['freq']
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg['attach_call_seq']
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
+        if template_mapping is None:
+            template_mapping = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Broadcast inputs
-        fix_broadcastable_args = (
-            close,
-            size,
-            price,
-            size_type,
-            fees,
-            fixed_fees,
-            slippage,
-            min_size,
-            max_size,
-            reject_prob,
-            lock_cash,
-            allow_partial,
-            raise_reject,
-            log,
-            accumulate,
-            upon_long_conflict,
-            upon_short_conflict,
-            upon_dir_conflict,
-            upon_opposite_entry,
-            val_price,
-            open,
-            high,
-            low,
-            sl_stop,
-            sl_trail,
-            tp_stop,
-            stop_entry_price,
-            stop_exit_price,
-            upon_stop_exit,
-            upon_stop_update
+        # Prepare the simulation
+        broadcastable_args = dict(
+            size=size,
+            price=price,
+            size_type=size_type,
+            fees=fees,
+            fixed_fees=fixed_fees,
+            slippage=slippage,
+            min_size=min_size,
+            max_size=max_size,
+            reject_prob=reject_prob,
+            lock_cash=lock_cash,
+            allow_partial=allow_partial,
+            raise_reject=raise_reject,
+            log=log,
+            accumulate=accumulate,
+            upon_long_conflict=upon_long_conflict,
+            upon_short_conflict=upon_short_conflict,
+            upon_dir_conflict=upon_dir_conflict,
+            upon_opposite_entry=upon_opposite_entry,
+            val_price=val_price,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            sl_stop=sl_stop,
+            sl_trail=sl_trail,
+            tp_stop=tp_stop,
+            stop_entry_price=stop_entry_price,
+            stop_exit_price=stop_exit_price,
+            upon_stop_exit=upon_stop_exit,
+            upon_stop_update=upon_stop_update
         )
         if not signal_func_mode:
             if ls_mode:
-                opt_broadcastable_args = (
-                    entries,
-                    exits,
-                    short_entries,
-                    short_exits
-                )
+                broadcastable_args['entries'] = entries
+                broadcastable_args['exits'] = exits
+                broadcastable_args['short_entries'] = short_entries
+                broadcastable_args['short_exits'] = short_exits
             else:
-                opt_broadcastable_args = (
-                    entries,
-                    exits,
-                    direction
-                )
-        else:
-            opt_broadcastable_args = ()
-        broadcastable_args = (*fix_broadcastable_args, *opt_broadcastable_args)
+                broadcastable_args['entries'] = entries
+                broadcastable_args['exits'] = exits
+                broadcastable_args['direction'] = direction
+        broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
+        close_idx = list(broadcastable_args.keys()).index('close')
+        keep_raw = [True] * len(broadcastable_args)
+        keep_raw[close_idx] = False
         broadcast_kwargs = merge_dicts(dict(
-            keep_raw=[False] + [True] * (len(broadcastable_args) - 1),
+            keep_raw=keep_raw,
             require_kwargs=dict(requirements='W')
         ), broadcast_kwargs)
-        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs)
-        close = broadcasted_args[0]
+        broadcasted_args = broadcast(*broadcastable_args.values(), **broadcast_kwargs)
+        broadcasted_args = dict(zip(broadcastable_args.keys(), broadcasted_args))
+        close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
@@ -2758,30 +2822,95 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             max_logs = target_shape_2d[0] * target_shape_2d[1]
         if not np.any(log):
             max_logs = 1
+        template_mapping = {**broadcasted_args, **dict(
+            target_shape=target_shape_2d,
+            group_lens=cs_group_lens,
+            init_cash=init_cash,
+            call_seq=call_seq,
+            adjust_sl_func_nb=adjust_sl_func_nb,
+            adjust_sl_args=adjust_sl_args,
+            adjust_tp_func_nb=adjust_tp_func_nb,
+            adjust_tp_args=adjust_tp_args,
+            use_stops=use_stops,
+            auto_call_seq=auto_call_seq,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            max_orders=max_orders,
+            max_logs=max_logs,
+            flex_2d=close.ndim == 2,
+            wrapper=wrapper
+        ), **template_mapping}
+        adjust_sl_args = deep_substitute(adjust_sl_args, template_mapping)
+        adjust_tp_args = deep_substitute(adjust_tp_args, template_mapping)
+        if signal_func_mode:
+            signal_args = deep_substitute(signal_args, template_mapping)
+        else:
+            if ls_mode:
+                signal_args = (
+                    broadcasted_args['entries'],
+                    broadcasted_args['exits'],
+                    broadcasted_args['short_entries'],
+                    broadcasted_args['short_exits']
+                )
+            else:
+                signal_args = (
+                    broadcasted_args['entries'],
+                    broadcasted_args['exits'],
+                    broadcasted_args['direction']
+                )
+        checks.assert_numba_func(signal_func_nb)
+        checks.assert_numba_func(adjust_sl_func_nb)
+        checks.assert_numba_func(adjust_tp_func_nb)
 
-        # Perform calculation
-        if not signal_func_mode:
-            signal_args = (*map(np.asarray, broadcasted_args[-len(opt_broadcastable_args):]),)
+        # Perform the simulation
         order_records, log_records = nb.simulate_from_signal_func_nb(
             target_shape_2d,
-            to_2d_array(close),
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            signal_func_nb,
-            signal_args,
-            *map(np.asarray, broadcasted_args[1:len(fix_broadcastable_args)]),
-            adjust_sl_func_nb,
-            adjust_sl_args,
-            adjust_tp_func_nb,
-            adjust_tp_args,
-            use_stops,
-            auto_call_seq,
-            ffill_val_price,
-            update_value,
-            max_orders,
-            max_logs,
-            close.ndim == 2
+            signal_func_nb=signal_func_nb,
+            signal_args=signal_args,
+            size=broadcasted_args['size'],
+            price=broadcasted_args['price'],
+            size_type=broadcasted_args['size_type'],
+            fees=broadcasted_args['fees'],
+            fixed_fees=broadcasted_args['fixed_fees'],
+            slippage=broadcasted_args['slippage'],
+            min_size=broadcasted_args['min_size'],
+            max_size=broadcasted_args['max_size'],
+            reject_prob=broadcasted_args['reject_prob'],
+            lock_cash=broadcasted_args['lock_cash'],
+            allow_partial=broadcasted_args['allow_partial'],
+            raise_reject=broadcasted_args['raise_reject'],
+            log=broadcasted_args['log'],
+            accumulate=broadcasted_args['accumulate'],
+            upon_long_conflict=broadcasted_args['upon_long_conflict'],
+            upon_short_conflict=broadcasted_args['upon_short_conflict'],
+            upon_dir_conflict=broadcasted_args['upon_dir_conflict'],
+            upon_opposite_entry=broadcasted_args['upon_opposite_entry'],
+            val_price=broadcasted_args['val_price'],
+            open=broadcasted_args['open'],
+            high=broadcasted_args['high'],
+            low=broadcasted_args['low'],
+            close=broadcasted_args['close'],
+            sl_stop=broadcasted_args['sl_stop'],
+            sl_trail=broadcasted_args['sl_trail'],
+            tp_stop=broadcasted_args['tp_stop'],
+            stop_entry_price=broadcasted_args['stop_entry_price'],
+            stop_exit_price=broadcasted_args['stop_exit_price'],
+            upon_stop_exit=broadcasted_args['upon_stop_exit'],
+            upon_stop_update=broadcasted_args['upon_stop_update'],
+            adjust_sl_func_nb=adjust_sl_func_nb,
+            adjust_sl_args=adjust_sl_args,
+            adjust_tp_func_nb=adjust_tp_func_nb,
+            adjust_tp_args=adjust_tp_args,
+            use_stops=use_stops,
+            auto_call_seq=auto_call_seq,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            max_orders=max_orders,
+            max_logs=max_logs,
+            flex_2d=close.ndim == 2
         )
 
         # Create an instance
@@ -2924,12 +3053,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
                         *order_args,
                         flexible: tp.Optional[bool] = None,
-                        target_shape: tp.Optional[tp.RelaxedShape] = None,
-                        keys: tp.Optional[tp.IndexLike] = None,
                         init_cash: tp.Optional[tp.ArrayLike] = None,
                         cash_sharing: tp.Optional[bool] = None,
                         call_seq: tp.Optional[tp.ArrayLike] = None,
                         segment_mask: tp.Optional[tp.ArrayLike] = None,
+                        call_pre_segment: tp.Optional[bool] = None,
+                        call_post_segment: tp.Optional[bool] = None,
                         pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
                         pre_sim_args: tp.Args = (),
                         post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
@@ -2948,8 +3077,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         post_segment_args: tp.Args = (),
                         post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
                         post_order_args: tp.Args = (),
-                        call_pre_segment: tp.Optional[bool] = None,
-                        call_post_segment: tp.Optional[bool] = None,
                         ffill_val_price: tp.Optional[bool] = None,
                         update_value: tp.Optional[bool] = None,
                         fill_pos_record: tp.Optional[bool] = None,
@@ -2959,12 +3086,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         max_logs: tp.Optional[int] = None,
                         seed: tp.Optional[int] = None,
                         group_by: tp.GroupByLike = None,
+                        broadcast_named_args: tp.KwargsLike = None,
                         broadcast_kwargs: tp.KwargsLike = None,
+                        template_mapping: tp.Optional[tp.Mapping] = None,
                         wrapper_kwargs: tp.KwargsLike = None,
                         freq: tp.Optional[tp.FrequencyLike] = None,
                         attach_call_seq: tp.Optional[bool] = None,
                         **kwargs) -> PortfolioT:
         """Build portfolio from a custom order function.
+
+        !!! hint
+            See `vectorbt.portfolio.nb.simulate_nb` for illustrations and argument definitions.
+
+        For more details on individual simulation functions:
 
         * not `row_wise` and not `flexible`: See `vectorbt.portfolio.nb.simulate_nb`
         * not `row_wise` and `flexible`: See `vectorbt.portfolio.nb.flex_simulate_nb`
@@ -2981,11 +3115,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             flexible (bool): Whether to simulate using a flexible order function.
 
                 This lifts the limit of one order per tick and symbol.
-            target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
-            keys (sequence): Outermost column level.
-
-                Each element should correspond to one iteration over columns in `close`.
-                Should be set only if `target_shape` is bigger than `close.shape`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
                 See `init_cash` in `Portfolio.from_orders`.
@@ -3002,11 +3131,16 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
                 !!! note
                     CallSeqType.Auto should be implemented manually.
-                    Use `sort_call_seq_nb` in `pre_segment_func_nb`.
+                    Use `vectorbt.portfolio.nb.sort_call_seq_nb` or `vectorbt.portfolio.nb.sort_call_seq_out_nb`
+                    in `pre_segment_func_nb`.
             segment_mask (int or array_like of bool): Mask of whether a particular segment should be executed.
 
-                Supplying an integer will activate every n-th row (just for convenience).
-                Supplying a boolean will broadcast to the number of rows and groups.
+                Supplying an integer will activate every n-th row.
+                Supplying a boolean or an array of boolean will broadcast to the number of rows and groups.
+
+                Does not broadcast together with `close` and `broadcast_named_args`, only against the final shape.
+            call_pre_segment (bool): Whether to call `pre_segment_func_nb` regardless of `segment_mask`.
+            call_post_segment (bool): Whether to call `post_segment_func_nb` regardless of `segment_mask`.
             pre_sim_func_nb (callable): Function called before simulation.
                 Defaults to `vectorbt.portfolio.nb.no_pre_func_nb`.
             pre_sim_args (tuple): Packed arguments passed to `pre_sim_func_nb`.
@@ -3050,8 +3184,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             post_order_func_nb (callable): Callback that is called after the order has been processed.
             post_order_args (tuple): Packed arguments passed to `post_order_func_nb`.
                 Defaults to `()`.
-            call_pre_segment (bool): Whether to call `pre_segment_func_nb` regardless of `segment_mask`.
-            call_post_segment (bool): Whether to call `post_segment_func_nb` regardless of `segment_mask`.
             ffill_val_price (bool): Whether to track valuation price only if it's known.
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
@@ -3077,7 +3209,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 Set to a lower number if you run out of memory.
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
+            broadcast_named_args (dict): See `Portfolio.from_signals`.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
+            template_mapping (mapping): See `Portfolio.from_signals`.
             wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
             attach_call_seq (bool): See `Portfolio.from_orders`.
@@ -3086,17 +3220,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
         !!! note
-            All passed functions should be Numba-compiled.
-
-            Objects passed as arguments to both functions will not broadcast to `target_shape`
-            as their purpose is unknown. You should broadcast manually or use flexible indexing.
+            All passed functions should be Numba-compiled if Numba is enabled.
 
             Also see notes on `Portfolio.from_orders`.
 
         !!! note
-            In contrast to other methods, the valuation price is previous `close`
-            instead of order price, since the price of an order is unknown before call.
-            You can still set valuation price explicitly in `pre_segment_func_nb`.
+            In contrast to other methods, the valuation price is previous `close` instead of the order price
+            since the price of an order is unknown before the call (which is more realistic by the way).
+            You can still override the valuation price in `pre_segment_func_nb`.
 
         ## Example
 
@@ -3105,7 +3236,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ```python-repl
         >>> @njit
         ... def order_func_nb(c, size):
-        ...     return order_nb(size=size)
+        ...     return nb.order_nb(size=size)
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> pf = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -3138,7 +3269,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         >>> @njit
         ... def order_func_nb(c, last_pos_state):
         ...     if c.position_now != 0:
-        ...         return close_position_nb()
+        ...         return nb.close_position_nb()
         ...
         ...     if last_pos_state[0] == 1:
         ...         size = -np.inf  # open short
@@ -3146,10 +3277,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ...     else:
         ...         size = np.inf  # open long
         ...         last_pos_state[0] = 1
-        ...     return order_nb(size=size)
+        ...     return nb.order_nb(size=size)
 
         >>> pf = vbt.Portfolio.from_order_func(
-        ...     close, order_func_nb, pre_group_func_nb=pre_group_func_nb)
+        ...     close,
+        ...     order_func_nb,
+        ...     pre_group_func_nb=pre_group_func_nb
+        ... )
 
         >>> pf.assets()
         0    100.000000
@@ -3167,52 +3301,65 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         dtype: float64
         ```
 
-        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+        * Equal-weighted portfolio as in the example under `vectorbt.portfolio.nb.simulate_nb`:
 
         ```python-repl
         >>> @njit
         ... def pre_group_func_nb(c):
-        ...     '''Define empty arrays for each group.'''
         ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
         ...     return (order_value_out,)
 
         >>> @njit
-        ... def pre_segment_func_nb(c, order_value_out):
-        ...     '''Perform rebalancing at each segment.'''
+        ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
         ...     for col in range(c.from_col, c.to_col):
-        ...         # Here we use order price for group valuation
-        ...         c.last_val_price[col] = c.close[c.i, col]
-        ...     # Reorder call sequence such that selling orders come first and buying last
-        ...     size = 1 / c.group_len
-        ...     size_type = SizeType.TargetPercent
-        ...     direction = Direction.LongOnly  # long positions only
-        ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out)
-        ...     return (size, size_type, direction)
+        ...         c.last_val_price[col] = nb.get_col_elem_nb(c, col, price)
+        ...     nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
+        ...     return ()
 
         >>> @njit
-        ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
-        ...     '''Place an order.'''
-        ...     return order_nb(
-        ...         size=size,
-        ...         size_type=size_type,
-        ...         direction=direction,
-        ...         fees=fees,
-        ...         fixed_fees=fixed_fees,
-        ...         slippage=slippage
+        ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
+        ...     return nb.order_nb(
+        ...         size=nb.get_elem_nb(c, size),
+        ...         price=nb.get_elem_nb(c, price),
+        ...         size_type=nb.get_elem_nb(c, size_type),
+        ...         direction=nb.get_elem_nb(c, direction),
+        ...         fees=nb.get_elem_nb(c, fees),
+        ...         fixed_fees=nb.get_elem_nb(c, fixed_fees),
+        ...         slippage=nb.get_elem_nb(c, slippage)
         ...     )
 
         >>> np.random.seed(42)
         >>> close = np.random.uniform(1, 10, size=(5, 3))
-        >>> fees = 0.001
-        >>> fixed_fees = 1.
-        >>> slippage = 0.001
+        >>> size_template = vbt.RepEval('np.asarray(1 / group_lens[0])')
 
         >>> pf = vbt.Portfolio.from_order_func(
-        ...     close,  # acts both as reference and order price here
-        ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
+        ...     close,
+        ...     order_func_nb,
+        ...     size_template,  # order_args as *args
+        ...     vbt.Rep('price'),
+        ...     vbt.Rep('size_type'),
+        ...     vbt.Rep('direction'),
+        ...     vbt.Rep('fees'),
+        ...     vbt.Rep('fixed_fees'),
+        ...     vbt.Rep('slippage'),
         ...     segment_mask=2,  # rebalance every second tick
         ...     pre_group_func_nb=pre_group_func_nb,
         ...     pre_segment_func_nb=pre_segment_func_nb,
+        ...     pre_segment_args=(
+        ...         size_template,
+        ...         vbt.Rep('price'),
+        ...         vbt.Rep('size_type'),
+        ...         vbt.Rep('direction')
+        ...     ),
+        ...     broadcast_named_args=dict(  # broadcast against each other
+        ...         price=close,
+        ...         size_type=SizeType.TargetPercent,
+        ...         direction=Direction.LongOnly,
+        ...         fees=0.001,
+        ...         fixed_fees=1.,
+        ...         slippage=0.001
+        ...     ),
+        ...     template_mapping=dict(np=np),  # required by size_template
         ...     cash_sharing=True, group_by=True,  # one group with cash sharing
         ... )
 
@@ -3220,6 +3367,28 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ```
 
         ![](/docs/img/simulate_nb.svg)
+
+        Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
+        before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
+        to broadcast some arguments against each other and templates to pass those objects to callbacks.
+        Additionally, we used an evaluation template to compute the size based on the number of assets in each group.
+
+        You may ask: why should we bother using broadcasting and templates if we could just pass `size=1/3`?
+        Because of flexibility those features provide: we can now pass whatever parameter combinations we want
+        and it will work flawlessly. For example, to create two groups of equally-allocated positions,
+        we need to change only two parameters:
+
+        ```python-repl
+        >>> close = np.random.uniform(1, 10, size=(5, 6))  # 6 columns instead of 3
+        >>> group_by = ['g1', 'g1', 'g1', 'g2', 'g2', 'g2']  # 2 groups instead of 1
+
+        >>> pf['g1'].asset_value(group_by=False).vbt.plot()
+        >>> pf['g2'].asset_value(group_by=False).vbt.plot()
+        ```
+
+        ![](/docs/img/from_order_func_g1.svg)
+
+        ![](/docs/img/from_order_func_g2.svg)
 
         * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -3231,33 +3400,33 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ...     return (stop_price,)
 
         >>> @njit
-        ... def order_func_nb(c, stop_price, entries, exits, size, flex_2d):
+        ... def order_func_nb(c, stop_price, entries, exits, size):
         ...     # Select info related to this order
-        ...     # flex_select_auto_nb allows us to pass size as single number, 1-dim or 2-dim array
-        ...     # If flex_2d is True, 1-dim array will be per column, otherwise per row
-        ...     size_now = flex_select_auto_nb(np.asarray(size), c.i, c.col, flex_2d)
-        ...     price_now = c.close[c.i, c.col]  # close is always 2-dim array
+        ...     entry_now = nb.get_elem_nb(c, entries)
+        ...     exit_now = nb.get_elem_nb(c, exits)
+        ...     size_now = nb.get_elem_nb(c, size)
+        ...     price_now = nb.get_elem_nb(c, c.close)
         ...     stop_price_now = stop_price[c.col]
         ...
         ...     # Our logic
-        ...     if entries[c.i, c.col]:
+        ...     if entry_now:
         ...         if c.position_now == 0:
-        ...             return order_nb(
+        ...             return nb.order_nb(
         ...                 size=size_now,
         ...                 price=price_now,
         ...                 direction=Direction.LongOnly)
-        ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
+        ...     elif exit_now or price_now >= stop_price_now:
         ...         if c.position_now > 0:
-        ...             return order_nb(
+        ...             return nb.order_nb(
         ...                 size=-size_now,
         ...                 price=price_now,
         ...                 direction=Direction.LongOnly)
         ...     return NoOrder
 
         >>> @njit
-        ... def post_order_func_nb(c, stop_price, stop, flex_2d):
+        ... def post_order_func_nb(c, stop_price, stop):
         ...     # Same broadcasting as for size
-        ...     stop_now = flex_select_auto_nb(np.asarray(stop), c.i, c.col, flex_2d)
+        ...     stop_now = nb.get_elem_nb(c, stop)
         ...
         ...     if c.order_result.status == OrderStatus.Filled:
         ...         if c.order_result.side == OrderSide.Buy:
@@ -3267,39 +3436,41 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ...             # Position exited: Remove stop condition
         ...             stop_price[c.col] = np.nan
 
-        >>> def simulate(close, entries, exits, threshold):
+        >>> def simulate(close, entries, exits, size, threshold):
         ...     return vbt.Portfolio.from_order_func(
         ...         close,
         ...         order_func_nb,
-        ...         to_2d_array(entries),  # 2-dim array
-        ...         to_2d_array(exits),  # 2-dim array
-        ...         np.inf, # will broadcast
-        ...         True,
+        ...         vbt.Rep('entries'), vbt.Rep('exits'), vbt.Rep('size'),  # order_args
         ...         pre_sim_func_nb=pre_sim_func_nb,
         ...         post_order_func_nb=post_order_func_nb,
-        ...         post_order_args=(
-        ...             threshold,  # will broadcast
-        ...             True
+        ...         post_order_args=(vbt.Rep('threshold'),),
+        ...         broadcast_named_args=dict(  # broadcast against each other
+        ...             entries=entries,
+        ...             exits=exits,
+        ...             size=size,
+        ...             threshold=threshold
         ...         )
         ...     )
 
         >>> close = pd.Series([10, 11, 12, 13, 14])
         >>> entries = pd.Series([True, True, False, False, False])
         >>> exits = pd.Series([False, False, False, True, True])
-        >>> simulate(close, entries, exits, 0.1).asset_flow()
+        >>> simulate(close, entries, exits, np.inf, 0.1).asset_flow()
         0    10.0
         1     0.0
         2   -10.0
         3     0.0
         4     0.0
         dtype: float64
-        >>> simulate(close, entries, exits, 0.2).asset_flow()
+
+        >>> simulate(close, entries, exits, np.inf, 0.2).asset_flow()
         0    10.0
         1     0.0
         2   -10.0
         3     0.0
         4     0.0
         dtype: float64
+
         >>> simulate(close, entries, exits, np.nan).asset_flow()
         0    10.0
         1     0.0
@@ -3315,6 +3486,22 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
         `Portfolio.from_signals`).
 
+        We can also test the parameter combinations above all at once (thanks to broadcasting):
+
+        ```python-repl
+        >>> size = pd.DataFrame(
+        ...     [[0.1, 0.2, np.nan]],
+        ...     columns=pd.Index(['0.1', '0.2', 'nan'], name='size')
+        ... )
+        >>> simulate(close, entries, exits, np.inf, size).asset_flow()
+        size   0.1   0.2   nan
+        0     10.0  10.0  10.0
+        1      0.0   0.0   0.0
+        2    -10.0 -10.0   0.0
+        3      0.0   0.0 -10.0
+        4      0.0   0.0   0.0
+        ```
+
         * Let's illustrate how to generate multiple orders per symbol and bar.
         For each bar, buy at open and sell at close:
 
@@ -3322,9 +3509,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         >>> @njit
         ... def flex_order_func_nb(c, open, size):
         ...     if c.call_idx == 0:
-        ...         return c.from_col, order_nb(size=size, price=open[c.i, c.from_col])
+        ...         return c.from_col, nb.order_nb(size=size, price=open[c.i, c.from_col])
         ...     if c.call_idx == 1:
-        ...         return c.from_col, close_position_nb(price=c.close[c.i, c.from_col])
+        ...         return c.from_col, nb.close_position_nb(price=c.close[c.i, c.from_col])
         ...     return -1, NoOrder
 
         >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
@@ -3353,9 +3540,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         ```
 
         !!! warning
-            Each bar is a black box - we don't know how the price moves inside.
-            Since trades must come in an order that replicates the real world, the only reliable
-            pieces of data are opening and closing prices.
+            Each bar is effectively a black box - we don't know how the price moves inside.
+            Since trades must come in an order that replicates that of the real world, the only reliable
+            pieces of information are the opening and the closing price.
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -3364,8 +3551,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         close = to_pd_array(close)
         if flexible is None:
             flexible = portfolio_cfg['flexible']
-        if target_shape is None:
-            target_shape = close.shape
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
         if isinstance(init_cash, str):
@@ -3411,29 +3596,38 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             freq = portfolio_cfg['freq']
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg['attach_call_seq']
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         require_kwargs = dict(require_kwargs=dict(requirements='W'))
         broadcast_kwargs = merge_dicts(require_kwargs, broadcast_kwargs)
+        if template_mapping is None:
+            template_mapping = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Broadcast inputs
-        if isinstance(target_shape, int):
-            target_shape = (target_shape,)
-        target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
-        if close.shape != target_shape:
-            close_wrapper = ArrayWrapper.from_obj(close)
-            if len(close_wrapper.columns) <= target_shape_2d[1]:
-                if target_shape_2d[1] % len(close_wrapper.columns) != 0:
-                    raise ValueError("Cannot broadcast close to target_shape")
-                if keys is None:
-                    keys = pd.Index(np.arange(target_shape_2d[1]), name='iteration_idx')
-                tile_times = target_shape_2d[1] // len(close_wrapper.columns)
-                close = close.vbt.tile(tile_times, keys=keys)
-        close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
+        # Prepare the simulation
+        broadcastable_args = {**dict(close=close), **broadcast_named_args}
+        if len(broadcastable_args) > 1:
+            close_idx = list(broadcastable_args.keys()).index('close')
+            keep_raw = [True] * len(broadcastable_args)
+            keep_raw[close_idx] = False
+            broadcast_kwargs = merge_dicts(dict(
+                keep_raw=keep_raw,
+                require_kwargs=dict(requirements='W')
+            ), broadcast_kwargs)
+            broadcasted_args = broadcast(*broadcastable_args.values(), **broadcast_kwargs)
+            broadcasted_args = dict(zip(broadcastable_args.keys(), broadcasted_args))
+            close = broadcasted_args['close']
+            if not checks.is_pandas(close):
+                close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        else:
+            broadcasted_args = broadcastable_args
+        broadcasted_args['close'] = to_2d_array(close)
+        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -3458,29 +3652,78 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             max_orders = target_shape_2d[0] * target_shape_2d[1]
         if max_logs is None:
             max_logs = target_shape_2d[0] * target_shape_2d[1]
+        template_mapping = {**broadcasted_args, **dict(
+            target_shape=target_shape_2d,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            segment_mask=segment_mask,
+            call_pre_segment=call_pre_segment,
+            call_post_segment=call_post_segment,
+            pre_sim_func_nb=pre_sim_func_nb,
+            pre_sim_args=pre_sim_args,
+            post_sim_func_nb=post_sim_func_nb,
+            post_sim_args=post_sim_args,
+            pre_group_func_nb=pre_group_func_nb,
+            pre_group_args=pre_group_args,
+            post_group_func_nb=post_group_func_nb,
+            post_group_args=post_group_args,
+            pre_row_func_nb=pre_row_func_nb,
+            pre_row_args=pre_row_args,
+            post_row_func_nb=post_row_func_nb,
+            post_row_args=post_row_args,
+            pre_segment_func_nb=pre_segment_func_nb,
+            pre_segment_args=pre_segment_args,
+            post_segment_func_nb=post_segment_func_nb,
+            post_segment_args=post_segment_args,
+            flex_order_func_nb=order_func_nb,
+            flex_order_args=order_args,
+            post_order_func_nb=post_order_func_nb,
+            post_order_args=post_order_args,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            fill_pos_record=fill_pos_record,
+            max_orders=max_orders,
+            max_logs=max_logs,
+            flex_2d=close.ndim == 2,
+            wrapper=wrapper
+        ), **template_mapping}
+        pre_sim_args = deep_substitute(pre_sim_args, template_mapping)
+        post_sim_args = deep_substitute(post_sim_args, template_mapping)
+        pre_group_args = deep_substitute(pre_group_args, template_mapping)
+        post_group_args = deep_substitute(post_group_args, template_mapping)
+        pre_row_args = deep_substitute(pre_row_args, template_mapping)
+        post_row_args = deep_substitute(post_row_args, template_mapping)
+        pre_segment_args = deep_substitute(pre_segment_args, template_mapping)
+        post_segment_args = deep_substitute(post_segment_args, template_mapping)
+        order_args = deep_substitute(order_args, template_mapping)
+        post_order_args = deep_substitute(post_order_args, template_mapping)
+        if use_numba:
+            checks.assert_numba_func(pre_sim_func_nb)
+            checks.assert_numba_func(post_sim_func_nb)
+            checks.assert_numba_func(pre_group_func_nb)
+            checks.assert_numba_func(post_group_func_nb)
+            checks.assert_numba_func(pre_row_func_nb)
+            checks.assert_numba_func(post_row_func_nb)
+            checks.assert_numba_func(pre_segment_func_nb)
+            checks.assert_numba_func(post_segment_func_nb)
+            checks.assert_numba_func(order_func_nb)
+            checks.assert_numba_func(post_order_func_nb)
 
-        # Perform calculation
+        # Perform the simulation
         if row_wise:
-            if use_numba:
-                checks.assert_numba_func(pre_sim_func_nb)
-                checks.assert_numba_func(post_sim_func_nb)
-                checks.assert_numba_func(pre_row_func_nb)
-                checks.assert_numba_func(post_row_func_nb)
-                checks.assert_numba_func(pre_segment_func_nb)
-                checks.assert_numba_func(post_segment_func_nb)
-                checks.assert_numba_func(order_func_nb)
-                checks.assert_numba_func(post_order_func_nb)
             if flexible:
                 simulate_func = nb.flex_simulate_row_wise_nb
                 if not use_numba and hasattr(simulate_func, 'py_func'):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
-                    close=to_2d_array(close),
                     group_lens=group_lens,
                     init_cash=init_cash,
                     cash_sharing=cash_sharing,
                     segment_mask=segment_mask,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
                     pre_sim_func_nb=pre_sim_func_nb,
                     pre_sim_args=pre_sim_args,
                     post_sim_func_nb=post_sim_func_nb,
@@ -3497,13 +3740,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
+                    close=broadcasted_args['close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
-                    max_logs=max_logs
+                    max_logs=max_logs,
+                    flex_2d=close.ndim == 2
                 )
             else:
                 simulate_func = nb.simulate_row_wise_nb
@@ -3511,12 +3754,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
-                    close=to_2d_array(close),
                     group_lens=group_lens,
                     init_cash=init_cash,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
                     segment_mask=segment_mask,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
                     pre_sim_func_nb=pre_sim_func_nb,
                     pre_sim_args=pre_sim_args,
                     post_sim_func_nb=post_sim_func_nb,
@@ -3533,35 +3777,27 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
+                    close=broadcasted_args['close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
-                    max_logs=max_logs
+                    max_logs=max_logs,
+                    flex_2d=close.ndim == 2
                 )
         else:
-            if use_numba:
-                checks.assert_numba_func(pre_sim_func_nb)
-                checks.assert_numba_func(post_sim_func_nb)
-                checks.assert_numba_func(pre_group_func_nb)
-                checks.assert_numba_func(post_group_func_nb)
-                checks.assert_numba_func(pre_segment_func_nb)
-                checks.assert_numba_func(post_segment_func_nb)
-                checks.assert_numba_func(order_func_nb)
-                checks.assert_numba_func(post_order_func_nb)
             if flexible:
                 simulate_func = nb.flex_simulate_nb
                 if not use_numba and hasattr(simulate_func, 'py_func'):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
-                    close=to_2d_array(close),
                     group_lens=group_lens,
                     init_cash=init_cash,
                     cash_sharing=cash_sharing,
                     segment_mask=segment_mask,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
                     pre_sim_func_nb=pre_sim_func_nb,
                     pre_sim_args=pre_sim_args,
                     post_sim_func_nb=post_sim_func_nb,
@@ -3578,13 +3814,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
+                    close=broadcasted_args['close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
-                    max_logs=max_logs
+                    max_logs=max_logs,
+                    flex_2d=close.ndim == 2
                 )
             else:
                 simulate_func = nb.simulate_nb
@@ -3592,12 +3828,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
-                    close=to_2d_array(close),
                     group_lens=group_lens,
                     init_cash=init_cash,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
                     segment_mask=segment_mask,
+                    call_pre_segment=call_pre_segment,
+                    call_post_segment=call_post_segment,
                     pre_sim_func_nb=pre_sim_func_nb,
                     pre_sim_args=pre_sim_args,
                     post_sim_func_nb=post_sim_func_nb,
@@ -3614,13 +3851,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
+                    close=broadcasted_args['close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
-                    max_logs=max_logs
+                    max_logs=max_logs,
+                    flex_2d=close.ndim == 2
                 )
 
         # Create an instance

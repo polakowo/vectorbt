@@ -610,14 +610,18 @@ __pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
 
 class SimulationContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -647,23 +651,18 @@ A tuple with exactly two elements: the number of rows and columns.
 One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
 where the first axis are rows (minutes) and the second axis are columns (assets).
 """
-__pdoc__['SimulationContext.close'] = """Latest asset price at each time step.
-
-Has shape `SimulationContext.target_shape`.
-"""
-__pdoc__['SimulationContext.group_lens'] = """Number of columns per each group.
+__pdoc__['SimulationContext.group_lens'] = """Number of columns in each group.
 
 Even if columns are not grouped, `group_lens` contains ones - one column per group.
 
 ## Example
 
 In pairs trading, `group_lens` would be `np.array([2])`, while three independent
-columns would require `group_lens` of `np.array([1, 1, 1])`.
+columns would be represented by `group_lens` of `np.array([1, 1, 1])`.
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column or group with cash sharing.
 
-If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, 
-otherwise has shape `(target_shape[1],)`.
+If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(target_shape[1],)`.
 
 ## Example
 
@@ -679,6 +678,8 @@ Controls the sequence in which `order_func_nb` is executed within each segment.
 Has shape `SimulationContext.target_shape` and each value must exist in the range `[0, group_len)`.
 
 !!! note
+    To use `sort_call_seq_nb`, should be generated using `CallSeqType.Default`.
+
     To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
 ## Example
@@ -693,16 +694,26 @@ np.array([
 ])
 ```
 """
-__pdoc__['SimulationContext.segment_mask'] = """Mask of whether order functions of a particular segment 
-should be executed.
+__pdoc__['SimulationContext.segment_mask'] = """Mask of whether a particular segment should be executed.
 
 A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
-The segment pre- and postprocessing functions are executed regardless of the mask.
+If a segment is inactive, any callback function inside of it will not be executed.
+You can still execute the segment's pre- and postprocessing function by enabling 
+`SimulationContext.call_pre_segment` and `SimulationContext.call_post_segment` respectively.
 
-You can change this mask in-place to dynamically disable future segments.
+Utilizes flexible indexing using `vectorbt.base.reshape_fns.flex_select_auto_nb` and `flex_2d`, 
+so it can be passed as 
 
-Has shape `(target_shape[0], group_lens.shape[0])`.
+* 2-dim array, 
+* 1-dim array per column (requires `flex_2d=True`), 
+* 1-dim array per row (requires `flex_2d=False`), and
+* a scalar. 
+
+Broadcasts to the shape `(target_shape[0], group_lens.shape[0])`.
+
+!!! note
+    To modify the array in place, make sure to build an array of the full shape.
 
 ## Example
 
@@ -713,13 +724,49 @@ np.array([[ True, False],
           [False,  True]])
 ```
 
-Only the first group is executed in the first row and only the second group is executed
-in the second row.
+The first group is only executed in the first row and the second group is only executed in the second row.
+"""
+__pdoc__['SimulationContext.call_pre_segment'] = """Whether to call `pre_segment_func_nb` regardless of 
+`SimulationContext.segment_mask`."""
+__pdoc__['SimulationContext.call_post_segment'] = """Whether to call `post_segment_func_nb` regardless of 
+`SimulationContext.segment_mask`.
+
+Allows, for example, to write user-defined arrays such as returns at the end of each segment."""
+__pdoc__['SimulationContext.close'] = """Latest asset price at each time step.
+
+Utilizes flexible indexing using `vectorbt.base.reshape_fns.flex_select_auto_nb` and `flex_2d`, 
+so it can be passed as 
+
+* 2-dim array, 
+* 1-dim array per column (requires `flex_2d=True`), 
+* 1-dim array per row (requires `flex_2d=False`), and
+* a scalar. 
+
+Broadcasts to the shape `SimulationContext.target_shape`.
+
+!!! note
+    To modify the array in place, make sure to build an array of the full shape.
 """
 __pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
 
 Otherwise, unknown `SimulationContext.close` will lead to NaN in valuation price at the next timestamp."""
-__pdoc__['SimulationContext.update_value'] = "Whether to update group value after each filled order."
+__pdoc__['SimulationContext.update_value'] = """Whether to update group value after each filled order.
+
+Otherwise, stays the same for all columns in the group (the value is calculated
+only once, before executing any order).
+
+The change is marginal and mostly driven by transaction costs and slippage."""
+__pdoc__['SimulationContext.fill_pos_record'] = """Whether to fill position record.
+
+Disable this to make simulation a bit faster for simple use cases."""
+__pdoc__['SimulationContext.flex_2d'] = """Whether the elements in a 1-dim array should be treated per
+column rather than per row.
+
+This flag is set automatically when using `vectorbt.portfolio.base.Portfolio.from_order_func` depending upon 
+whether there is any argument that has been broadcast to 2 dimensions.
+
+Has only effect when using flexible indexing, for example, with `vectorbt.base.reshape_fns.flex_select_auto_nb`.
+"""
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
 It's a 1-dimensional array with records of type `order_dt`.
@@ -918,14 +965,18 @@ Here's order info from `order_func_nb` and the updated position info from `post_
 
 class GroupContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -992,14 +1043,18 @@ If columns are not grouped, equals to `from_col + 1`.
 
 class RowContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1035,14 +1090,18 @@ Has range `[0, target_shape[0])`.
 
 class SegmentContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1098,14 +1157,18 @@ You can use `pre_segment_func_nb` to override `call_seq_now`.
 
 class OrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1172,14 +1235,18 @@ __pdoc__['OrderContext.pos_record_now'] = "`SimulationContext.last_pos_record` f
 
 class PostOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    segment_mask: tp.Array2d
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1264,14 +1331,18 @@ __pdoc__['PostOrderContext.pos_record_now'] = "`OrderContext.pos_record_now` aft
 
 class FlexOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: None
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1515,7 +1586,7 @@ __pdoc__['AdjustSLContext.col'] = """Current column.
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
 __pdoc__['AdjustSLContext.position_now'] = "Latest position."
 __pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
-__pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."
+__pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbt.base.reshape_fns.flex_select_auto_nb`."
 
 # ############# Records ############# #
 

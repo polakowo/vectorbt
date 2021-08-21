@@ -592,7 +592,7 @@ def stop_choice_nb(from_i: int,
                 If `wait` is greater than 0, trailing stop won't update at bars that come before `from_i`.
         pick_first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
-        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."""
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`."""
     stops = np.asarray(stop)
     trailings = np.asarray(trailing)
 
@@ -782,7 +782,7 @@ def ohlc_stop_choice_nb(from_i: int,
                 trailing stop won't update at bars that come before `from_i`.
         pick_first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
-        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`.
     """
     sl_stops = np.asarray(sl_stop)
     sl_trails = np.asarray(sl_trail)

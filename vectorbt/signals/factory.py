@@ -253,7 +253,7 @@ class SignalFactory(IndicatorFactory):
                     Default is an automatically generated array of shape `input_shape[0]`.
 
                     You can also pass `temp_idx_arr1`, `temp_idx_arr2`, etc. to generate multiple.
-                * `flex_2d`: See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
+                * `flex_2d`: See `vectorbt.base.reshape_fns.flex_select_auto_nb`.
                     Default is provided by the pipeline if `pass_flex_2d` is True.
             pass_cache (bool): Whether to pass cache from `cache_func` to the choice function.
 
