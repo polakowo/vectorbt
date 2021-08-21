@@ -1,5 +1,4 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
-[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
 [![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
 [![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
@@ -533,7 +532,8 @@ Please make sure to update tests as appropriate.
 
 ## License
 
-This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
+This work is [fair-code](http://faircode.io/) distributed under Apache 2.0 with Commons Clause license, 
+but installing optional dependencies may be subject to a stronger license.
 
 ## Disclaimer
 
