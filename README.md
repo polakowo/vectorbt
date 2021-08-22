@@ -529,7 +529,9 @@ After making changes, make sure you did not break any functionality:
 pytest
 ```
 
-Please make sure to update tests as appropriate.
+Make sure to update tests as appropriate.
+
+Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 

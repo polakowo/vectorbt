@@ -1,4 +1,4 @@
-# Copyright 2021 Oleg Polakow
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Other metrics that are not compiled with Numba."""
