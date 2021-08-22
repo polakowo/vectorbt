@@ -1,5 +1,5 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
-[![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
 [![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
 [![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
@@ -535,7 +535,7 @@ Please note: contribution to this project requires signing a Contributor Licence
 
 ## License
 
-This work is [fair-code](http://faircode.io/) distributed under Apache 2.0 with Commons Clause license. 
+This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license. 
 The source code is open and everyone (individuals and organizations) can use it for free. 
 However, it is not allowed to sell products and services that are mostly just this software.
 

@@ -578,7 +578,7 @@ Note: you must run the notebook to play with the widgets.
 - If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
 - For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
 
-## How to contribute
+## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
@@ -597,11 +597,19 @@ After making changes, make sure you did not break any functionality:
 pytest
 ```
 
-Please make sure to update tests as appropriate.
+Make sure to update tests as appropriate.
+
+Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 
-This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
+This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license.
+The source code is open and everyone (individuals and organizations) can use it for free.
+However, it is not allowed to sell products and services that are mostly just this software.
+
+If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
+
+Installing optional dependencies may be subject to a more restrictive license.
 
 ## Disclaimer
 
