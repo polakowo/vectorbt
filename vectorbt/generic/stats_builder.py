@@ -144,8 +144,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     this argument was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
                 * `resolve_path_{arg}`: Whether to resolve an argument that is meant to be an attribute of
-                    this object and is part of the path of `calc_func`. Defaults to True.
-                    See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
+                    this object and is the first part of the path of `calc_func`. Passes only optional arguments.
+                    Defaults to True. See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object and is present in the function's signature. Defaults to False.
                     See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
@@ -454,9 +454,10 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                           args: tp.ArgsLike = None,
                                           kwargs: tp.KwargsLike = None,
                                           call_attr: bool = True,
+                                          _final_kwargs: tp.Kwargs = final_kwargs,
+                                          _opt_arg_names: tp.Set[str] = opt_arg_names,
                                           _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                          _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
+                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
                             if args is None:
                                 args = ()
                             if kwargs is None:
@@ -466,7 +467,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                     return custom_reself.resolve_attr(
                                         attr,
                                         args=args,
-                                        cond_kwargs=_final_kwargs,
+                                        cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
                                         kwargs=kwargs,
                                         custom_arg_names=_custom_arg_names,
                                         cache_dct=_arg_cache_dct,

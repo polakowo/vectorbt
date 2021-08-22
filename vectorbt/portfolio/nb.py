@@ -1015,6 +1015,9 @@ def sort_call_seq_out_nb(ctx: SegmentContext,
         Should be used in flexible simulation functions."""
     if not ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
+    size_arr = np.asarray(size)
+    size_type_arr = np.asarray(size_type)
+    direction_arr = np.asarray(direction)
 
     group_value_now = get_group_value_ctx_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
@@ -1023,13 +1026,13 @@ def sort_call_seq_out_nb(ctx: SegmentContext,
             raise ValueError("call_seq_out should follow CallSeqType.Default")
         col = ctx.from_col + k
         if ctx_select:
-            _size = get_col_elem_nb(ctx, col, size)
-            _size_type = get_col_elem_nb(ctx, col, size_type)
-            _direction = get_col_elem_nb(ctx, col, direction)
+            _size = get_col_elem_nb(ctx, col, size_arr)
+            _size_type = get_col_elem_nb(ctx, col, size_type_arr)
+            _direction = get_col_elem_nb(ctx, col, direction_arr)
         else:
-            _size = flex_select_auto_nb(size, k, 0, False)
-            _size_type = flex_select_auto_nb(size_type, k, 0, False)
-            _direction = flex_select_auto_nb(direction, k, 0, False)
+            _size = flex_select_auto_nb(size_arr, k, 0, False)
+            _size_type = flex_select_auto_nb(size_type_arr, k, 0, False)
+            _direction = flex_select_auto_nb(direction_arr, k, 0, False)
         if ctx.cash_sharing:
             cash_now = ctx.last_cash[ctx.group]
             free_cash_now = ctx.last_free_cash[ctx.group]

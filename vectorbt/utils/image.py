@@ -2,7 +2,7 @@
 
 import numpy as np
 import imageio
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
@@ -37,6 +37,7 @@ def save_animation(fname: str,
                    fps: int = 3,
                    writer_kwargs: dict = None,
                    show_progress: bool = True,
+                   tqdm_kwargs: tp.KwargsLike = None,
                    to_image_kwargs: tp.KwargsLike = None,
                    **kwargs) -> None:
     """Save animation to a file.
@@ -54,20 +55,23 @@ def save_animation(fname: str,
         fps (int): Frames per second.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
+        tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
     """
     if writer_kwargs is None:
         writer_kwargs = {}
+    if tqdm_kwargs is None:
+        tqdm_kwargs = {}
+    if to_image_kwargs is None:
+        to_image_kwargs = {}
     if delta is None:
         delta = len(index) // 2
 
     with imageio.get_writer(fname, fps=fps, **writer_kwargs) as writer:
-        for i in tqdm(range(0, len(index) - delta, step), disable=not show_progress):
+        for i in tqdm(range(0, len(index) - delta, step), disable=not show_progress, **tqdm_kwargs):
             fig = plot_func(index[i:i + delta], *args, **kwargs)
             if isinstance(fig, (go.Figure, go.FigureWidget)):
-                if to_image_kwargs is None:
-                    to_image_kwargs = {}
                 fig = fig.to_image(format="png", **to_image_kwargs)
             if not isinstance(fig, np.ndarray):
                 fig = imageio.imread(fig)

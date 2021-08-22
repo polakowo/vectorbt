@@ -526,8 +526,10 @@ class Trades(Ranges):
         """Rate of winning trades."""
         win_count = to_1d_array(self.winning.count(group_by=group_by))
         total_count = to_1d_array(self.count(group_by=group_by))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            win_rate = win_count / total_count
         wrap_kwargs = merge_dicts(dict(name_or_index='win_rate'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(win_count / total_count, group_by=group_by, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(win_rate, group_by=group_by, **wrap_kwargs)
 
     @cached_method
     def profit_factor(self, group_by: tp.GroupByLike = None,
@@ -541,7 +543,8 @@ class Trades(Ranges):
         total_win[np.isnan(total_win) & has_values] = 0.
         total_loss[np.isnan(total_loss) & has_values] = 0.
 
-        profit_factor = total_win / np.abs(total_loss)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            profit_factor = total_win / np.abs(total_loss)
         wrap_kwargs = merge_dicts(dict(name_or_index='profit_factor'), wrap_kwargs)
         return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
 

@@ -1849,9 +1849,9 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns.values,
             np.array([
-                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1),
-                (2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (3, 1, 1, 2, 2, 3, 2.0, 1.0, 2.0, 1),
-                (4, 1, 3, 4, 4, 5, 3.0, 1.0, 3.0, 1), (5, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1),
+                (2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (3, 1, 1, 2, 2, 3, 2.0, 1.0, 3.0, 1),
+                (4, 1, 3, 4, 4, 5, 3.0, 1.0, 4.0, 1), (5, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)
             ], dtype=drawdown_dt)
         )
         assert drawdowns.wrapper.freq == day_dt
@@ -1922,7 +1922,7 @@ class TestDrawdowns:
         np.testing.assert_array_equal(
             records_readable['End Value'].values,
             np.array([
-                2., 3., 1., 2., 3., 2.
+                3., 4., 1., 3., 4., 2.
             ])
         )
         np.testing.assert_array_equal(
@@ -1994,11 +1994,11 @@ class TestDrawdowns:
     def test_recovery_return(self):
         np.testing.assert_array_almost_equal(
             drawdowns['a'].recovery_return.values,
-            np.array([1., 2., 0.])
+            np.array([2., 3., 0.])
         )
         np.testing.assert_array_almost_equal(
             drawdowns.recovery_return.values,
-            np.array([1., 2., 0., 1., 2., 1.])
+            np.array([2., 3., 0., 2., 3., 1.])
         )
         pd.testing.assert_frame_equal(
             drawdowns.recovery_return.to_pd(),
@@ -2006,10 +2006,10 @@ class TestDrawdowns:
                 np.array([
                     [np.nan, np.nan, np.nan, np.nan],
                     [np.nan, np.nan, np.nan, np.nan],
-                    [1.0, np.nan, np.nan, np.nan],
-                    [np.nan, 1.0, np.nan, np.nan],
                     [2.0, np.nan, np.nan, np.nan],
-                    [0.0, 2.0, 1.0, np.nan]
+                    [np.nan, 2.0, np.nan, np.nan],
+                    [3.0, np.nan, np.nan, np.nan],
+                    [0.0, 3.0, 1.0, np.nan]
                 ]),
                 index=ts2.index,
                 columns=ts2.columns
@@ -2017,35 +2017,35 @@ class TestDrawdowns:
         )
 
     def test_avg_recovery_return(self):
-        assert drawdowns['a'].avg_recovery_return() == 1.0
+        assert drawdowns['a'].avg_recovery_return() == 1.6666666666666667
         pd.testing.assert_series_equal(
             drawdowns.avg_recovery_return(),
             pd.Series(
-                np.array([1.0, 1.5, 1.0, np.nan]),
+                np.array([1.6666666666666667, 2.5, 1.0, np.nan]),
                 index=wrapper.columns
             ).rename('avg_recovery_return')
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.avg_recovery_return(),
             pd.Series(
-                np.array([1.2, 1.0]),
+                np.array([2.0, 1.0]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('avg_recovery_return')
         )
 
     def test_max_recovery_return(self):
-        assert drawdowns['a'].max_recovery_return() == 2.0
+        assert drawdowns['a'].max_recovery_return() == 3.0
         pd.testing.assert_series_equal(
             drawdowns.max_recovery_return(),
             pd.Series(
-                np.array([2.0, 2.0, 1.0, np.nan]),
+                np.array([3.0, 3.0, 1.0, np.nan]),
                 index=wrapper.columns
             ).rename('max_recovery_return')
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.max_recovery_return(),
             pd.Series(
-                np.array([2.0, 1.0]),
+                np.array([3.0, 1.0]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('max_recovery_return')
         )
@@ -2167,7 +2167,7 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns['a'].recovered.values,
             np.array([
-                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1)
             ], dtype=drawdown_dt)
         )
         record_arrays_close(
@@ -2177,8 +2177,8 @@ class TestDrawdowns:
         record_arrays_close(
             drawdowns.recovered.values,
             np.array([
-                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 2.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 3.0, 1),
-                (3, 1, 1, 2, 2, 3, 2.0, 1.0, 2.0, 1), (4, 1, 3, 4, 4, 5, 3.0, 1.0, 3.0, 1)
+                (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1),
+                (3, 1, 1, 2, 2, 3, 2.0, 1.0, 3.0, 1), (4, 1, 3, 4, 4, 5, 3.0, 1.0, 4.0, 1)
             ], dtype=drawdown_dt)
         )
 
@@ -2260,7 +2260,7 @@ class TestDrawdowns:
                 pd.Timedelta('6 days 00:00:00'), 44.444444444444436, 1.5, 1.0, 0.5,
                 54.166666666666664, pd.Timedelta('2 days 00:00:00'), 25.0, 50.0,
                 pd.Timedelta('0 days 12:00:00'), 66.66666666666666, 58.33333333333333,
-                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 300.0, 250.0,
                 pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
@@ -2274,7 +2274,7 @@ class TestDrawdowns:
                 pd.Timedelta('6 days 00:00:00'), 44.444444444444436, 1.5, 1.0, 0.5,
                 54.166666666666664, pd.Timedelta('2 days 00:00:00'), 25.0, 50.0,
                 pd.Timedelta('0 days 12:00:00'), 69.44444444444444, 62.962962962962955,
-                pd.Timedelta('1 days 16:00:00'), pd.Timedelta('1 days 16:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 16:00:00'), pd.Timedelta('1 days 16:00:00'), 300.0, 250.0,
                 pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
@@ -2287,7 +2287,7 @@ class TestDrawdowns:
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
                 pd.Timedelta('6 days 00:00:00'), 50.0, 3, 2, 1, 75.0, pd.Timedelta('1 days 00:00:00'),
                 0.0, 0.0, pd.Timedelta('0 days 00:00:00'), 66.66666666666666, 58.33333333333333,
-                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 200.0, 150.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 300.0, 250.0,
                 pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=stats_index,
@@ -2300,7 +2300,7 @@ class TestDrawdowns:
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
                 pd.Timedelta('6 days 00:00:00'), 41.66666666666667, 5, 4, 1, 66.66666666666666,
                 58.33333333333333, pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
-                200.0, 150.0, pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
+                300.0, 250.0, pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 1.0
             ],
                 index=pd.Index([
                     'Start', 'End', 'Period', 'Coverage [%]', 'Total Records',
@@ -2496,7 +2496,7 @@ class TestOrders:
     def test_stats(self):
         stats_index = pd.Index([
             'Start', 'End', 'Period', 'Total Records', 'Total Buy Orders', 'Total Sell Orders',
-            'Max Size', 'Min Size', 'Avg Size', 'Avg Buy Size', 'Avg Sell Size',
+            'Min Size', 'Max Size', 'Avg Size', 'Avg Buy Size', 'Avg Sell Size',
             'Avg Buy Price', 'Avg Sell Price', 'Total Fees', 'Min Fees', 'Max Fees',
             'Avg Fees', 'Avg Buy Fees', 'Avg Sell Fees'
         ], dtype='object')
@@ -2504,7 +2504,7 @@ class TestOrders:
             orders.stats(),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), 5.25, 2.75, 2.5, 2.0, 0.10000000000000002,
+                pd.Timedelta('8 days 00:00:00'), 5.25, 2.75, 2.5, 0.10000000000000002, 2.0,
                 0.9333333333333335, 0.9166666666666666, 0.9194444444444446, 4.388888888888889,
                 4.527777777777779, 0.26949999999999996, 0.002, 0.16, 0.051333333333333335,
                 0.050222222222222224, 0.050222222222222224
@@ -2517,7 +2517,7 @@ class TestOrders:
             orders.stats(column='a'),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), 7, 4, 3, 2.0, 0.1, 0.8857142857142858,
+                pd.Timedelta('8 days 00:00:00'), 7, 4, 3, 0.1, 2.0, 0.8857142857142858,
                 1.025, 0.7000000000000001, 4.25, 4.666666666666667, 0.33599999999999997,
                 0.002, 0.16, 0.047999999999999994, 0.057999999999999996, 0.03466666666666667
             ],
@@ -2529,7 +2529,7 @@ class TestOrders:
             orders.stats(column='g1', group_by=group_by),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), 14, 7, 7, 2.0, 0.1, 0.8857142857142858,
+                pd.Timedelta('8 days 00:00:00'), 14, 7, 7, 0.1, 2.0, 0.8857142857142858,
                 0.8857142857142856, 0.8857142857142858, 4.428571428571429, 4.428571428571429,
                 0.672, 0.002, 0.16, 0.048, 0.048, 0.047999999999999994
             ],

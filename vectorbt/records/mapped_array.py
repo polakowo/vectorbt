@@ -578,11 +578,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         `**kwargs` are passed to `MappedArray.copy`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
+        mask_indices = np.flatnonzero(mask)
         return self.copy(
-            mapped_arr=self.values[mask],
-            col_arr=self.col_arr[mask],
-            id_arr=self.id_arr[mask],
-            idx_arr=idx_arr[mask] if idx_arr is not None else None,
+            mapped_arr=np.take(self.values, mask_indices),
+            col_arr=np.take(self.col_arr, mask_indices),
+            id_arr=np.take(self.id_arr, mask_indices),
+            idx_arr=np.take(idx_arr, mask_indices) if idx_arr is not None else None,
             **kwargs
         ).regroup(group_by)
 

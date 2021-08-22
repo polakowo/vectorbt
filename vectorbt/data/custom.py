@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import time
 import warnings
 from functools import wraps
@@ -419,7 +419,8 @@ class BinanceData(Data):
                         end: tp.DatetimeLike = 'now UTC',
                         delay: tp.Optional[float] = 500,
                         limit: int = 500,
-                        show_progress: bool = True) -> tp.Frame:
+                        show_progress: bool = True,
+                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -437,12 +438,15 @@ class BinanceData(Data):
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
+            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
 
         For defaults, see `data.binance` in `vectorbt._settings.settings`.
         """
         if client is None:
             raise ValueError("client must be provided")
 
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {}
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
@@ -464,7 +468,7 @@ class BinanceData(Data):
 
         # Iteratively collect the data
         data: tp.List[list] = []
-        with tqdm(disable=not show_progress) as pbar:
+        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
                 # Fetch the klines for the next interval
@@ -595,7 +599,8 @@ class CCXTData(Data):
                         limit: tp.Optional[int] = 500,
                         retries: int = 3,
                         show_progress: bool = True,
-                        params: tp.Optional[dict] = None) -> tp.Frame:
+                        params: tp.Optional[dict] = None,
+                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -619,6 +624,7 @@ class CCXTData(Data):
             limit (int): The maximum number of returned items.
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
+            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
             params (dict): Exchange-specific key-value parameters.
 
         For defaults, see `data.ccxt` in `vectorbt._settings.settings`.
@@ -629,6 +635,8 @@ class CCXTData(Data):
 
         if config is None:
             config = {}
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {}
         if params is None:
             params = {}
         if isinstance(exchange, str):
@@ -694,7 +702,7 @@ class CCXTData(Data):
 
         # Iteratively collect the data
         data: tp.List[list] = []
-        with tqdm(disable=not show_progress) as pbar:
+        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
                 # Fetch the klines for the next interval

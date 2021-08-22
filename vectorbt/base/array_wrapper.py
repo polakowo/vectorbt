@@ -509,7 +509,7 @@ class ArrayWrapper(Configured, PandasIndexer):
              group_by: tp.GroupByLike = None,
              to_timedelta: bool = False,
              to_index: bool = False,
-             silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
+             silence_warnings: tp.Optional[bool] = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
 
         Runs the following pipeline:
@@ -580,7 +580,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                      group_by: tp.GroupByLike = None,
                      to_timedelta: bool = False,
                      to_index: bool = False,
-                     silence_warnings: tp.Optional[bool] = False) -> tp.MaybeSeriesFrame:
+                     silence_warnings: tp.Optional[bool] = None) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,

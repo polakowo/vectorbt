@@ -683,7 +683,11 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
 
     def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
-        return self.copy(records_arr=self.values[mask], **kwargs).regroup(group_by)
+        mask_indices = np.flatnonzero(mask)
+        return self.copy(
+            records_arr=np.take(self.values, mask_indices),
+            **kwargs
+        ).regroup(group_by)
 
     def map_array(self,
                   a: tp.ArrayLike,

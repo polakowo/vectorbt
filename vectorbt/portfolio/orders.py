@@ -45,8 +45,8 @@ Period                 100 days 00:00:00
 Total Records                        100
 Total Buy Orders                      58
 Total Sell Orders                     42
-Max Size                        0.989877
 Min Size                        0.003033
+Max Size                        0.989877
 Avg Size                        0.508608
 Avg Buy Size                    0.468802
 Avg Sell Size                   0.563577
@@ -71,8 +71,8 @@ Period                 100 days 00:00:00
 Total Records                        200
 Total Buy Orders                     109
 Total Sell Orders                     91
-Max Size                        0.989877
 Min Size                        0.003033
+Max Size                        0.989877
 Avg Size                        0.506279
 Avg Buy Size                    0.472504
 Avg Sell Size                   0.546735
@@ -254,14 +254,14 @@ class Orders(Records):
                 calc_func='sell.count',
                 tags=['orders', 'sell']
             ),
-            max_size=dict(
-                title='Max Size',
-                calc_func='size.max',
-                tags=['orders', 'size']
-            ),
             min_size=dict(
                 title='Min Size',
                 calc_func='size.min',
+                tags=['orders', 'size']
+            ),
+            max_size=dict(
+                title='Max Size',
+                calc_func='size.max',
                 tags=['orders', 'size']
             ),
             avg_size=dict(

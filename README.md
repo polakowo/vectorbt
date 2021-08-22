@@ -534,10 +534,12 @@ Please make sure to update tests as appropriate.
 ## License
 
 This work is [fair-code](http://faircode.io/) distributed under Apache 2.0 with Commons Clause license. 
-The source code is open and everyone (individuals and companies) can use it for free. 
-However, it is not allowed to sell products or services that are mostly just this software.
+The source code is open and everyone (individuals and organizations) can use it for free. 
+However, it is not allowed to sell products and services that are mostly just this software.
 
-Installing optional dependencies may be subject to a more restrictive license.
+If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
+
+Installing optional dependencies may be subject to a more unrestrictive license.
 
 ## Disclaimer
 

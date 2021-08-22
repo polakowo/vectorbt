@@ -499,7 +499,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 _silence_warnings = final_kwargs.get('silence_warnings')
                 title = final_kwargs.pop('title', subplot_name)
                 plot_func = final_kwargs.pop('plot_func', None)
-                xaxis_title = final_kwargs.pop('xaxis_title', 'Date')
+                xaxis_title = final_kwargs.pop('xaxis_title', 'Time')
                 yaxis_title = final_kwargs.pop('yaxis_title', title)
                 resolve_plot_func = final_kwargs.pop('resolve_plot_func', True)
                 use_caching = final_kwargs.pop('use_caching', True)
@@ -515,9 +515,10 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                                               args: tp.ArgsLike = None,
                                               kwargs: tp.KwargsLike = None,
                                               call_attr: bool = True,
+                                              _final_kwargs: tp.Kwargs = final_kwargs,
+                                              _opt_arg_names: tp.Set[str] = opt_arg_names,
                                               _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                              _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
+                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
                                 if args is None:
                                     args = ()
                                 if kwargs is None:
@@ -527,7 +528,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                                         return custom_reself.resolve_attr(
                                             attr,
                                             args=args,
-                                            cond_kwargs=_final_kwargs,
+                                            cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
                                             kwargs=kwargs,
                                             custom_arg_names=_custom_arg_names,
                                             cache_dct=_arg_cache_dct,

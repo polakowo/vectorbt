@@ -3998,8 +3998,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
         value = self.value(group_by=group_by, wrap_kwargs=wrap_kwargs)
+        wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
         return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Assets ############# #

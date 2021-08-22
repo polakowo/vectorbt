@@ -33,8 +33,8 @@ Using `Drawdowns.from_ts`, you can generate drawdown records for any time series
 2 2019-12-17 00:00:00+00:00 2020-01-01 00:00:00+00:00  9551.714844
 
    Valley Value    End Value     Status
-0   7988.155762  8393.041992  Recovered
-1   7493.488770  8595.740234  Recovered
+0   7988.155762  8595.740234  Recovered
+1   7493.488770  8660.700195  Recovered
 2   6640.515137  7200.174316     Active
 
 >>> drawdowns.duration.max(wrap_kwargs=dict(to_timedelta=True))
@@ -81,8 +81,8 @@ Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
 Max Drawdown Duration          1 days 00:00:00
 Avg Drawdown Duration          1 days 00:00:00
-Max Recovery Return [%]                  100.0
-Avg Recovery Return [%]                  100.0
+Max Recovery Return [%]                  200.0
+Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
 Avg Recovery Duration Ratio                1.0
@@ -110,8 +110,8 @@ Max Drawdown [%]                          50.0
 Avg Drawdown [%]                     41.666667
 Max Drawdown Duration          1 days 00:00:00
 Avg Drawdown Duration          1 days 00:00:00
-Max Recovery Return [%]                  100.0
-Avg Recovery Return [%]                  100.0
+Max Recovery Return [%]                  200.0
+Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
 Avg Recovery Duration Ratio                1.0
@@ -139,8 +139,8 @@ Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
 Max Drawdown Duration          1 days 00:00:00
 Avg Drawdown Duration          1 days 00:00:00
-Max Recovery Return [%]                  100.0
-Avg Recovery Return [%]                  100.0
+Max Recovery Return [%]                  200.0
+Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
 Avg Recovery Duration Ratio                1.0
@@ -710,19 +710,28 @@ class Drawdowns(Ranges):
             peak_idx = self_col.resolve_map_field_to_index('peak_idx')
             peak_idx_title = self_col.resolve_field_title('peak_idx')
 
-            peak_val = self_col.resolve_field_arr('peak_val')
+            if self_col.ts is not None:
+                peak_val = self_col.ts.loc[peak_idx]
+            else:
+                peak_val = self_col.resolve_field_arr('peak_val')
             peak_val_title = self_col.resolve_field_title('peak_val')
 
             valley_idx = self_col.resolve_map_field_to_index('valley_idx')
             valley_idx_title = self_col.resolve_field_title('valley_idx')
 
-            valley_val = self_col.resolve_field_arr('valley_val')
+            if self_col.ts is not None:
+                valley_val = self_col.ts.loc[valley_idx]
+            else:
+                valley_val = self_col.resolve_field_arr('valley_val')
             valley_val_title = self_col.resolve_field_title('valley_val')
 
             end_idx = self_col.resolve_map_field_to_index('end_idx')
             end_idx_title = self_col.resolve_field_title('end_idx')
 
-            end_val = self_col.resolve_field_arr('end_val')
+            if self_col.ts is not None:
+                end_val = self_col.ts.loc[end_idx]
+            else:
+                end_val = self_col.resolve_field_arr('end_val')
             end_val_title = self_col.resolve_field_title('end_val')
 
             drawdown = self_col.drawdown.values

@@ -1615,7 +1615,6 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
         valley_idx = -1
         peak_val = ts[0, col]
         valley_val = ts[0, col]
-        end_val = np.nan
         store_record = False
         status = -1
 
@@ -1634,7 +1633,6 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                         if cur_val >= peak_val:
                             drawdown_started = False
                             store_record = True
-                            end_val = peak_val
                             status = DrawdownStatus.Recovered
                 else:
                     # Value decreased
@@ -1653,7 +1651,6 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                     # If still running, mark for save
                     drawdown_started = False
                     store_record = True
-                    end_val = cur_val
                     status = DrawdownStatus.Active
 
                 if store_record:
@@ -1666,7 +1663,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                     out[ddidx]['end_idx'] = i
                     out[ddidx]['peak_val'] = peak_val
                     out[ddidx]['valley_val'] = valley_val
-                    out[ddidx]['end_val'] = end_val
+                    out[ddidx]['end_val'] = cur_val
                     out[ddidx]['status'] = status
                     ddidx += 1
 
