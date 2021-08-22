@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Ultimate Python library for time series analysis and backtesting at scale.
 
 While there are many great backtesting packages for Python, vectorbt combines an extremely fast backtester 

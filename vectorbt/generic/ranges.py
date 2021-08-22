@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Base class for working with range records.
 
 Range records capture information on ranges. They are useful for analyzing duration of processes,

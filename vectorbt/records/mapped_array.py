@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Base class for working with mapped arrays.
 
 This class takes the mapped array and the corresponding column and (optionally) index arrays,

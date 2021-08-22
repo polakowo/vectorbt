@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Class that exposes methods to group columns.
 
 Class `ColumnGrouper` stores metadata related to grouping columns. It can return, for example,

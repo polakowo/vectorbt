@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Modules for working with records.
 
 Records are the second form of data representation in vectorbt. They allow storing sparse event data

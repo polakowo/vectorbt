@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for constructing and displaying figures."""
 
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget

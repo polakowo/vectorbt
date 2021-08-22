@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Functions for working with index/columns.
 
 Index functions perform operations on index objects, such as stacking, combining,

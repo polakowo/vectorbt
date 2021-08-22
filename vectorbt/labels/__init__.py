@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Modules for building and running look-ahead indicators and label generators."""
 
 from vectorbt.labels.enums import *

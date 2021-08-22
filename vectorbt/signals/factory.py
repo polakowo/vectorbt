@@ -1,3 +1,6 @@
+# Copyright 2021 Oleg Polakow
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """A factory for building new signal generators with ease.
 
 The signal factory class `SignalFactory` extends `vectorbt.indicators.factory.IndicatorFactory`
