@@ -567,7 +567,7 @@ def first_choice_nb(from_i: int, to_i: int, col: int, a: tp.Array2d) -> tp.Array
 def stop_choice_nb(from_i: int,
                    to_i: int,
                    col: int,
-                   ts: tp.Array,
+                   ts: tp.ArrayLike,
                    stop: tp.MaybeArray[float],
                    trailing: tp.MaybeArray[bool],
                    wait: int,
@@ -596,14 +596,13 @@ def stop_choice_nb(from_i: int,
         pick_first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
         flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`."""
-    stops = np.asarray(stop)
-    trailings = np.asarray(trailing)
-
     j = 0
     init_i = from_i - wait
     init_ts = flex_select_auto_nb(ts, init_i, col, flex_2d)
-    init_stop = flex_select_auto_nb(stops, init_i, col, flex_2d)
-    init_trailing = flex_select_auto_nb(trailings, init_i, col, flex_2d)
+    init_stop = flex_select_auto_nb(np.asarray(stop), init_i, col, flex_2d)
+    if init_stop == 0:
+        raise ValueError("Stop cannot be 0")
+    init_trailing = flex_select_auto_nb(np.asarray(trailing), init_i, col, flex_2d)
     max_high = min_low = init_ts
 
     for i in range(from_i, to_i):
@@ -642,7 +641,7 @@ def stop_choice_nb(from_i: int,
 
 @njit
 def generate_stop_ex_nb(entries: tp.Array2d,
-                        ts: tp.Array,
+                        ts: tp.ArrayLike,
                         stop: tp.MaybeArray[float],
                         trailing: tp.MaybeArray[bool],
                         wait: int,
@@ -727,15 +726,16 @@ def generate_stop_enex_nb(entries: tp.Array2d,
 def ohlc_stop_choice_nb(from_i: int,
                         to_i: int,
                         col: int,
-                        open: tp.Array,
-                        high: tp.Array,
-                        low: tp.Array,
-                        close: tp.Array,
+                        open: tp.ArrayLike,
+                        high: tp.ArrayLike,
+                        low: tp.ArrayLike,
+                        close: tp.ArrayLike,
                         stop_price_out: tp.Array2d,
                         stop_type_out: tp.Array2d,
                         sl_stop: tp.MaybeArray[float],
                         sl_trail: tp.MaybeArray[bool],
                         tp_stop: tp.MaybeArray[float],
+                        reverse: tp.MaybeArray[bool],
                         is_open_safe: bool,
                         wait: int,
                         pick_first: bool,
@@ -773,6 +773,7 @@ def ohlc_stop_choice_nb(from_i: int,
         tp_stop (float or array_like): Percentage value for take profit.
 
             Can be per frame, column, row, or element-wise. Set to `np.nan` to disable.
+        reverse (bool or array_like): Whether to do the opposite, i.e.: prices are followed downwards.
         is_open_safe (bool): Whether entry price comes right at or before open.
 
             If True and wait is 0, can use high/low at entry bar. Otherwise uses only close.
@@ -787,16 +788,17 @@ def ohlc_stop_choice_nb(from_i: int,
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
         flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`.
     """
-    sl_stops = np.asarray(sl_stop)
-    sl_trails = np.asarray(sl_trail)
-    tp_stops = np.asarray(tp_stop)
-
     init_i = from_i - wait
     init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
-    init_sl_stop = abs(flex_select_auto_nb(sl_stops, init_i, col, flex_2d))
-    init_sl_trail = abs(flex_select_auto_nb(sl_trails, init_i, col, flex_2d))
-    init_tp_stop = abs(flex_select_auto_nb(tp_stops, init_i, col, flex_2d))
-    max_p = init_open
+    init_sl_stop = flex_select_auto_nb(np.asarray(sl_stop), init_i, col, flex_2d)
+    if init_sl_stop <= 0:
+        raise ValueError("SL stop must greater than 0")
+    init_sl_trail = flex_select_auto_nb(np.asarray(sl_trail), init_i, col, flex_2d)
+    init_tp_stop = flex_select_auto_nb(np.asarray(tp_stop), init_i, col, flex_2d)
+    if init_tp_stop <= 0:
+        raise ValueError("TP stop must greater than 0")
+    init_reverse = flex_select_auto_nb(np.asarray(reverse), init_i, col, flex_2d)
+    max_p = min_p = init_open
     j = 0
 
     for i in range(from_i, to_i):
@@ -815,11 +817,20 @@ def ohlc_stop_choice_nb(from_i: int,
         # Calculate stop price
         if not np.isnan(init_sl_stop):
             if init_sl_trail:
-                curr_sl_stop_price = max_p * (1 - init_sl_stop)
+                if init_reverse:
+                    curr_sl_stop_price = min_p * (1 + init_sl_stop)
+                else:
+                    curr_sl_stop_price = max_p * (1 - init_sl_stop)
             else:
-                curr_sl_stop_price = init_open * (1 - init_sl_stop)
+                if init_reverse:
+                    curr_sl_stop_price = init_open * (1 + init_sl_stop)
+                else:
+                    curr_sl_stop_price = init_open * (1 - init_sl_stop)
         if not np.isnan(init_tp_stop):
-            curr_tp_stop_price = init_open * (1 + init_tp_stop)
+            if init_reverse:
+                curr_tp_stop_price = init_open * (1 - init_tp_stop)
+            else:
+                curr_tp_stop_price = init_open * (1 + init_tp_stop)
 
         # Check if stop price is within bar
         if i > init_i or is_open_safe:
@@ -833,7 +844,8 @@ def ohlc_stop_choice_nb(from_i: int,
 
         exit_signal = False
         if not np.isnan(init_sl_stop):
-            if curr_low <= curr_sl_stop_price:
+            if (not init_reverse and curr_low <= curr_sl_stop_price) or \
+                    (init_reverse and curr_high >= curr_sl_stop_price):
                 exit_signal = True
                 stop_price_out[i, col] = curr_sl_stop_price
                 if init_sl_trail:
@@ -841,7 +853,8 @@ def ohlc_stop_choice_nb(from_i: int,
                 else:
                     stop_type_out[i, col] = StopType.StopLoss
         if not exit_signal and not np.isnan(init_tp_stop):
-            if curr_high >= curr_tp_stop_price:
+            if (not init_reverse and curr_high >= curr_tp_stop_price) or \
+                    (init_reverse and curr_low <= curr_tp_stop_price):
                 exit_signal = True
                 stop_price_out[i, col] = curr_tp_stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
@@ -853,6 +866,8 @@ def ohlc_stop_choice_nb(from_i: int,
 
         # Keep track of highest high if trailing
         if init_sl_trail:
+            if curr_low < min_p:
+                min_p = curr_low
             if curr_high > max_p:
                 max_p = curr_high
 
@@ -861,15 +876,16 @@ def ohlc_stop_choice_nb(from_i: int,
 
 @njit
 def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
-                             open: tp.Array,
-                             high: tp.Array,
-                             low: tp.Array,
-                             close: tp.Array,
+                             open: tp.ArrayLike,
+                             high: tp.ArrayLike,
+                             low: tp.ArrayLike,
+                             close: tp.ArrayLike,
                              stop_price_out: tp.Array2d,
                              stop_type_out: tp.Array2d,
                              sl_stop: tp.MaybeArray[float],
                              sl_trail: tp.MaybeArray[bool],
                              tp_stop: tp.MaybeArray[float],
+                             reverse: tp.MaybeArray[bool],
                              is_open_safe: bool,
                              wait: int,
                              until_next: bool,
@@ -905,6 +921,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
     ...     sl_stop=0.1,
     ...     sl_trail=True,
     ...     tp_stop=0.1,
+    ...     reverse=False,
     ...     is_open_safe=True,
     ...     wait=1,
     ...     until_next=True,
@@ -954,6 +971,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         sl_stop,
         sl_trail,
         tp_stop,
+        reverse,
         is_open_safe,
         wait,
         pick_first,
@@ -964,15 +982,16 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
 
 @njit
 def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
-                               open: tp.Array,
-                               high: tp.Array,
-                               low: tp.Array,
-                               close: tp.Array,
+                               open: tp.ArrayLike,
+                               high: tp.ArrayLike,
+                               low: tp.ArrayLike,
+                               close: tp.ArrayLike,
                                stop_price_out: tp.Array2d,
                                stop_type_out: tp.Array2d,
                                sl_stop: tp.MaybeArray[float],
                                sl_trail: tp.MaybeArray[bool],
                                tp_stop: tp.MaybeArray[float],
+                               reverse: tp.MaybeArray[bool],
                                is_open_safe: bool,
                                entry_wait: int,
                                exit_wait: int,
@@ -1003,6 +1022,7 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
             sl_stop,
             sl_trail,
             tp_stop,
+            reverse,
             is_open_safe,
             exit_wait,
             pick_first,

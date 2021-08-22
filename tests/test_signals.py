@@ -1056,6 +1056,9 @@ class TestAccessors:
         e = pd.Series([True, False, False, False, False, False])
         t = pd.Series([2, 3, 4, 3, 2, 1]).astype(np.float64)
 
+        with pytest.raises(Exception):
+            _ = e.vbt.signals.generate_stop_exits(t, 0)
+
         # stop loss
         pd.testing.assert_series_equal(
             e.vbt.signals.generate_stop_exits(t, -0.1),
@@ -1151,6 +1154,15 @@ class TestAccessors:
         )
 
     def test_generate_ohlc_stop_exits(self):
+        with pytest.raises(Exception):
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0)
+        with pytest.raises(Exception):
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1)
+        with pytest.raises(Exception):
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0)
+        with pytest.raises(Exception):
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
+
         pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_stop_exits(ts, -0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1)
@@ -1162,6 +1174,18 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_stop_exits(ts, 0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1)
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_stop_exits(ts, 0.1),
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, reverse=True)
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_stop_exits(ts, 0.1, trailing=True),
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True, reverse=True)
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_stop_exits(ts, -0.1),
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, reverse=True)
         )
 
         def _test_ohlc_stop_exits(**kwargs):
@@ -3056,6 +3080,16 @@ class TestGenerators:
                 (np.nan, False, 0.1, 'c')
             ], names=['ohlcstx_sl_stop', 'ohlcstx_sl_trail', 'ohlcstx_tp_stop', None])
             )
+        )
+        np.testing.assert_array_equal(
+            vbt.OHLCSTX.run(
+                mask, price['open'], price['high'], price['low'], price['close'],
+                sl_stop=[0.1, np.nan], sl_trail=False, tp_stop=[np.nan, 0.1], reverse=False
+            ).exits.values,
+            vbt.OHLCSTX.run(
+                mask, price['open'], price['high'], price['low'], price['close'],
+                sl_stop=[np.nan, 0.1], sl_trail=False, tp_stop=[0.1, np.nan], reverse=True
+            ).exits.values
         )
 
     def test_OHLCSTCX(self):

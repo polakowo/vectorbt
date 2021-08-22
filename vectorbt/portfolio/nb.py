@@ -2279,8 +2279,12 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                     new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
                                 _sl_stop = flex_select_auto_nb(sl_stop, i, col, flex_2d)
+                                if _sl_stop <= 0:
+                                    raise ValueError("SL stop must greater than 0")
                                 _sl_trail = flex_select_auto_nb(sl_trail, i, col, flex_2d)
                                 _tp_stop = flex_select_auto_nb(tp_stop, i, col, flex_2d)
+                                if _tp_stop <= 0:
+                                    raise ValueError("TP stop must greater than 0")
 
                                 if state.position == 0 or np.sign(position_now) != np.sign(state.position):
                                     # Position opened/reversed -> set stops

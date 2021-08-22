@@ -753,8 +753,6 @@ class SignalsAccessor(GenericAccessor):
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, ts, stop, trailing = reshape_fns.broadcast(
             entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
-        if np.any(stop == 0):
-            warnings.warn("At least one stop value is 0", stacklevel=2)
 
         # Perform generation
         if chain:
@@ -793,9 +791,10 @@ class SignalsAccessor(GenericAccessor):
                                  close: tp.Optional[tp.ArrayLike] = None,
                                  is_open_safe: bool = True,
                                  out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
-                                 sl_stop: tp.Optional[tp.ArrayLike] = np.nan,
-                                 sl_trail: tp.Optional[tp.ArrayLike] = False,
-                                 tp_stop: tp.Optional[tp.ArrayLike] = np.nan,
+                                 sl_stop: tp.ArrayLike = np.nan,
+                                 sl_trail: tp.ArrayLike = False,
+                                 tp_stop: tp.ArrayLike = np.nan,
+                                 reverse: tp.ArrayLike = False,
                                  entry_wait: int = 1,
                                  exit_wait: int = 1,
                                  until_next: bool = True,
@@ -968,15 +967,11 @@ class SignalsAccessor(GenericAccessor):
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
-        keep_raw = (False, True, True, True, True, True, True, True) + (False,) * len(out_args)
+        keep_raw = (False, True, True, True, True, True, True, True, True) + (False,) * len(out_args)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args = reshape_fns.broadcast(
-            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args,
+        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args = reshape_fns.broadcast(
+            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args,
             **broadcast_kwargs, keep_raw=keep_raw)
-        if np.any(sl_stop == 0):
-            warnings.warn("At least one SL stop value is 0", stacklevel=2)
-        if np.any(tp_stop == 0):
-            warnings.warn("At least one TP stop value is 0", stacklevel=2)
         if stop_price_out is None:
             stop_price_out = np.empty_like(entries, dtype=np.float_)
         else:
@@ -1002,6 +997,7 @@ class SignalsAccessor(GenericAccessor):
                 sl_stop,
                 sl_trail,
                 tp_stop,
+                reverse,
                 is_open_safe,
                 entry_wait,
                 exit_wait,
@@ -1028,6 +1024,7 @@ class SignalsAccessor(GenericAccessor):
                 sl_stop,
                 sl_trail,
                 tp_stop,
+                reverse,
                 is_open_safe,
                 exit_wait,
                 until_next,
