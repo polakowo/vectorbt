@@ -539,7 +539,7 @@ However, it is not allowed to sell products and services that are mostly just th
 
 If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
 
-Installing optional dependencies may be subject to a more unrestrictive license.
+Installing optional dependencies may be subject to a more restrictive license.
 
 ## Disclaimer
 
