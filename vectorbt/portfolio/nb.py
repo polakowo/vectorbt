@@ -1193,6 +1193,7 @@ def update_pos_record_nb(record: tp.Record,
             else:
                 record['direction'] = TradeDirection.Short
             record['status'] = TradeStatus.Open
+            record['parent_id'] = record['id']
         elif position_before != 0 and position_now == 0:
             # Position closed
             record['exit_idx'] = i
@@ -1232,6 +1233,7 @@ def update_pos_record_nb(record: tp.Record,
             else:
                 record['direction'] = TradeDirection.Short
             record['status'] = TradeStatus.Open
+            record['parent_id'] = record['id']
         else:
             # Position changed
             if abs(position_before) <= abs(position_now):
@@ -2279,12 +2281,8 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                     new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
                                 _sl_stop = flex_select_auto_nb(sl_stop, i, col, flex_2d)
-                                if _sl_stop <= 0:
-                                    raise ValueError("SL stop must greater than 0")
                                 _sl_trail = flex_select_auto_nb(sl_trail, i, col, flex_2d)
                                 _tp_stop = flex_select_auto_nb(tp_stop, i, col, flex_2d)
-                                if _tp_stop <= 0:
-                                    raise ValueError("TP stop must greater than 0")
 
                                 if state.position == 0 or np.sign(position_now) != np.sign(state.position):
                                     # Position opened/reversed -> set stops
@@ -2763,7 +2761,7 @@ def simulate_nb(target_shape: tp.Shape,
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -3395,7 +3393,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -4102,7 +4100,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -4635,7 +4633,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -5117,6 +5115,617 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
 
 # ############# Trade records ############# #
 
+size_zero_neg_err = "Found order with size 0 or less"
+price_zero_neg_err = "Found order with price 0 or less"
+
+
+@njit(cache=True)
+def get_trade_stats_nb(size: float,
+                       entry_price: float,
+                       entry_fees: float,
+                       exit_price: float,
+                       exit_fees: float,
+                       direction: int) -> tp.Tuple[float, float]:
+    """Get trade statistics."""
+    entry_val = size * entry_price
+    exit_val = size * exit_price
+    val_diff = add_nb(exit_val, -entry_val)
+    if val_diff != 0 and direction == TradeDirection.Short:
+        val_diff *= -1
+    pnl = val_diff - entry_fees - exit_fees
+    ret = pnl / entry_val
+    return pnl, ret
+
+
+@njit(cache=True)
+def fill_trade_record_nb(record: tp.Record,
+                         id_: int,
+                         col: int,
+                         size: float,
+                         entry_idx: int,
+                         entry_price: float,
+                         entry_fees: float,
+                         exit_idx: int,
+                         exit_price: float,
+                         exit_fees: float,
+                         direction: int,
+                         status: int,
+                         parent_id: int) -> None:
+    """Fill a trade record."""
+    # Calculate PnL and return
+    pnl, ret = get_trade_stats_nb(
+        size,
+        entry_price,
+        entry_fees,
+        exit_price,
+        exit_fees,
+        direction
+    )
+
+    # Save trade
+    record['id'] = id_
+    record['col'] = col
+    record['size'] = size
+    record['entry_idx'] = entry_idx
+    record['entry_price'] = entry_price
+    record['entry_fees'] = entry_fees
+    record['exit_idx'] = exit_idx
+    record['exit_price'] = exit_price
+    record['exit_fees'] = exit_fees
+    record['pnl'] = pnl
+    record['return'] = ret
+    record['direction'] = direction
+    record['status'] = status
+    record['parent_id'] = parent_id
+
+
+@njit(cache=True)
+def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
+                                     col_map: tp.ColMap,
+                                     col: int,
+                                     first_c: int,
+                                     last_c: int,
+                                     first_entry_size: float,
+                                     first_entry_fees: float,
+                                     exit_idx: int,
+                                     exit_size_sum: float,
+                                     exit_gross_sum: float,
+                                     exit_fees_sum: float,
+                                     direction: int,
+                                     status: int,
+                                     parent_id: int,
+                                     trade_records: tp.RecordArray,
+                                     tidx: int) -> int:
+    """Fill entry trades located within a single position."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+
+    # Iterate over orders located within a single position
+    for c in range(first_c, last_c + 1):
+        oidx = col_idxs[col_start_idxs[col] + c]
+        record = order_records[oidx]
+        order_side = record['side']
+
+        # Ignore exit orders
+        if (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
+                or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+            continue
+
+        if c == first_c:
+            entry_size = first_entry_size
+            entry_fees = first_entry_fees
+        else:
+            entry_size = record['size']
+            entry_fees = record['fees']
+
+        # Take a size-weighted average of exit price
+        exit_price = exit_gross_sum / exit_size_sum
+
+        # Take a fraction of exit fees
+        size_fraction = entry_size / exit_size_sum
+        exit_fees = size_fraction * exit_fees_sum
+
+        # Fill the record
+        fill_trade_record_nb(
+            trade_records[tidx],
+            tidx,
+            col,
+            entry_size,
+            record['idx'],
+            record['price'],
+            entry_fees,
+            exit_idx,
+            exit_price,
+            exit_fees,
+            direction,
+            status,
+            parent_id
+        )
+        tidx += 1
+
+    return tidx
+
+
+@njit(cache=True)
+def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map: tp.ColMap) -> tp.RecordArray:
+    """Fill entry trade records by aggregating order records.
+
+    Entry trade records are buy orders in a long position and sell orders in a short position.
+
+    ## Example
+
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from numba import njit
+    >>> from vectorbt.records.nb import col_map_nb
+    >>> from vectorbt.portfolio.nb import simulate_from_orders_nb, get_entry_trades_nb
+
+    >>> close = order_price = np.array([
+    ...     [1, 6],
+    ...     [2, 5],
+    ...     [3, 4],
+    ...     [4, 3],
+    ...     [5, 2],
+    ...     [6, 1]
+    ... ])
+    >>> size = np.asarray([
+    ...     [1, -1],
+    ...     [0.1, -0.1],
+    ...     [-1, 1],
+    ...     [-0.1, 0.1],
+    ...     [1, -1],
+    ...     [-2, 2]
+    ... ])
+    >>> target_shape = close.shape
+    >>> group_lens = np.full(target_shape[1], 1)
+    >>> init_cash = np.full(target_shape[1], 100)
+    >>> call_seq = np.full(target_shape, 0)
+
+    >>> order_records, log_records = simulate_from_orders_nb(
+    ...     target_shape,
+    ...     group_lens,
+    ...     init_cash,
+    ...     call_seq,
+    ...     size=size,
+    ...     price=close,
+    ...     fees=np.asarray(0.01),
+    ...     slippage=np.asarray(0.01)
+    ... )
+
+    >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+    >>> entry_trade_records = get_entry_trades_nb(order_records, close, col_map)
+    >>> pd.DataFrame.from_records(entry_trade_records)
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.0          0         1.01     0.01010         3    3.060000
+    1   1    0   0.1          1         2.02     0.00202         3    3.060000
+    2   2    0   1.0          4         5.05     0.05050         5    5.940000
+    3   3    0   1.0          5         5.94     0.05940         5    6.000000
+    4   4    1   1.0          0         5.94     0.05940         3    3.948182
+    5   5    1   0.1          1         4.95     0.00495         3    3.948182
+    6   6    1   1.0          4         1.98     0.01980         5    1.010000
+    7   7    1   1.0          5         1.01     0.01010         5    1.000000
+
+       exit_fees       pnl    return  direction  status  parent_id
+    0   0.030600  2.009300  1.989406          0       1          0
+    1   0.003060  0.098920  0.489703          0       1          0
+    2   0.059400  0.780100  0.154475          0       1          1
+    3   0.000000 -0.119400 -0.020101          1       0          2
+    4   0.039482  1.892936  0.318676          1       1          3
+    5   0.003948  0.091284  0.184411          1       1          3
+    6   0.010100  0.940100  0.474798          1       1          4
+    7   0.000000 -0.020100 -0.019901          0       0          5
+    ```"""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    records = np.empty(len(order_records), dtype=trade_dt)
+    tidx = 0
+    parent_id = -1
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        last_id = -1
+        in_position = False
+
+        for c in range(col_len):
+            oidx = col_idxs[col_start_idxs[col] + c]
+            record = order_records[oidx]
+
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
+
+            order_idx = record['idx']
+            order_size = record['size']
+            order_price = record['price']
+            order_fees = record['fees']
+            order_side = record['side']
+
+            if order_size <= 0.:
+                raise ValueError(size_zero_neg_err)
+            if order_price <= 0.:
+                raise ValueError(price_zero_neg_err)
+
+            if not in_position:
+                # New position opened
+                first_c = c
+                in_position = True
+                parent_id += 1
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                entry_size_sum = 0.
+                entry_gross_sum = 0.
+                entry_fees_sum = 0.
+                exit_size_sum = 0.
+                exit_gross_sum = 0.
+                exit_fees_sum = 0.
+                first_entry_size = order_size
+                first_entry_fees = order_fees
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+                entry_fees_sum += order_fees
+
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+                if is_close_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position closed
+                    last_c = c
+                    in_position = False
+                    exit_size_sum = entry_size_sum
+                    exit_gross_sum += order_size * order_price
+                    exit_fees_sum += order_fees
+
+                    # Fill trade records
+                    tidx = fill_entry_trades_in_position_nb(
+                        order_records,
+                        col_map,
+                        col,
+                        first_c,
+                        last_c,
+                        first_entry_size,
+                        first_entry_fees,
+                        order_idx,
+                        exit_size_sum,
+                        exit_gross_sum,
+                        exit_fees_sum,
+                        direction,
+                        TradeStatus.Closed,
+                        parent_id,
+                        records,
+                        tidx
+                    )
+                elif is_less_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position decreased
+                    exit_size_sum += order_size
+                    exit_gross_sum += order_size * order_price
+                    exit_fees_sum += order_fees
+                else:
+                    # Position closed
+                    last_c = c
+                    remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+                    exit_size_sum = entry_size_sum
+                    exit_gross_sum += remaining_size * order_price
+                    exit_fees_sum += remaining_size / order_size * order_fees
+
+                    # Fill trade records
+                    tidx = fill_entry_trades_in_position_nb(
+                        order_records,
+                        col_map,
+                        col,
+                        first_c,
+                        last_c,
+                        first_entry_size,
+                        first_entry_fees,
+                        order_idx,
+                        exit_size_sum,
+                        exit_gross_sum,
+                        exit_fees_sum,
+                        direction,
+                        TradeStatus.Closed,
+                        parent_id,
+                        records,
+                        tidx
+                    )
+
+                    # New position opened
+                    first_c = c
+                    parent_id += 1
+                    if order_side == OrderSide.Buy:
+                        direction = TradeDirection.Long
+                    else:
+                        direction = TradeDirection.Short
+                    entry_size_sum = add_nb(order_size, -remaining_size)
+                    entry_gross_sum = entry_size_sum * order_price
+                    entry_fees_sum = entry_size_sum / order_size * order_fees
+                    first_entry_size = entry_size_sum
+                    first_entry_fees = entry_fees_sum
+                    exit_size_sum = 0.
+                    exit_gross_sum = 0.
+                    exit_fees_sum = 0.
+
+        if in_position and is_less_nb(exit_size_sum, entry_size_sum):
+            # Position hasn't been closed
+            last_c = col_len - 1
+            remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+            exit_size_sum = entry_size_sum
+            exit_gross_sum += remaining_size * close[close.shape[0] - 1, col]
+
+            # Fill trade records
+            tidx = fill_entry_trades_in_position_nb(
+                order_records,
+                col_map,
+                col,
+                first_c,
+                last_c,
+                first_entry_size,
+                first_entry_fees,
+                close.shape[0] - 1,
+                exit_size_sum,
+                exit_gross_sum,
+                exit_fees_sum,
+                direction,
+                TradeStatus.Open,
+                parent_id,
+                records,
+                tidx
+            )
+
+    return records[:tidx]
+
+
+@njit(cache=True)
+def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map: tp.ColMap) -> tp.RecordArray:
+    """Fill exit trade records by aggregating order records.
+
+    Exit trade records are sell orders in a long position and buy orders in a short position.
+
+    ## Example
+
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from numba import njit
+    >>> from vectorbt.records.nb import col_map_nb
+    >>> from vectorbt.portfolio.nb import simulate_from_orders_nb, get_exit_trades_nb
+
+    >>> close = order_price = np.array([
+    ...     [1, 6],
+    ...     [2, 5],
+    ...     [3, 4],
+    ...     [4, 3],
+    ...     [5, 2],
+    ...     [6, 1]
+    ... ])
+    >>> size = np.asarray([
+    ...     [1, -1],
+    ...     [0.1, -0.1],
+    ...     [-1, 1],
+    ...     [-0.1, 0.1],
+    ...     [1, -1],
+    ...     [-2, 2]
+    ... ])
+    >>> target_shape = close.shape
+    >>> group_lens = np.full(target_shape[1], 1)
+    >>> init_cash = np.full(target_shape[1], 100)
+    >>> call_seq = np.full(target_shape, 0)
+
+    >>> order_records, log_records = simulate_from_orders_nb(
+    ...     target_shape,
+    ...     group_lens,
+    ...     init_cash,
+    ...     call_seq,
+    ...     size=size,
+    ...     price=close,
+    ...     fees=np.asarray(0.01),
+    ...     slippage=np.asarray(0.01)
+    ... )
+
+    >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+    >>> exit_trade_records = get_exit_trades_nb(order_records, close, col_map)
+    >>> pd.DataFrame.from_records(exit_trade_records)
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.0          0     1.101818    0.011018         2        2.97
+    1   1    0   0.1          0     1.101818    0.001102         3        3.96
+    2   2    0   1.0          4     5.050000    0.050500         5        5.94
+    3   3    0   1.0          5     5.940000    0.059400         5        6.00
+    4   4    1   1.0          0     5.850000    0.058500         2        4.04
+    5   5    1   0.1          0     5.850000    0.005850         3        3.03
+    6   6    1   1.0          4     1.980000    0.019800         5        1.01
+    7   7    1   1.0          5     1.010000    0.010100         5        1.00
+
+       exit_fees       pnl    return  direction  status  parent_id
+    0    0.02970  1.827464  1.658589          0       1          0
+    1    0.00396  0.280756  2.548119          0       1          0
+    2    0.05940  0.780100  0.154475          0       1          1
+    3    0.00000 -0.119400 -0.020101          1       0          2
+    4    0.04040  1.711100  0.292496          1       1          3
+    5    0.00303  0.273120  0.466872          1       1          3
+    6    0.01010  0.940100  0.474798          1       1          4
+    7    0.00000 -0.020100 -0.019901          0       0          5
+    ```"""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    records = np.empty(len(order_records), dtype=trade_dt)
+    tidx = 0
+    parent_id = -1
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        last_id = -1
+        in_position = False
+
+        for c in range(col_len):
+            oidx = col_idxs[col_start_idxs[col] + c]
+            record = order_records[oidx]
+
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
+
+            i = record['idx']
+            order_size = record['size']
+            order_price = record['price']
+            order_fees = record['fees']
+            order_side = record['side']
+
+            if order_size <= 0.:
+                raise ValueError(size_zero_neg_err)
+            if order_price <= 0.:
+                raise ValueError(price_zero_neg_err)
+
+            if not in_position:
+                # Trade opened
+                in_position = True
+                entry_idx = i
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                parent_id += 1
+                entry_size_sum = 0.
+                entry_gross_sum = 0.
+                entry_fees_sum = 0.
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+                entry_fees_sum += order_fees
+
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+                if is_close_or_less_nb(order_size, entry_size_sum):
+                    # Trade closed
+                    if is_close_nb(order_size, entry_size_sum):
+                        exit_size = entry_size_sum
+                    else:
+                        exit_size = order_size
+                    exit_price = order_price
+                    exit_fees = order_fees
+                    exit_idx = i
+
+                    # Take a size-weighted average of entry price
+                    entry_price = entry_gross_sum / entry_size_sum
+
+                    # Take a fraction of entry fees
+                    size_fraction = exit_size / entry_size_sum
+                    entry_fees = size_fraction * entry_fees_sum
+
+                    fill_trade_record_nb(
+                        records[tidx],
+                        tidx,
+                        col,
+                        exit_size,
+                        entry_idx,
+                        entry_price,
+                        entry_fees,
+                        exit_idx,
+                        exit_price,
+                        exit_fees,
+                        direction,
+                        TradeStatus.Closed,
+                        parent_id
+                    )
+                    tidx += 1
+
+                    if is_close_nb(order_size, entry_size_sum):
+                        # Position closed
+                        entry_idx = -1
+                        direction = -1
+                        in_position = False
+                    else:
+                        # Position decreased, previous orders have now less impact
+                        size_fraction = (entry_size_sum - order_size) / entry_size_sum
+                        entry_size_sum *= size_fraction
+                        entry_gross_sum *= size_fraction
+                        entry_fees_sum *= size_fraction
+                else:
+                    # Trade reversed
+                    # Close current trade
+                    cl_exit_size = entry_size_sum
+                    cl_exit_price = order_price
+                    cl_exit_fees = cl_exit_size / order_size * order_fees
+                    cl_exit_idx = i
+
+                    # Take a size-weighted average of entry price
+                    entry_price = entry_gross_sum / entry_size_sum
+
+                    # Take a fraction of entry fees
+                    size_fraction = cl_exit_size / entry_size_sum
+                    entry_fees = size_fraction * entry_fees_sum
+
+                    fill_trade_record_nb(
+                        records[tidx],
+                        tidx,
+                        col,
+                        cl_exit_size,
+                        entry_idx,
+                        entry_price,
+                        entry_fees,
+                        cl_exit_idx,
+                        cl_exit_price,
+                        cl_exit_fees,
+                        direction,
+                        TradeStatus.Closed,
+                        parent_id
+                    )
+                    tidx += 1
+
+                    # Open a new trade
+                    entry_size_sum = order_size - cl_exit_size
+                    entry_gross_sum = entry_size_sum * order_price
+                    entry_fees_sum = order_fees - cl_exit_fees
+                    entry_idx = i
+                    if direction == TradeDirection.Long:
+                        direction = TradeDirection.Short
+                    else:
+                        direction = TradeDirection.Long
+                    parent_id += 1
+
+        if in_position and is_less_nb(-entry_size_sum, 0):
+            # Trade hasn't been closed
+            exit_size = entry_size_sum
+            exit_price = close[close.shape[0] - 1, col]
+            exit_fees = 0.
+            exit_idx = close.shape[0] - 1
+
+            # Take a size-weighted average of entry price
+            entry_price = entry_gross_sum / entry_size_sum
+
+            # Take a fraction of entry fees
+            size_fraction = exit_size / entry_size_sum
+            entry_fees = size_fraction * entry_fees_sum
+
+            fill_trade_record_nb(
+                records[tidx],
+                tidx,
+                col,
+                exit_size,
+                entry_idx,
+                entry_price,
+                entry_fees,
+                exit_idx,
+                exit_price,
+                exit_fees,
+                direction,
+                TradeStatus.Open,
+                parent_id
+            )
+            tidx += 1
+
+    return records[:tidx]
+
 
 @njit(cache=True)
 def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
@@ -5146,317 +5755,11 @@ def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     return out
 
 
-@njit(cache=True)
-def get_trade_stats_nb(size: float,
-                       entry_price: float,
-                       entry_fees: float,
-                       exit_price: float,
-                       exit_fees: float,
-                       direction: int) -> tp.Tuple[float, float]:
-    """Get trade statistics."""
-    entry_val = size * entry_price
-    exit_val = size * exit_price
-    val_diff = add_nb(exit_val, -entry_val)
-    if val_diff != 0 and direction == TradeDirection.Short:
-        val_diff *= -1
-    pnl = val_diff - entry_fees - exit_fees
-    ret = pnl / entry_val
-    return pnl, ret
-
-
-size_zero_neg_err = "Found order with size 0 or less"
-price_zero_neg_err = "Found order with price 0 or less"
-
-
-@njit(cache=True)
-def fill_trade_record_nb(record: tp.Record,
-                         col: int,
-                         entry_idx: int,
-                         entry_size_sum: float,
-                         entry_gross_sum: float,
-                         entry_fees_sum: float,
-                         exit_idx: int,
-                         exit_size: float,
-                         exit_price: float,
-                         exit_fees: float,
-                         direction: int,
-                         status: int,
-                         position_id: int) -> None:
-    """Fill trade record."""
-    # Size-weighted average of price
-    entry_price = entry_gross_sum / entry_size_sum
-
-    # Fraction of fees
-    size_fraction = exit_size / entry_size_sum
-    entry_fees = size_fraction * entry_fees_sum
-
-    # Get PnL and return
-    pnl, ret = get_trade_stats_nb(
-        exit_size,
-        entry_price,
-        entry_fees,
-        exit_price,
-        exit_fees,
-        direction
-    )
-
-    # Save trade
-    record['col'] = col
-    record['size'] = exit_size
-    record['entry_idx'] = entry_idx
-    record['entry_price'] = entry_price
-    record['entry_fees'] = entry_fees
-    record['exit_idx'] = exit_idx
-    record['exit_price'] = exit_price
-    record['exit_fees'] = exit_fees
-    record['pnl'] = pnl
-    record['return'] = ret
-    record['direction'] = direction
-    record['status'] = status
-    record['position_id'] = position_id
-
-
-@njit(cache=True)
-def trades_from_orders_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map: tp.ColMap) -> tp.RecordArray:
-    """Find trades and store their information as records to an array.
-
-    ## Example
-
-    Simulate a strategy and find all trades in generated orders:
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from numba import njit
-    >>> from vectorbt.records.nb import col_map_nb
-    >>> from vectorbt.portfolio.nb import simulate_nb, order_nb, trades_from_orders_nb
-
-    >>> @njit
-    ... def order_func_nb(c, order_size, order_price):
-    ...     return order_nb(
-    ...         size=order_size[c.i, c.col],
-    ...         price=order_price[c.i, c.col],
-    ...         fees=0.01,
-    ...         slippage=0.01
-    ...     )
-
-    >>> order_size = np.asarray([
-    ...     [1, -1],
-    ...     [0.1, -0.1],
-    ...     [-1, 1],
-    ...     [-0.1, 0.1],
-    ...     [1, -1],
-    ...     [-2, 2]
-    ... ])
-    >>> close = order_price = np.array([
-    ...     [1, 6],
-    ...     [2, 5],
-    ...     [3, 4],
-    ...     [4, 3],
-    ...     [5, 2],
-    ...     [6, 1]
-    ... ])
-    >>> target_shape = order_size.shape
-    >>> group_lens = np.full(target_shape[1], 1)
-    >>> init_cash = np.full(target_shape[1], 100)
-    >>> cash_sharing = False
-    >>> call_seq = np.full(target_shape, 0)
-    >>> segment_mask = np.full(target_shape, True)
-
-    >>> order_records, log_records = simulate_nb(
-    ...     target_shape, close, group_lens,
-    ...     init_cash, cash_sharing, call_seq, segment_mask,
-    ...     order_func_nb=order_func_nb,
-    ...     order_args=(order_size, order_price)
-    ... )
-
-    >>> col_map = col_map_nb(order_records['col'], target_shape[1])
-    >>> trade_records = trades_from_orders_nb(order_records, close, col_map)
-    >>> pd.DataFrame.from_records(trade_records)
-       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0   0    0   1.0          0     1.101818    0.011018         2        2.97
-    1   1    0   0.1          0     1.101818    0.001102         3        3.96
-    2   2    0   1.0          4     5.050000    0.050500         5        5.94
-    3   3    0   1.0          5     5.940000    0.059400         5        6.00
-    4   4    1   1.0          0     5.850000    0.058500         2        4.04
-    5   5    1   0.1          0     5.850000    0.005850         3        3.03
-    6   6    1   1.0          4     1.980000    0.019800         5        1.01
-    7   7    1   1.0          5     1.010000    0.010100         5        1.00
-
-       exit_fees       pnl    return  direction  status  position_id
-    0    0.02970  1.827464  1.658589          0       1            0
-    1    0.00396  0.280756  2.548119          0       1            0
-    2    0.05940  0.780100  0.154475          0       1            1
-    3    0.00000 -0.119400 -0.020101          1       0            2
-    4    0.04040  1.711100  0.292496          1       1            3
-    5    0.00303  0.273120  0.466872          1       1            3
-    6    0.01010  0.940100  0.474798          1       1            4
-    7    0.00000 -0.020100 -0.019901          0       0            5
-    ```
-    """
-    col_idxs, col_lens = col_map
-    col_start_idxs = np.cumsum(col_lens) - col_lens
-    records = np.empty(len(order_records), dtype=trade_dt)
-    tidx = 0
-    position_id = -1
-
-    for col in range(col_lens.shape[0]):
-        col_len = col_lens[col]
-        if col_len == 0:
-            continue
-        entry_idx = -1
-        direction = -1
-        last_id = -1
-        entry_size_sum = 0.
-        entry_gross_sum = 0.
-        entry_fees_sum = 0.
-
-        for i in range(col_len):
-            oidx = col_idxs[col_start_idxs[col] + i]
-            record = order_records[oidx]
-
-            if record['id'] < last_id:
-                raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
-
-            i = record['idx']
-            order_size = record['size']
-            order_price = record['price']
-            order_fees = record['fees']
-            order_side = record['side']
-
-            if order_size <= 0.:
-                raise ValueError(size_zero_neg_err)
-            if order_price <= 0.:
-                raise ValueError(price_zero_neg_err)
-
-            if entry_idx == -1:
-                # Trade opened
-                entry_idx = i
-                if order_side == OrderSide.Buy:
-                    direction = TradeDirection.Long
-                else:
-                    direction = TradeDirection.Short
-                position_id += 1
-
-                # Reset current vars for a new position
-                entry_size_sum = 0.
-                entry_gross_sum = 0.
-                entry_fees_sum = 0.
-
-            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
-                # Position increased
-                entry_size_sum += order_size
-                entry_gross_sum += order_size * order_price
-                entry_fees_sum += order_fees
-
-            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
-                if is_close_or_less_nb(order_size, entry_size_sum):
-                    # Trade closed
-                    if is_close_nb(order_size, entry_size_sum):
-                        exit_size = entry_size_sum
-                    else:
-                        exit_size = order_size
-                    exit_price = order_price
-                    exit_fees = order_fees
-                    exit_idx = i
-                    fill_trade_record_nb(
-                        records[tidx],
-                        col,
-                        entry_idx,
-                        entry_size_sum,
-                        entry_gross_sum,
-                        entry_fees_sum,
-                        exit_idx,
-                        exit_size,
-                        exit_price,
-                        exit_fees,
-                        direction,
-                        TradeStatus.Closed,
-                        position_id
-                    )
-                    records[tidx]['id'] = tidx
-                    tidx += 1
-
-                    if is_close_nb(order_size, entry_size_sum):
-                        # Position closed
-                        entry_idx = -1
-                        direction = -1
-                    else:
-                        # Position decreased, previous orders have now less impact
-                        size_fraction = (entry_size_sum - order_size) / entry_size_sum
-                        entry_size_sum *= size_fraction
-                        entry_gross_sum *= size_fraction
-                        entry_fees_sum *= size_fraction
-                else:
-                    # Trade reversed
-                    # Close current trade
-                    cl_exit_size = entry_size_sum
-                    cl_exit_price = order_price
-                    cl_exit_fees = cl_exit_size / order_size * order_fees
-                    cl_exit_idx = i
-                    fill_trade_record_nb(
-                        records[tidx],
-                        col,
-                        entry_idx,
-                        entry_size_sum,
-                        entry_gross_sum,
-                        entry_fees_sum,
-                        cl_exit_idx,
-                        cl_exit_size,
-                        cl_exit_price,
-                        cl_exit_fees,
-                        direction,
-                        TradeStatus.Closed,
-                        position_id
-                    )
-                    records[tidx]['id'] = tidx
-                    tidx += 1
-
-                    # Open a new trade
-                    entry_size_sum = order_size - cl_exit_size
-                    entry_gross_sum = entry_size_sum * order_price
-                    entry_fees_sum = order_fees - cl_exit_fees
-                    entry_idx = i
-                    if direction == TradeDirection.Long:
-                        direction = TradeDirection.Short
-                    else:
-                        direction = TradeDirection.Long
-                    position_id += 1
-
-        if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
-            # Trade in the previous column hasn't been closed
-            exit_size = entry_size_sum
-            exit_price = close[close.shape[0] - 1, col]
-            exit_fees = 0.
-            exit_idx = close.shape[0] - 1
-            fill_trade_record_nb(
-                records[tidx],
-                col,
-                entry_idx,
-                entry_size_sum,
-                entry_gross_sum,
-                entry_fees_sum,
-                exit_idx,
-                exit_size,
-                exit_price,
-                exit_fees,
-                direction,
-                TradeStatus.Open,
-                position_id
-            )
-            records[tidx]['id'] = tidx
-            tidx += 1
-
-    return records[:tidx]
-
-
 # ############# Position records ############# #
 
 @njit(cache=True)
-def fill_position_record_nb(record: tp.Record, trade_records: tp.RecordArray) -> None:
-    """Fill position record."""
+def fill_position_record_nb(record: tp.Record, id_: int, trade_records: tp.RecordArray) -> None:
+    """Fill a position record by aggregating trade records."""
     # Aggregate trades
     col = trade_records['col'][0]
     size = np.sum(trade_records['size'])
@@ -5478,6 +5781,7 @@ def fill_position_record_nb(record: tp.Record, trade_records: tp.RecordArray) ->
     )
 
     # Save position
+    record['id'] = id_
     record['col'] = col
     record['size'] = size
     record['entry_idx'] = entry_idx
@@ -5490,37 +5794,43 @@ def fill_position_record_nb(record: tp.Record, trade_records: tp.RecordArray) ->
     record['return'] = ret
     record['direction'] = direction
     record['status'] = status
+    record['parent_id'] = id_
 
 
 @njit(cache=True)
-def copy_trade_record_nb(position_record: tp.Record, trade_record: tp.Record) -> None:
-    # Save position
-    position_record['col'] = trade_record['col']
-    position_record['size'] = trade_record['size']
-    position_record['entry_idx'] = trade_record['entry_idx']
-    position_record['entry_price'] = trade_record['entry_price']
-    position_record['entry_fees'] = trade_record['entry_fees']
-    position_record['exit_idx'] = trade_record['exit_idx']
-    position_record['exit_price'] = trade_record['exit_price']
-    position_record['exit_fees'] = trade_record['exit_fees']
-    position_record['pnl'] = trade_record['pnl']
-    position_record['return'] = trade_record['return']
-    position_record['direction'] = trade_record['direction']
-    position_record['status'] = trade_record['status']
+def copy_trade_record_nb(record: tp.Record, trade_record: tp.Record) -> None:
+    """Copy a trade record."""
+    record['id'] = trade_record['id']
+    record['col'] = trade_record['col']
+    record['size'] = trade_record['size']
+    record['entry_idx'] = trade_record['entry_idx']
+    record['entry_price'] = trade_record['entry_price']
+    record['entry_fees'] = trade_record['entry_fees']
+    record['exit_idx'] = trade_record['exit_idx']
+    record['exit_price'] = trade_record['exit_price']
+    record['exit_fees'] = trade_record['exit_fees']
+    record['pnl'] = trade_record['pnl']
+    record['return'] = trade_record['return']
+    record['direction'] = trade_record['direction']
+    record['status'] = trade_record['status']
+    record['parent_id'] = trade_record['parent_id']
 
 
 @njit(cache=True)
-def positions_from_trades_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
-    """Find positions and store their information as records to an array.
+def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
+    """Fill position records by aggregating trade records.
+
+    Trades can be entry trades, exit trades, and even positions themselves - all will produce the same results.
 
     ## Example
 
-    Building upon the example in `trades_from_orders_nb`, convert trades to positions:
-    ```python-repl
-    >>> from vectorbt.portfolio.nb import positions_from_trades_nb
+    Building upon the example in `get_exit_trades_nb`:
 
-    >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
-    >>> position_records = positions_from_trades_nb(trade_records, col_map)
+    ```python-repl
+    >>> from vectorbt.portfolio.nb import get_positions_nb
+
+    >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
+    >>> position_records = get_positions_nb(exit_trade_records, col_map)
     >>> pd.DataFrame.from_records(position_records)
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.1          0     1.101818     0.01212         3    3.060000
@@ -5530,18 +5840,18 @@ def positions_from_trades_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) 
     4   4    1   1.0          4     1.980000     0.01980         5    1.010000
     5   5    1   1.0          5     1.010000     0.01010         5    1.000000
 
-       exit_fees      pnl    return  direction  status
-    0    0.03366  2.10822  1.739455          0       1
-    1    0.05940  0.78010  0.154475          0       1
-    2    0.00000 -0.11940 -0.020101          1       0
-    3    0.04343  1.98422  0.308348          1       1
-    4    0.01010  0.94010  0.474798          1       1
-    5    0.00000 -0.02010 -0.019901          0       0
+       exit_fees      pnl    return  direction  status  parent_id
+    0    0.03366  2.10822  1.739455          0       1          0
+    1    0.05940  0.78010  0.154475          0       1          1
+    2    0.00000 -0.11940 -0.020101          1       0          2
+    3    0.04343  1.98422  0.308348          1       1          3
+    4    0.01010  0.94010  0.474798          1       1          4
+    5    0.00000 -0.02010 -0.019901          0       0          5
     ```
     """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    records = np.empty(len(trade_records), dtype=position_dt)
+    records = np.empty(len(trade_records), dtype=trade_dt)
     pidx = 0
     from_tidx = -1
 
@@ -5552,34 +5862,36 @@ def positions_from_trades_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) 
         last_id = -1
         last_position_id = -1
 
-        for i in range(col_len):
-            tidx = col_idxs[col_start_idxs[col] + i]
+        for c in range(col_len):
+            tidx = col_idxs[col_start_idxs[col] + c]
             record = trade_records[tidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
             last_id = record['id']
 
-            position_id = record['position_id']
+            parent_id = record['parent_id']
 
-            if position_id != last_position_id:
+            if parent_id != last_position_id:
                 if last_position_id != -1:
                     if tidx - from_tidx > 1:
-                        fill_position_record_nb(records[pidx], trade_records[from_tidx:tidx])
+                        fill_position_record_nb(records[pidx], pidx, trade_records[from_tidx:tidx])
                     else:
                         # Speed up
                         copy_trade_record_nb(records[pidx], trade_records[from_tidx])
-                    records[pidx]['id'] = pidx
+                        records[pidx]['id'] = pidx
+                        records[pidx]['parent_id'] = pidx
                     pidx += 1
                 from_tidx = tidx
-                last_position_id = position_id
+                last_position_id = parent_id
 
         if tidx - from_tidx > 0:
-            fill_position_record_nb(records[pidx], trade_records[from_tidx:tidx + 1])
+            fill_position_record_nb(records[pidx], pidx, trade_records[from_tidx:tidx + 1])
         else:
             # Speed up
             copy_trade_record_nb(records[pidx], trade_records[from_tidx])
-        records[pidx]['id'] = pidx
+            records[pidx]['id'] = pidx
+            records[pidx]['parent_id'] = pidx
         pidx += 1
 
     return records[:pidx]
@@ -5631,8 +5943,8 @@ def asset_flow_nb(target_shape: tp.Shape,
         last_id = -1
         position_now = 0.
 
-        for i in range(col_len):
-            oidx = col_idxs[col_start_idxs[col] + i]
+        for c in range(col_len):
+            oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
             if record['id'] < last_id:
@@ -5757,8 +6069,8 @@ def cash_flow_nb(target_shape: tp.Shape,
         position_now = 0.
         debt_now = 0.
 
-        for i in range(col_len):
-            oidx = col_idxs[col_start_idxs[col] + i]
+        for c in range(col_len):
+            oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
             if record['id'] < last_id:
@@ -5974,8 +6286,8 @@ def total_profit_nb(target_shape: tp.Shape,
             continue
         last_id = -1
 
-        for i in range(col_len):
-            oidx = col_idxs[col_start_idxs[col] + i]
+        for c in range(col_len):
+            oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
             if record['id'] < last_id:

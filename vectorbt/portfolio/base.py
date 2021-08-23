@@ -998,45 +998,41 @@ In this case, we don't have to pass `resolve_trades=True` any more as vectorbt d
 Another advantage is that vectorbt can access the signature of the last method in the path
 (`vectorbt.records.mapped_array.MappedArray.max` in our case) and resolve its arguments.
 
-Since `trades` and `positions` are very similar concepts (positions are aggregations of trades),
-you can substitute a trade with a position by passing `use_positions=True`.
-Additionally, you can pass `incl_open=True` to also include open trades/positions.
+To switch between entry trades, exit trades, and positions, use the `trades_type` setting.
+Additionally, you can pass `incl_open=True` to also include open trades.
 
 ```python-repl
->>> pf.stats(column=10, settings=dict(use_positions=True, incl_open=True))
-Start                            2020-01-01 00:00:00+00:00
-End                              2020-09-01 00:00:00+00:00
-Period                                   244 days 00:00:00
-Start Value                                          100.0
-End Value                                       106.721585
-Total Return [%]                                  6.721585
-Benchmark Return [%]                             66.252621
-Max Gross Exposure [%]                               100.0
-Total Fees Paid                                        0.0
-Max Drawdown [%]                                 22.190944
-Max Drawdown Duration                    101 days 00:00:00
-Total Positions                                         10
-Total Closed Positions                                  10
-Total Open Positions                                     0
-Open Position PnL                                      0.0
-Win Rate [%]                                          60.0
-Best Position [%]                                 15.31962
-Worst Position [%]                               -9.904223
-Avg Winning Position [%]                          4.671959
-Avg Losing Position [%]                          -4.851205
-Avg Winning Position Duration             11 days 08:00:00
-Avg Losing Position Duration              14 days 06:00:00
-Profit Factor                                     1.347457
-Expectancy                                        0.672158
-Sharpe Ratio                                      0.445231
-Calmar Ratio                                      0.460573
-Omega Ratio                                       1.099192
-Sortino Ratio                                     0.706986
+>>> pf.stats(column=10, settings=dict(trades_type='positions', incl_open=True))
+Start                         2020-01-01 00:00:00+00:00
+End                           2020-09-01 00:00:00+00:00
+Period                                244 days 00:00:00
+Start Value                                       100.0
+End Value                                    106.721585
+Total Return [%]                               6.721585
+Benchmark Return [%]                          66.252621
+Max Gross Exposure [%]                            100.0
+Total Fees Paid                                     0.0
+Max Drawdown [%]                              22.190944
+Max Drawdown Duration                 100 days 00:00:00
+Total Trades                                         10
+Total Closed Trades                                  10
+Total Open Trades                                     0
+Open Trade PnL                                      0.0
+Win Rate [%]                                       60.0
+Best Trade [%]                                 15.31962
+Worst Trade [%]                               -9.904223
+Avg Winning Trade [%]                          4.671959
+Avg Losing Trade [%]                          -4.851205
+Avg Winning Trade Duration             11 days 08:00:00
+Avg Losing Trade Duration              14 days 06:00:00
+Profit Factor                                  1.347457
+Expectancy                                     0.672158
+Sharpe Ratio                                   0.445231
+Calmar Ratio                                   0.460573
+Omega Ratio                                    1.099192
+Sortino Ratio                                  0.706986
 Name: 10, dtype: object
 ```
-
-Notice how vectorbt changed each 'Trade' to 'Position' thanks to evaluation templates
-defined in `Portfolio.metrics`. We can use the same feature in any custom metric.
 
 Any default metric setting or even global setting can be overridden by the user using metric-specific
 keyword arguments. Here, we override the global aggregation function for `max_dd_duration`:
@@ -1371,7 +1367,7 @@ from vectorbt.returns.accessors import ReturnsAccessor
 from vectorbt.returns import nb as returns_nb
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
-from vectorbt.portfolio.trades import Trades, Positions
+from vectorbt.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
 from vectorbt.portfolio.decorators import attach_returns_acc_methods
@@ -1441,6 +1437,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             Applied after the simulation to avoid NaNs in asset value.
 
             See `Portfolio.get_filled_close`.
+        trades_type (str or int): Default `vectorbt.portfolio.trades.Trades` to use across `Portfolio`.
+
+            See `vectorbt.portfolio.enums.TradesType`.
+
+    For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
@@ -1457,7 +1458,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                  init_cash: tp.ArrayLike,
                  cash_sharing: bool,
                  call_seq: tp.Optional[tp.Array2d] = None,
-                 fillna_close: tp.Optional[bool] = None) -> None:
+                 fillna_close: tp.Optional[bool] = None,
+                 trades_type: tp.Optional[tp.Union[int, str]] = None) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -1467,7 +1469,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             init_cash=init_cash,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            fillna_close=fillna_close
+            fillna_close=fillna_close,
+            trades_type=trades_type
         )
         StatsBuilderMixin.__init__(self)
         PlotBuilderMixin.__init__(self)
@@ -1478,6 +1481,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         if fillna_close is None:
             fillna_close = portfolio_cfg['fillna_close']
+        if trades_type is None:
+            trades_type = portfolio_cfg['trades_type']
+        if isinstance(trades_type, str):
+            trades_type = map_enum_fields(trades_type, TradesType)
 
         # Store passed arguments
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
@@ -1487,6 +1494,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
         self._fillna_close = fillna_close
+        self._trades_type = trades_type
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
@@ -3917,6 +3925,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         """Whether to forward-backward fill NaN values in `Portfolio.close`."""
         return self._fillna_close
 
+    @property
+    def trades_type(self) -> int:
+        """Default `vectorbt.portfolio.trades.Trades` to use across `Portfolio`."""
+        return self._trades_type
+
     # ############# Reference price ############# #
 
     @property
@@ -3967,16 +3980,33 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return Logs(self.wrapper, self.log_records, **kwargs).regroup(group_by)
 
     @cached_property
+    def entry_trades(self) -> EntryTrades:
+        """`Portfolio.get_entry_trades` with default arguments."""
+        return self.get_entry_trades()
+
+    @cached_method
+    def get_entry_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> EntryTrades:
+        """Get entry trade records.
+
+        See `vectorbt.portfolio.trades.EntryTrades`."""
+        return EntryTrades.from_orders(self.orders, **kwargs).regroup(group_by)
+
+    @cached_property
+    def exit_trades(self) -> ExitTrades:
+        """`Portfolio.get_exit_trades` with default arguments."""
+        return self.get_exit_trades()
+
+    @cached_method
+    def get_exit_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> ExitTrades:
+        """Get exit trade records.
+
+        See `vectorbt.portfolio.trades.ExitTrades`."""
+        return ExitTrades.from_orders(self.orders, **kwargs).regroup(group_by)
+
+    @cached_property
     def trades(self) -> Trades:
         """`Portfolio.get_trades` with default arguments."""
         return self.get_trades()
-
-    @cached_method
-    def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
-        """Get trade records.
-
-        See `vectorbt.portfolio.trades.Trades`."""
-        return Trades.from_orders(self.orders, **kwargs).regroup(group_by)
 
     @cached_property
     def positions(self) -> Positions:
@@ -3988,7 +4018,16 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
-        return Positions.from_trades(self.trades, **kwargs).regroup(group_by)
+        return Positions.from_trades(self.exit_trades, **kwargs).regroup(group_by)
+
+    @cached_method
+    def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
+        """Get trade/position records depending upon `Portfolio.trades_type`."""
+        if self.trades_type == TradesType.EntryTrades:
+            return self.get_entry_trades(group_by=group_by, **kwargs)
+        elif self.trades_type == TradesType.ExitTrades:
+            return self.get_exit_trades(group_by=group_by, **kwargs)
+        return self.get_positions(group_by=group_by, **kwargs)
 
     @cached_property
     def drawdowns(self) -> Drawdowns:
@@ -4374,13 +4413,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         Uses the following keys:
 
         * `use_asset_returns`: Whether to use `Portfolio.asset_returns` when resolving `returns` argument.
-        * `use_positions`: Whether to use `Portfolio.positions` when resolving `trades` argument."""
+        * `trades_type`: Which trade type to use when resolving `trades` argument."""
         if 'use_asset_returns' in final_kwargs:
             if attr == 'returns' and final_kwargs['use_asset_returns']:
                 attr = 'asset_returns'
-        if 'use_positions' in final_kwargs:
-            if attr == 'trades' and final_kwargs['use_positions']:
-                attr = 'positions'
+        if 'trades_type' in final_kwargs:
+            trades_type = final_kwargs['trades_type']
+            if isinstance(final_kwargs['trades_type'], str):
+                trades_type = map_enum_fields(trades_type, TradesType)
+            if attr == 'trades' and trades_type != self.trades_type:
+                if trades_type == TradesType.EntryTrades:
+                    attr = 'entry_trades'
+                elif trades_type == TradesType.ExitTrades:
+                    attr = 'exit_trades'
+                else:
+                    attr = 'positions'
         return attr
 
     def post_resolve_attr(self, attr: str, out: tp.Any, final_kwargs: tp.KwargsLike = None) -> str:
@@ -4388,8 +4435,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         Uses the following keys:
 
-        * `incl_open`: Whether to include open trades/positions when resolving `trades`/`positions` argument."""
-        if attr in ['trades', 'positions'] and not final_kwargs['incl_open']:
+        * `incl_open`: Whether to include open trades/positions when resolving an argument
+            that is an instance of `vectorbt.portfolio.trades.Trades`."""
+        if isinstance(out, Trades) and not final_kwargs['incl_open']:
             out = out.closed
         return out
 
@@ -4410,7 +4458,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             dict(
                 settings=dict(
                     year_freq=returns_cfg['year_freq'],
-                    benchmark_rets=None
+                    trades_type=self.trades_type
                 )
             ),
             portfolio_stats_cfg
@@ -4484,79 +4532,79 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 tags=['portfolio', 'drawdowns', 'duration']
             ),
             total_trades=dict(
-                title=RepEval("'Total Positions' if use_positions else 'Total Trades'"),
+                title='Total Trades',
                 calc_func='trades.count',
                 incl_open=True,
-                tags=['portfolio', Rep("trades_tag")]
+                tags=['portfolio', 'trades']
             ),
             total_closed_trades=dict(
-                title=RepEval("'Total Closed Positions' if use_positions else 'Total Closed Trades'"),
+                title='Total Closed Trades',
                 calc_func='trades.closed.count',
-                tags=['portfolio', Rep("trades_tag"), 'closed']
+                tags=['portfolio', 'trades', 'closed']
             ),
             total_open_trades=dict(
-                title=RepEval("'Total Open Positions' if use_positions else 'Total Open Trades'"),
+                title='Total Open Trades',
                 calc_func='trades.open.count',
                 incl_open=True,
-                tags=['portfolio', Rep("trades_tag"), 'open']
+                tags=['portfolio', 'trades', 'open']
             ),
             open_trade_pnl=dict(
-                title=RepEval("'Open Position PnL' if use_positions else 'Open Trade PnL'"),
+                title='Open Trade PnL',
                 calc_func='trades.open.pnl.sum',
                 incl_open=True,
-                tags=['portfolio', Rep("trades_tag"), 'open']
+                tags=['portfolio', 'trades', 'open']
             ),
             win_rate=dict(
                 title='Win Rate [%]',
                 calc_func='trades.win_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             best_trade=dict(
-                title=RepEval("'Best Position [%]' if use_positions else 'Best Trade [%]'"),
+                title='Best Trade [%]',
                 calc_func='trades.returns.max',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             worst_trade=dict(
-                title=RepEval("'Worst Position [%]' if use_positions else 'Worst Trade [%]'"),
+                title='Worst Trade [%]',
                 calc_func='trades.returns.min',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             avg_winning_trade=dict(
-                title=RepEval("'Avg Winning Position [%]' if use_positions else 'Avg Winning Trade [%]'"),
+                title='Avg Winning Trade [%]',
                 calc_func='trades.winning.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'winning']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning']")
             ),
             avg_losing_trade=dict(
-                title=RepEval("'Avg Losing Position [%]' if use_positions else 'Avg Losing Trade [%]'"),
+                title='Avg Losing Trade [%]',
                 calc_func='trades.losing.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'losing']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing']")
             ),
             avg_winning_trade_duration=dict(
-                title=RepEval("'Avg Winning Position Duration' if use_positions else 'Avg Winning Trade Duration'"),
+                title='Avg Winning Trade Duration',
                 calc_func='trades.winning.duration.mean',
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'winning', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning', 'duration']")
             ),
             avg_losing_trade_duration=dict(
-                title=RepEval("'Avg Losing Position Duration' if use_positions else 'Avg Losing Trade Duration'"),
+                title='Avg Losing Trade Duration',
                 calc_func='trades.losing.duration.mean',
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags, 'losing', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing', 'duration']")
             ),
             profit_factor=dict(
                 title='Profit Factor',
                 calc_func='trades.profit_factor',
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             expectancy=dict(
                 title='Expectancy',
                 calc_func='trades.expectancy',
-                tags=RepEval("['portfolio', trades_tag, *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
             ),
             sharpe_ratio=dict(
                 title='Sharpe Ratio',
@@ -5212,7 +5260,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             dict(
                 settings=dict(
                     year_freq=returns_cfg['year_freq'],
-                    benchmark_rets=None
+                    trades_type=self.trades_type
                 )
             ),
             portfolio_plot_cfg
@@ -5240,20 +5288,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                 check_is_not_grouped=True,
                 plot_func='trades.plot_pnl',
                 tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
-            ),
-            positions=dict(
-                title="Positions",
-                yaxis_title="Price",
-                check_is_not_grouped=True,
-                plot_func='positions.plot',
-                tags=RepEval("['portfolio', 'positions', *incl_open_tags]")
-            ),
-            position_pnl=dict(
-                title="Position PnL",
-                yaxis_title="Position PnL",
-                check_is_not_grouped=True,
-                plot_func='positions.plot_pnl',
-                tags=RepEval("['portfolio', 'positions', *incl_open_tags]")
             ),
             asset_flow=dict(
                 title="Asset Flow",

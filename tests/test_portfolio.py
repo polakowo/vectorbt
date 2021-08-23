@@ -4037,9 +4037,9 @@ class TestFromOrderFunc:
         return_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
         return_arr2 = np.empty(size.shape, dtype=np.float_)
         return_arr3 = np.empty(size.shape, dtype=np.float_)
-        pos_record_arr1 = np.empty(size.shape, dtype=position_dt)
-        pos_record_arr2 = np.empty(size.shape, dtype=position_dt)
-        pos_record_arr3 = np.empty(size.shape, dtype=position_dt)
+        pos_record_arr1 = np.empty(size.shape, dtype=trade_dt)
+        pos_record_arr2 = np.empty(size.shape, dtype=trade_dt)
+        pos_record_arr3 = np.empty(size.shape, dtype=trade_dt)
 
         def pre_segment_func_nb(c):
             value_arr1[c.i, c.group] = c.last_value[c.group]
@@ -4148,56 +4148,56 @@ class TestFromOrderFunc:
         record_arrays_close(
             pos_record_arr1.flatten()[3:],
             np.array([
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0),
-                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0)
-            ], dtype=position_dt)
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0, 1)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             pos_record_arr2.flatten()[3:],
             np.array([
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
-                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 1.0, 0.25, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.5, 0.375, 0, 0),
-                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.5, -0.375, 1, 0),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0)
-            ], dtype=position_dt)
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 1.0, 0.25, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.5, 0.375, 0, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.5, -0.375, 1, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 1)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             pos_record_arr3.flatten(),
             np.array([
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
-                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
-                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0),
-                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0),
-                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0),
-                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0),
-                (0, 0, 3.0, 0, 3.0, 3.0, -1, 4.0, 1.0, 1.0, 0.1111111111111111, 0, 0),
-                (1, 1, 1.0, 3, 4.0, 1.0, 4, 5.0, 1.0, -3.0, -0.75, 1, 1),
-                (1, 2, 2.0, 2, 4.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0)
-            ], dtype=position_dt)
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0, 1),
+                (0, 0, 3.0, 0, 3.0, 3.0, -1, 4.0, 1.0, 1.0, 0.1111111111111111, 0, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, 4, 5.0, 1.0, -3.0, -0.75, 1, 1, 1),
+                (1, 2, 2.0, 2, 4.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 1)
+            ], dtype=trade_dt)
         )
 
         cash_arr = np.empty((size.shape[0], 2), dtype=np.float_)
@@ -5850,9 +5850,61 @@ class TestPortfolio:
             result
         )
 
-    def test_trades(self):
+    def test_entry_trades(self):
         record_arrays_close(
-            pf.trades.values,
+            pf.entry_trades.values,
+            np.array([
+                (0, 0, 0.1, 1, 2.02, 0.10202, 2, 2.9699999999999998, 0.10297,
+                 -0.10999000000000003, -0.5445049504950497, 0, 1, 0),
+                (1, 0, 1.0, 4, 5.05, 0.1505, 4, 5.0, 0.0, -0.20049999999999982, -0.03970297029702967, 0, 0, 1),
+                (2, 1, 1.0, 0, 0.99, 0.10990000000000001, 4, 4.954285714285714,
+                 0.049542857142857145, -4.12372857142857, -4.165382395382394, 1, 0, 2),
+                (3, 1, 0.1, 1, 1.98, 0.10198, 4, 4.954285714285714, 0.004954285714285714,
+                 -0.4043628571428571, -2.0422366522366517, 1, 0, 2),
+                (4, 1, 1.0, 4, 4.95, 0.14950000000000002, 4, 4.954285714285714,
+                 0.049542857142857145, -0.20332857142857072, -0.04107647907647893, 1, 0, 2),
+                (5, 2, 1.0, 0, 1.01, 0.1101, 3, 3.0599999999999996, 0.21241818181818184,
+                 1.727481818181818, 1.71037803780378, 0, 1, 3),
+                (6, 2, 0.1, 1, 2.02, 0.10202, 3, 3.0599999999999996, 0.021241818181818185,
+                 -0.019261818181818203, -0.09535553555355546, 0, 1, 3)
+            ], dtype=trade_dt)
+        )
+        result = pd.Series(
+            np.array([2, 3, 2]),
+            index=price_na.columns
+        ).rename('count')
+        pd.testing.assert_series_equal(
+            pf.entry_trades.count(),
+            result
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped.get_entry_trades(group_by=False).count(),
+            result
+        )
+        pd.testing.assert_series_equal(
+            pf_shared.get_entry_trades(group_by=False).count(),
+            result
+        )
+        result = pd.Series(
+            np.array([5, 2]),
+            index=pd.Index(['first', 'second'], dtype='object', name='group')
+        ).rename('count')
+        pd.testing.assert_series_equal(
+            pf.get_entry_trades(group_by=group_by).count(),
+            result
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped.entry_trades.count(),
+            result
+        )
+        pd.testing.assert_series_equal(
+            pf_shared.entry_trades.count(),
+            result
+        )
+
+    def test_exit_trades(self):
+        record_arrays_close(
+            pf.exit_trades.values,
             np.array([
                 (0, 0, 0.1, 1, 2.02, 0.10202, 2, 2.9699999999999998, 0.10297,
                  -0.10999000000000003, -0.5445049504950497, 0, 1, 0),
@@ -5873,15 +5925,15 @@ class TestPortfolio:
             index=price_na.columns
         ).rename('count')
         pd.testing.assert_series_equal(
-            pf.trades.count(),
+            pf.exit_trades.count(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_grouped.get_trades(group_by=False).count(),
+            pf_grouped.get_exit_trades(group_by=False).count(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_shared.get_trades(group_by=False).count(),
+            pf_shared.get_exit_trades(group_by=False).count(),
             result
         )
         result = pd.Series(
@@ -5889,15 +5941,15 @@ class TestPortfolio:
             index=pd.Index(['first', 'second'], dtype='object', name='group')
         ).rename('count')
         pd.testing.assert_series_equal(
-            pf.get_trades(group_by=group_by).count(),
+            pf.get_exit_trades(group_by=group_by).count(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_grouped.trades.count(),
+            pf_grouped.exit_trades.count(),
             result
         )
         pd.testing.assert_series_equal(
-            pf_shared.trades.count(),
+            pf_shared.exit_trades.count(),
             result
         )
 
@@ -5906,14 +5958,14 @@ class TestPortfolio:
             pf.positions.values,
             np.array([
                 (0, 0, 0.1, 1, 2.02, 0.10202, 2, 2.9699999999999998,
-                 0.10297, -0.10999000000000003, -0.5445049504950497, 0, 1),
+                 0.10297, -0.10999000000000003, -0.5445049504950497, 0, 1, 0),
                 (1, 0, 1.0, 4, 5.05, 0.1505, 4, 5.0, 0.0,
-                 -0.20049999999999982, -0.03970297029702967, 0, 0),
+                 -0.20049999999999982, -0.03970297029702967, 0, 0, 1),
                 (2, 1, 2.1, 0, 2.9228571428571426, 0.36138000000000003, 4, 4.954285714285714,
-                 0.10404000000000001, -4.731420000000001, -0.7708406647116326, 1, 0),
+                 0.10404000000000001, -4.731420000000001, -0.7708406647116326, 1, 0, 2),
                 (3, 2, 1.1, 0, 1.1018181818181818, 0.21212000000000003, 3,
-                 3.06, 0.23366000000000003, 1.7082200000000003, 1.4094224422442245, 0, 1)
-            ], dtype=position_dt)
+                 3.06, 0.23366000000000003, 1.7082200000000003, 1.4094224422442245, 0, 1, 3)
+            ], dtype=trade_dt)
         )
         result = pd.Series(
             np.array([2, 1, 1]),
@@ -7231,7 +7283,7 @@ class TestPortfolio:
                 name='a')
         )
         pd.testing.assert_series_equal(
-            pf.stats(column='a', settings=dict(use_positions=True)),
+            pf.stats(column='a', settings=dict(trade_type='positions')),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
@@ -7245,11 +7297,11 @@ class TestPortfolio:
                     'Start', 'End', 'Period', 'Start Value', 'End Value',
                     'Total Return [%]', 'Benchmark Return [%]', 'Max Gross Exposure [%]',
                     'Total Fees Paid', 'Max Drawdown [%]', 'Max Drawdown Duration',
-                    'Total Positions', 'Total Closed Positions', 'Total Open Positions',
-                    'Open Position PnL', 'Win Rate [%]', 'Best Position [%]',
-                    'Worst Position [%]', 'Avg Winning Position [%]',
-                    'Avg Losing Position [%]', 'Avg Winning Position Duration',
-                    'Avg Losing Position Duration', 'Profit Factor', 'Expectancy',
+                    'Total Trades', 'Total Closed Trades', 'Total Open Trades',
+                    'Open Trade PnL', 'Win Rate [%]', 'Best Trade [%]',
+                    'Worst Trade [%]', 'Avg Winning Trade [%]',
+                    'Avg Losing Trade [%]', 'Avg Winning Trade Duration',
+                    'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy',
                     'Sharpe Ratio', 'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio'
                 ], dtype='object'),
                 name='a')

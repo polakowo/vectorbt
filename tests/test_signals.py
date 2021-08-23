@@ -1056,9 +1056,6 @@ class TestAccessors:
         e = pd.Series([True, False, False, False, False, False])
         t = pd.Series([2, 3, 4, 3, 2, 1]).astype(np.float64)
 
-        with pytest.raises(Exception):
-            _ = e.vbt.signals.generate_stop_exits(t, 0)
-
         # stop loss
         pd.testing.assert_series_equal(
             e.vbt.signals.generate_stop_exits(t, -0.1),
@@ -1155,11 +1152,7 @@ class TestAccessors:
 
     def test_generate_ohlc_stop_exits(self):
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0)
-        with pytest.raises(Exception):
             _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1)
-        with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0)
         with pytest.raises(Exception):
             _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
 

@@ -1577,16 +1577,15 @@ def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
 # ############# Drawdowns ############# #
 
 @njit(cache=True)
-def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
-    """Find drawdows and store their information as records to an array.
+def get_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
+    """Fill drawdown records by analyzing a time series.
 
     ## Example
 
-    Find drawdowns in time series:
     ```python-repl
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from vectorbt.generic.nb import find_drawdowns_nb
+    >>> from vectorbt.generic.nb import get_drawdowns_nb
 
     >>> ts = np.asarray([
     ...     [1, 5, 1, 3],
@@ -1595,7 +1594,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
     ...     [4, 2, 2, 2],
     ...     [5, 1, 1, 3]
     ... ])
-    >>> records = find_drawdowns_nb(ts)
+    >>> records = get_drawdowns_nb(ts)
 
     >>> pd.DataFrame.from_records(records)
        id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\

@@ -283,7 +283,7 @@ class Drawdowns(Ranges):
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
         ts_pd = to_pd_array(ts)
-        records_arr = nb.find_drawdowns_nb(to_2d_array(ts_pd))
+        records_arr = nb.get_drawdowns_nb(to_2d_array(ts_pd))
         wrapper = ArrayWrapper.from_obj(ts_pd, **merge_dicts({}, wrapper_kwargs))
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 

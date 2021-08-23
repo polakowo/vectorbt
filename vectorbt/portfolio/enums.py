@@ -29,7 +29,7 @@ __all__ = [
     'OrderStatusInfo',
     'TradeDirection',
     'TradeStatus',
-    'TradeType',
+    'TradesType',
     'ProcessOrderState',
     'ExecuteOrderState',
     'SimulationContext',
@@ -47,7 +47,6 @@ __all__ = [
     'SignalContext',
     'order_dt',
     'trade_dt',
-    'position_dt',
     'log_dt'
 ]
 
@@ -556,18 +555,19 @@ __pdoc__['TradeStatus'] = f"""Event status.
 """
 
 
-class TradeTypeT(tp.NamedTuple):
-    Trade: int = 0
-    Position: int = 1
+class TradesTypeT(tp.NamedTuple):
+    EntryTrades: int = 0
+    ExitTrades: int = 1
+    Positions: int = 2
 
 
-TradeType = TradeTypeT()
+TradesType = TradesTypeT()
 """_"""
 
-__pdoc__['TradeType'] = f"""Trade type.
+__pdoc__['TradesType'] = f"""Trades type.
 
 ```json
-{to_doc(TradeType)}
+{to_doc(TradesType)}
 ```
 """
 
@@ -904,7 +904,7 @@ Similar to `SimulationContext.last_oidx` but for log records.
 """
 __pdoc__['SimulationContext.last_pos_record'] = """Latest position record of each column.
 
-It's a 1-dimensional array with records of type `position_dt`.
+It's a 1-dimensional array with records of type `trade_dt`.
 
 Has shape `(target_shape[1],)`.
 
@@ -1625,7 +1625,7 @@ _trade_fields = [
     ('return', np.float_),
     ('direction', np.int_),
     ('status', np.int_),
-    ('position_id', np.int_)
+    ('parent_id', np.int_)
 ]
 
 trade_dt = np.dtype(_trade_fields, align=True)
@@ -1635,18 +1635,6 @@ __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 
 ```json
 {to_doc(trade_dt)}
-```
-"""
-
-_position_fields = _trade_fields[:-1]
-
-position_dt = np.dtype(_position_fields, align=True)
-"""_"""
-
-__pdoc__['position_dt'] = f"""`np.dtype` of position records.
-
-```json
-{to_doc(position_dt)}
 ```
 """
 

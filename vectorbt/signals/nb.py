@@ -600,8 +600,6 @@ def stop_choice_nb(from_i: int,
     init_i = from_i - wait
     init_ts = flex_select_auto_nb(ts, init_i, col, flex_2d)
     init_stop = flex_select_auto_nb(np.asarray(stop), init_i, col, flex_2d)
-    if init_stop == 0:
-        raise ValueError("Stop cannot be 0")
     init_trailing = flex_select_auto_nb(np.asarray(trailing), init_i, col, flex_2d)
     max_high = min_low = init_ts
 
@@ -791,12 +789,12 @@ def ohlc_stop_choice_nb(from_i: int,
     init_i = from_i - wait
     init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
     init_sl_stop = flex_select_auto_nb(np.asarray(sl_stop), init_i, col, flex_2d)
-    if init_sl_stop <= 0:
-        raise ValueError("SL stop must greater than 0")
+    if init_sl_stop < 0:
+        raise ValueError("Stop value must be 0 or greater")
     init_sl_trail = flex_select_auto_nb(np.asarray(sl_trail), init_i, col, flex_2d)
     init_tp_stop = flex_select_auto_nb(np.asarray(tp_stop), init_i, col, flex_2d)
-    if init_tp_stop <= 0:
-        raise ValueError("TP stop must greater than 0")
+    if init_tp_stop < 0:
+        raise ValueError("Stop value must be 0 or greater")
     init_reverse = flex_select_auto_nb(np.asarray(reverse), init_i, col, flex_2d)
     max_p = min_p = init_open
     j = 0

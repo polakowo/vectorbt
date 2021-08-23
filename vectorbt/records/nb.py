@@ -482,6 +482,6 @@ def mapped_value_counts_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.ColMap
         if col_len == 0:
             continue
         col_start_idx = col_start_idxs[col]
-        for i in range(col_len):
-            out[codes[col_idxs[col_start_idx + i]], col] += 1
+        for c in range(col_len):
+            out[codes[col_idxs[col_start_idx + c]], col] += 1
     return out

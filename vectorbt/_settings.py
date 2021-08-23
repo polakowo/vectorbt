@@ -416,9 +416,6 @@ settings = SettingsConfig(
                 )
             )
         ),
-        positions=dict(
-            stats=Config()  # flex
-        ),
         logs=dict(
             stats=Config()  # flex
         ),
@@ -467,6 +464,7 @@ settings = SettingsConfig(
             freq=None,
             attach_call_seq=False,
             fillna_close=True,
+            trades_type='exittrades',
             stats=Config(  # flex
                 dict(
                     filters=dict(
@@ -478,11 +476,10 @@ settings = SettingsConfig(
                     ),
                     settings=dict(
                         use_asset_returns=False,
-                        use_positions=False,
-                        incl_open=False
+                        incl_open=False,
+                        benchmark_rets=None
                     ),
                     template_mapping=dict(
-                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
@@ -492,7 +489,8 @@ settings = SettingsConfig(
                     subplots=['orders', 'trade_pnl', 'cum_returns'],
                     settings=dict(
                         use_asset_returns=False,
-                        incl_open=True
+                        incl_open=True,
+                        benchmark_rets=None
                     ),
                     template_mapping=dict(
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")

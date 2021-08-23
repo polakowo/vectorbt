@@ -3,33 +3,55 @@
 
 """Base class for working with trade records.
 
-Trade records capture information on trades. Use `vectorbt.portfolio.trades.Trades.from_orders`
-to generate trade records from order records. This is done automatically in the
-`vectorbt.portfolio.base.Portfolio` class, available as `vectorbt.portfolio.base.Portfolio.trades`.
+Trade records capture information on trades.
 
-Position records capture information on positions and are also
-provided by `vectorbt.portfolio.base.Portfolio` as `vectorbt.portfolio.base.Portfolio.positions`.
+In vectorbt, a trade is a sequence of orders that starts with an opening order and optionally ends
+with a closing order. Every pair of opposite orders can be represented by a trade. Each trade has a PnL
+info attached to quickly assess its performance. An interesting effect of this representation
+is the ability to aggregate trades: if two or more trades are happening one after another in time,
+they can be aggregated into a bigger trade. This way, for example, single-order trades can be aggregated
+into positions; but also multiple positions can be aggregated into a single blob that reflects the performance
+of the entire symbol.
 
 !!! warning
-    Both record types return both closed AND open trades, which may skew your performance results.
-    To only consider closed trades, you should explicitly query `closed` attribute.
+    All classes return both closed AND open trades/positions, which may skew your performance results.
+    To only consider closed trades/positions, you should explicitly query the `closed` attribute.
 
-## Classes
+## Trade types
 
-### Trades
+There are three main types of trades.
 
-In vectorbt, a trade is a partial closing operation; it's is a more fine-grained representation
-of a position. One position can incorporate multiple trades. Performance for this operation is
-calculated based on the size-weighted average of previous opening operations within the same
-position. The PnL of all trades combined always equals to the PnL of the entire position.
+### Entry trades
 
-For example, if you have a single large buy operation and 100 small sell operations, you will see
-100 trades, each opening with a fraction of the buy operation's size and fees. On the other hand,
-having 100 buy operations and just a single sell operation will generate a single trade with buy
-price being a size-weighted average over all purchase prices, and opening size and fees being
-the sum over all sizes and fees.
+An entry trade is created from each order that opens or adds to a position.
 
-Increasing position:
+For example, if we have a single large buy order and 100 smaller sell orders, we will see
+a single trade with the entry information copied from the buy order and the exit information being
+a size-weighted average over the exit information of all sell orders. On the other hand,
+if we have 100 smaller buy orders and a single sell order, we will see 100 trades,
+each with the entry information copied from the buy order and the exit information being
+a size-based fraction of the exit information of the sell order.
+
+Use `vectorbt.portfolio.trades.EntryTrades.from_orders` to build entry trades from orders.
+Also available as `vectorbt.portfolio.base.Portfolio.entry_trades`.
+
+### Exit trades
+
+An exit trade is created from each order that closes or removes from a position.
+
+Use `vectorbt.portfolio.trades.ExitTrades.from_orders` to build exit trades from orders.
+Also available as `vectorbt.portfolio.base.Portfolio.exit_trades`.
+
+### Positions
+
+A position is created from a sequence of entry or exit trades.
+
+Use `vectorbt.portfolio.trades.Positions.from_trades` to build positions from entry or exit trades.
+Also available as `vectorbt.portfolio.base.Portfolio.positions`.
+
+## Example
+
+* Increasing position:
 
 ```python-repl
 >>> import pandas as pd
@@ -37,136 +59,270 @@ Increasing position:
 >>> from datetime import datetime, timedelta
 >>> import vectorbt as vbt
 
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([1., 1., 1., 1., -4.]),
-...     fixed_fees=1.).trades.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   4.0          0          2.5         4.0         4         5.0
+>>> # Entry trades
+>>> pf_kwargs = dict(
+...     close=pd.Series([1., 2., 3., 4., 5.]),
+...     size=pd.Series([1., 1., 1., 1., -4.]),
+...     fixed_fees=1.
+... )
+>>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
+>>> entry_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+1         1       0   1.0                1              2.0         1.0
+2         2       0   1.0                2              3.0         1.0
+3         3       0   1.0                3              4.0         1.0
 
-   exit_fees  pnl  return  direction  status  position_id
-0        1.0  5.0     0.5          0       1            0
+   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
+0               4             5.0       0.25  2.75  2.7500      Long  Closed
+1               4             5.0       0.25  1.75  0.8750      Long  Closed
+2               4             5.0       0.25  0.75  0.2500      Long  Closed
+3               4             5.0       0.25 -0.25 -0.0625      Long  Closed
+
+   Parent Id
+0          0
+1          0
+2          0
+3          0
+
+>>> # Exit trades
+>>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
+>>> exit_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   4.0                0              2.5         4.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               4             5.0        1.0  5.0     0.5      Long  Closed
+
+   Parent Id
+0          0
+
+>>> # Positions
+>>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
+>>> positions.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   4.0                0              2.5         4.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               4             5.0        1.0  5.0     0.5      Long  Closed
+
+   Parent Id
+0          0
+
+>>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
+True
 ```
 
-Decreasing position:
+* Decreasing position:
 
 ```python-repl
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([4., -1., -1., -1., -1.]),
-...     fixed_fees=1.).trades.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   1.0          0          1.0        0.25         1         2.0
-1   1    0   1.0          0          1.0        0.25         2         3.0
-2   2    0   1.0          0          1.0        0.25         3         4.0
-3   3    0   1.0          0          1.0        0.25         4         5.0
+>>> # Entry trades
+>>> pf_kwargs = dict(
+...     close=pd.Series([1., 2., 3., 4., 5.]),
+...     size=pd.Series([4., -1., -1., -1., -1.]),
+...     fixed_fees=1.
+... )
+>>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
+>>> entry_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   4.0                0              1.0         1.0
 
-   exit_fees   pnl  return  direction  status  position_id
-0        1.0 -0.25   -0.25          0       1            0
-1        1.0  0.75    0.75          0       1            0
-2        1.0  1.75    1.75          0       1            0
-3        1.0  2.75    2.75          0       1            0
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               4             3.5        4.0  5.0    1.25      Long  Closed
+
+   Parent Id
+0          0
+
+>>> # Exit trades
+>>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
+>>> exit_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0        0.25
+1         1       0   1.0                0              1.0        0.25
+2         2       0   1.0                0              1.0        0.25
+3         3       0   1.0                0              1.0        0.25
+
+   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
+0               1             2.0        1.0 -0.25   -0.25      Long  Closed
+1               2             3.0        1.0  0.75    0.75      Long  Closed
+2               3             4.0        1.0  1.75    1.75      Long  Closed
+3               4             5.0        1.0  2.75    2.75      Long  Closed
+
+   Parent Id
+0          0
+1          0
+2          0
+3          0
+
+>>> # Positions
+>>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
+>>> positions.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   4.0                0              1.0         1.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               4             3.5        4.0  5.0    1.25      Long  Closed
+
+   Parent Id
+0          0
+
+>>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
+True
 ```
 
-Multiple reversing positions:
+* Multiple reversing positions:
 
 ```python-repl
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([1., -2., 2., -2., 1.]),
-...     fixed_fees=1.).trades.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   1.0          0          1.0         1.0         1         2.0
-1   1    0   1.0          1          2.0         0.5         2         3.0
-2   2    0   1.0          2          3.0         0.5         3         4.0
-3   3    0   1.0          3          4.0         0.5         4         5.0
+>>> # Entry trades
+>>> pf_kwargs = dict(
+...     close=pd.Series([1., 2., 3., 4., 5.]),
+...     size=pd.Series([1., -2., 2., -2., 1.]),
+...     fixed_fees=1.
+... )
+>>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
+>>> entry_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+1         1       0   1.0                1              2.0         0.5
+2         2       0   1.0                2              3.0         0.5
+3         3       0   1.0                3              4.0         0.5
 
-   exit_fees  pnl  return  direction  status  position_id
-0        0.5 -0.5  -0.500          0       1            0
-1        0.5 -2.0  -1.000          1       1            1
-2        0.5  0.0   0.000          0       1            2
-3        1.0 -2.5  -0.625          1       1            3
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               1             2.0        0.5 -0.5  -0.500      Long  Closed
+1               2             3.0        0.5 -2.0  -1.000     Short  Closed
+2               3             4.0        0.5  0.0   0.000      Long  Closed
+3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+
+   Parent Id
+0          0
+1          1
+2          2
+3          3
+
+>>> # Exit trades
+>>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
+>>> exit_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+1         1       0   1.0                1              2.0         0.5
+2         2       0   1.0                2              3.0         0.5
+3         3       0   1.0                3              4.0         0.5
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               1             2.0        0.5 -0.5  -0.500      Long  Closed
+1               2             3.0        0.5 -2.0  -1.000     Short  Closed
+2               3             4.0        0.5  0.0   0.000      Long  Closed
+3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+
+   Parent Id
+0          0
+1          1
+2          2
+3          3
+
+>>> # Positions
+>>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
+>>> positions.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+1         1       0   1.0                1              2.0         0.5
+2         2       0   1.0                2              3.0         0.5
+3         3       0   1.0                3              4.0         0.5
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
+0               1             2.0        0.5 -0.5  -0.500      Long  Closed
+1               2             3.0        0.5 -2.0  -1.000     Short  Closed
+2               3             4.0        0.5  0.0   0.000      Long  Closed
+3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+
+   Parent Id
+0          0
+1          1
+2          2
+3          3
+
+>>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
+True
 ```
 
-Get count and PnL of trades:
+* Open position:
+
+```python-repl
+>>> # Entry trades
+>>> pf_kwargs = dict(
+...     close=pd.Series([1., 2., 3., 4., 5.]),
+...     size=pd.Series([1., 0., 0., 0., 0.]),
+...     fixed_fees=1.
+... )
+>>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
+>>> entry_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
+0               4             5.0        0.0  3.0     3.0      Long   Open
+
+   Parent Id
+0          0
+
+>>> # Exit trades
+>>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
+>>> exit_trades.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
+0               4             5.0        0.0  3.0     3.0      Long   Open
+
+   Parent Id
+0          0
+
+>>> # Positions
+>>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
+>>> positions.records_readable
+   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
+0         0       0   1.0                0              1.0         1.0
+
+   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
+0               4             5.0        0.0  3.0     3.0      Long   Open
+
+   Parent Id
+0          0
+
+>>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
+True
+```
+
+Get trade count, trade PnL, and winning trade PnL:
 
 ```python-repl
 >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
->>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
->>> pf = vbt.Portfolio.from_orders(price, orders)
+>>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+>>> trades = vbt.Portfolio.from_orders(price, size).trades
 
->>> trades = vbt.Trades.from_orders(pf.orders, price)
 >>> trades.count()
 6
+
 >>> trades.pnl.sum()
 -3.0
+
 >>> trades.winning.count()
 2
+
 >>> trades.winning.pnl.sum()
 1.5
 ```
 
 Get count and PnL of trades with duration of more than 2 days:
+
 ```python-repl
 >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
 >>> trades_filtered = trades.apply_mask(mask)
 >>> trades_filtered.count()
 2
+
 >>> trades_filtered.pnl.sum()
 -3.0
-```
-
-### Positions
-
-In vectorbt, a position aggregates one or multiple trades sharing the same column
-and position index. It has the same layout as a trade.
-
-Increasing position:
-
-```python-repl
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([1., 1., 1., 1., -4.]),
-...     fixed_fees=1.).positions.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   4.0          0          2.5         4.0         4         5.0
-
-   exit_fees  pnl  return  direction  status
-0        1.0  5.0     0.5          0       1
-```
-
-Decreasing position:
-
-```python-repl
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([4., -1., -1., -1., -1.]),
-...     fixed_fees=1.).positions.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   4.0          0          1.0         1.0         4         3.5
-
-   exit_fees  pnl  return  direction  status
-0        4.0  5.0    1.25          0       1
-```
-
-Multiple positions:
-
-```python-repl
->>> vbt.Portfolio.from_orders(
-...     pd.Series([1., 2., 3., 4., 5.]),
-...     pd.Series([1., -2., 2., -2., 1.]),
-...     fixed_fees=1.).positions.records
-   id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0   0    0   1.0          0          1.0         1.0         1         2.0
-1   1    0   1.0          1          2.0         0.5         2         3.0
-2   2    0   1.0          2          3.0         0.5         3         4.0
-3   3    0   1.0          3          4.0         0.5         4         5.0
-
-   exit_fees  pnl  return  direction  status
-0        0.5 -0.5  -0.500          0       1
-1        0.5 -2.0  -1.000          1       1
-2        0.5  0.0   0.000          0       1
-3        1.0 -2.5  -0.625          1       1
 ```
 
 ## Stats
@@ -328,7 +484,7 @@ from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.ranges import Ranges
 from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.records.mapped_array import MappedArray
-from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, position_dt
+from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 
@@ -389,9 +545,8 @@ trades_field_config = Config(
                 title='Status',
                 mapping=TradeStatus
             ),
-            'position_id': dict(
-                title='Position Id',
-                plot=True
+            'parent_id': dict(
+                title='Parent Id'
             )
         }
     ),
@@ -438,7 +593,8 @@ TradesT = tp.TypeVar("TradesT", bound="Trades")
 @attach_fields(trades_attach_field_config)
 @override_field_config(trades_field_config)
 class Trades(Ranges):
-    """Extends `vectorbt.generic.ranges.Ranges` for working with trade records."""
+    """Extends `vectorbt.generic.ranges.Ranges` for working with trade-like records, such as
+    entry trades, exit trades, and positions."""
 
     @property
     def field_config(self) -> Config:
@@ -480,22 +636,6 @@ class Trades(Ranges):
     @classmethod
     def from_ts(cls: tp.Type[TradesT], *args, **kwargs) -> TradesT:
         raise NotImplementedError
-
-    @classmethod
-    def from_orders(cls: tp.Type[TradesT],
-                    orders: Orders,
-                    close: tp.Optional[tp.ArrayLike] = None,
-                    attach_close: bool = True,
-                    **kwargs) -> TradesT:
-        """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
-        if close is None:
-            close = orders.close
-        trade_records_arr = nb.trades_from_orders_nb(
-            orders.values,
-            to_2d_array(close),
-            orders.col_mapper.col_map
-        )
-        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
     @cached_property
     def winning(self: TradesT) -> TradesT:
@@ -835,8 +975,6 @@ class Trades(Ranges):
             id_ = self_col.resolve_field_arr('id')
             id_title = self_col.resolve_field_title('id')
 
-            plot_position_id = self_col.resolve_field_setting('position_id', 'plot', True)
-
             exit_idx = self_col.resolve_map_field_to_index('exit_idx')
             exit_idx_title = self_col.resolve_field_title('exit_idx')
 
@@ -862,30 +1000,19 @@ class Trades(Ranges):
 
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    if plot_position_id:
-                        position_id = self_col.resolve_field_arr('position_id')
-                        position_id_title = self_col.resolve_field_title('position_id')
-                        customdata = np.stack((
-                            id_[mask],
-                            position_id[mask],
-                            pnl[mask],
-                            returns[mask]
-                        ), axis=1)
-                        hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                        f"<br>{position_id_title}: %{{customdata[1]}}" \
-                                        f"<br>{exit_idx_title}: %{{x}}" \
-                                        f"<br>{pnl_title}: %{{customdata[2]:.6f}}" \
-                                        f"<br>{return_title}: %{{customdata[3]:.2%}}"
-                    else:
-                        customdata = np.stack((
-                            id_[mask],
-                            pnl[mask],
-                            returns[mask]
-                        ), axis=1)
-                        hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                        f"<br>{exit_idx_title}: %{{x}}" \
-                                        f"<br>{pnl_title}: %{{customdata[1]:.6f}}" \
-                                        f"<br>{return_title}: %{{customdata[2]:.2%}}"
+                    parent_id = self_col.resolve_field_arr('parent_id')
+                    parent_id_title = self_col.resolve_field_title('parent_id')
+                    customdata = np.stack((
+                        id_[mask],
+                        parent_id[mask],
+                        pnl[mask],
+                        returns[mask]
+                    ), axis=1)
+                    hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                    f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                    f"<br>{exit_idx_title}: %{{x}}" \
+                                    f"<br>{pnl_title}: %{{customdata[2]:.6f}}" \
+                                    f"<br>{return_title}: %{{customdata[3]:.2%}}"
                     scatter = go.Scatter(
                         x=exit_idx[mask],
                         y=returns[mask] if pct_scale else pnl[mask],
@@ -1042,8 +1169,6 @@ class Trades(Ranges):
             id_ = self_col.resolve_field_arr('id')
             id_title = self_col.resolve_field_title('id')
 
-            plot_position_id = self_col.resolve_field_setting('position_id', 'plot', True)
-
             size = self_col.resolve_field_arr('size')
             size_title = self_col.resolve_field_title('size')
 
@@ -1080,36 +1205,22 @@ class Trades(Ranges):
                 self_col.duration.values, to_pd=True, silence_warnings=True))
 
             # Plot Entry markers
-            if plot_position_id:
-                position_id = self_col.resolve_field_arr('position_id')
-                position_id_title = self_col.resolve_field_title('position_id')
-                entry_customdata = np.stack((
-                    id_,
-                    position_id,
-                    size,
-                    entry_fees,
-                    direction
-                ), axis=1)
-                entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                      f"<br>{position_id_title}: %{{customdata[1]}}" \
-                                      f"<br>{size_title}: %{{customdata[2]:.6f}}" \
-                                      f"<br>{entry_idx_title}: %{{x}}" \
-                                      f"<br>{entry_price_title}: %{{y}}" \
-                                      f"<br>{entry_fees_title}: %{{customdata[3]:.6f}}" \
-                                      f"<br>{direction_title}: %{{customdata[4]}}"
-            else:
-                entry_customdata = np.stack((
-                    id_,
-                    size,
-                    entry_fees,
-                    direction
-                ), axis=1)
-                entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                      f"<br>{size_title}: %{{customdata[1]:.6f}}" \
-                                      f"<br>{entry_idx_title}: %{{x}}" \
-                                      f"<br>{entry_price_title}: %{{y}}" \
-                                      f"<br>{entry_fees_title}: %{{customdata[2]:.6f}}" \
-                                      f"<br>{direction_title}: %{{customdata[3]}}"
+            parent_id = self_col.resolve_field_arr('parent_id')
+            parent_id_title = self_col.resolve_field_title('parent_id')
+            entry_customdata = np.stack((
+                id_,
+                parent_id,
+                size,
+                entry_fees,
+                direction
+            ), axis=1)
+            entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                  f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                  f"<br>{size_title}: %{{customdata[2]:.6f}}" \
+                                  f"<br>{entry_idx_title}: %{{x}}" \
+                                  f"<br>{entry_price_title}: %{{y}}" \
+                                  f"<br>{entry_fees_title}: %{{customdata[3]:.6f}}" \
+                                  f"<br>{direction_title}: %{{customdata[4]}}"
             entry_scatter = go.Scatter(
                 x=entry_idx,
                 y=entry_price,
@@ -1133,48 +1244,28 @@ class Trades(Ranges):
             # Plot end markers
             def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    if plot_position_id:
-                        position_id = self_col.resolve_field_arr('position_id')
-                        position_id_title = self_col.resolve_field_title('position_id')
-                        exit_customdata = np.stack((
-                            id_[mask],
-                            position_id[mask],
-                            size[mask],
-                            exit_fees[mask],
-                            pnl[mask],
-                            returns[mask],
-                            direction[mask],
-                            duration[mask]
-                        ), axis=1)
-                        exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                             f"<br>{position_id_title}: %{{customdata[1]}}" \
-                                             f"<br>{size_title}: %{{customdata[2]:.6f}}" \
-                                             f"<br>{exit_idx_title}: %{{x}}" \
-                                             f"<br>{exit_price_title}: %{{y}}" \
-                                             f"<br>{exit_fees_title}: %{{customdata[3]:.6f}}" \
-                                             f"<br>{pnl_title}: %{{customdata[4]:.6f}}" \
-                                             f"<br>{return_title}: %{{customdata[5]:.2%}}" \
-                                             f"<br>{direction_title}: %{{customdata[6]}}" \
-                                             f"<br>Duration: %{{customdata[7]}}"
-                    else:
-                        exit_customdata = np.stack((
-                            id_[mask],
-                            size[mask],
-                            exit_fees[mask],
-                            pnl[mask],
-                            returns[mask],
-                            direction[mask],
-                            duration[mask]
-                        ), axis=1)
-                        exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                             f"<br>{size_title}: %{{customdata[1]:.6f}}" \
-                                             f"<br>{exit_idx_title}: %{{x}}" \
-                                             f"<br>{exit_price_title}: %{{y}}" \
-                                             f"<br>{exit_fees_title}: %{{customdata[2]:.6f}}" \
-                                             f"<br>{pnl_title}: %{{customdata[3]:.6f}}" \
-                                             f"<br>{return_title}: %{{customdata[4]:.2%}}" \
-                                             f"<br>{direction_title}: %{{customdata[5]}}" \
-                                             f"<br>Duration: %{{customdata[6]}}"
+                    parent_id = self_col.resolve_field_arr('parent_id')
+                    parent_id_title = self_col.resolve_field_title('parent_id')
+                    exit_customdata = np.stack((
+                        id_[mask],
+                        parent_id[mask],
+                        size[mask],
+                        exit_fees[mask],
+                        pnl[mask],
+                        returns[mask],
+                        direction[mask],
+                        duration[mask]
+                    ), axis=1)
+                    exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                         f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                         f"<br>{size_title}: %{{customdata[2]:.6f}}" \
+                                         f"<br>{exit_idx_title}: %{{x}}" \
+                                         f"<br>{exit_price_title}: %{{y}}" \
+                                         f"<br>{exit_fees_title}: %{{customdata[3]:.6f}}" \
+                                         f"<br>{pnl_title}: %{{customdata[4]:.6f}}" \
+                                         f"<br>{return_title}: %{{customdata[5]:.2%}}" \
+                                         f"<br>{direction_title}: %{{customdata[6]}}" \
+                                         f"<br>Duration: %{{customdata[7]}}"
                     scatter = go.Scatter(
                         x=exit_idx[mask],
                         y=exit_price[mask],
@@ -1270,36 +1361,61 @@ class Trades(Ranges):
 Trades.override_field_config_doc(__pdoc__)
 Trades.override_metrics_doc(__pdoc__)
 
+# ############# EntryTrades ############# #
+
+EntryTradesT = tp.TypeVar("EntryTradesT", bound="EntryTrades")
+
+
+class EntryTrades(Trades):
+    """Extends `Trades` for working with entry trade records."""
+
+    @classmethod
+    def from_orders(cls: tp.Type[EntryTradesT],
+                    orders: Orders,
+                    close: tp.Optional[tp.ArrayLike] = None,
+                    attach_close: bool = True,
+                    **kwargs) -> EntryTradesT:
+        """Build `EntryTrades` from `vectorbt.portfolio.orders.Orders`."""
+        if close is None:
+            close = orders.close
+        trade_records_arr = nb.get_entry_trades_nb(
+            orders.values,
+            to_2d_array(close),
+            orders.col_mapper.col_map
+        )
+        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+
+
+# ############# ExitTrades ############# #
+
+ExitTradesT = tp.TypeVar("ExitTradesT", bound="ExitTrades")
+
+
+class ExitTrades(Trades):
+    """Extends `Trades` for working with exit trade records."""
+
+    @classmethod
+    def from_orders(cls: tp.Type[ExitTradesT],
+                    orders: Orders,
+                    close: tp.Optional[tp.ArrayLike] = None,
+                    attach_close: bool = True,
+                    **kwargs) -> ExitTradesT:
+        """Build `ExitTrades` from `vectorbt.portfolio.orders.Orders`."""
+        if close is None:
+            close = orders.close
+        trade_records_arr = nb.get_exit_trades_nb(
+            orders.values,
+            to_2d_array(close),
+            orders.col_mapper.col_map
+        )
+        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+
+
 # ############# Positions ############# #
-
-positions_field_config = Config(
-    dict(
-        dtype=position_dt,
-        settings={
-            'id': dict(
-                title='Position Id'
-            ),
-            'position_id': dict(
-                plot=False
-            )
-        }
-    ),
-    readonly=True,
-    as_attrs=False
-)
-"""_"""
-
-__pdoc__['positions_field_config'] = f"""Field config for `Positions`.
-
-```json
-{positions_field_config.to_doc()}
-```
-"""
 
 PositionsT = tp.TypeVar("PositionsT", bound="Positions")
 
 
-@override_field_config(positions_field_config)
 class Positions(Trades):
     """Extends `Trades` for working with position records."""
 
@@ -1316,184 +1432,5 @@ class Positions(Trades):
         """Build `Positions` from `Trades`."""
         if close is None:
             close = trades.close
-        position_records_arr = nb.positions_from_trades_nb(trades.values, trades.col_mapper.col_map)
+        position_records_arr = nb.get_positions_nb(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)
-
-    @classmethod
-    def from_orders(cls: tp.Type[PositionsT],
-                    orders: Orders,
-                    close: tp.Optional[tp.ArrayLike] = None,
-                    attach_close: bool = True,
-                    **kwargs) -> PositionsT:
-        """Build `Trades` from `vectorbt.portfolio.orders.Orders` and `close`."""
-        trades = Trades.from_orders(orders, close=close, attach_close=False)
-        return cls.from_trades(trades, close=close, attach_close=attach_close, **kwargs)
-
-    # ############# Stats ############# #
-
-    @property
-    def stats_defaults(self) -> tp.Kwargs:
-        """Defaults for `Positions.stats`.
-
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults`,
-        `Trades.stats_defaults`, and `positions.stats` in `vectorbt._settings.settings`."""
-        from vectorbt._settings import settings
-        positions_stats_cfg = settings['positions']['stats']
-
-        return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
-            Trades.stats_defaults.__get__(self),
-            positions_stats_cfg
-        )
-
-    _metrics: tp.ClassVar[Config] = Config(
-        dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            period=dict(
-                title='Period',
-                calc_func=lambda self: len(self.wrapper.index),
-                apply_to_timedelta=True,
-                agg_func=None,
-                tags='wrapper'
-            ),
-            first_position_start=dict(
-                title='First Position Start',
-                calc_func='entry_idx.nth',
-                n=0,
-                wrap_kwargs=dict(to_index=True),
-                tags=['positions', 'index']
-            ),
-            last_position_end=dict(
-                title='Last Position End',
-                calc_func='exit_idx.nth',
-                n=-1,
-                wrap_kwargs=dict(to_index=True),
-                tags=['positions', 'index']
-            ),
-            coverage=dict(
-                title='Coverage [%]',
-                calc_func='coverage',
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=['ranges', 'duration']
-            ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
-            ),
-            total_long_positions=dict(
-                title='Total Long Positions',
-                calc_func='long.count',
-                tags=['positions', 'long']
-            ),
-            total_short_positions=dict(
-                title='Total Short Positions',
-                calc_func='short.count',
-                tags=['positions', 'short']
-            ),
-            total_closed_positions=dict(
-                title='Total Closed Positions',
-                calc_func='closed.count',
-                tags=['positions', 'closed']
-            ),
-            total_open_positions=dict(
-                title='Total Open Positions',
-                calc_func='open.count',
-                tags=['positions', 'open']
-            ),
-            open_position_pnl=dict(
-                title='Open Position PnL',
-                calc_func='open.pnl.sum',
-                tags=['positions', 'open']
-            ),
-            win_rate=dict(
-                title='Win Rate [%]',
-                calc_func='closed.win_rate',
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['positions', *incl_open_tags]")
-            ),
-            winning_streak=dict(
-                title='Max Win Streak',
-                calc_func=RepEval("'winning_streak.max' if incl_open else 'closed.winning_streak.max'"),
-                wrap_kwargs=dict(dtype=pd.Int64Dtype()),
-                tags=RepEval("['positions', *incl_open_tags, 'streak']")
-            ),
-            losing_streak=dict(
-                title='Max Loss Streak',
-                calc_func=RepEval("'losing_streak.max' if incl_open else 'closed.losing_streak.max'"),
-                wrap_kwargs=dict(dtype=pd.Int64Dtype()),
-                tags=RepEval("['positions', *incl_open_tags, 'streak']")
-            ),
-            best_position=dict(
-                title='Best Position [%]',
-                calc_func=RepEval("'returns.max' if incl_open else 'closed.returns.max'"),
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['positions', *incl_open_tags]")
-            ),
-            worst_position=dict(
-                title='Worst Position [%]',
-                calc_func=RepEval("'returns.min' if incl_open else 'closed.returns.min'"),
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['positions', *incl_open_tags]")
-            ),
-            avg_winning_position=dict(
-                title='Avg Winning Position [%]',
-                calc_func=RepEval("'winning.returns.mean' if incl_open else 'closed.winning.returns.mean'"),
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['positions', *incl_open_tags, 'winning']")
-            ),
-            avg_losing_position=dict(
-                title='Avg Losing Position [%]',
-                calc_func=RepEval("'losing.returns.mean' if incl_open else 'closed.losing.returns.mean'"),
-                post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['positions', *incl_open_tags, 'losing']")
-            ),
-            avg_winning_position_duration=dict(
-                title='Avg Winning Position Duration',
-                calc_func=RepEval("'winning.avg_duration' if incl_open else 'closed.winning.avg_duration'"),
-                fill_wrap_kwargs=True,
-                tags=RepEval("['positions', *incl_open_tags, 'winning', 'duration']")
-            ),
-            avg_losing_position_duration=dict(
-                title='Avg Losing Position Duration',
-                calc_func=RepEval("'losing.avg_duration' if incl_open else 'closed.losing.avg_duration'"),
-                fill_wrap_kwargs=True,
-                tags=RepEval("['positions', *incl_open_tags, 'losing', 'duration']")
-            ),
-            profit_factor=dict(
-                title='Profit Factor',
-                calc_func=RepEval("'profit_factor' if incl_open else 'closed.profit_factor'"),
-                tags=RepEval("['positions', *incl_open_tags]")
-            ),
-            expectancy=dict(
-                title='Expectancy',
-                calc_func=RepEval("'expectancy' if incl_open else 'closed.expectancy'"),
-                tags=RepEval("['positions', *incl_open_tags]")
-            ),
-            sqn=dict(
-                title='SQN',
-                calc_func=RepEval("'sqn' if incl_open else 'closed.sqn'"),
-                tags=RepEval("['positions', *incl_open_tags]")
-            )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
-    )
-
-    @property
-    def metrics(self) -> Config:
-        return self._metrics
-
-
-Positions.override_field_config_doc(__pdoc__)
-Positions.override_metrics_doc(__pdoc__)

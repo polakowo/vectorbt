@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 
 from vectorbt.generic.enums import range_dt, drawdown_dt
-from vectorbt.portfolio.enums import order_dt, trade_dt, position_dt, log_dt
+from vectorbt.portfolio.enums import order_dt, trade_dt, log_dt
 
 from tests.utils import record_arrays_close
 
@@ -1801,6 +1801,7 @@ class TestRanges:
         pd.testing.assert_index_equal(stats_df.index, ranges.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+
 # ############# drawdowns.py ############# #
 
 
@@ -2561,42 +2562,42 @@ class TestOrders:
 
 # ############# trades.py ############# #
 
-trades = vbt.Trades.from_orders(orders)
-trades_grouped = vbt.Trades.from_orders(orders_grouped)
+exit_trades = vbt.ExitTrades.from_orders(orders)
+exit_trades_grouped = vbt.ExitTrades.from_orders(orders_grouped)
 
 
-class TestTrades:
+class TestExitTrades:
     def test_mapped_fields(self):
         for name in trade_dt.names:
             if name == 'return':
                 np.testing.assert_array_equal(
-                    getattr(trades, 'returns').values,
-                    trades.values[name]
+                    getattr(exit_trades, 'returns').values,
+                    exit_trades.values[name]
                 )
             else:
                 np.testing.assert_array_equal(
-                    getattr(trades, name).values,
-                    trades.values[name]
+                    getattr(exit_trades, name).values,
+                    exit_trades.values[name]
                 )
 
     def test_close(self):
         pd.testing.assert_frame_equal(
-            trades.close,
+            exit_trades.close,
             close
         )
         pd.testing.assert_series_equal(
-            trades['a'].close,
+            exit_trades['a'].close,
             close['a']
         )
         pd.testing.assert_frame_equal(
-            trades_grouped['g1'].close,
+            exit_trades_grouped['g1'].close,
             close[['a', 'b']]
         )
-        assert trades.copy(close=None)['a'].close is None
+        assert exit_trades.copy(close=None)['a'].close is None
 
     def test_records_arr(self):
         record_arrays_close(
-            trades.values,
+            exit_trades.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2619,12 +2620,12 @@ class TestTrades:
             orders.values[orders.values['col'] == 0]
         )))
         record_arrays_close(
-            vbt.Trades.from_orders(reversed_col_orders).values,
-            trades.values
+            vbt.ExitTrades.from_orders(reversed_col_orders).values,
+            exit_trades.values
         )
 
     def test_records_readable(self):
-        records_readable = trades.records_readable
+        records_readable = exit_trades.records_readable
 
         np.testing.assert_array_equal(
             records_readable['Trade Id'].values,
@@ -2729,7 +2730,7 @@ class TestTrades:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Position Id'].values,
+            records_readable['Parent Id'].values,
             np.array([
                 0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9
             ])
@@ -2737,19 +2738,19 @@ class TestTrades:
 
     def test_duration(self):
         np.testing.assert_array_almost_equal(
-            trades['a'].duration.values,
+            exit_trades['a'].duration.values,
             np.array([2, 3, 1, 1])
         )
         np.testing.assert_array_almost_equal(
-            trades.duration.values,
+            exit_trades.duration.values,
             np.array([2, 3, 1, 1, 2, 3, 1, 1, 2, 3, 1, 1, 1])
         )
 
     def test_winning_records(self):
-        assert isinstance(trades.winning, vbt.Trades)
-        assert trades.winning.wrapper == trades.wrapper
+        assert isinstance(exit_trades.winning, vbt.ExitTrades)
+        assert exit_trades.winning.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].winning.values,
+            exit_trades['a'].winning.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2757,11 +2758,11 @@ class TestTrades:
             ], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].winning.values,
-            trades.winning['a'].values
+            exit_trades['a'].winning.values,
+            exit_trades.winning['a'].values
         )
         record_arrays_close(
-            trades.winning.values,
+            exit_trades.winning.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2773,20 +2774,20 @@ class TestTrades:
         )
 
     def test_losing_records(self):
-        assert isinstance(trades.losing, vbt.Trades)
-        assert trades.losing.wrapper == trades.wrapper
+        assert isinstance(exit_trades.losing, vbt.ExitTrades)
+        assert exit_trades.losing.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].losing.values,
+            exit_trades['a'].losing.values,
             np.array([
                 (3, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0, 2)
             ], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].losing.values,
-            trades.losing['a'].values
+            exit_trades['a'].losing.values,
+            exit_trades.losing['a'].values
         )
         record_arrays_close(
-            trades.losing.values,
+            exit_trades.losing.values,
             np.array([
                 (3, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0, 2),
                 (4, 1, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, -1.95, -1.7875, 1, 1, 3),
@@ -2799,16 +2800,16 @@ class TestTrades:
         )
 
     def test_win_rate(self):
-        assert trades['a'].win_rate() == 0.75
+        assert exit_trades['a'].win_rate() == 0.75
         pd.testing.assert_series_equal(
-            trades.win_rate(),
+            exit_trades.win_rate(),
             pd.Series(
                 np.array([0.75, 0., 0.6, np.nan]),
                 index=close.columns
             ).rename('win_rate')
         )
         pd.testing.assert_series_equal(
-            trades_grouped.win_rate(),
+            exit_trades_grouped.win_rate(),
             pd.Series(
                 np.array([0.375, 0.6]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
@@ -2817,35 +2818,35 @@ class TestTrades:
 
     def test_winning_streak(self):
         np.testing.assert_array_almost_equal(
-            trades['a'].winning_streak.values,
+            exit_trades['a'].winning_streak.values,
             np.array([1, 2, 3, 0])
         )
         np.testing.assert_array_almost_equal(
-            trades.winning_streak.values,
+            exit_trades.winning_streak.values,
             np.array([1, 2, 3, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0])
         )
 
     def test_losing_streak(self):
         np.testing.assert_array_almost_equal(
-            trades['a'].losing_streak.values,
+            exit_trades['a'].losing_streak.values,
             np.array([0, 0, 0, 1])
         )
         np.testing.assert_array_almost_equal(
-            trades.losing_streak.values,
+            exit_trades.losing_streak.values,
             np.array([0, 0, 0, 1, 1, 2, 3, 4, 0, 0, 0, 1, 2])
         )
 
     def test_profit_factor(self):
-        assert trades['a'].profit_factor() == 18.9
+        assert exit_trades['a'].profit_factor() == 18.9
         pd.testing.assert_series_equal(
-            trades.profit_factor(),
+            exit_trades.profit_factor(),
             pd.Series(
                 np.array([18.9, 0., 2.45853659, np.nan]),
                 index=ts2.columns
             ).rename('profit_factor')
         )
         pd.testing.assert_series_equal(
-            trades_grouped.profit_factor(),
+            exit_trades_grouped.profit_factor(),
             pd.Series(
                 np.array([0.81818182, 2.45853659]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
@@ -2853,16 +2854,16 @@ class TestTrades:
         )
 
     def test_expectancy(self):
-        assert trades['a'].expectancy() == 0.716
+        assert exit_trades['a'].expectancy() == 0.716
         pd.testing.assert_series_equal(
-            trades.expectancy(),
+            exit_trades.expectancy(),
             pd.Series(
                 np.array([0.716, -0.884, 0.3588, np.nan]),
                 index=ts2.columns
             ).rename('expectancy')
         )
         pd.testing.assert_series_equal(
-            trades_grouped.expectancy(),
+            exit_trades_grouped.expectancy(),
             pd.Series(
                 np.array([-0.084, 0.3588]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
@@ -2870,16 +2871,16 @@ class TestTrades:
         )
 
     def test_sqn(self):
-        assert trades['a'].sqn() == 1.634155521947584
+        assert exit_trades['a'].sqn() == 1.634155521947584
         pd.testing.assert_series_equal(
-            trades.sqn(),
+            exit_trades.sqn(),
             pd.Series(
                 np.array([1.63415552, -2.13007307, 0.71660403, np.nan]),
                 index=ts2.columns
             ).rename('sqn')
         )
         pd.testing.assert_series_equal(
-            trades_grouped.sqn(),
+            exit_trades_grouped.sqn(),
             pd.Series(
                 np.array([-0.20404671, 0.71660403]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
@@ -2887,10 +2888,10 @@ class TestTrades:
         )
 
     def test_long_records(self):
-        assert isinstance(trades.long, vbt.Trades)
-        assert trades.long.wrapper == trades.wrapper
+        assert isinstance(exit_trades.long, vbt.ExitTrades)
+        assert exit_trades.long.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].long.values,
+            exit_trades['a'].long.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2899,11 +2900,11 @@ class TestTrades:
             ], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].long.values,
-            trades.long['a'].values
+            exit_trades['a'].long.values,
+            exit_trades.long['a'].values
         )
         record_arrays_close(
-            trades.long.values,
+            exit_trades.long.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2917,18 +2918,18 @@ class TestTrades:
         )
 
     def test_short_records(self):
-        assert isinstance(trades.short, vbt.Trades)
-        assert trades.short.wrapper == trades.wrapper
+        assert isinstance(exit_trades.short, vbt.ExitTrades)
+        assert exit_trades.short.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].short.values,
+            exit_trades['a'].short.values,
             np.array([], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].short.values,
-            trades.short['a'].values
+            exit_trades['a'].short.values,
+            exit_trades.short['a'].values
         )
         record_arrays_close(
-            trades.short.values,
+            exit_trades.short.values,
             np.array([
                 (4, 1, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, -1.95, -1.7875, 1, 1, 3),
                 (5, 1, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, -0.296, -2.71333333, 1, 1, 3),
@@ -2939,20 +2940,20 @@ class TestTrades:
         )
 
     def test_open_records(self):
-        assert isinstance(trades.open, vbt.Trades)
-        assert trades.open.wrapper == trades.wrapper
+        assert isinstance(exit_trades.open, vbt.ExitTrades)
+        assert exit_trades.open.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].open.values,
+            exit_trades['a'].open.values,
             np.array([
                 (3, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0, 2)
             ], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].open.values,
-            trades.open['a'].values
+            exit_trades['a'].open.values,
+            exit_trades.open['a'].values
         )
         record_arrays_close(
-            trades.open.values,
+            exit_trades.open.values,
             np.array([
                 (3, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0, 2),
                 (7, 1, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 1, 0, 5),
@@ -2961,10 +2962,10 @@ class TestTrades:
         )
 
     def test_closed_records(self):
-        assert isinstance(trades.closed, vbt.Trades)
-        assert trades.closed.wrapper == trades.wrapper
+        assert isinstance(exit_trades.closed, vbt.ExitTrades)
+        assert exit_trades.closed.wrapper == exit_trades.wrapper
         record_arrays_close(
-            trades['a'].closed.values,
+            exit_trades['a'].closed.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -2972,11 +2973,11 @@ class TestTrades:
             ], dtype=trade_dt)
         )
         record_arrays_close(
-            trades['a'].closed.values,
-            trades.closed['a'].values
+            exit_trades['a'].closed.values,
+            exit_trades.closed['a'].values
         )
         record_arrays_close(
-            trades.closed.values,
+            exit_trades.closed.values,
             np.array([
                 (0, 0, 1., 0, 1.09090909, 0.01090909, 2, 3., 0.03, 1.86818182, 1.7125, 0, 1, 0),
                 (1, 0, 0.1, 0, 1.09090909, 0.00109091, 3, 4., 0.004, 0.28581818, 2.62, 0, 1, 0),
@@ -3002,7 +3003,7 @@ class TestTrades:
             'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy', 'SQN'
         ], dtype='object')
         pd.testing.assert_series_equal(
-            trades.stats(),
+            exit_trades.stats(),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
@@ -3017,7 +3018,7 @@ class TestTrades:
             )
         )
         pd.testing.assert_series_equal(
-            trades.stats(settings=dict(incl_open=True)),
+            exit_trades.stats(settings=dict(incl_open=True)),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
@@ -3032,7 +3033,7 @@ class TestTrades:
             )
         )
         pd.testing.assert_series_equal(
-            trades.stats(column='a'),
+            exit_trades.stats(column='a'),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
@@ -3046,7 +3047,7 @@ class TestTrades:
             )
         )
         pd.testing.assert_series_equal(
-            trades.stats(column='g1', group_by=group_by),
+            exit_trades.stats(column='g1', group_by=group_by),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
                 pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
@@ -3060,7 +3061,7 @@ class TestTrades:
             )
         )
         pd.testing.assert_index_equal(
-            trades.stats(tags='trades').index,
+            exit_trades.stats(tags='trades').index,
             pd.Index([
                 'First Trade Start', 'Last Trade End', 'Total Long Trades',
                 'Total Short Trades', 'Total Closed Trades', 'Total Open Trades',
@@ -3071,277 +3072,96 @@ class TestTrades:
             ], dtype='object')
         )
         pd.testing.assert_series_equal(
-            trades['c'].stats(),
-            trades.stats(column='c')
+            exit_trades['c'].stats(),
+            exit_trades.stats(column='c')
         )
         pd.testing.assert_series_equal(
-            trades['c'].stats(),
-            trades.stats(column='c', group_by=False)
+            exit_trades['c'].stats(),
+            exit_trades.stats(column='c', group_by=False)
         )
         pd.testing.assert_series_equal(
-            trades_grouped['g2'].stats(),
-            trades_grouped.stats(column='g2')
+            exit_trades_grouped['g2'].stats(),
+            exit_trades_grouped.stats(column='g2')
         )
         pd.testing.assert_series_equal(
-            trades_grouped['g2'].stats(),
-            trades.stats(column='g2', group_by=group_by)
+            exit_trades_grouped['g2'].stats(),
+            exit_trades.stats(column='g2', group_by=group_by)
         )
-        stats_df = trades.stats(agg_func=None)
+        stats_df = exit_trades.stats(agg_func=None)
         assert stats_df.shape == (4, 25)
-        pd.testing.assert_index_equal(stats_df.index, trades.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.index, exit_trades.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
 
-positions = vbt.Positions.from_trades(trades)
-positions_grouped = vbt.Positions.from_trades(trades_grouped)
+entry_trades = vbt.EntryTrades.from_orders(orders)
+entry_trades_grouped = vbt.EntryTrades.from_orders(orders_grouped)
+
+
+class TestEntryTrades:
+    def test_records_arr(self):
+        record_arrays_close(
+            entry_trades.values,
+            np.array([
+                (0, 0, 1.0, 0, 1.0, 0.01, 3, 3.0909090909090904, 0.03090909090909091, 2.05, 2.05, 0, 1, 0),
+                (1, 0, 0.1, 1, 2.0, 0.002, 3, 3.0909090909090904, 0.003090909090909091,
+                 0.10399999999999998, 0.5199999999999999, 0, 1, 0),
+                (2, 0, 1.0, 5, 6.0, 0.06, 6, 7.0, 0.07, 0.8699999999999999, 0.145, 0, 1, 1),
+                (3, 0, 2.0, 7, 8.0, 0.16, 7, 8.0, 0.0, -0.16, -0.01, 0, 0, 2),
+                (4, 1, 1.0, 0, 1.0, 0.01, 3, 3.0909090909090904, 0.03090909090909091,
+                 -2.131818181818181, -2.131818181818181, 1, 1, 3),
+                (5, 1, 0.1, 1, 2.0, 0.002, 3, 3.0909090909090904, 0.003090909090909091,
+                 -0.11418181818181816, -0.5709090909090908, 1, 1, 3),
+                (6, 1, 1.0, 5, 6.0, 0.06, 6, 7.0, 0.07, -1.1300000000000001, -0.18833333333333335, 1, 1, 4),
+                (7, 1, 2.0, 7, 8.0, 0.16, 7, 8.0, 0.0, -0.16, -0.01, 1, 0, 5),
+                (8, 2, 1.0, 0, 1.0, 0.01, 3, 3.0909090909090904, 0.03090909090909091, 2.05, 2.05, 0, 1, 6),
+                (9, 2, 0.1, 1, 2.0, 0.002, 3, 3.0909090909090904, 0.003090909090909091,
+                 0.10399999999999998, 0.5199999999999999, 0, 1, 6),
+                (10, 2, 1.0, 5, 6.0, 0.06, 6, 7.0, 0.07, 0.8699999999999999, 0.145, 0, 1, 7),
+                (11, 2, 1.0, 6, 7.0, 0.07, 7, 8.0, 0.08, -1.1500000000000001, -0.1642857142857143, 1, 1, 8),
+                (12, 2, 1.0, 7, 8.0, 0.08, 7, 8.0, 0.0, -0.08, -0.01, 0, 0, 9)
+            ], dtype=trade_dt)
+        )
+        reversed_col_orders = orders.copy(records_arr=np.concatenate((
+            orders.values[orders.values['col'] == 2],
+            orders.values[orders.values['col'] == 1],
+            orders.values[orders.values['col'] == 0]
+        )))
+        record_arrays_close(
+            vbt.EntryTrades.from_orders(reversed_col_orders).values,
+            entry_trades.values
+        )
+
+
+positions = vbt.Positions.from_trades(exit_trades)
+positions_grouped = vbt.Positions.from_trades(exit_trades_grouped)
 
 
 class TestPositions:
-    def test_mapped_fields(self):
-        for name in position_dt.names:
-            if name == 'return':
-                np.testing.assert_array_equal(
-                    getattr(positions, 'returns').values,
-                    positions.values[name]
-                )
-            else:
-                np.testing.assert_array_equal(
-                    getattr(positions, name).values,
-                    positions.values[name]
-                )
-
-    def test_close(self):
-        pd.testing.assert_frame_equal(
-            positions.close,
-            close
-        )
-        pd.testing.assert_series_equal(
-            positions['a'].close,
-            close['a']
-        )
-        pd.testing.assert_frame_equal(
-            positions_grouped['g1'].close,
-            close[['a', 'b']]
-        )
-        assert positions.copy(close=None)['a'].close is None
-
     def test_records_arr(self):
         record_arrays_close(
             positions.values,
             np.array([
-                (0, 0, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, 2.154, 1.795, 0, 1),
-                (1, 0, 1., 5, 6., 0.06, 6, 7., 0.07, 0.87, 0.145, 0, 1),
-                (2, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0),
-                (3, 1, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, -2.246, -1.87166667, 1, 1),
-                (4, 1, 1., 5, 6., 0.06, 6, 7., 0.07, -1.13, -0.18833333, 1, 1),
-                (5, 1, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 1, 0),
-                (6, 2, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, 2.154, 1.795, 0, 1),
-                (7, 2, 1., 5, 6., 0.06, 6, 7., 0.07, 0.87, 0.145, 0, 1),
-                (8, 2, 1., 6, 7., 0.07, 7, 8., 0.08, -1.15, -0.16428571, 1, 1),
-                (9, 2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0)
-            ], dtype=position_dt)
+                (0, 0, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, 2.154, 1.795, 0, 1, 0),
+                (1, 0, 1., 5, 6., 0.06, 6, 7., 0.07, 0.87, 0.145, 0, 1, 1),
+                (2, 0, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 0, 0, 2),
+                (3, 1, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, -2.246, -1.87166667, 1, 1, 3),
+                (4, 1, 1., 5, 6., 0.06, 6, 7., 0.07, -1.13, -0.18833333, 1, 1, 4),
+                (5, 1, 2., 7, 8., 0.16, 7, 8., 0., -0.16, -0.01, 1, 0, 5),
+                (6, 2, 1.1, 0, 1.09090909, 0.012, 3, 3.09090909, 0.034, 2.154, 1.795, 0, 1, 6),
+                (7, 2, 1., 5, 6., 0.06, 6, 7., 0.07, 0.87, 0.145, 0, 1, 7),
+                (8, 2, 1., 6, 7., 0.07, 7, 8., 0.08, -1.15, -0.16428571, 1, 1, 8),
+                (9, 2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 9)
+            ], dtype=trade_dt)
         )
-        reversed_col_trades = trades.copy(records_arr=np.concatenate((
-            trades.values[trades.values['col'] == 2],
-            trades.values[trades.values['col'] == 1],
-            trades.values[trades.values['col'] == 0]
+        reversed_col_trades = exit_trades.copy(records_arr=np.concatenate((
+            exit_trades.values[exit_trades.values['col'] == 2],
+            exit_trades.values[exit_trades.values['col'] == 1],
+            exit_trades.values[exit_trades.values['col'] == 0]
         )))
         record_arrays_close(
             vbt.Positions.from_trades(reversed_col_trades).values,
             positions.values
         )
-
-    def test_records_readable(self):
-        records_readable = positions.records_readable
-
-        np.testing.assert_array_equal(
-            records_readable['Position Id'].values,
-            np.array([
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Column'].values,
-            np.array([
-                'a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c'
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Size'].values,
-            np.array([
-                1.1, 1.0, 2.0, 1.1, 1.0, 2.0, 1.1, 1.0, 1.0, 1.0
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Entry Timestamp'].values,
-            np.array([
-                '2020-01-01T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
-                '2020-01-08T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
-                '2020-01-06T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
-                '2020-01-01T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
-                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000'
-            ], dtype='datetime64[ns]')
-        )
-        np.testing.assert_array_equal(
-            records_readable['Avg Entry Price'].values,
-            np.array([
-                1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 7.0, 8.0
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Entry Fees'].values,
-            np.array([
-                0.012, 0.06, 0.16, 0.012, 0.06, 0.16, 0.012, 0.06, 0.07, 0.08
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Exit Timestamp'].values,
-            np.array([
-                '2020-01-04T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
-                '2020-01-08T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
-                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
-                '2020-01-04T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
-                '2020-01-08T00:00:00.000000000', '2020-01-08T00:00:00.000000000'
-            ], dtype='datetime64[ns]')
-        )
-        np.testing.assert_array_equal(
-            records_readable['Avg Exit Price'].values,
-            np.array([
-                3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 8.0
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Exit Fees'].values,
-            np.array([
-                0.034, 0.07, 0.0, 0.034, 0.07, 0.0, 0.034, 0.07, 0.08, 0.0
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['PnL'].values,
-            np.array([
-                2.1540000000000004, 0.8699999999999999, -0.16, -2.246, -1.1300000000000001,
-                -0.16, 2.1540000000000004, 0.8699999999999999, -1.1500000000000001, -0.08
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Return'].values,
-            np.array([
-                1.7950000000000004, 0.145, -0.01, -1.8716666666666668, -0.18833333333333335,
-                -0.01, 1.7950000000000004, 0.145, -0.1642857142857143, -0.01
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Direction'].values,
-            np.array([
-                'Long', 'Long', 'Long', 'Short', 'Short', 'Short', 'Long', 'Long', 'Short', 'Long'
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable['Status'].values,
-            np.array([
-                'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Closed', 'Open'
-            ])
-        )
-
-    def test_stats(self):
-        stats_index = pd.Index([
-            'Start', 'End', 'Period', 'First Position Start', 'Last Position End', 'Coverage [%]',
-            'Total Records', 'Total Long Positions', 'Total Short Positions',
-            'Total Closed Positions', 'Total Open Positions', 'Open Position PnL',
-            'Win Rate [%]', 'Max Win Streak', 'Max Loss Streak',
-            'Best Position [%]', 'Worst Position [%]', 'Avg Winning Position [%]',
-            'Avg Losing Position [%]', 'Avg Winning Position Duration',
-            'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN'
-        ], dtype='object')
-        pd.testing.assert_series_equal(
-            positions.stats(),
-            pd.Series([
-                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 66.66666666666667, 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
-                55.55555555555555, 1.3333333333333333, 1.0, 113.38888888888891,
-                -63.031746031746046, 97.00000000000001, -59.714285714285715,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('1 days 12:00:00'), np.inf,
-                0.14955555555555547, -0.006787870702610184
-            ],
-                index=stats_index,
-                name='agg_func_mean'
-            )
-        )
-        pd.testing.assert_series_equal(
-            positions.stats(settings=dict(incl_open=True)),
-            pd.Series([
-                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 66.66666666666667, 2.5, 1.5, 1.0, 1.75, 0.75, -0.1,
-                55.55555555555555, 1.3333333333333333, 2.0, 119.33333333333336,
-                -68.19841269841271, 97.00000000000001, -26.23809523809524,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('1 days 05:20:00'), 7.11951219512195,
-                0.0748333333333333, 0.036347069097538744
-            ],
-                index=stats_index,
-                name='agg_func_mean'
-            )
-        )
-        pd.testing.assert_series_equal(
-            positions.stats(column='a'),
-            pd.Series([
-                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 62.5, 3, 3, 0, 2, 1, -0.16, 100.0, 2, 0,
-                179.50000000000003, 14.499999999999998, 97.00000000000001, np.nan,
-                pd.Timedelta('2 days 00:00:00'), pd.NaT, np.inf, 1.512, 2.355140186915887
-            ],
-                index=stats_index,
-                name='a'
-            )
-        )
-        pd.testing.assert_series_equal(
-            positions.stats(column='g1', group_by=group_by),
-            pd.Series([
-                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                pd.Timedelta('8 days 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                pd.Timestamp('2020-01-08 00:00:00'), 31.25, 6, 3, 3, 4, 2, -0.32, 50.0, 2, 2,
-                179.50000000000003, -187.16666666666669, 97.00000000000001, -103.0,
-                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 0.895734597156398,
-                -0.08800000000000008, -0.08917040366737132
-            ],
-                index=stats_index,
-                name='g1'
-            )
-        )
-        pd.testing.assert_index_equal(
-            positions.stats(tags='positions').index,
-            pd.Index([
-                'First Position Start', 'Last Position End', 'Total Long Positions',
-                'Total Short Positions', 'Total Closed Positions',
-                'Total Open Positions', 'Open Position PnL', 'Win Rate [%]',
-                'Max Win Streak', 'Max Loss Streak', 'Best Position [%]',
-                'Worst Position [%]', 'Avg Winning Position [%]',
-                'Avg Losing Position [%]', 'Avg Winning Position Duration',
-                'Avg Losing Position Duration', 'Profit Factor', 'Expectancy', 'SQN'
-            ], dtype='object')
-        )
-        pd.testing.assert_series_equal(
-            positions['c'].stats(),
-            positions.stats(column='c')
-        )
-        pd.testing.assert_series_equal(
-            positions['c'].stats(),
-            positions.stats(column='c', group_by=False)
-        )
-        pd.testing.assert_series_equal(
-            positions_grouped['g2'].stats(),
-            positions_grouped.stats(column='g2')
-        )
-        pd.testing.assert_series_equal(
-            positions_grouped['g2'].stats(),
-            positions.stats(column='g2', group_by=group_by)
-        )
-        stats_df = positions.stats(agg_func=None)
-        assert stats_df.shape == (4, 24)
-        pd.testing.assert_index_equal(stats_df.index, positions.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
 
 # ############# logs.py ############# #
