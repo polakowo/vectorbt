@@ -311,6 +311,13 @@ Total Records                  6
 Name: first, dtype: object
 ```
 
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Records.subplots`.
+
+This class is too generic to have any subplots, but feel free to add custom subplots to your subclass.
+
 ## Extending
 
 `Records` class can be extended by subclassing.
@@ -395,6 +402,7 @@ from vectorbt.utils.attr import get_dict_attr
 from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.col_mapper import ColumnMapper
@@ -428,11 +436,11 @@ class RecordsWithFields(metaclass=MetaFields):
         return self._field_config
 
 
-class MetaRecords(type(StatsBuilderMixin), type(RecordsWithFields)):
+class MetaRecords(type(StatsBuilderMixin), type(PlotsBuilderMixin), type(RecordsWithFields)):
     pass
 
 
-class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaRecords):
+class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields, metaclass=MetaRecords):
     """Wraps the actual records array (such as trades) and exposes methods for mapping
     it to some array of values (such as PnL of each trade).
 
@@ -775,7 +783,7 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
         """Defaults for `Records.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `records.stats` in `vectorbt._settings.settings`."""
+        `records.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         records_stats_cfg = settings['records']['stats']
 
@@ -818,6 +826,26 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Plotting ############# #
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Records.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `records.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        records_plots_cfg = settings['records']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            records_plots_cfg
+        )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
     # ############# Docs ############# #
 
     @classmethod
@@ -839,3 +867,4 @@ class Records(Wrapping, StatsBuilderMixin, RecordsWithFields, metaclass=MetaReco
 
 Records.override_field_config_doc(__pdoc__)
 Records.override_metrics_doc(__pdoc__)
+Records.override_subplots_doc(__pdoc__)

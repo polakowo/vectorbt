@@ -176,7 +176,7 @@ def bshift_1d_nb(a: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> t
     Numba equivalent to `pd.Series(a).shift(n)`.
 
     !!! warning
-        Shift backward means looking ahead."""
+        This operation looks ahead."""
     nb_enabled = not isinstance(a, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(a.dtype)
@@ -325,6 +325,34 @@ def pct_change_nb(a: tp.Array2d, n: int = 1) -> tp.Array2d:
 
 
 @njit(cache=True)
+def bfill_1d_nb(a: tp.Array1d) -> tp.Array1d:
+    """Fill NaNs by propagating first valid observation backward.
+
+    Numba equivalent to `pd.Series(a).fillna(method='bfill')`.
+
+    !!! warning
+        This operation looks ahead."""
+    out = np.empty_like(a, dtype=a.dtype)
+    lastval = a[-1]
+    for i in range(a.shape[0] - 1, -1, -1):
+        if np.isnan(a[i]):
+            out[i] = lastval
+        else:
+            lastval = out[i] = a[i]
+    return out
+
+
+@njit(cache=True)
+def bfill_nb(a: tp.Array2d) -> tp.Array2d:
+    """2-dim version of `bfill_1d_nb`."""
+    out = np.empty_like(a, dtype=a.dtype)
+    for col in range(a.shape[1]):
+        out[:, col] = bfill_1d_nb(a[:, col])
+    return out
+
+
+
+@njit(cache=True)
 def ffill_1d_nb(a: tp.Array1d) -> tp.Array1d:
     """Fill NaNs by propagating last valid observation forward.
 
@@ -349,7 +377,7 @@ def ffill_nb(a: tp.Array2d) -> tp.Array2d:
 
 
 @generated_jit(nopython=True, cache=True)
-def nanprod_nb(a):
+def nanprod_nb(a: tp.Array2d) -> tp.Array1d:
     """Numba-equivalent of `np.nanprod` along axis 0."""
     nb_enabled = not isinstance(a, np.ndarray)
     if nb_enabled:
@@ -371,7 +399,7 @@ def nanprod_nb(a):
 
 
 @generated_jit(nopython=True, cache=True)
-def nancumsum_nb(a):
+def nancumsum_nb(a: tp.Array2d) -> tp.Array2d:
     """Numba-equivalent of `np.nancumsum` along axis 0."""
     nb_enabled = not isinstance(a, np.ndarray)
     if nb_enabled:
@@ -393,7 +421,7 @@ def nancumsum_nb(a):
 
 
 @generated_jit(nopython=True, cache=True)
-def nancumprod_nb(a):
+def nancumprod_nb(a: tp.Array2d) -> tp.Array2d:
     """Numba-equivalent of `np.nancumprod` along axis 0."""
     nb_enabled = not isinstance(a, np.ndarray)
     if nb_enabled:
@@ -424,7 +452,7 @@ def nancnt_nb(a: tp.Array2d) -> tp.Array1d:
 
 
 @generated_jit(nopython=True, cache=True)
-def nansum_nb(a):
+def nansum_nb(a: tp.Array2d) -> tp.Array1d:
     """Numba-equivalent of `np.nansum` along axis 0."""
     nb_enabled = not isinstance(a, np.ndarray)
     if nb_enabled:

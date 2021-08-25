@@ -75,14 +75,21 @@ Status Counts: Rejected                            13
 Status Info Counts: None                          187
 Status Info Counts: NoCashLong                     13
 Name: group, dtype: object
-```"""
+```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Logs.subplots`.
+
+This class does not have any subplots.
+"""
 
 import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_dict
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
 from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.portfolio.enums import (
@@ -266,13 +273,13 @@ class Logs(Records):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Logs.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `logs.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.records.base.Records.stats_defaults` and
+        `logs.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         logs_stats_cfg = settings['logs']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Records.stats_defaults.__get__(self),
             logs_stats_cfg
         )
 
@@ -323,6 +330,27 @@ class Logs(Records):
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Plotting ############# #
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Logs.plots`.
+
+        Merges `vectorbt.records.base.Records.plots_defaults` and
+        `logs.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        logs_plots_cfg = settings['logs']['plots']
+
+        return merge_dicts(
+            Records.plots_defaults.__get__(self),
+            logs_plots_cfg
+        )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 Logs.override_field_config_doc(__pdoc__)
 Logs.override_metrics_doc(__pdoc__)
+Logs.override_subplots_doc(__pdoc__)

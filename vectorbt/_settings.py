@@ -138,7 +138,9 @@ settings = SettingsConfig(
                 dict(
                     enableRateLimit=True
                 )
-            )
+            ),
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         plotting=dict(
             use_widgets=True,
@@ -256,7 +258,7 @@ settings = SettingsConfig(
             ),
             metric_settings=Config(),  # flex
         ),
-        plot_builder=dict(
+        plots_builder=dict(
             subplots='all',
             tags='all',
             silence_warnings=False,
@@ -292,7 +294,7 @@ settings = SettingsConfig(
             hide_id_labels=True,
             group_id_labels=True,
             make_subplots_kwargs=Config(),  # flex
-            kwargs=Config(),  # flex
+            layout_kwargs=Config(),  # flex
         ),
         generic=dict(
             stats=Config(  # flex
@@ -307,10 +309,12 @@ settings = SettingsConfig(
                         incl_all_keys=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         ranges=dict(
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         drawdowns=dict(
             stats=Config(  # flex
@@ -319,7 +323,8 @@ settings = SettingsConfig(
                         incl_active=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         ohlcv=dict(
             plot_type='OHLC',
@@ -330,7 +335,8 @@ settings = SettingsConfig(
                 close='Close',
                 volume='Volume'
             ),
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         signals=dict(
             stats=Config(
@@ -347,7 +353,8 @@ settings = SettingsConfig(
                         from_other=False
                     )
                 )
-            )  # flex
+            ),  # flex
+            plots=Config()  # flex
         ),
         returns=dict(
             year_freq='365 days',
@@ -381,10 +388,12 @@ settings = SettingsConfig(
                         check_is_not_grouped=True
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         records=dict(
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         mapped_array=dict(
             stats=Config(  # flex
@@ -399,10 +408,12 @@ settings = SettingsConfig(
                         incl_all_keys=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         orders=dict(
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         trades=dict(
             stats=Config(  # flex
@@ -414,7 +425,8 @@ settings = SettingsConfig(
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         logs=dict(
             stats=Config()  # flex
@@ -484,16 +496,12 @@ settings = SettingsConfig(
                     )
                 )
             ),
-            plot=Config(  # flex
+            plots=Config(  # flex
                 dict(
                     subplots=['orders', 'trade_pnl', 'cum_returns'],
                     settings=dict(
                         use_asset_returns=False,
-                        incl_open=True,
                         benchmark_rets=None
-                    ),
-                    template_mapping=dict(
-                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
             )
@@ -624,12 +632,12 @@ Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 {settings['stats_builder'].to_doc()}
 ```
 
-## settings.plot_builder
+## settings.plots_builder
 
-Settings applied to `vectorbt.generic.plot_builder.PlotBuilderMixin`.
+Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
 
 ```json
-{settings['plot_builder'].to_doc()}
+{settings['plots_builder'].to_doc()}
 ```
 
 ## settings.generic

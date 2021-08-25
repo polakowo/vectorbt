@@ -1087,6 +1087,12 @@ Name: (2, b), dtype: float64
 2020-01-05  4.5  1.5
 ```
 
+## TA-Lib
+
+Indicator factory also provides a class method `IndicatorFactory.from_talib`
+that can be used to wrap any function from TA-Lib. It automatically fills all the
+neccessary information, such as input, parameter and output names.
+
 ## Stats
 
 !!! hint
@@ -1117,11 +1123,41 @@ sum_diff    170.0
 Name: a, dtype: float64
 ```
 
-## TA-Lib
+## Plots
 
-Indicator factory also provides a class method `IndicatorFactory.from_talib`
-that can be used to wrap any function from TA-Lib. It automatically fills all the
-neccessary information, such as input, parameter and output names.
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
+
+Similarly to stats, we can attach subplots to any new indicator class:
+
+```python-repl
+>>> @njit
+... def apply_func_nb(price):
+...     return price ** 2, price ** 3
+
+>>> def plot_outputs(out1, out2, column=None, fig=None):
+...     fig = out1[column].rename('out1').vbt.plot(fig=fig)
+...     fig = out2[column].rename('out2').vbt.plot(fig=fig)
+
+>>> MyInd = vbt.IndicatorFactory(
+...     input_names=['price'],
+...     output_names=['out1', 'out2'],
+...     subplots=dict(
+...         plot_outputs=dict(
+...             plot_func=plot_outputs,
+...             resolve_out1=True,
+...             resolve_out2=True
+...         )
+...     )
+... ).from_apply_func(
+...     apply_func_nb
+... )
+
+>>> myind = MyInd.run(price)
+>>> myind.plots(column='a')
+```
+
+![](/docs/img/IndicatorFactory_plots.svg)
 """
 
 import numpy as np
@@ -1150,6 +1186,7 @@ from vectorbt.base.indexing import build_param_indexer
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.accessors import BaseAccessor
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -2001,7 +2038,11 @@ RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOu
 RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
-class IndicatorBase(Wrapping, StatsBuilderMixin):
+class MetaIndicatorBase(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
+class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaIndicatorBase):
     """Indicator base class.
 
     Properties should be set before instantiation."""
@@ -2071,6 +2112,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             level_names=level_names
         )
         StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
         if input_mapper is not None:
             checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
@@ -2178,7 +2220,9 @@ class IndicatorFactory:
                  custom_output_props: tp.KwargsLike = None,
                  attr_settings: tp.KwargsLike = None,
                  metrics: tp.Optional[tp.Kwargs] = None,
-                 stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None) -> None:
+                 stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None,
+                 subplots: tp.Optional[tp.Kwargs] = None,
+                 plots_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None) -> None:
         """A factory for creating new indicators.
 
         Initialize `IndicatorFactory` to create a skeleton and then use a class method
@@ -2221,6 +2265,12 @@ class IndicatorFactory:
 
                 If dict, will be converted to `vectorbt.utils.config.Config`.
             stats_defaults (callable or dict): Defaults for `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+                If dict, will be converted into a property.
+            subplots (dict): Subplots supported by `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
+
+                If dict, will be converted to `vectorbt.utils.config.Config`.
+            plots_defaults (callable or dict): Defaults for `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
 
                 If dict, will be converted into a property.
 
@@ -2547,6 +2597,22 @@ class IndicatorFactory:
                     return stats_defaults(self)
             stats_defaults_prop.__name__ = "stats_defaults"
             setattr(Indicator, "stats_defaults", property(stats_defaults_prop))
+
+        # Prepare plots
+        if subplots is not None:
+            if not isinstance(subplots, Config):
+                subplots = Config(subplots, copy_kwargs=dict(copy_mode='deep'))
+            setattr(Indicator, "_subplots", subplots.copy())
+
+        if plots_defaults is not None:
+            if isinstance(plots_defaults, dict):
+                def plots_defaults_prop(self, _plots_defaults: tp.Kwargs = plots_defaults) -> tp.Kwargs:
+                    return _plots_defaults
+            else:
+                def plots_defaults_prop(self, _plots_defaults: tp.Kwargs = plots_defaults) -> tp.Kwargs:
+                    return plots_defaults(self)
+            plots_defaults_prop.__name__ = "plots_defaults"
+            setattr(Indicator, "plots_defaults", property(plots_defaults_prop))
 
         # Save indicator
         self.Indicator = Indicator

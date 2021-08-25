@@ -182,6 +182,13 @@ Partition Distance: Mean        2 days 00:00:00
 Partition Distance: Std         0 days 00:00:00
 Name: 0, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `SignalsAccessor.subplots`.
+
+This class inherits subplots from `vectorbt.generic.accessors.GenericAccessor`.
 """
 
 import numpy as np
@@ -200,10 +207,11 @@ from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic import plotting
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.ranges import Ranges
 from vectorbt.generic import nb as generic_nb
 from vectorbt.signals import nb
+
+__pdoc__ = {}
 
 
 class SignalsAccessor(GenericAccessor):
@@ -217,22 +225,22 @@ class SignalsAccessor(GenericAccessor):
         GenericAccessor.__init__(self, obj, **kwargs)
 
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["SignalsSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return SignalsSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["SignalsDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return SignalsDFAccessor
 
     # ############# Overriding ############# #
 
-    def bshift(self, *args, fill_value: bool = False, **kwargs):
+    def bshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.generic.accessors.GenericAccessor.bshift` with `fill_value=False`."""
         return GenericAccessor.bshift(self, *args, fill_value=fill_value, **kwargs)
 
-    def fshift(self, *args, fill_value: bool = False, **kwargs):
+    def fshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.generic.accessors.GenericAccessor.fshift` with `fill_value=False`."""
         return GenericAccessor.fshift(self, *args, fill_value=fill_value, **kwargs)
 
@@ -1525,15 +1533,15 @@ class SignalsAccessor(GenericAccessor):
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
-        """Defaults for `GenericAccessor.stats`.
+        """Defaults for `SignalsAccessor.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `signals.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.generic.accessors.GenericAccessor.stats_defaults` and
+        `signals.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         signals_stats_cfg = settings['signals']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            GenericAccessor.stats_defaults.__get__(self),
             signals_stats_cfg
         )
 
@@ -1685,6 +1693,28 @@ class SignalsAccessor(GenericAccessor):
         )
         return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `SignalsAccessor.plots`.
+
+        Merges `vectorbt.generic.accessors.GenericAccessor.plots_defaults` and
+        `signals.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        signals_plots_cfg = settings['signals']['plots']
+
+        return merge_dicts(
+            GenericAccessor.plots_defaults.__get__(self),
+            signals_plots_cfg
+        )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+SignalsAccessor.override_metrics_doc(__pdoc__)
+SignalsAccessor.override_subplots_doc(__pdoc__)
+
 
 @register_series_vbt_accessor('signals')
 class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
@@ -1793,7 +1823,3 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
         GenericDFAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
-
-
-__pdoc__ = dict()
-SignalsAccessor.override_metrics_doc(__pdoc__)

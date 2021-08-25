@@ -124,6 +124,13 @@ dtype: object
 
 !!! note
     `ReturnsAccessor.stats` does not support grouping.
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `ReturnsAccessor.subplots`.
+
+This class inherits subplots from `vectorbt.generic.accessors.GenericAccessor`.
 """
 
 import numpy as np
@@ -145,8 +152,9 @@ from vectorbt.generic.accessors import (
     GenericSRAccessor,
     GenericDFAccessor
 )
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.returns import nb, metrics
+
+__pdoc__ = {}
 
 ReturnsAccessorT = tp.TypeVar("ReturnsAccessorT", bound="ReturnsAccessor")
 
@@ -167,19 +175,18 @@ class ReturnsAccessor(GenericAccessor):
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
-        # Set defaults
         self._year_freq = year_freq
         self._defaults = defaults
 
         GenericAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
 
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["ReturnsSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return ReturnsSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["ReturnsDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return ReturnsDFAccessor
 
@@ -232,7 +239,8 @@ class ReturnsAccessor(GenericAccessor):
     def defaults(self) -> tp.Kwargs:
         """Defaults for `ReturnsAccessor`.
 
-        Merges `returns.defaults` in `vectorbt._settings.settings` with `defaults` from `ReturnsAccessor.__init__`."""
+        Merges `returns.defaults` from `vectorbt._settings.settings` with `defaults`
+        from `ReturnsAccessor.__init__`."""
         from vectorbt._settings import settings
         returns_defaults_cfg = settings['returns']['defaults']
 
@@ -837,14 +845,14 @@ class ReturnsAccessor(GenericAccessor):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `ReturnsAccessor.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults`,
+        Merges `vectorbt.generic.accessors.GenericAccessor.stats_defaults`,
         defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
-        `returns.stats` in `vectorbt._settings.settings`"""
+        `returns.stats` from `vectorbt._settings.settings`"""
         from vectorbt._settings import settings
         returns_stats_cfg = settings['returns']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            GenericAccessor.stats_defaults.__get__(self),
             dict(settings=self.defaults),
             dict(settings=dict(year_freq=self.year_freq)),
             returns_stats_cfg
@@ -991,6 +999,33 @@ class ReturnsAccessor(GenericAccessor):
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Plotting ############# #
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `ReturnsAccessor.plots`.
+
+        Merges `vectorbt.generic.accessors.GenericAccessor.plots_defaults`,
+        defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
+        `returns.plots` from `vectorbt._settings.settings`"""
+        from vectorbt._settings import settings
+        returns_plots_cfg = settings['returns']['plots']
+
+        return merge_dicts(
+            GenericAccessor.plots_defaults.__get__(self),
+            dict(settings=self.defaults),
+            dict(settings=dict(year_freq=self.year_freq)),
+            returns_plots_cfg
+        )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+ReturnsAccessor.override_metrics_doc(__pdoc__)
+ReturnsAccessor.override_subplots_doc(__pdoc__)
+
 
 @register_series_vbt_accessor('returns')
 class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
@@ -1125,7 +1160,3 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
                  **kwargs) -> None:
         GenericDFAccessor.__init__(self, obj, **kwargs)
         ReturnsAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
-
-
-__pdoc__ = dict()
-ReturnsAccessor.override_metrics_doc(__pdoc__)

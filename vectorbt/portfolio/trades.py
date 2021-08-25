@@ -465,6 +465,19 @@ Expectancy                                     -0.006035
 SQN                                            -0.365593
 Name: group, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Trades.subplots`.
+
+`Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
+
+```python-repl
+>>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show_svg()
+```
+
+![](/docs/img/trades_plots.svg)
 """
 
 import numpy as np
@@ -480,7 +493,6 @@ from vectorbt.utils.template import RepEval
 from vectorbt.utils.decorators import cached_method, cached_property
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.ranges import Ranges
 from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.records.mapped_array import MappedArray
@@ -725,13 +737,13 @@ class Trades(Ranges):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Trades.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `trades.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.generic.ranges.Ranges.stats_defaults` and
+        `trades.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         trades_stats_cfg = settings['trades']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Ranges.stats_defaults.__get__(self),
             trades_stats_cfg
         )
 
@@ -1357,9 +1369,48 @@ class Trades(Ranges):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Trades.plots`.
+
+        Merges `vectorbt.generic.ranges.Ranges.plots_defaults` and
+        `trades.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        trades_plots_cfg = settings['trades']['plots']
+
+        return merge_dicts(
+            Ranges.plots_defaults.__get__(self),
+            trades_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                title="Trades",
+                yaxis_kwargs=dict(title="Price"),
+                check_is_not_grouped=True,
+                plot_func='plot',
+                tags='trades'
+            ),
+            plot_pnl=dict(
+                title="Trade PnL",
+                yaxis_kwargs=dict(title="Trade PnL"),
+                check_is_not_grouped=True,
+                plot_func='plot_pnl',
+                tags='trades'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 Trades.override_field_config_doc(__pdoc__)
 Trades.override_metrics_doc(__pdoc__)
+Trades.override_subplots_doc(__pdoc__)
 
 # ############# EntryTrades ############# #
 

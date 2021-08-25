@@ -186,6 +186,19 @@ Min Index                  y
 Max Index                  z
 Name: 0, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `GenericAccessor.subplots`.
+
+`GenericAccessor` class has a single subplot based on `GenericAccessor.plot`:
+
+```python-repl
+>>> df2.vbt.plots()
+```
+
+![](/docs/img/generic_plots.svg)
 """
 
 import numpy as np
@@ -219,6 +232,7 @@ from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.records.mapped_array import MappedArray
 
@@ -244,6 +258,13 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
+__pdoc__ = {}
+
+
+class MetaGenericAccessor(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
 GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
 SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
 
@@ -259,8 +280,6 @@ class TransformerT(tp.Protocol):
         ...
 
 
-__pdoc__ = {}
-
 nb_config = Config(
     {
         'shuffle': dict(func=nb.shuffle_nb, path='vectorbt.generic.nb.shuffle_nb'),
@@ -269,6 +288,7 @@ nb_config = Config(
         'fshift': dict(func=nb.fshift_nb, path='vectorbt.generic.nb.fshift_nb'),
         'diff': dict(func=nb.diff_nb, path='vectorbt.generic.nb.diff_nb'),
         'pct_change': dict(func=nb.pct_change_nb, path='vectorbt.generic.nb.pct_change_nb'),
+        'bfill': dict(func=nb.bfill_nb, path='vectorbt.generic.nb.bfill_nb'),
         'ffill': dict(func=nb.ffill_nb, path='vectorbt.generic.nb.ffill_nb'),
         'cumsum': dict(func=nb.nancumsum_nb, path='vectorbt.generic.nb.nancumsum_nb'),
         'cumprod': dict(func=nb.nancumprod_nb, path='vectorbt.generic.nb.nancumprod_nb'),
@@ -342,7 +362,7 @@ __pdoc__['transform_config'] = f"""Config of transform methods to be added to `G
 
 @attach_nb_methods(nb_config)
 @attach_transform_methods(transform_config)
-class GenericAccessor(BaseAccessor, StatsBuilderMixin):
+class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaGenericAccessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
@@ -350,6 +370,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
         BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
         if mapping is not None:
             if isinstance(mapping, str):
@@ -361,12 +382,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         self._mapping = mapping
 
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["GenericSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return GenericSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["GenericDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return GenericDFAccessor
 
@@ -1055,7 +1076,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """Defaults for `GenericAccessor.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `generic.stats` in `vectorbt._settings.settings`."""
+        `generic.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         generic_stats_cfg = settings['generic']['stats']
 
@@ -1255,6 +1276,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def zscore(self, **kwargs) -> tp.SeriesFrame:
         """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
         return self.scale(with_mean=True, with_std=True, **kwargs)
+
+    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Rebase all series to a given intial base.
+
+        This makes comparing/plotting different series together easier.
+        Will forward and backward fill NaN values."""
+        result = nb.bfill_nb(nb.ffill_nb(self.to_2d_array()))
+        result = result / result[0] * base
+        return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Splitting ############# #
 
@@ -1673,6 +1703,40 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         if return_fig:
             return box.fig
         return box
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `GenericAccessor.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `generic.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        generic_plots_cfg = settings['generic']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            generic_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                check_is_not_grouped=True,
+                plot_func='plot',
+                pass_trace_names=False,
+                tags='generic'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+GenericAccessor.override_metrics_doc(__pdoc__)
+GenericAccessor.override_subplots_doc(__pdoc__)
 
 
 class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
@@ -2399,6 +2463,3 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                    **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
-
-
-GenericAccessor.override_metrics_doc(__pdoc__)

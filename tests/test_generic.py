@@ -232,6 +232,10 @@ class TestAccessors:
         np.testing.assert_array_equal(df['a'].vbt.pct_change().values, nb.pct_change_1d_nb(df['a'].values))
         pd.testing.assert_frame_equal(df.vbt.pct_change(), df.pct_change(fill_method=None))
 
+    def test_bfill(self):
+        pd.testing.assert_series_equal(df['b'].vbt.bfill(), df['b'].bfill())
+        pd.testing.assert_frame_equal(df.vbt.bfill(), df.bfill())
+
     def test_ffill(self):
         pd.testing.assert_series_equal(df['a'].vbt.ffill(), df['a'].ffill())
         pd.testing.assert_frame_equal(df.vbt.ffill(), df.ffill())

@@ -7511,7 +7511,7 @@ class TestPortfolio:
                 name='a')
         )
 
-    def test_plot_methods(self):
+    def test_plots(self):
         _ = pf.plot(column='a', subplots='all')
         _ = pf_grouped.plot(column='first', subplots='all')
         _ = pf_grouped.plot(column='a', subplots='all', group_by=False)

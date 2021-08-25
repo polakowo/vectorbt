@@ -43,7 +43,7 @@ class Sub(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return self.template.substitute(mapping)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"template=\"{self.template.template}\", " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -75,7 +75,7 @@ class Rep(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return mapping[self.key]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"key='{self.key}', " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -107,7 +107,7 @@ class RepEval(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return eval(self.expression, {}, mapping)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"expression=\"{self.expression}\", " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -144,7 +144,7 @@ class RepFunc(SafeToStr):
                 func_kwargs[k] = v
         return self.func(**func_kwargs)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"func={self.func}, " \
                f"mapping={prepare_for_doc(self.mapping)})"

@@ -338,6 +338,20 @@ Min Index                  x
 Max Index                  z
 Name: first, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `MappedArray.subplots`.
+
+`MappedArray` class has a single subplot based on `MappedArray.to_pd` and
+`vectorbt.generic.accessors.GenericAccessor.plot`:
+
+```python-repl
+>>> ma.plots()
+```
+
+![](/docs/img/mapped_to_pd_plot.svg)
 """
 
 import numpy as np
@@ -352,6 +366,7 @@ from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
 
@@ -380,9 +395,13 @@ def combine_mapped_with_other(self: MappedArrayT,
     return self.copy(mapped_arr=np_func(self.values, other))
 
 
+class MetaMappedArray(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
 @attach_binary_magic_methods(combine_mapped_with_other)
 @attach_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
-class MappedArray(Wrapping, StatsBuilderMixin):
+class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaMappedArray):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
 
@@ -1041,7 +1060,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         """Defaults for `MappedArray.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `mapped_array.stats` in `vectorbt._settings.settings`."""
+        `mapped_array.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         mapped_array_stats_cfg = settings['mapped_array']['stats']
 
@@ -1135,6 +1154,8 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Plotting ############# #
+
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.histplot(**kwargs)
@@ -1143,6 +1164,37 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         """Plot box plot by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `MappedArray.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `mapped_array.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        mapped_array_plots_cfg = settings['mapped_array']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            mapped_array_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            to_pd_plot=dict(
+                check_is_not_grouped=True,
+                plot_func='to_pd.vbt.plot',
+                pass_trace_names=False,
+                tags='mapped_array'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 __pdoc__ = dict()
 MappedArray.override_metrics_doc(__pdoc__)
+MappedArray.override_subplots_doc(__pdoc__)

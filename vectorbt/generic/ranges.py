@@ -96,8 +96,20 @@ Duration: Max                 2 days 00:00:00
 Duration: Mean                1 days 09:36:00
 Duration: Std       0 days 13:08:43.228968446
 Name: group, dtype: object
-
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Ranges.subplots`.
+
+`Ranges` class has a single subplot based on `Ranges.plot`:
+
+```python-repl
+>>> ranges['a'].plots()
+```
+
+![](/docs/img/ranges_plots.svg)
 """
 
 import numpy as np
@@ -319,13 +331,13 @@ class Ranges(Records):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Ranges.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `ranges.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.records.base.Records.stats_defaults` and
+        `ranges.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         ranges_stats_cfg = settings['ranges']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Records.stats_defaults.__get__(self),
             ranges_stats_cfg
         )
 
@@ -613,6 +625,37 @@ class Ranges(Records):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Ranges.plots`.
+
+        Merges `vectorbt.records.base.Records.plots_defaults` and
+        `ranges.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        ranges_plots_cfg = settings['ranges']['plots']
+
+        return merge_dicts(
+            Records.plots_defaults.__get__(self),
+            ranges_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                title="Ranges",
+                check_is_not_grouped=True,
+                plot_func='plot',
+                tags='ranges'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 Ranges.override_field_config_doc(__pdoc__)
 Ranges.override_metrics_doc(__pdoc__)
+Ranges.override_subplots_doc(__pdoc__)

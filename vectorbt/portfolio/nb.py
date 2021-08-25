@@ -426,7 +426,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
     order_size_type = order.size_type
 
     if order.direction == Direction.ShortOnly:
-        # Positive size in short direction should be treated as negative
+        # Positive/negative size in short direction should be treated as negative/positive
         order_size *= -1
 
     if order_size_type == SizeType.TargetPercent:

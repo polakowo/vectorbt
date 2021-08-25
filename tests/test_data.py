@@ -968,6 +968,71 @@ class TestData:
         assert MyData.download([0, 1], shape=(5, 3), columns=['feat0', 'feat1', 'feat2'])[['feat0']].wrapper == \
                MyData.download([0, 1], shape=(5, 1), columns=['feat0']).wrapper
 
+    def test_stats(self):
+        index_mask = vbt.symbol_dict({
+            0: [False, True, True, True, True],
+            1: [True, True, True, True, False]
+        })
+        column_mask = vbt.symbol_dict({
+            0: [False, True, True],
+            1: [True, True, False]
+        })
+        data = MyData.download(
+            [0, 1], shape=(5, 3), index_mask=index_mask, column_mask=column_mask,
+            missing_index='nan', missing_columns='nan', columns=['feat0', 'feat1', 'feat2'])
+
+        stats_index = pd.Index([
+            'Start', 'End', 'Period', 'Total Symbols', 'Null Counts: 0', 'Null Counts: 1'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            data.stats(),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timestamp('2020-01-05 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timedelta('5 days 00:00:00'),
+                2, 2.3333333333333335, 2.3333333333333335
+            ],
+                index=stats_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            data.stats(column='feat0'),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timestamp('2020-01-05 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timedelta('5 days 00:00:00'),
+                2, 5, 1
+            ],
+                index=stats_index,
+                name='feat0'
+            )
+        )
+        pd.testing.assert_series_equal(
+            data.stats(group_by=True),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timestamp('2020-01-05 00:00:00+0000', tz='UTC', freq='D'),
+                pd.Timedelta('5 days 00:00:00'),
+                2, 7, 7
+            ],
+                index=stats_index,
+                name='group'
+            )
+        )
+        pd.testing.assert_series_equal(
+            data['feat0'].stats(),
+            data.stats(column='feat0')
+        )
+        pd.testing.assert_series_equal(
+            data.copy(wrapper=data.wrapper.copy(group_by=True)).stats(),
+            data.stats(group_by=True)
+        )
+        stats_df = data.stats(agg_func=None)
+        assert stats_df.shape == (3, 6)
+        pd.testing.assert_index_equal(stats_df.index, data.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
 
 # ############# updater.py ############# #
 

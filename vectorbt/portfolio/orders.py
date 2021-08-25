@@ -89,6 +89,19 @@ Avg Buy Fees                    0.006881
 Avg Sell Fees                   0.008058
 Name: group, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Orders.subplots`.
+
+`Orders` class has a single subplot based on `Orders.plot`:
+
+```python-repl
+>>> orders['a'].plots()
+```
+
+![](/docs/img/orders_plots.svg)
 """
 
 import numpy as np
@@ -101,7 +114,6 @@ from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_2d_array
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.base import Records
 from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.portfolio.enums import order_dt, OrderSide
@@ -211,13 +223,13 @@ class Orders(Records):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Orders.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `orders.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.records.base.Records.stats_defaults` and
+        `orders.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         orders_stats_cfg = settings['orders']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Records.stats_defaults.__get__(self),
             orders_stats_cfg
         )
 
@@ -480,6 +492,38 @@ class Orders(Records):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Orders.plots`.
+
+        Merges `vectorbt.records.base.Records.plots_defaults` and
+        `orders.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        orders_plots_cfg = settings['orders']['plots']
+
+        return merge_dicts(
+            Records.plots_defaults.__get__(self),
+            orders_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                title="Orders",
+                yaxis_kwargs=dict(title="Price"),
+                check_is_not_grouped=True,
+                plot_func='plot',
+                tags='orders'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 Orders.override_field_config_doc(__pdoc__)
 Orders.override_metrics_doc(__pdoc__)
+Orders.override_subplots_doc(__pdoc__)

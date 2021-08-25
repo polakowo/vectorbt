@@ -1213,10 +1213,10 @@ The third option is to set `metrics` globally under `portfolio.stats` in `vector
 >>> pf.stats(column=10)
 ```
 
-## Plotting
+## Plots
 
 !!! hint
-    See `vectorbt.generic.plot_builder.PlotBuilderMixin.plot`.
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
 
     The features implemented in this method are very similar to `Portfolio.stats`.
     See also the examples under `Portfolio.stats`.
@@ -1263,7 +1263,7 @@ To create a new subplot, a preferred way is to pass a plotting function:
 ...     'orders',
 ...     ('order_size', dict(
 ...         title='Order Size',
-...         yaxis_title='Order size',
+...         yaxis_kwargs=dict(title='Order size'),
 ...         check_is_not_grouped=True,
 ...         plot_func=plot_order_size
 ...     ))
@@ -1284,7 +1284,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ...     'orders',
 ...     ('order_size', dict(
 ...         title='Order Size',
-...         yaxis_title='Order size',
+...         yaxis_kwargs=dict(title='Order size'),
 ...         check_is_not_grouped=True
 ...     ))  # placeholder
 ... ], column=10)
@@ -1304,13 +1304,13 @@ You can additionally use templates to make some parameters to depend upon passed
 >>> subplots = [
 ...     ('cumulative_returns', dict(
 ...         title='Cumulative Returns',
-...         yaxis_title='Cumulative returns',
+...         yaxis_kwargs=dict(title='Cumulative returns'),
 ...         plot_func='returns.vbt.returns.cumulative.vbt.plot',
 ...         pass_add_trace_kwargs=True
 ...     )),
 ...     ('rolling_drawdown', dict(
 ...         title='Rolling Drawdown',
-...         yaxis_title='Rolling drawdown',
+...         yaxis_kwargs=dict(title='Rolling drawdown'),
 ...         plot_func=[
 ...             'returns.vbt.returns',  # returns accessor
 ...             (
@@ -1360,7 +1360,7 @@ from vectorbt.utils.figure import get_domain
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plot_builder import PlotBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.signals.generators import RANDNX, RPROBNX
 from vectorbt.returns.accessors import ReturnsAccessor
@@ -1414,12 +1414,12 @@ __pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be ad
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
 
 
-class MetaPortfolio(type(StatsBuilderMixin), type(PlotBuilderMixin)):
+class MetaPortfolio(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
     pass
 
 
 @attach_returns_acc_methods(returns_acc_config)
-class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPortfolio):
+class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPortfolio):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
@@ -1473,7 +1473,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             trades_type=trades_type
         )
         StatsBuilderMixin.__init__(self)
-        PlotBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
         # Get defaults
         from vectorbt._settings import settings
@@ -4437,8 +4437,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
         * `incl_open`: Whether to include open trades/positions when resolving an argument
             that is an instance of `vectorbt.portfolio.trades.Trades`."""
-        if isinstance(out, Trades) and not final_kwargs['incl_open']:
-            out = out.closed
+        if 'incl_open' in final_kwargs:
+            if isinstance(out, Trades) and not final_kwargs['incl_open']:
+                out = out.closed
         return out
 
     # ############# Stats ############# #
@@ -4448,7 +4449,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         """Defaults for `Portfolio.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `portfolio.stats` in `vectorbt._settings.settings`."""
+        `portfolio.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         returns_cfg = settings['returns']
         portfolio_stats_cfg = settings['portfolio']['stats']
@@ -4670,27 +4671,27 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
     # ############# Plotting ############# #
 
-    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of orders."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.orders.regroup(False).plot(column=column, **kwargs)
 
-    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trades."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.trades.regroup(False).plot(column=column, **kwargs)
 
-    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trade PnL."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
 
-    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of positions."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.positions.regroup(False).plot(column=column, **kwargs)
 
-    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
+    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of position PnL."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
@@ -4701,7 +4702,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         xref: str = 'x',
                         yref: str = 'y',
                         hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:
+                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of asset flow.
 
         Args:
@@ -4749,7 +4750,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                        xref: str = 'x',
                        yref: str = 'y',
                        hline_shape_kwargs: tp.KwargsLike = None,
-                       **kwargs) -> tp.BaseFigure:
+                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash flow.
 
         Args:
@@ -4797,7 +4798,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                     xref: str = 'x',
                     yref: str = 'y',
                     hline_shape_kwargs: tp.KwargsLike = None,
-                    **kwargs) -> tp.BaseFigure:
+                    **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of assets.
 
         Args:
@@ -4852,7 +4853,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                   xref: str = 'x',
                   yref: str = 'y',
                   hline_shape_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.BaseFigure:
+                  **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash balance.
 
         Args:
@@ -4910,7 +4911,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                          xref: str = 'x',
                          yref: str = 'y',
                          hline_shape_kwargs: tp.KwargsLike = None,
-                         **kwargs) -> tp.BaseFigure:
+                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of asset value.
 
         Args:
@@ -4965,7 +4966,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                    xref: str = 'x',
                    yref: str = 'y',
                    hline_shape_kwargs: tp.KwargsLike = None,
-                   **kwargs) -> tp.BaseFigure:
+                   **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of value.
 
         Args:
@@ -5015,7 +5016,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                          group_by: tp.GroupByLike = None,
                          benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                          use_asset_returns: bool = False,
-                         **kwargs) -> tp.BaseFigure:
+                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cumulative returns.
 
         Args:
@@ -5063,7 +5064,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
     def plot_drawdowns(self,
                        column: tp.Optional[tp.Label] = None,
                        group_by: tp.GroupByLike = None,
-                       **kwargs) -> tp.BaseFigure:
+                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of drawdowns.
 
         Args:
@@ -5090,7 +5091,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                         xref: str = 'x',
                         yref: str = 'y',
                         hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:
+                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of underwater.
 
         Args:
@@ -5142,7 +5143,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                             xref: str = 'x',
                             yref: str = 'y',
                             hline_shape_kwargs: tp.KwargsLike = None,
-                            **kwargs) -> tp.BaseFigure:
+                            **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of gross exposure.
 
         Args:
@@ -5197,7 +5198,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
                           xref: str = 'x',
                           yref: str = 'y',
                           hline_shape_kwargs: tp.KwargsLike = None,
-                          **kwargs) -> tp.BaseFigure:
+                          **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of net exposure.
 
         Args:
@@ -5246,52 +5247,52 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         return fig
 
     @property
-    def plot_defaults(self) -> tp.Kwargs:
+    def plots_defaults(self) -> tp.Kwargs:
         """Defaults for `Portfolio.plot`.
 
-        Merges `vectorbt.generic.plot_builder.PlotBuilderMixin.plot_defaults` and
-        `portfolio.plot` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `portfolio.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         returns_cfg = settings['returns']
-        portfolio_plot_cfg = settings['portfolio']['plot']
+        portfolio_plots_cfg = settings['portfolio']['plots']
 
         return merge_dicts(
-            PlotBuilderMixin.plot_defaults.__get__(self),
+            PlotsBuilderMixin.plots_defaults.__get__(self),
             dict(
                 settings=dict(
                     year_freq=returns_cfg['year_freq'],
                     trades_type=self.trades_type
                 )
             ),
-            portfolio_plot_cfg
+            portfolio_plots_cfg
         )
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             orders=dict(
                 title="Orders",
-                yaxis_title="Price",
+                yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
                 plot_func='orders.plot',
                 tags=['portfolio', 'orders']
             ),
             trades=dict(
                 title="Trades",
-                yaxis_title="Price",
+                yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
                 plot_func='trades.plot',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=['portfolio', 'trades']
             ),
             trade_pnl=dict(
                 title="Trade PnL",
-                yaxis_title="Trade PnL",
+                yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
                 plot_func='trades.plot_pnl',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=['portfolio', 'trades']
             ),
             asset_flow=dict(
                 title="Asset Flow",
-                yaxis_title="Asset flow",
+                yaxis_kwargs=dict(title="Asset flow"),
                 check_is_not_grouped=True,
                 plot_func='plot_asset_flow',
                 pass_add_trace_kwargs=True,
@@ -5299,14 +5300,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             ),
             cash_flow=dict(
                 title="Cash Flow",
-                yaxis_title="Cash flow",
+                yaxis_kwargs=dict(title="Cash flow"),
                 plot_func='plot_cash_flow',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'cash']
             ),
             assets=dict(
                 title="Assets",
-                yaxis_title="Assets",
+                yaxis_kwargs=dict(title="Assets"),
                 check_is_not_grouped=True,
                 plot_func='plot_assets',
                 pass_add_trace_kwargs=True,
@@ -5314,28 +5315,28 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             ),
             cash=dict(
                 title="Cash",
-                yaxis_title="Cash",
+                yaxis_kwargs=dict(title="Cash"),
                 plot_func='plot_cash',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'cash']
             ),
             asset_value=dict(
                 title="Asset Value",
-                yaxis_title="Asset value",
+                yaxis_kwargs=dict(title="Asset value"),
                 plot_func='plot_asset_value',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'assets', 'value']
             ),
             value=dict(
                 title="Value",
-                yaxis_title="Value",
+                yaxis_kwargs=dict(title="Value"),
                 plot_func='plot_value',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'value']
             ),
             cum_returns=dict(
                 title="Cumulative Returns",
-                yaxis_title="Cumulative returns",
+                yaxis_kwargs=dict(title="Cumulative returns"),
                 plot_func='plot_cum_returns',
                 pass_hline_shape_kwargs=True,
                 pass_add_trace_kwargs=True,
@@ -5345,7 +5346,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             ),
             drawdowns=dict(
                 title="Drawdowns",
-                yaxis_title="Value",
+                yaxis_kwargs=dict(title="Value"),
                 plot_func='plot_drawdowns',
                 pass_add_trace_kwargs=True,
                 pass_xref=True,
@@ -5354,21 +5355,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
             ),
             underwater=dict(
                 title="Underwater",
-                yaxis_title="Drawdown",
+                yaxis_kwargs=dict(title="Drawdown"),
                 plot_func='plot_underwater',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'value', 'drawdowns']
             ),
             gross_exposure=dict(
                 title="Gross Exposure",
-                yaxis_title="Gross exposure",
+                yaxis_kwargs=dict(title="Gross exposure"),
                 plot_func='plot_gross_exposure',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'exposure']
             ),
             net_exposure=dict(
                 title="Net Exposure",
-                yaxis_title="Net exposure",
+                yaxis_kwargs=dict(title="Net exposure"),
                 plot_func='plot_net_exposure',
                 pass_add_trace_kwargs=True,
                 tags=['portfolio', 'exposure']
@@ -5377,6 +5378,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
         copy_kwargs=dict(copy_mode='deep')
     )
 
+    plot = PlotsBuilderMixin.plots
+
     @property
     def subplots(self) -> Config:
         return self._subplots
@@ -5384,3 +5387,5 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin, metaclass=MetaPor
 
 Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
+
+__pdoc__['Portfolio.plot'] = "See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`."

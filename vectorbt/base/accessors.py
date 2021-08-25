@@ -113,12 +113,12 @@ class BaseAccessor(Wrapping):
         return self.copy(**kwargs)
 
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["BaseSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return BaseSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["BaseDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return BaseDFAccessor
 

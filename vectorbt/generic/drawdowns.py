@@ -149,6 +149,19 @@ Avg Recovery Duration          1 days 00:00:00
 Avg Recovery Duration Ratio                1.0
 Name: group, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Drawdowns.subplots`.
+
+`Drawdowns` class has a single subplot based on `Drawdowns.plot`:
+
+```python-repl
+>>> drawdowns['a'].plots()
+```
+
+![](/docs/img/drawdowns_plots.svg)
 """
 
 import numpy as np
@@ -464,13 +477,13 @@ class Drawdowns(Ranges):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Drawdowns.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `drawdowns.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.generic.ranges.Ranges.stats_defaults` and
+        `drawdowns.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         drawdowns_stats_cfg = settings['drawdowns']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Ranges.stats_defaults.__get__(self),
             drawdowns_stats_cfg
         )
 
@@ -921,6 +934,37 @@ class Drawdowns(Ranges):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Drawdowns.plots`.
+
+        Merges `vectorbt.generic.ranges.Ranges.plots_defaults` and
+        `drawdowns.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        drawdowns_plots_cfg = settings['drawdowns']['plots']
+
+        return merge_dicts(
+            Ranges.plots_defaults.__get__(self),
+            drawdowns_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                title="Drawdowns",
+                check_is_not_grouped=True,
+                plot_func='plot',
+                tags='drawdowns'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 Drawdowns.override_field_config_doc(__pdoc__)
 Drawdowns.override_metrics_doc(__pdoc__)
+Drawdowns.override_subplots_doc(__pdoc__)

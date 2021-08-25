@@ -33,7 +33,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
@@ -90,11 +90,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         ${metrics}
         ```
 
-        Returns `StatsBuilderMixin._metrics`, which gets (deep) copied upon creation of each instance.
+        Returns `${cls_name}._metrics`, which gets (deep) copied upon creation of each instance.
         Thus, changing this config won't affect the class.
 
-        To change metrics, you can either change the config in-place, override `StatsBuilderMixin.metrics`,
-        or overwrite the instance variable `StatsBuilderMixin._metrics`."""
+        To change metrics, you can either change the config in-place, override this property,
+        or overwrite the instance variable `${cls_name}._metrics`."""
         return self._metrics
 
     def stats(self,
@@ -407,7 +407,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         # Any metrics left?
         if len(metrics_dct) == 0:
             if not silence_warnings:
-                warnings.warn("No metrics left to calculate", stacklevel=2)
+                warnings.warn("No metrics to calculate", stacklevel=2)
             return None
 
         # Compute stats
