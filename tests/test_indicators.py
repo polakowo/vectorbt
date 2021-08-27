@@ -11,6 +11,8 @@ import vectorbt as vbt
 ray_available = True
 try:
     import ray
+
+    ray.init(ignore_reinit_error=True)
 except ImportError:
     ray_available = False
 
