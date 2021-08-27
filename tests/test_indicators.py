@@ -12,7 +12,9 @@ ray_available = True
 try:
     import ray
 
-    ray.init(ignore_reinit_error=True)
+    if ray.is_initialized():
+        ray.shutdown()
+    ray.init()
 except:
     ray_available = False
 
