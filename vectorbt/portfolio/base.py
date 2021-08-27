@@ -2067,7 +2067,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         You have three options to provide signals:
 
-        1) `entries` and `exits`: The direction of each pair of signals is taken from `direction` argument.
+        * `entries` and `exits`: The direction of each pair of signals is taken from `direction` argument.
             Best to use when the direction doesn't change throughout time.
 
             Uses `vectorbt.portfolio.nb.dir_enex_signal_func_nb` as `signal_func_nb`.
@@ -2078,12 +2078,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 * (True, True, 'longonly') -> True, True, False, False
                 * (True, True, 'shortonly') -> False, False, True, True
                 * (True, True, 'both') -> True, False, True, False
-        2) `entries` (acting as long), `exits` (acting as long), `short_entries`, and `short_exits`:
+
+        * `entries` (acting as long), `exits` (acting as long), `short_entries`, and `short_exits`:
             The direction is already built into the arrays. Best to use when the direction changes frequently
             (for example, if you have one indicator providing long signals and one providing short signals).
 
             Uses `vectorbt.portfolio.nb.ls_enex_signal_func_nb` as `signal_func_nb`.
-        3) `signal_func_nb` and `signal_args`: Custom signal function that returns direction-aware signals.
+
+        * `signal_func_nb` and `signal_args`: Custom signal function that returns direction-aware signals.
             Best to use when signals should be placed dynamically based on custom conditions.
 
         Args:
@@ -2150,10 +2152,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 See `vectorbt.portfolio.enums.ConflictMode`. Will broadcast.
             upon_short_conflict (ConflictMode or array_like): Conflict mode for short signals.
                 See `vectorbt.portfolio.enums.ConflictMode`. Will broadcast.
-            upon_dir_conflict (DirectionConflictMode or array_like):
-                See `vectorbt.portfolio.enums.DirectionConflictMode`. Will broadcast.
-            upon_opposite_entry (OppositeEntryMode or array_like):
-                See `vectorbt.portfolio.enums.OppositeEntryMode`. Will broadcast.
+            upon_dir_conflict (DirectionConflictMode or array_like): See `vectorbt.portfolio.enums.DirectionConflictMode`. Will broadcast.
+            upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbt.portfolio.enums.OppositeEntryMode`. Will broadcast.
             direction (Direction or array_like): See `Portfolio.from_orders`.
 
                 Takes only effect if `short_entries` and `short_exits` are not set.
@@ -3194,9 +3194,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_sharing (bool): Whether to share cash within the same group.
 
                 If `group_by` is None, `group_by` becomes True to form a single group with cash sharing.
-
-                !!! warning
-                    Introduces cross-asset dependencies.
             call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.

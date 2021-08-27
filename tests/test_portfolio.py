@@ -3451,37 +3451,39 @@ class TestFromRandomSignals:
 
 @njit
 def order_func_nb(c, size):
-    return nb.order_nb(size if c.i % 2 == 0 else -size)
+    _size = nb.get_elem_nb(c, size)
+    return nb.order_nb(_size if c.i % 2 == 0 else -_size)
 
 
 @njit
 def log_order_func_nb(c, size):
-    return nb.order_nb(size if c.i % 2 == 0 else -size, log=True)
+    _size = nb.get_elem_nb(c, size)
+    return nb.order_nb(_size if c.i % 2 == 0 else -_size, log=True)
 
 
 @njit
 def flex_order_func_nb(c, size):
     if c.call_idx < c.group_len:
-        return c.from_col + c.call_idx, nb.order_nb(size if c.i % 2 == 0 else -size)
+        _size = nb.get_col_elem_nb(c, c.from_col + c.call_idx, size)
+        return c.from_col + c.call_idx, nb.order_nb(_size if c.i % 2 == 0 else -_size)
     return -1, nb.order_nothing_nb()
 
 
 @njit
 def log_flex_order_func_nb(c, size):
     if c.call_idx < c.group_len:
-        return c.from_col + c.call_idx, nb.order_nb(size if c.i % 2 == 0 else -size, log=True)
+        _size = nb.get_col_elem_nb(c, c.from_col + c.call_idx, size)
+        return c.from_col + c.call_idx, nb.order_nb(_size if c.i % 2 == 0 else -_size, log=True)
     return -1, nb.order_nothing_nb()
 
 
 class TestFromOrderFunc:
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_one_column(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         pf = vbt.Portfolio.from_order_func(
-            price.tolist(), order_func, np.inf, row_wise=test_row_wise, flexible=test_flexible)
+            price.tolist(), order_func, np.asarray(np.inf), row_wise=test_row_wise, flexible=test_flexible)
         record_arrays_close(
             pf.order_records,
             np.array([
@@ -3491,7 +3493,7 @@ class TestFromOrderFunc:
             ], dtype=order_dt)
         )
         pf = vbt.Portfolio.from_order_func(
-            price, order_func, np.inf, row_wise=test_row_wise, flexible=test_flexible)
+            price, order_func, np.asarray(np.inf), row_wise=test_row_wise, flexible=test_flexible)
         record_arrays_close(
             pf.order_records,
             np.array([
@@ -3512,40 +3514,34 @@ class TestFromOrderFunc:
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
-    def test_multiple_columns(self, test_row_wise, test_flexible):
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    @pytest.mark.parametrize("test_use_numba", [False, True])
+    def test_multiple_columns(self, test_row_wise, test_flexible, test_use_numba):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, np.inf, row_wise=test_row_wise, flexible=test_flexible)
+            price_wide, order_func, vbt.Rep('size'), broadcast_named_args=dict(size=[0, 1, np.inf]),
+            row_wise=test_row_wise, flexible=test_flexible, use_numba=test_use_numba)
         if test_row_wise:
             record_arrays_close(
                 pf.order_records,
                 np.array([
-                    (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 1, 0, 100.0, 1.0, 0.0, 0),
-                    (2, 2, 0, 100.0, 1.0, 0.0, 0), (3, 0, 1, 200.0, 2.0, 0.0, 1),
-                    (4, 1, 1, 200.0, 2.0, 0.0, 1), (5, 2, 1, 200.0, 2.0, 0.0, 1),
-                    (6, 0, 2, 133.33333333333334, 3.0, 0.0, 0), (7, 1, 2, 133.33333333333334, 3.0, 0.0, 0),
-                    (8, 2, 2, 133.33333333333334, 3.0, 0.0, 0), (9, 0, 3, 66.66666666666669, 4.0, 0.0, 1),
-                    (10, 1, 3, 66.66666666666669, 4.0, 0.0, 1), (11, 2, 3, 66.66666666666669, 4.0, 0.0, 1),
-                    (12, 0, 4, 53.33333333333335, 5.0, 0.0, 0), (13, 1, 4, 53.33333333333335, 5.0, 0.0, 0),
-                    (14, 2, 4, 53.33333333333335, 5.0, 0.0, 0)
+                    (0, 1, 0, 1.0, 1.0, 0.0, 0), (1, 2, 0, 100.0, 1.0, 0.0, 0),
+                    (2, 1, 1, 1.0, 2.0, 0.0, 1), (3, 2, 1, 200.0, 2.0, 0.0, 1),
+                    (4, 1, 2, 1.0, 3.0, 0.0, 0), (5, 2, 2, 133.33333333333334, 3.0, 0.0, 0),
+                    (6, 1, 3, 1.0, 4.0, 0.0, 1), (7, 2, 3, 66.66666666666669, 4.0, 0.0, 1),
+                    (8, 1, 4, 1.0, 5.0, 0.0, 0), (9, 2, 4, 53.33333333333335, 5.0, 0.0, 0)
                 ], dtype=order_dt)
             )
         else:
             record_arrays_close(
                 pf.order_records,
                 np.array([
-                    (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 0, 1, 200.0, 2.0, 0.0, 1),
-                    (2, 0, 2, 133.33333333333334, 3.0, 0.0, 0), (3, 0, 3, 66.66666666666669, 4.0, 0.0, 1),
-                    (4, 0, 4, 53.33333333333335, 5.0, 0.0, 0), (5, 1, 0, 100.0, 1.0, 0.0, 0),
-                    (6, 1, 1, 200.0, 2.0, 0.0, 1), (7, 1, 2, 133.33333333333334, 3.0, 0.0, 0),
-                    (8, 1, 3, 66.66666666666669, 4.0, 0.0, 1), (9, 1, 4, 53.33333333333335, 5.0, 0.0, 0),
-                    (10, 2, 0, 100.0, 1.0, 0.0, 0), (11, 2, 1, 200.0, 2.0, 0.0, 1),
-                    (12, 2, 2, 133.33333333333334, 3.0, 0.0, 0), (13, 2, 3, 66.66666666666669, 4.0, 0.0, 1),
-                    (14, 2, 4, 53.33333333333335, 5.0, 0.0, 0)
+                    (0, 1, 0, 1.0, 1.0, 0.0, 0), (1, 1, 1, 1.0, 2.0, 0.0, 1),
+                    (2, 1, 2, 1.0, 3.0, 0.0, 0), (3, 1, 3, 1.0, 4.0, 0.0, 1),
+                    (4, 1, 4, 1.0, 5.0, 0.0, 0), (5, 2, 0, 100.0, 1.0, 0.0, 0),
+                    (6, 2, 1, 200.0, 2.0, 0.0, 1), (7, 2, 2, 133.33333333333334, 3.0, 0.0, 0),
+                    (8, 2, 3, 66.66666666666669, 4.0, 0.0, 1), (9, 2, 4, 53.33333333333335, 5.0, 0.0, 0)
                 ], dtype=order_dt)
             )
         pd.testing.assert_index_equal(
@@ -3560,14 +3556,12 @@ class TestFromOrderFunc:
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_group_by(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, np.inf,
+            price_wide, order_func, np.asarray(np.inf),
             group_by=np.array([0, 0, 1]), row_wise=test_row_wise, flexible=test_flexible)
         if test_row_wise:
             record_arrays_close(
@@ -3607,14 +3601,12 @@ class TestFromOrderFunc:
         )
         assert not pf.cash_sharing
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_cash_sharing(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, np.inf,
+            price_wide, order_func, np.asarray(np.inf),
             group_by=np.array([0, 0, 1]), cash_sharing=True, row_wise=test_row_wise, flexible=test_flexible)
         if test_row_wise:
             record_arrays_close(
@@ -3654,7 +3646,7 @@ class TestFromOrderFunc:
     )
     def test_call_seq(self, test_row_wise):
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func_nb, np.inf, group_by=np.array([0, 0, 1]),
+            price_wide, order_func_nb, np.asarray(np.inf), group_by=np.array([0, 0, 1]),
             cash_sharing=True, row_wise=test_row_wise)
         if test_row_wise:
             record_arrays_close(
@@ -3689,7 +3681,7 @@ class TestFromOrderFunc:
             ])
         )
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func_nb, np.inf, group_by=np.array([0, 0, 1]),
+            price_wide, order_func_nb, np.asarray(np.inf), group_by=np.array([0, 0, 1]),
             cash_sharing=True, call_seq='reversed', row_wise=test_row_wise)
         if test_row_wise:
             record_arrays_close(
@@ -3724,7 +3716,7 @@ class TestFromOrderFunc:
             ])
         )
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func_nb, np.inf, group_by=np.array([0, 0, 1]),
+            price_wide, order_func_nb, np.asarray(np.inf), group_by=np.array([0, 0, 1]),
             cash_sharing=True, call_seq='random', seed=seed, row_wise=test_row_wise)
         if test_row_wise:
             record_arrays_close(
@@ -3760,7 +3752,7 @@ class TestFromOrderFunc:
         )
         with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
-                price_wide, order_func_nb, np.inf, group_by=np.array([0, 0, 1]),
+                price_wide, order_func_nb, np.asarray(np.inf), group_by=np.array([0, 0, 1]),
                 cash_sharing=True, call_seq='auto', row_wise=test_row_wise
             )
 
@@ -3809,10 +3801,8 @@ class TestFromOrderFunc:
             target_hold_value
         )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_target_value(self, test_row_wise, test_flexible):
         @njit
         def target_val_pre_segment_func_nb(c, val_price):
@@ -3870,10 +3860,8 @@ class TestFromOrderFunc:
                 ], dtype=order_dt)
             )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_target_percent(self, test_row_wise, test_flexible):
         @njit
         def target_pct_pre_segment_func_nb(c, val_price):
@@ -3931,10 +3919,8 @@ class TestFromOrderFunc:
                 ], dtype=order_dt)
             )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_update_value(self, test_row_wise, test_flexible):
         if test_flexible:
             @njit
@@ -4012,10 +3998,8 @@ class TestFromOrderFunc:
             ])
         )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_states(self, test_row_wise, test_flexible):
         close = np.array([
             [1, 1, 1],
@@ -4289,10 +4273,8 @@ class TestFromOrderFunc:
                 pf.returns(in_sim_order=True, group_by=False).values
             )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_post_sim_ctx(self, test_row_wise, test_flexible):
         if test_flexible:
             def order_func(c):
@@ -4579,10 +4561,8 @@ class TestFromOrderFunc:
         assert c.log_records[c.last_lidx[1]]['col'] == 1
         assert c.log_records[c.last_lidx[2]]['col'] == 2
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_free_cash(self, test_row_wise, test_flexible):
         if test_flexible:
             def order_func(c, size):
@@ -4730,14 +4710,12 @@ class TestFromOrderFunc:
             pf.cash(free=True).values
         )
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_init_cash(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, 10., row_wise=test_row_wise,
+            price_wide, order_func, np.asarray(10.), row_wise=test_row_wise,
             init_cash=[1., 10., np.inf], flexible=test_flexible)
         if test_row_wise:
             record_arrays_close(
@@ -4769,10 +4747,10 @@ class TestFromOrderFunc:
             )
         assert type(pf._init_cash) == np.ndarray
         base_pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, 10., row_wise=test_row_wise,
+            price_wide, order_func, np.asarray(10.), row_wise=test_row_wise,
             init_cash=np.inf, flexible=test_flexible)
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, 10., row_wise=test_row_wise,
+            price_wide, order_func, np.asarray(10.), row_wise=test_row_wise,
             init_cash=InitCashMode.Auto, flexible=test_flexible)
         record_arrays_close(
             pf.order_records,
@@ -4780,7 +4758,7 @@ class TestFromOrderFunc:
         )
         assert pf._init_cash == InitCashMode.Auto
         pf = vbt.Portfolio.from_order_func(
-            price_wide, order_func, 10., row_wise=test_row_wise,
+            price_wide, order_func, np.asarray(10.), row_wise=test_row_wise,
             init_cash=InitCashMode.AutoAlign, flexible=test_flexible)
         record_arrays_close(
             pf.order_records,
@@ -5456,33 +5434,35 @@ class TestFromOrderFunc:
         assert list(order_lst) == [6, 8, 13, 15, 17, 22, 24, 26, 29, 31]
         assert list(post_order_lst) == [7, 14, 16, 23, 25, 30]
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_max_orders(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         _ = vbt.Portfolio.from_order_func(
-            price_wide, order_func, np.inf, row_wise=test_row_wise, flexible=test_flexible)
+            price_wide, order_func, np.asarray(np.inf),
+            row_wise=test_row_wise, flexible=test_flexible)
         _ = vbt.Portfolio.from_order_func(
-            price_wide, order_func, np.inf, row_wise=test_row_wise, max_orders=15, flexible=test_flexible)
+            price_wide, order_func, np.asarray(np.inf),
+            row_wise=test_row_wise, max_orders=15, flexible=test_flexible)
         with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
-                price_wide, order_func, np.inf, row_wise=test_row_wise, max_orders=14, flexible=test_flexible)
+                price_wide, order_func, np.asarray(np.inf),
+                row_wise=test_row_wise, max_orders=14, flexible=test_flexible)
 
-    @pytest.mark.parametrize(
-        "test_row_wise,test_flexible",
-        [[False, False], [False, True], [True, False], [True, True]],
-    )
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
     def test_max_logs(self, test_row_wise, test_flexible):
         log_order_func = log_flex_order_func_nb if test_flexible else log_order_func_nb
         _ = vbt.Portfolio.from_order_func(
-            price_wide, log_order_func, np.inf, row_wise=test_row_wise, flexible=test_flexible)
+            price_wide, log_order_func, np.asarray(np.inf),
+            row_wise=test_row_wise, flexible=test_flexible)
         _ = vbt.Portfolio.from_order_func(
-            price_wide, log_order_func, np.inf, row_wise=test_row_wise, max_logs=15, flexible=test_flexible)
+            price_wide, log_order_func, np.asarray(np.inf),
+            row_wise=test_row_wise, max_logs=15, flexible=test_flexible)
         with pytest.raises(Exception):
             _ = vbt.Portfolio.from_order_func(
-                price_wide, log_order_func, np.inf, row_wise=test_row_wise, max_logs=14, flexible=test_flexible)
+                price_wide, log_order_func, np.asarray(np.inf),
+                row_wise=test_row_wise, max_logs=14, flexible=test_flexible)
 
 
 # ############# Portfolio ############# #
@@ -7463,6 +7443,18 @@ class TestPortfolio:
                 'Trades with PnL over $10',
                 'Trades with PnL over $20'
             ], name='a')
+        )
+        pd.testing.assert_frame_equal(
+            pf.stats(metrics='total_trades', agg_func=None, settings=dict(trades_type='entry_trades')),
+            pd.DataFrame([2, 2, 2], index=price_na.columns, columns=['Total Trades'])
+        )
+        pd.testing.assert_frame_equal(
+            pf.stats(metrics='total_trades', agg_func=None, settings=dict(trades_type='exit_trades')),
+            pd.DataFrame([2, 2, 2], index=price_na.columns, columns=['Total Trades'])
+        )
+        pd.testing.assert_frame_equal(
+            pf.stats(metrics='total_trades', agg_func=None, settings=dict(trades_type='positions')),
+            pd.DataFrame([2, 2, 2], index=price_na.columns, columns=['Total Trades'])
         )
         pd.testing.assert_series_equal(
             pf['c'].stats(),

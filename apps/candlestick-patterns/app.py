@@ -31,7 +31,7 @@ from talib._ta_lib import (
 from vectorbt import settings
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.portfolio.enums import Direction, ConflictMode
+from vectorbt.portfolio.enums import Direction, DirectionConflictMode
 from vectorbt.portfolio.base import Portfolio
 
 USE_CACHING = os.environ.get(
@@ -80,7 +80,7 @@ intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1
 patterns = talib.get_function_groups()['Pattern Recognition']
 stats_table_columns = ["Metric", "Buy & Hold", "Random (Median)", "Strategy", "Z-Score"]
 directions = Direction._fields
-conflict_modes = ConflictMode._fields
+conflict_modes = DirectionConflictMode._fields
 plot_types = ['OHLC', 'Candlestick']
 
 # Colors
@@ -1295,7 +1295,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
             price=df['Open'],
             size=np.abs(size),
             direction=direction,
-            conflict_mode=conflict_mode,
+            upon_dir_conflict=conflict_mode,
             accumulate='allow_accumulate' in sim_options,
             init_cash=init_cash,
             fees=float(fees) / 100,
