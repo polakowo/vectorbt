@@ -21,7 +21,7 @@ setup(
         'vectorbt': ['templates/*.json']
     },
     install_requires=[
-        'numpy>=1.20.0',
+        'numpy>=1.16.5',
         'pandas',
         'scipy',
         'matplotlib',
@@ -62,7 +62,7 @@ setup(
         ]
     },
     python_requires='>=3.6, <3.10',
-    license='Apache 2.0',
+    license='Apache 2.0 with Commons Clause',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',

@@ -5,7 +5,9 @@
 
 Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,
 and unstacking."""
+
 import numpy as np
+from numpy.lib.stride_tricks import _broadcast_shape
 import pandas as pd
 from numba import njit
 from collections.abc import Sequence
@@ -559,7 +561,7 @@ def broadcast(*args: tp.ArrayLike,
 
     # Get final shape
     if to_shape is None:
-        to_shape = np.broadcast_shapes(*map(lambda x: np.asarray(x).shape, arr_args_2d))
+        to_shape = _broadcast_shape(*map(np.asarray, arr_args_2d))
 
     # Perform broadcasting
     new_args = []
