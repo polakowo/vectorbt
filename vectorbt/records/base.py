@@ -607,6 +607,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         for col_name in df.columns:
             if col_name in field_settings:
                 dct = field_settings[col_name]
+                if dct.get('ignore', False):
+                    df = df.drop(columns=col_name)
+                    continue
                 field_name = dct.get('name', col_name)
                 if 'title' in dct:
                     title = dct['title']

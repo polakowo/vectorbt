@@ -558,7 +558,7 @@ trades_field_config = Config(
                 mapping=TradeStatus
             ),
             'parent_id': dict(
-                title='Parent Id'
+                title='Position Id'
             )
         }
     ),
@@ -1012,19 +1012,30 @@ class Trades(Ranges):
 
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    parent_id = self_col.get_field_arr('parent_id')
-                    parent_id_title = self_col.get_field_title('parent_id')
-                    customdata = np.stack((
-                        id_[mask],
-                        parent_id[mask],
-                        pnl[mask],
-                        returns[mask]
-                    ), axis=1)
-                    hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                    f"<br>{parent_id_title}: %{{customdata[1]}}" \
-                                    f"<br>{exit_idx_title}: %{{x}}" \
-                                    f"<br>{pnl_title}: %{{customdata[2]:.6f}}" \
-                                    f"<br>{return_title}: %{{customdata[3]:.2%}}"
+                    if self_col.get_field_setting('parent_id', 'ignore', False):
+                        customdata = np.stack((
+                            id_[mask],
+                            pnl[mask],
+                            returns[mask]
+                        ), axis=1)
+                        hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                        f"<br>{exit_idx_title}: %{{x}}" \
+                                        f"<br>{pnl_title}: %{{customdata[1]:.6f}}" \
+                                        f"<br>{return_title}: %{{customdata[2]:.2%}}"
+                    else:
+                        parent_id = self_col.get_field_arr('parent_id')
+                        parent_id_title = self_col.get_field_title('parent_id')
+                        customdata = np.stack((
+                            id_[mask],
+                            parent_id[mask],
+                            pnl[mask],
+                            returns[mask]
+                        ), axis=1)
+                        hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                        f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                        f"<br>{exit_idx_title}: %{{x}}" \
+                                        f"<br>{pnl_title}: %{{customdata[2]:.6f}}" \
+                                        f"<br>{return_title}: %{{customdata[3]:.2%}}"
                     scatter = go.Scatter(
                         x=exit_idx[mask],
                         y=returns[mask] if pct_scale else pnl[mask],
@@ -1217,22 +1228,36 @@ class Trades(Ranges):
                 self_col.duration.values, to_pd=True, silence_warnings=True))
 
             # Plot Entry markers
-            parent_id = self_col.get_field_arr('parent_id')
-            parent_id_title = self_col.get_field_title('parent_id')
-            entry_customdata = np.stack((
-                id_,
-                parent_id,
-                size,
-                entry_fees,
-                direction
-            ), axis=1)
-            entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                  f"<br>{parent_id_title}: %{{customdata[1]}}" \
-                                  f"<br>{size_title}: %{{customdata[2]:.6f}}" \
-                                  f"<br>{entry_idx_title}: %{{x}}" \
-                                  f"<br>{entry_price_title}: %{{y}}" \
-                                  f"<br>{entry_fees_title}: %{{customdata[3]:.6f}}" \
-                                  f"<br>{direction_title}: %{{customdata[4]}}"
+            if self_col.get_field_setting('parent_id', 'ignore', False):
+                entry_customdata = np.stack((
+                    id_,
+                    size,
+                    entry_fees,
+                    direction
+                ), axis=1)
+                entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                      f"<br>{size_title}: %{{customdata[1]:.6f}}" \
+                                      f"<br>{entry_idx_title}: %{{x}}" \
+                                      f"<br>{entry_price_title}: %{{y}}" \
+                                      f"<br>{entry_fees_title}: %{{customdata[2]:.6f}}" \
+                                      f"<br>{direction_title}: %{{customdata[3]}}"
+            else:
+                parent_id = self_col.get_field_arr('parent_id')
+                parent_id_title = self_col.get_field_title('parent_id')
+                entry_customdata = np.stack((
+                    id_,
+                    parent_id,
+                    size,
+                    entry_fees,
+                    direction
+                ), axis=1)
+                entry_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                      f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                      f"<br>{size_title}: %{{customdata[2]:.6f}}" \
+                                      f"<br>{entry_idx_title}: %{{x}}" \
+                                      f"<br>{entry_price_title}: %{{y}}" \
+                                      f"<br>{entry_fees_title}: %{{customdata[3]:.6f}}" \
+                                      f"<br>{direction_title}: %{{customdata[4]}}"
             entry_scatter = go.Scatter(
                 x=entry_idx,
                 y=entry_price,
@@ -1256,28 +1281,48 @@ class Trades(Ranges):
             # Plot end markers
             def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    parent_id = self_col.get_field_arr('parent_id')
-                    parent_id_title = self_col.get_field_title('parent_id')
-                    exit_customdata = np.stack((
-                        id_[mask],
-                        parent_id[mask],
-                        size[mask],
-                        exit_fees[mask],
-                        pnl[mask],
-                        returns[mask],
-                        direction[mask],
-                        duration[mask]
-                    ), axis=1)
-                    exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
-                                         f"<br>{parent_id_title}: %{{customdata[1]}}" \
-                                         f"<br>{size_title}: %{{customdata[2]:.6f}}" \
-                                         f"<br>{exit_idx_title}: %{{x}}" \
-                                         f"<br>{exit_price_title}: %{{y}}" \
-                                         f"<br>{exit_fees_title}: %{{customdata[3]:.6f}}" \
-                                         f"<br>{pnl_title}: %{{customdata[4]:.6f}}" \
-                                         f"<br>{return_title}: %{{customdata[5]:.2%}}" \
-                                         f"<br>{direction_title}: %{{customdata[6]}}" \
-                                         f"<br>Duration: %{{customdata[7]}}"
+                    if self_col.get_field_setting('parent_id', 'ignore', False):
+                        exit_customdata = np.stack((
+                            id_[mask],
+                            size[mask],
+                            exit_fees[mask],
+                            pnl[mask],
+                            returns[mask],
+                            direction[mask],
+                            duration[mask]
+                        ), axis=1)
+                        exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                             f"<br>{size_title}: %{{customdata[1]:.6f}}" \
+                                             f"<br>{exit_idx_title}: %{{x}}" \
+                                             f"<br>{exit_price_title}: %{{y}}" \
+                                             f"<br>{exit_fees_title}: %{{customdata[2]:.6f}}" \
+                                             f"<br>{pnl_title}: %{{customdata[3]:.6f}}" \
+                                             f"<br>{return_title}: %{{customdata[4]:.2%}}" \
+                                             f"<br>{direction_title}: %{{customdata[5]}}" \
+                                             f"<br>Duration: %{{customdata[6]}}"
+                    else:
+                        parent_id = self_col.get_field_arr('parent_id')
+                        parent_id_title = self_col.get_field_title('parent_id')
+                        exit_customdata = np.stack((
+                            id_[mask],
+                            parent_id[mask],
+                            size[mask],
+                            exit_fees[mask],
+                            pnl[mask],
+                            returns[mask],
+                            direction[mask],
+                            duration[mask]
+                        ), axis=1)
+                        exit_hovertemplate = f"{id_title}: %{{customdata[0]}}" \
+                                             f"<br>{parent_id_title}: %{{customdata[1]}}" \
+                                             f"<br>{size_title}: %{{customdata[2]:.6f}}" \
+                                             f"<br>{exit_idx_title}: %{{x}}" \
+                                             f"<br>{exit_price_title}: %{{y}}" \
+                                             f"<br>{exit_fees_title}: %{{customdata[3]:.6f}}" \
+                                             f"<br>{pnl_title}: %{{customdata[4]:.6f}}" \
+                                             f"<br>{return_title}: %{{customdata[5]:.2%}}" \
+                                             f"<br>{direction_title}: %{{customdata[6]}}" \
+                                             f"<br>Duration: %{{customdata[7]}}"
                     scatter = go.Scatter(
                         x=exit_idx[mask],
                         y=exit_price[mask],
@@ -1414,9 +1459,30 @@ Trades.override_subplots_doc(__pdoc__)
 
 # ############# EntryTrades ############# #
 
+entry_trades_field_config = Config(
+    dict(
+        settings={
+            'id': dict(
+                title='Entry Trade Id'
+            )
+        }
+    ),
+    readonly=True,
+    as_attrs=False
+)
+"""_"""
+
+__pdoc__['entry_trades_field_config'] = f"""Field config for `EntryTrades`.
+
+```json
+{entry_trades_field_config.to_doc()}
+```
+"""
+
 EntryTradesT = tp.TypeVar("EntryTradesT", bound="EntryTrades")
 
 
+@override_field_config(entry_trades_field_config)
 class EntryTrades(Trades):
     """Extends `Trades` for working with entry trade records."""
 
@@ -1439,9 +1505,30 @@ class EntryTrades(Trades):
 
 # ############# ExitTrades ############# #
 
+exit_trades_field_config = Config(
+    dict(
+        settings={
+            'id': dict(
+                title='Exit Trade Id'
+            )
+        }
+    ),
+    readonly=True,
+    as_attrs=False
+)
+"""_"""
+
+__pdoc__['exit_trades_field_config'] = f"""Field config for `ExitTrades`.
+
+```json
+{exit_trades_field_config.to_doc()}
+```
+"""
+
 ExitTradesT = tp.TypeVar("ExitTradesT", bound="ExitTrades")
 
 
+@override_field_config(exit_trades_field_config)
 class ExitTrades(Trades):
     """Extends `Trades` for working with exit trade records."""
 
@@ -1464,9 +1551,34 @@ class ExitTrades(Trades):
 
 # ############# Positions ############# #
 
+positions_field_config = Config(
+    dict(
+        settings={
+            'id': dict(
+                title='Position Id'
+            ),
+            'parent_id': dict(
+                title='Parent Id',
+                ignore=True
+            )
+        }
+    ),
+    readonly=True,
+    as_attrs=False
+)
+"""_"""
+
+__pdoc__['positions_field_config'] = f"""Field config for `Positions`.
+
+```json
+{positions_field_config.to_doc()}
+```
+"""
+
 PositionsT = tp.TypeVar("PositionsT", bound="Positions")
 
 
+@override_field_config(positions_field_config)
 class Positions(Trades):
     """Extends `Trades` for working with position records."""
 

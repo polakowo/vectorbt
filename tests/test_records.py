@@ -2628,7 +2628,7 @@ class TestExitTrades:
         records_readable = exit_trades.records_readable
 
         np.testing.assert_array_equal(
-            records_readable['Trade Id'].values,
+            records_readable['Exit Trade Id'].values,
             np.array([
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
             ])
@@ -2730,7 +2730,7 @@ class TestExitTrades:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable['Parent Id'].values,
+            records_readable['Position Id'].values,
             np.array([
                 0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9
             ])
@@ -3131,6 +3131,22 @@ class TestEntryTrades:
             entry_trades.values
         )
 
+    def test_records_readable(self):
+        records_readable = entry_trades.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Entry Trade Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Position Id'].values,
+            np.array([
+                0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9
+            ])
+        )
+
 
 positions = vbt.Positions.from_trades(exit_trades)
 positions_grouped = vbt.Positions.from_trades(exit_trades_grouped)
@@ -3162,6 +3178,17 @@ class TestPositions:
             vbt.Positions.from_trades(reversed_col_trades).values,
             positions.values
         )
+
+    def test_records_readable(self):
+        records_readable = positions.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Position Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+            ])
+        )
+        assert 'Parent Id' not in records_readable.columns
 
 
 # ############# logs.py ############# #
