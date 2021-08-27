@@ -27,7 +27,7 @@ setup(
         'matplotlib',
         'plotly>=4.12.0',
         'ipywidgets>=7.0.0',
-        'numba>=0.53.1',
+        'numba<=0.53.1',
         'dill',
         'tqdm',
         'dateparser',
