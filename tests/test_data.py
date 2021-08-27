@@ -1025,7 +1025,7 @@ class TestData:
             data.stats(column='feat0')
         )
         pd.testing.assert_series_equal(
-            data.copy(wrapper=data.wrapper.copy(group_by=True)).stats(),
+            data.replace(wrapper=data.wrapper.replace(group_by=True)).stats(),
             data.stats(group_by=True)
         )
         stats_df = data.stats(agg_func=None)

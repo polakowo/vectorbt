@@ -65,7 +65,7 @@ class Accessor:
         if isinstance(obj, (pd.Series, pd.DataFrame)):
             accessor_obj = self._accessor(obj)
         elif isinstance(obj, Configured):
-            accessor_obj = obj.copy(_class=self._accessor)
+            accessor_obj = obj.replace(cls_=self._accessor)
         else:
             accessor_obj = self._accessor(obj.obj)
         return accessor_obj

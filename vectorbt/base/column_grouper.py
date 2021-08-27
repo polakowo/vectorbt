@@ -117,7 +117,7 @@ class ColumnGrouper(Configured):
         Columns should build groups that are coherent and sorted for using `get_group_lens_nb`.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `ColumnGrouper.copy`."""
+        This class is meant to be immutable. To change any attribute, use `ColumnGrouper.replace`."""
 
     def __init__(self, columns: tp.Index, group_by: tp.GroupByLike = None, allow_enable: bool = True,
                  allow_disable: bool = True, allow_modify: bool = True) -> None:

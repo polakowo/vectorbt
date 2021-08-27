@@ -621,8 +621,10 @@ class Config(PickleableDict, Documented):
 
         return self_copy
 
-    def merge_with(self: ConfigT, other: InConfigLikeT,
-                   nested: tp.Optional[bool] = None, **kwargs) -> OutConfigLikeT:
+    def merge_with(self: ConfigT,
+                   other: InConfigLikeT,
+                   nested: tp.Optional[bool] = None,
+                   **kwargs) -> OutConfigLikeT:
         """Merge with another dict into one single dict.
 
         See `merge_dicts`."""
@@ -758,35 +760,44 @@ class Configured(Pickleable, Documented):
             if isinstance(base_cls, Configured)
         }
 
-    def copy(self: ConfiguredT,
-             copy_mode: tp.Optional[str] = 'shallow',
-             nested: tp.Optional[bool] = None,
-             _class: tp.Optional[type] = None,
-             **new_config) -> ConfiguredT:
-        """Copy config and writeable attributes to initialize a new instance.
+    def replace(self: ConfiguredT,
+                copy_mode_: tp.Optional[str] = 'shallow',
+                nested_: tp.Optional[bool] = None,
+                cls_: tp.Optional[type] = None,
+                **new_config) -> ConfiguredT:
+        """Create a new instance by copying and (optionally) changing the config.
 
         !!! warning
-            This "copy" operation won't return a copy of the instance but a new instance
+            This operation won't return a copy of the instance but a new instance
             initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
-        if _class is None:
-            _class = self.__class__
-        new_config = self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested)
-        new_instance = _class(**new_config)
+        if cls_ is None:
+            cls_ = self.__class__
+        new_config = self.config.merge_with(new_config, copy_mode=copy_mode_, nested=nested_)
+        new_instance = cls_(**new_config)
         for attr in self.writeable_attrs:
             attr_obj = getattr(self, attr)
             if isinstance(attr_obj, Config):
                 attr_obj = attr_obj.copy(
-                    copy_mode=copy_mode,
-                    nested=nested
+                    copy_mode=copy_mode_,
+                    nested=nested_
                 )
             else:
-                if copy_mode is not None:
-                    if copy_mode == 'hybrid':
+                if copy_mode_ is not None:
+                    if copy_mode_ == 'hybrid':
                         attr_obj = copy(attr_obj)
-                    elif copy_mode == 'deep':
+                    elif copy_mode_ == 'deep':
                         attr_obj = deepcopy(attr_obj)
             setattr(new_instance, attr, attr_obj)
         return new_instance
+
+    def copy(self: ConfiguredT,
+             copy_mode: tp.Optional[str] = 'shallow',
+             nested: tp.Optional[bool] = None,
+             cls: tp.Optional[type] = None) -> ConfiguredT:
+        """Create a new instance by copying the config.
+
+        See `Configured.replace`."""
+        return self.replace(copy_mode_=copy_mode, nested_=nested, cls_=cls)
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""

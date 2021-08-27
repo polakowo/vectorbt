@@ -114,7 +114,7 @@ class ArrayWrapper(Configured, PandasIndexer):
     `**kwargs` are passed to `vectorbt.base.column_grouper.ColumnGrouper`.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`.
+        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.replace`.
 
         Use methods that begin with `get_` to get group-aware results."""
 
@@ -306,7 +306,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 ungrouped_group_idxs[group_lens[:-1]] = 1
                 ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
-                return _self.copy(
+                return _self.replace(
                     index=new_index,
                     columns=ungrouped_columns,
                     ndim=ungrouped_ndim,
@@ -316,7 +316,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             # Selection based on columns
             col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
-            return _self.copy(
+            return _self.replace(
                 index=new_index,
                 columns=new_columns,
                 ndim=new_ndim,
@@ -325,7 +325,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             ), idx_idxs, col_idxs, col_idxs
 
         # Grouping disabled
-        return _self.copy(
+        return _self.replace(
             index=new_index,
             columns=new_columns,
             ndim=new_ndim,
@@ -485,7 +485,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             if self.grouper.is_grouped(group_by=group_by):
                 if not self.grouper.is_group_count_changed(group_by=group_by):
                     grouped_ndim = self.grouped_ndim
-            return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
+            return self.replace(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
         return self  # important for keeping cache
 
     @cached_method
@@ -495,7 +495,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         Replaces columns and other metadata with groups."""
         _self = self.regroup(group_by=group_by, **kwargs)
         if _self.grouper.is_grouped():
-            return _self.copy(
+            return _self.replace(
                 columns=_self.grouper.get_columns(),
                 ndim=_self.grouped_ndim,
                 grouped_ndim=None,
@@ -696,7 +696,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
-        return self.copy(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
+        return self.replace(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
 
     @property
     def wrapper(self) -> ArrayWrapper:
@@ -711,7 +711,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         `**kwargs` will be passed to `ArrayWrapper.regroup`."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
+            return self.replace(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
     def resolve_self(self: AttrResolverT,
@@ -733,13 +733,13 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
             silence_warnings = array_wrapper_cfg['silence_warnings']
 
         if 'freq' in cond_kwargs:
-            wrapper_copy = self.wrapper.copy(freq=cond_kwargs['freq'])
+            wrapper_copy = self.wrapper.replace(freq=cond_kwargs['freq'])
 
             if wrapper_copy.freq != self.wrapper.freq:
                 if not silence_warnings:
                     warnings.warn(f"Changing the frequency will create a copy of this object. "
                                   f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
-                self_copy = self.copy(wrapper=wrapper_copy)
+                self_copy = self.replace(wrapper=wrapper_copy)
                 for alias in self.self_aliases:
                     if alias not in custom_arg_names:
                         cond_kwargs[alias] = self_copy

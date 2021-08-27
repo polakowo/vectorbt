@@ -2174,7 +2174,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
             # Tuple mapper is a list because of its complex data type
             mapper_list.append(getattr(self, f'_{param_name}_mapper')[col_idxs_arr])
 
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             input_list=input_list,
             input_mapper=input_mapper,

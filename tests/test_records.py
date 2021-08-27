@@ -45,11 +45,11 @@ wrapper = vbt.ArrayWrapper(
     ndim=2,
     freq='1 days'
 )
-wrapper_grouped = wrapper.copy(group_by=group_by)
+wrapper_grouped = wrapper.replace(group_by=group_by)
 
 records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
-records_nosort = records.copy(records_arr=records_nosort_arr)
+records_nosort = records.replace(records_arr=records_nosort_arr)
 records_nosort_grouped = vbt.records.Records(wrapper_grouped, records_nosort_arr)
 
 
@@ -186,8 +186,8 @@ mapped_array_grouped = records_grouped.map_field('some_field1')
 mapped_array_nosort = records_nosort.map_field('some_field1')
 mapped_array_nosort_grouped = records_nosort_grouped.map_field('some_field1')
 mapping = {x: 'test_' + str(x) for x in pd.unique(mapped_array.values)}
-mp_mapped_array = mapped_array.copy(mapping=mapping)
-mp_mapped_array_grouped = mapped_array_grouped.copy(mapping=mapping)
+mp_mapped_array = mapped_array.replace(mapping=mapping)
+mp_mapped_array_grouped = mapped_array_grouped.replace(mapping=mapping)
 
 
 class TestMappedArray:
@@ -824,7 +824,7 @@ class TestMappedArray:
                 columns=pd.Index(['g1', 'g2'], dtype='object')
             )
         )
-        mapped_array2 = mapped_array.copy(mapped_arr=[4, 4, 3, 2, np.nan, 4, 3, 2, 1])
+        mapped_array2 = mapped_array.replace(mapped_arr=[4, 4, 3, 2, np.nan, 4, 3, 2, 1])
         pd.testing.assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=False),
             pd.DataFrame(
@@ -1700,10 +1700,10 @@ class TestRanges:
         )
         pd.testing.assert_series_equal(
             ranges.coverage(),
-            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage()
+            ranges.replace(records_arr=np.repeat(ranges.values, 2)).coverage()
         )
         pd.testing.assert_series_equal(
-            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True),
+            ranges.replace(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True),
             pd.Series(
                 np.array([1.0, 1.0, 1.0, np.nan]),
                 index=ts2.columns
@@ -1717,7 +1717,7 @@ class TestRanges:
             ).rename('coverage')
         )
         pd.testing.assert_series_equal(
-            ranges.copy(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True, normalize=False),
+            ranges.replace(records_arr=np.repeat(ranges.values, 2)).coverage(overlapping=True, normalize=False),
             pd.Series(
                 np.array([3.0, 3.0, 3.0, np.nan]),
                 index=ts2.columns
@@ -1732,7 +1732,7 @@ class TestRanges:
         )
         pd.testing.assert_series_equal(
             ranges_grouped.coverage(),
-            ranges_grouped.copy(records_arr=np.repeat(ranges_grouped.values, 2)).coverage()
+            ranges_grouped.replace(records_arr=np.repeat(ranges_grouped.values, 2)).coverage()
         )
 
     def test_stats(self):
@@ -1844,7 +1844,7 @@ class TestDrawdowns:
             drawdowns_grouped['g1'].ts,
             ts2[['a', 'b']]
         )
-        assert drawdowns.copy(ts=None)['a'].ts is None
+        assert drawdowns.replace(ts=None)['a'].ts is None
 
     def test_from_ts(self):
         record_arrays_close(
@@ -2378,7 +2378,7 @@ class TestOrders:
             orders_grouped['g1'].close,
             close[['a', 'b']]
         )
-        assert orders.copy(close=None)['a'].close is None
+        assert orders.replace(close=None)['a'].close is None
 
     def test_records_readable(self):
         records_readable = orders.records_readable
@@ -2593,7 +2593,7 @@ class TestExitTrades:
             exit_trades_grouped['g1'].close,
             close[['a', 'b']]
         )
-        assert exit_trades.copy(close=None)['a'].close is None
+        assert exit_trades.replace(close=None)['a'].close is None
 
     def test_records_arr(self):
         record_arrays_close(
@@ -2614,7 +2614,7 @@ class TestExitTrades:
                 (12, 2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 9)
             ], dtype=trade_dt)
         )
-        reversed_col_orders = orders.copy(records_arr=np.concatenate((
+        reversed_col_orders = orders.replace(records_arr=np.concatenate((
             orders.values[orders.values['col'] == 2],
             orders.values[orders.values['col'] == 1],
             orders.values[orders.values['col'] == 0]
@@ -3121,7 +3121,7 @@ class TestEntryTrades:
                 (12, 2, 1.0, 7, 8.0, 0.08, 7, 8.0, 0.0, -0.08, -0.01, 0, 0, 9)
             ], dtype=trade_dt)
         )
-        reversed_col_orders = orders.copy(records_arr=np.concatenate((
+        reversed_col_orders = orders.replace(records_arr=np.concatenate((
             orders.values[orders.values['col'] == 2],
             orders.values[orders.values['col'] == 1],
             orders.values[orders.values['col'] == 0]
@@ -3153,7 +3153,7 @@ class TestPositions:
                 (9, 2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 9)
             ], dtype=trade_dt)
         )
-        reversed_col_trades = exit_trades.copy(records_arr=np.concatenate((
+        reversed_col_trades = exit_trades.replace(records_arr=np.concatenate((
             exit_trades.values[exit_trades.values['col'] == 2],
             exit_trades.values[exit_trades.values['col'] == 1],
             exit_trades.values[exit_trades.values['col'] == 0]

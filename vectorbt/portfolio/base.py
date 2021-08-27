@@ -1510,7 +1510,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         The `__init__` method is reserved for indexing purposes.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
+        This class is meant to be immutable. To change any attribute, use `Portfolio.replace`."""
 
     def __init__(self,
                  wrapper: ArrayWrapper,
@@ -1574,7 +1574,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             new_call_seq = None
 
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             close=new_close,
             order_records=new_order_records,
@@ -3952,7 +3952,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Array wrapper."""
         if self.cash_sharing:
             # Allow only disabling grouping when needed (but not globally, see regroup)
-            return self._wrapper.copy(
+            return self._wrapper.replace(
                 allow_enable=False,
                 allow_modify=False
             )

@@ -1307,7 +1307,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     # Align initial cash across main and random strategies
     aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)))
     # Fixate initial cash for indexing
-    aligned_portfolio = aligned_portfolio.copy(
+    aligned_portfolio = aligned_portfolio.replace(
         init_cash=aligned_portfolio.init_cash
     )
     # Separate portfolios

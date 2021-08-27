@@ -215,14 +215,14 @@ class ReturnsAccessor(GenericAccessor):
         else:
             new_benchmark_rets = None
         if checks.is_series(new_obj):
-            return self.copy(
-                _class=self.sr_accessor_cls,
+            return self.replace(
+                cls_=self.sr_accessor_cls,
                 obj=new_obj,
                 benchmark_rets=new_benchmark_rets,
                 wrapper=new_wrapper
             )
-        return self.copy(
-            _class=self.df_accessor_cls,
+        return self.replace(
+            cls_=self.df_accessor_cls,
             obj=new_obj,
             benchmark_rets=new_benchmark_rets,
             wrapper=new_wrapper
@@ -906,7 +906,7 @@ class ReturnsAccessor(GenericAccessor):
             silence_warnings=silence_warnings
         )
         if 'year_freq' in cond_kwargs:
-            self_copy = reself.copy(year_freq=cond_kwargs['year_freq'])
+            self_copy = reself.replace(year_freq=cond_kwargs['year_freq'])
 
             if self_copy.year_freq != reself.year_freq:
                 if not silence_warnings:

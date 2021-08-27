@@ -347,14 +347,14 @@ sr2_wrapper = array_wrapper.ArrayWrapper.from_obj(sr2)
 df2_wrapper = array_wrapper.ArrayWrapper.from_obj(df2)
 df4_wrapper = array_wrapper.ArrayWrapper.from_obj(df4)
 
-sr2_wrapper_co = sr2_wrapper.copy(column_only_select=True)
-df4_wrapper_co = df4_wrapper.copy(column_only_select=True)
+sr2_wrapper_co = sr2_wrapper.replace(column_only_select=True)
+df4_wrapper_co = df4_wrapper.replace(column_only_select=True)
 
-sr2_grouped_wrapper = sr2_wrapper.copy(group_by=np.array(['g1']), group_select=True)
-df4_grouped_wrapper = df4_wrapper.copy(group_by=np.array(['g1', 'g1', 'g2']), group_select=True)
+sr2_grouped_wrapper = sr2_wrapper.replace(group_by=np.array(['g1']), group_select=True)
+df4_grouped_wrapper = df4_wrapper.replace(group_by=np.array(['g1', 'g1', 'g2']), group_select=True)
 
-sr2_grouped_wrapper_co = sr2_grouped_wrapper.copy(column_only_select=True, group_select=True)
-df4_grouped_wrapper_co = df4_grouped_wrapper.copy(column_only_select=True, group_select=True)
+sr2_grouped_wrapper_co = sr2_grouped_wrapper.replace(column_only_select=True, group_select=True)
+df4_grouped_wrapper_co = df4_grouped_wrapper.replace(column_only_select=True, group_select=True)
 
 
 class TestArrayWrapper:
@@ -674,13 +674,13 @@ class TestArrayWrapper:
 
     def test_freq(self):
         assert sr2_wrapper.freq is None
-        assert sr2_wrapper.copy(freq='1D').freq == day_dt
-        assert sr2_wrapper.copy(index=pd.Index([
+        assert sr2_wrapper.replace(freq='1D').freq == day_dt
+        assert sr2_wrapper.replace(index=pd.Index([
             datetime(2020, 1, 1),
             datetime(2020, 1, 2),
             datetime(2020, 1, 3)
         ], freq='1D')).freq == day_dt
-        assert sr2_wrapper.copy(index=pd.Index([
+        assert sr2_wrapper.replace(index=pd.Index([
             datetime(2020, 1, 1),
             datetime(2020, 1, 2),
             datetime(2020, 1, 3)
@@ -2636,6 +2636,9 @@ class TestCombineFns:
 # ############# accessors.py ############# #
 
 class TestAccessors:
+    def test_indexing(self):
+        pd.testing.assert_series_equal(df4.vbt['a6'].obj, df4['a6'].vbt.obj)
+
     def test_freq(self):
         ts = pd.Series([1, 2, 3], index=pd.DatetimeIndex([
             datetime(2018, 1, 1),

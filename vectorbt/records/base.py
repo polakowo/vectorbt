@@ -201,7 +201,7 @@ There are multiple ways of define grouping:
 
 ```python-repl
 >>> group_by = np.array(['first', 'first', 'second'])
->>> grouped_wrapper = wrapper.copy(group_by=group_by)
+>>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_records = vbt.Records(grouped_wrapper, records_arr)
 
 >>> grouped_records.map_field('some_field').mean()
@@ -457,7 +457,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                 It depends on `records_arr`, so make sure to invalidate `col_mapper` upon creating
                 a `Records` instance with a modified `records_arr`.
 
-                `Records.copy` does it automatically.
+                `Records.replace` does it automatically.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -530,8 +530,8 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
             col_mapper = ColumnMapper(wrapper, self.col_arr)
         self._col_mapper = col_mapper
 
-    def copy(self: RecordsT, **kwargs) -> RecordsT:
-        """See `vectorbt.utils.config.Configured.copy`.
+    def replace(self: RecordsT, **kwargs) -> RecordsT:
+        """See `vectorbt.utils.config.Configured.replace`.
 
         Also, makes sure that `Records.col_mapper` is not passed to the new instance."""
         if self.config.get('col_mapper', None) is not None:
@@ -541,7 +541,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
             if 'records_arr' in kwargs:
                 if self.records_arr is not kwargs.get('records_arr'):
                     kwargs['col_mapper'] = None
-        return Configured.copy(self, **kwargs)
+        return Configured.replace(self, **kwargs)
 
     def get_by_col_idxs(self, col_idxs: tp.Array1d) -> tp.RecordArray:
         """Get records corresponding to column indices.
@@ -565,7 +565,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
         new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             records_arr=new_records_arr
         )
@@ -685,17 +685,17 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         !!! note
             Sorting is expensive. A better approach is to append records already in the correct order."""
         if self.is_sorted(incl_id=incl_id):
-            return self.copy(**kwargs).regroup(group_by)
+            return self.replace(**kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
             ind = np.argsort(self.col_arr)
-        return self.copy(records_arr=self.values[ind], **kwargs).regroup(group_by)
+        return self.replace(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
     def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
         mask_indices = np.flatnonzero(mask)
-        return self.copy(
+        return self.replace(
             records_arr=np.take(self.values, mask_indices),
             **kwargs
         ).regroup(group_by)

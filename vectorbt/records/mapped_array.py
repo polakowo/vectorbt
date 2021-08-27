@@ -178,7 +178,7 @@ There are multiple ways of define grouping:
 
 ```python-repl
 >>> group_by = np.array(['first', 'first', 'second'])
->>> grouped_wrapper = wrapper.copy(group_by=group_by)
+>>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_ma = vbt.MappedArray(grouped_wrapper, a, col_arr, idx_arr=idx_arr)
 
 >>> grouped_ma.mean()
@@ -392,7 +392,7 @@ def combine_mapped_with_other(self: MappedArrayT,
         checks.assert_array_equal(self.id_arr, other.id_arr)
         checks.assert_array_equal(self.col_arr, other.col_arr)
         other = other.values
-    return self.copy(mapped_arr=np_func(self.values, other))
+    return self.replace(mapped_arr=np_func(self.values, other))
 
 
 class MetaMappedArray(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
@@ -400,7 +400,7 @@ class MetaMappedArray(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
 
 
 @attach_binary_magic_methods(combine_mapped_with_other)
-@attach_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
+@attach_unary_magic_methods(lambda self, np_func: self.replace(mapped_arr=np_func(self.values)))
 class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaMappedArray):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
@@ -426,7 +426,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                 It depends upon `wrapper` and `col_arr`, so make sure to invalidate `col_mapper` upon creating
                 a `MappedArray` instance with a modified `wrapper` or `col_arr.
 
-                `MappedArray.copy` does it automatically.
+                `MappedArray.replace` does it automatically.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -481,8 +481,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             col_mapper = ColumnMapper(wrapper, col_arr)
         self._col_mapper = col_mapper
 
-    def copy(self: MappedArrayT, **kwargs) -> MappedArrayT:
-        """See `vectorbt.utils.config.Configured.copy`.
+    def replace(self: MappedArrayT, **kwargs) -> MappedArrayT:
+        """See `vectorbt.utils.config.Configured.replace`.
 
         Also, makes sure that `MappedArray.col_mapper` is not passed to the new instance."""
         if self.config.get('col_mapper', None) is not None:
@@ -492,7 +492,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             if 'col_arr' in kwargs:
                 if self.col_arr is not kwargs.get('col_arr'):
                     kwargs['col_mapper'] = None
-        return Configured.copy(self, **kwargs)
+        return Configured.replace(self, **kwargs)
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
@@ -511,7 +511,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
             self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
@@ -573,16 +573,16 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
              **kwargs) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional).
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         if self.is_sorted(incl_id=incl_id):
-            return self.copy(idx_arr=idx_arr, **kwargs).regroup(group_by)
+            return self.replace(idx_arr=idx_arr, **kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
             ind = np.argsort(self.col_arr)
-        return self.copy(
+        return self.replace(
             mapped_arr=self.values[ind],
             col_arr=self.col_arr[ind],
             id_arr=self.id_arr[ind],
@@ -597,11 +597,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                    **kwargs) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         mask_indices = np.flatnonzero(mask)
-        return self.copy(
+        return self.replace(
             mapped_arr=np.take(self.values, mask_indices),
             col_arr=np.take(self.col_arr, mask_indices),
             id_arr=np.take(self.id_arr, mask_indices),
@@ -702,7 +702,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
         See `vectorbt.records.nb.apply_on_mapped_nb`.
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         checks.assert_numba_func(apply_func_nb)
         if apply_per_group:
             col_map = self.col_mapper.get_col_map(group_by=group_by)
@@ -710,7 +710,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             col_map = self.col_mapper.get_col_map(group_by=False)
         mapped_arr = nb.apply_on_mapped_nb(self.values, col_map, apply_func_nb, *args)
         mapped_arr = np.asarray(mapped_arr, dtype=dtype)
-        return self.copy(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
+        return self.replace(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
 
     def reduce(self,
                reduce_func_nb: tp.ReduceFunc, *args,
@@ -1047,7 +1047,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             elif mapping.lower() == 'columns':
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        return self.copy(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
+        return self.replace(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
 
     def to_index(self):
         """Convert to index."""

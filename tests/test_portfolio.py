@@ -7481,7 +7481,7 @@ class TestPortfolio:
             pf.stats(column='second', group_by=group_by)
         )
         pd.testing.assert_series_equal(
-            pf.copy(wrapper=pf.wrapper.copy(freq='10d')).stats(),
+            pf.replace(wrapper=pf.wrapper.replace(freq='10d')).stats(),
             pf.stats(settings=dict(freq='10d'))
         )
         stats_df = pf.stats(agg_func=None)

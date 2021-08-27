@@ -199,7 +199,7 @@ class QSAdapter(Configured):
     def __call__(self: QSAdapterT, **kwargs) -> QSAdapterT:
         """Allows passing arguments to the initializer."""
 
-        return self.copy(**kwargs)
+        return self.replace(**kwargs)
 
     @property
     def returns_accessor(self) -> ReturnsAccessor:

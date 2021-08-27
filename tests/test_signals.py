@@ -57,6 +57,9 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_indexing(self):
+        assert mask.vbt.signals['a'].total() == mask['a'].vbt.signals.total()
+
     def test_freq(self):
         assert mask.vbt.signals.wrapper.freq == day_dt
         assert mask['a'].vbt.signals.wrapper.freq == day_dt

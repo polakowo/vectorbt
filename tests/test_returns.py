@@ -65,6 +65,9 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_indexing(self):
+        assert rets.vbt.returns['a'].total() == rets['a'].vbt.returns.total()
+
     def test_benchmark_rets(self):
         ret_acc = rets.vbt.returns(benchmark_rets=benchmark_rets)
         pd.testing.assert_frame_equal(ret_acc.benchmark_rets, benchmark_rets)

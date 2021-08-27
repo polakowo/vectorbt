@@ -2209,6 +2209,7 @@ class TestFactory:
             'post_resolve_attr',
             'pre_resolve_attr',
             'regroup',
+            'replace',
             'resolve_attr',
             'resolve_self',
             'run',

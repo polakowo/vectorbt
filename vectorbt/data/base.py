@@ -327,7 +327,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
         new_data = {k: pd_indexing_func(v) for k, v in self.data.items()}
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             data=new_data
         )
@@ -657,8 +657,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
         # Create new instance
         new_index = new_data[self.symbols[0]].index
-        return self.copy(
-            wrapper=self.wrapper.copy(index=new_index),
+        return self.replace(
+            wrapper=self.wrapper.replace(index=new_index),
             data=new_data
         )
 

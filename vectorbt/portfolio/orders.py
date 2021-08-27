@@ -206,7 +206,7 @@ class Orders(Records):
             new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         else:
             new_close = None
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             records_arr=new_records_arr,
             close=new_close

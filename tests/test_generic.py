@@ -74,6 +74,9 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_indexing(self):
+        assert df.vbt['a'].min() == df['a'].vbt.min()
+
     def test_set_by_mask(self):
         np.testing.assert_array_equal(
             nb.set_by_mask_1d_nb(

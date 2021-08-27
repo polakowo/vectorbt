@@ -104,13 +104,13 @@ class BaseAccessor(Wrapping):
         if wrapper is None:
             wrapper = ArrayWrapper.from_obj(obj, **wrapping_kwargs)
         else:
-            wrapper = wrapper.copy(**wrapping_kwargs)
+            wrapper = wrapper.replace(**wrapping_kwargs)
         Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 
     def __call__(self: BaseAccessorT, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""
 
-        return self.copy(**kwargs)
+        return self.replace(**kwargs)
 
     @property
     def sr_accessor_cls(self) -> tp.Type["BaseSRAccessor"]:
@@ -127,13 +127,13 @@ class BaseAccessor(Wrapping):
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
         if checks.is_series(new_obj):
-            return self.copy(
-                _class=self.sr_accessor_cls,
+            return self.replace(
+                cls_=self.sr_accessor_cls,
                 obj=new_obj,
                 wrapper=new_wrapper
             )
-        return self.copy(
-            _class=self.df_accessor_cls,
+        return self.replace(
+            cls_=self.df_accessor_cls,
             obj=new_obj,
             wrapper=new_wrapper
         )

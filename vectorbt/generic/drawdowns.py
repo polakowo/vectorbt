@@ -280,7 +280,7 @@ class Drawdowns(Ranges):
             new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
         else:
             new_ts = None
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             records_arr=new_records_arr,
             ts=new_ts

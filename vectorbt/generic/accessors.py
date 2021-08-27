@@ -1054,7 +1054,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             silence_warnings=silence_warnings
         )
         if 'mapping' in cond_kwargs:
-            self_copy = reself.copy(mapping=cond_kwargs['mapping'])
+            self_copy = reself.replace(mapping=cond_kwargs['mapping'])
 
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:

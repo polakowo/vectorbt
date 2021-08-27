@@ -920,8 +920,8 @@ class TestConfig:
                 self.my_cfg = config.Config(dict(sr=pd.Series([1, 2, 3])))
 
         assert H(1).config == {'a': 1, 'b': 2}
-        assert H(1).copy(b=3).config == {'a': 1, 'b': 3}
-        assert H(1).copy(c=4).config == {'a': 1, 'b': 2, 'c': 4}
+        assert H(1).replace(b=3).config == {'a': 1, 'b': 3}
+        assert H(1).replace(c=4).config == {'a': 1, 'b': 2, 'c': 4}
         assert H(pd.Series([1, 2, 3])) == H(pd.Series([1, 2, 3]))
         assert H(pd.Series([1, 2, 3])) != H(pd.Series([1, 2, 4]))
         assert H(pd.DataFrame([1, 2, 3])) == H(pd.DataFrame([1, 2, 3]))
