@@ -20,11 +20,11 @@ from vectorbt.base.reshape_fns import to_2d_array
 from vectorbt.generic.plotting import clean_labels
 
 
-def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-    """Class decorator to add Plotly Express methods that accept a DataFrame as first argument."""
+def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+    """Class decorator to attach Plotly Express methods."""
 
     for px_func_name, px_func in getmembers(px, isfunction):
-        if checks.method_accepts_argument(px_func, 'data_frame') or px_func_name == 'imshow':
+        if checks.func_accepts_arg(px_func, 'data_frame') or px_func_name == 'imshow':
             def plot_func(self, *args, _px_func_name: str = px_func_name,
                           _px_func: tp.Callable = px_func, **kwargs) -> tp.BaseFigure:
                 from vectorbt._settings import settings
@@ -65,7 +65,7 @@ def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     return cls
 
 
-@add_px_methods
+@attach_px_methods
 class PXAccessor(BaseAccessor):
     """Accessor for running Plotly Express functions.
 

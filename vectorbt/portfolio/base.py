@@ -1213,6 +1213,61 @@ The third option is to set `metrics` globally under `portfolio.stats` in `vector
 >>> pf.stats(column=10)
 ```
 
+## Returns stats
+
+We can compute the stats solely based on the portfolio's returns using `Portfolio.returns_stats`,
+which calls `vectorbt.returns.accessors.ReturnsAccessor.stats`.
+
+```python-repl
+>>> pf.returns_stats(column=10)
+Start                        2020-01-01 00:00:00+00:00
+End                          2020-09-01 00:00:00+00:00
+Period                               244 days 00:00:00
+Total Return [%]                              6.721585
+Benchmark Return [%]                         66.252621
+Annualized Return [%]                         10.22056
+Annualized Volatility [%]                    36.683518
+Max Drawdown [%]                             22.190944
+Max Drawdown Duration                100 days 00:00:00
+Sharpe Ratio                                  0.445231
+Calmar Ratio                                  0.460573
+Omega Ratio                                   1.099192
+Sortino Ratio                                 0.706986
+Skew                                          1.328259
+Kurtosis                                      10.80246
+Tail Ratio                                    1.057913
+Common Sense Ratio                            1.166037
+Value at Risk                                -0.031011
+Alpha                                        -0.075109
+Beta                                          0.220351
+Name: 10, dtype: object
+```
+
+Most metrics defined in `vectorbt.returns.accessors.ReturnsAccessor` are also available
+as attributes of `Portfolio`:
+
+```python-repl
+>>> pf.sharpe_ratio()
+randnx_n
+10    0.445231
+20    1.886158
+Name: sharpe_ratio, dtype: float64
+```
+
+Moreover, we can access quantstats functions using `vectorbt.returns.qs_adapter.QSAdapter`:
+
+```python-repl
+>>> pf.qs.sharpe()
+randnx_n
+10    0.445231
+20    1.886158
+dtype: float64
+
+>>> pf[10].qs.plot_snapshot()
+```
+
+![](/docs/img/portfolio_plot_snapshot.png)
+
 ## Plots
 
 !!! hint
@@ -1353,7 +1408,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import map_enum_fields
 from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.template import RepEval, Rep, deep_substitute
+from vectorbt.utils.template import RepEval, deep_substitute
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import get_domain
@@ -1371,6 +1426,13 @@ from vectorbt.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
 from vectorbt.portfolio.decorators import attach_returns_acc_methods
+
+try:
+    import quantstats as qs
+except ImportError:
+    QSAdapterT = tp.Any
+else:
+    from vectorbt.returns.qs_adapter import QSAdapter as QSAdapterT
 
 __pdoc__ = {}
 
@@ -4340,14 +4402,20 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         asset_returns = nb.asset_returns_nb(cash_flow, asset_value)
         return self.wrapper.wrap(asset_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
+    @property
+    def returns_acc(self) -> ReturnsAccessor:
+        """`Portfolio.get_returns_acc` with default arguments."""
+        return self.get_returns_acc()
+
     @cached_method
-    def returns_acc(self,
-                    group_by: tp.GroupByLike = None,
-                    freq: tp.Optional[tp.FrequencyLike] = None,
-                    year_freq: tp.Optional[tp.FrequencyLike] = None,
-                    use_asset_returns: bool = False,
-                    defaults: tp.KwargsLike = None,
-                    **kwargs) -> ReturnsAccessor:
+    def get_returns_acc(self,
+                        group_by: tp.GroupByLike = None,
+                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                        freq: tp.Optional[tp.FrequencyLike] = None,
+                        year_freq: tp.Optional[tp.FrequencyLike] = None,
+                        use_asset_returns: bool = False,
+                        defaults: tp.KwargsLike = None,
+                        **kwargs) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbt.returns.accessors.ReturnsAccessor`.
 
         !!! hint
@@ -4358,7 +4426,42 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             returns = self.asset_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by)
-        return returns.vbt.returns(freq=freq, year_freq=year_freq, defaults=defaults, **kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_returns(group_by=group_by)
+        return returns.vbt.returns(
+            benchmark_rets=benchmark_rets,
+            freq=freq,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs
+        )
+
+    @cached_property
+    def qs(self) -> QSAdapterT:
+        """`Portfolio.get_qs` with default arguments."""
+        return self.get_qs()
+
+    @cached_method
+    def get_qs(self,
+               group_by: tp.GroupByLike = None,
+               benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+               freq: tp.Optional[tp.FrequencyLike] = None,
+               year_freq: tp.Optional[tp.FrequencyLike] = None,
+               use_asset_returns: bool = False,
+               **kwargs) -> QSAdapterT:
+        """Get quantstats adapter of type `vectorbt.returns.qs_adapter.QSAdapter`.
+
+        `**kwargs` are passed to the adapter constructor."""
+        from vectorbt.returns.qs_adapter import QSAdapter
+
+        returns_acc = self.get_returns_acc(
+            group_by=group_by,
+            benchmark_rets=benchmark_rets,
+            freq=freq,
+            year_freq=year_freq,
+            use_asset_returns=use_asset_returns
+        )
+        return QSAdapter(returns_acc, **kwargs)
 
     @cached_method
     def benchmark_value(self, group_by: tp.GroupByLike = None,
@@ -4390,6 +4493,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         benchmark_returns = returns_nb.returns_nb(benchmark_value, init_cash)
         return self.wrapper.wrap(benchmark_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
+
+    benchmark_rets = benchmark_returns
 
     @cached_method
     def total_benchmark_return(self, group_by: tp.GroupByLike = None,
@@ -4504,8 +4609,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
-                calc_func=RepEval("'total_benchmark_return' if benchmark_rets is None else "
-                                  "benchmark_rets.vbt.returns.total()"),
+                calc_func='benchmark_rets.vbt.returns.total',
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
@@ -4645,11 +4749,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def returns_stats(self,
                       group_by: tp.GroupByLike = None,
+                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                       freq: tp.Optional[tp.FrequencyLike] = None,
                       year_freq: tp.Optional[tp.FrequencyLike] = None,
                       use_asset_returns: bool = False,
                       defaults: tp.KwargsLike = None,
-                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                       **kwargs) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
 
@@ -4657,17 +4761,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         `kwargs` will be passed to `vectorbt.returns.accessors.ReturnsAccessor.stats` method.
         If `benchmark_rets` is not set, uses `Portfolio.benchmark_returns`."""
-        returns_acc = self.returns_acc(
+        returns_acc = self.get_returns_acc(
             group_by=group_by,
+            benchmark_rets=benchmark_rets,
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
             defaults=defaults
         )
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_returns(group_by=group_by)
-        settings = dict(benchmark_rets=benchmark_rets)
-        return getattr(returns_acc, 'stats')(settings=settings, **kwargs)
+        return getattr(returns_acc, 'stats')(**kwargs)
 
     # ############# Plotting ############# #
 

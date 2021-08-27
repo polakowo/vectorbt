@@ -364,6 +364,7 @@ randnx_n      0      1      2
 - Functions for working with returns
     - Numba-compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
     - Rolling versions of most metrics
+    - Adapter for [quantstats](https://github.com/ranaroussi/quantstats)
 
 ```python-repl
 >>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
@@ -374,7 +375,7 @@ randnx_n      0      1      2
     - Accepts signals, orders, and custom order function
     - Supports long and short positions
     - Supports individual and multi-asset mixed portfolios
-    - Offers metrics and tools for analyzing returns, orders, trades and positions
+    - Offers metrics and tools for analyzing returns, orders, and trades
     - Allows saving and loading from disk using [dill](https://github.com/uqfoundation/dill)
     
 ```python-repl

@@ -523,6 +523,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                               _opt_arg_names: tp.Set[str] = opt_arg_names,
                                               _custom_arg_names: tp.Set[str] = custom_arg_names,
                                               _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
+                                if attr in final_kwargs:
+                                    return final_kwargs[attr]
                                 if args is None:
                                     args = ()
                                 if kwargs is None:

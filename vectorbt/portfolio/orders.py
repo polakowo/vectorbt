@@ -409,22 +409,22 @@ class Orders(Records):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.resolve_field_arr('id')
-            id_title = self_col.resolve_field_title('id')
+            id_ = self_col.get_field_arr('id')
+            id_title = self_col.get_field_title('id')
 
-            idx = self_col.resolve_map_field_to_index('idx')
-            idx_title = self_col.resolve_field_title('idx')
+            idx = self_col.get_map_field_to_index('idx')
+            idx_title = self_col.get_field_title('idx')
 
-            size = self_col.resolve_field_arr('size')
-            size_title = self_col.resolve_field_title('size')
+            size = self_col.get_field_arr('size')
+            size_title = self_col.get_field_title('size')
 
-            fees = self_col.resolve_field_arr('fees')
-            fees_title = self_col.resolve_field_title('fees')
+            fees = self_col.get_field_arr('fees')
+            fees_title = self_col.get_field_title('fees')
 
-            price = self_col.resolve_field_arr('price')
-            price_title = self_col.resolve_field_title('price')
+            price = self_col.get_field_arr('price')
+            price_title = self_col.get_field_title('price')
 
-            side = self_col.resolve_field_arr('side')
+            side = self_col.get_field_arr('side')
 
             buy_mask = side == OrderSide.Buy
             if buy_mask.any():

@@ -5,7 +5,7 @@
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.config import Config, get_func_arg_names
+from vectorbt.utils.config import Config
 from vectorbt.utils.decorators import cached_method
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
@@ -32,24 +32,20 @@ def attach_returns_acc_methods(config: Config) -> WrapperFuncT:
             def new_method(self,
                            *,
                            group_by: tp.GroupByLike = None,
+                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                            freq: tp.Optional[tp.FrequencyLike] = None,
                            year_freq: tp.Optional[tp.FrequencyLike] = None,
                            use_asset_returns: bool = False,
                            _source_name: str = source_name,
                            **kwargs) -> tp.Any:
-                returns_acc = self.returns_acc(
+                returns_acc = self.get_returns_acc(
                     group_by=group_by,
+                    benchmark_rets=benchmark_rets,
                     freq=freq,
                     year_freq=year_freq,
                     use_asset_returns=use_asset_returns
                 )
-                source_method = getattr(returns_acc, _source_name)
-                if 'benchmark_rets' in kwargs or 'benchmark_rets' in get_func_arg_names(source_method):
-                    benchmark_rets = kwargs.pop('benchmark_rets', None)
-                    if benchmark_rets is None:
-                        benchmark_rets = self.benchmark_returns(group_by=group_by)
-                    kwargs['benchmark_rets'] = benchmark_rets
-                return source_method(**kwargs)
+                return getattr(returns_acc, _source_name)(**kwargs)
 
             new_method.__name__ = target_name
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"

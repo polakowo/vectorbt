@@ -138,22 +138,29 @@ def is_namedtuple(x: tp.Any) -> bool:
     return all(type(n) == str for n in f)
 
 
-def method_accepts_argument(method: tp.Callable, arg_name: str) -> bool:
-    """Check whether `method` accepts a positional or keyword argument with name `arg_name`."""
-    sig = signature(method)
-    if arg_name.startswith('**'):
-        return arg_name[2:] in [
+def func_accepts_arg(func: tp.Callable, arg_name: str, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> bool:
+    """Check whether `func` accepts a positional or keyword argument with name `arg_name`."""
+    sig = signature(func)
+    if arg_kind is not None and isinstance(arg_kind, int):
+        arg_kind = (arg_kind,)
+    if arg_kind is None:
+        if arg_name.startswith('**'):
+            return arg_name[2:] in [
+                p.name for p in sig.parameters.values()
+                if p.kind == p.VAR_KEYWORD
+            ]
+        if arg_name.startswith('*'):
+            return arg_name[1:] in [
+                p.name for p in sig.parameters.values()
+                if p.kind == p.VAR_POSITIONAL
+            ]
+        return arg_name in [
             p.name for p in sig.parameters.values()
-            if p.kind == p.VAR_KEYWORD
-        ]
-    if arg_name.startswith('*'):
-        return arg_name[1:] in [
-            p.name for p in sig.parameters.values()
-            if p.kind == p.VAR_POSITIONAL
+            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
         ]
     return arg_name in [
         p.name for p in sig.parameters.values()
-        if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+        if p.kind in arg_kind
     ]
 
 
@@ -174,7 +181,7 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
         __kwargs = dict()
         if len(kwargs) > 0:
             for k, v in _kwargs.items():
-                if method_accepts_argument(_method, k):
+                if func_accepts_arg(_method, k):
                     __kwargs[k] = v
         return __kwargs
 

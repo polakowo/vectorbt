@@ -125,11 +125,11 @@ class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
         GenericDFAccessor.__init__(self, obj, **kwargs)
 
 
-def register_series_vbt_accessor(name: str) -> tp.Callable:
-    """Decorator to register a custom `pd.Series` accessor on top of the `vbt` accessor."""
-    return register_accessor(name, Vbt_SRAccessor)
+def register_series_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_SRAccessor) -> tp.Callable:
+    """Decorator to register a `pd.Series` accessor on top of a parent accessor."""
+    return register_accessor(name, parent)
 
 
-def register_dataframe_vbt_accessor(name: str) -> tp.Callable:
-    """Decorator to register a custom `pd.DataFrame` accessor on top of the `vbt` accessor."""
-    return register_accessor(name, Vbt_DFAccessor)
+def register_dataframe_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_DFAccessor) -> tp.Callable:
+    """Decorator to register a `pd.DataFrame` accessor on top of a parent accessor."""
+    return register_accessor(name, parent)

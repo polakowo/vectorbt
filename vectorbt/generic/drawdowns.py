@@ -313,8 +313,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         drawdown = nb.dd_drawdown_nb(
-            self.resolve_field_arr('peak_val'),
-            self.resolve_field_arr('valley_val')
+            self.get_field_arr('peak_val'),
+            self.get_field_arr('valley_val')
         )
         return self.map_array(drawdown)
 
@@ -344,8 +344,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         recovery_return = nb.dd_recovery_return_nb(
-            self.resolve_field_arr('valley_val'),
-            self.resolve_field_arr('end_val')
+            self.get_field_arr('valley_val'),
+            self.get_field_arr('end_val')
         )
         return self.map_array(recovery_return)
 
@@ -375,8 +375,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         decline_duration = nb.dd_decline_duration_nb(
-            self.resolve_field_arr('start_idx'),
-            self.resolve_field_arr('valley_idx')
+            self.get_field_arr('start_idx'),
+            self.get_field_arr('valley_idx')
         )
         return self.map_array(decline_duration)
 
@@ -388,8 +388,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         recovery_duration = nb.dd_recovery_duration_nb(
-            self.resolve_field_arr('valley_idx'),
-            self.resolve_field_arr('end_idx')
+            self.get_field_arr('valley_idx'),
+            self.get_field_arr('end_idx')
         )
         return self.map_array(recovery_duration)
 
@@ -399,9 +399,9 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         recovery_duration_ratio = nb.dd_recovery_duration_ratio_nb(
-            self.resolve_field_arr('start_idx'),
-            self.resolve_field_arr('valley_idx'),
-            self.resolve_field_arr('end_idx')
+            self.get_field_arr('start_idx'),
+            self.get_field_arr('valley_idx'),
+            self.get_field_arr('end_idx')
         )
         return self.map_array(recovery_duration_ratio)
 
@@ -720,35 +720,35 @@ class Drawdowns(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.resolve_field_arr('id')
-            id_title = self_col.resolve_field_title('id')
+            id_ = self_col.get_field_arr('id')
+            id_title = self_col.get_field_title('id')
 
-            peak_idx = self_col.resolve_map_field_to_index('peak_idx')
-            peak_idx_title = self_col.resolve_field_title('peak_idx')
+            peak_idx = self_col.get_map_field_to_index('peak_idx')
+            peak_idx_title = self_col.get_field_title('peak_idx')
 
             if self_col.ts is not None:
                 peak_val = self_col.ts.loc[peak_idx]
             else:
-                peak_val = self_col.resolve_field_arr('peak_val')
-            peak_val_title = self_col.resolve_field_title('peak_val')
+                peak_val = self_col.get_field_arr('peak_val')
+            peak_val_title = self_col.get_field_title('peak_val')
 
-            valley_idx = self_col.resolve_map_field_to_index('valley_idx')
-            valley_idx_title = self_col.resolve_field_title('valley_idx')
+            valley_idx = self_col.get_map_field_to_index('valley_idx')
+            valley_idx_title = self_col.get_field_title('valley_idx')
 
             if self_col.ts is not None:
                 valley_val = self_col.ts.loc[valley_idx]
             else:
-                valley_val = self_col.resolve_field_arr('valley_val')
-            valley_val_title = self_col.resolve_field_title('valley_val')
+                valley_val = self_col.get_field_arr('valley_val')
+            valley_val_title = self_col.get_field_title('valley_val')
 
-            end_idx = self_col.resolve_map_field_to_index('end_idx')
-            end_idx_title = self_col.resolve_field_title('end_idx')
+            end_idx = self_col.get_map_field_to_index('end_idx')
+            end_idx_title = self_col.get_field_title('end_idx')
 
             if self_col.ts is not None:
                 end_val = self_col.ts.loc[end_idx]
             else:
-                end_val = self_col.resolve_field_arr('end_val')
-            end_val_title = self_col.resolve_field_title('end_val')
+                end_val = self_col.get_field_arr('end_val')
+            end_val_title = self_col.get_field_title('end_val')
 
             drawdown = self_col.drawdown.values
             recovery_return = self_col.recovery_return.values
@@ -759,7 +759,7 @@ class Drawdowns(Ranges):
             duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
                 self_col.duration.values, to_pd=True, silence_warnings=True))
 
-            status = self_col.resolve_field_arr('status')
+            status = self_col.get_field_arr('status')
 
             peak_mask = peak_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
             if peak_mask.any():

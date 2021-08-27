@@ -54,10 +54,10 @@ The accessors extend `vectorbt.generic.accessors`.
 `vectorbt.returns.accessors.ReturnsAccessor` accepts `defaults` dictionary where you can pass
 defaults for arguments used throughout the accessor, such as
 
-* `start_value`: The starting returns.
+* `start_value`: The starting value.
 * `window`: Window length.
-* `minp`: Minimum number of observations in window required to have a value.
-* `ddof`: Means Delta Degrees of Freedom.
+* `minp`: Minimum number of observations in a window required to have a value.
+* `ddof`: Delta Degrees of Freedom.
 * `risk_free`: Constant risk-free return throughout the period.
 * `levy_alpha`: Scaling relation (Levy stability exponent).
 * `required_return`: Minimum acceptance return of the investor.
@@ -93,7 +93,8 @@ Value at Risk                     -0.0823718
 dtype: object
 ```
 
-The missing `benchmark_rets` can be passed inside of `settings`:
+The missing `benchmark_rets` can be either passed to the contrustor of the accessor
+or as a setting to `ReturnsAccessor.stats`:
 
 ```python-repl
 >>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
@@ -165,20 +166,32 @@ class ReturnsAccessor(GenericAccessor):
     Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`.
 
     Args:
-        obj (pd.Series or pd.DataFrame): Pandas object.
+        obj (pd.Series or pd.DataFrame): Pandas object representing returns.
+        benchmark_rets (array_like): Pandas object representing benchmark returns.
         year_freq (any): Year frequency for annualization purposes.
         defaults (dict): Defaults that override `returns.defaults` in `vectorbt._settings.settings`.
         **kwargs: Keyword arguments that are passed down to `vectorbt.generic.accessors.GenericAccessor`."""
 
     def __init__(self,
                  obj: tp.SeriesFrame,
+                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
+        GenericAccessor.__init__(
+            self,
+            obj,
+            benchmark_rets=benchmark_rets,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs
+        )
+
+        if benchmark_rets is not None:
+            benchmark_rets = broadcast_to(benchmark_rets, obj)
+        self._benchmark_rets = benchmark_rets
         self._year_freq = year_freq
         self._defaults = defaults
-
-        GenericAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
 
     @property
     def sr_accessor_cls(self) -> tp.Type["ReturnsSRAccessor"]:
@@ -189,6 +202,31 @@ class ReturnsAccessor(GenericAccessor):
     def df_accessor_cls(self) -> tp.Type["ReturnsDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return ReturnsDFAccessor
+
+    def indexing_func(self: ReturnsAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ReturnsAccessorT:
+        """Perform indexing on `ReturnsAccessor`."""
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        if self.benchmark_rets is not None:
+            new_benchmark_rets = new_wrapper.wrap(
+                to_2d_array(self.benchmark_rets)[idx_idxs, :][:, col_idxs],
+                group_by=False
+            )
+        else:
+            new_benchmark_rets = None
+        if checks.is_series(new_obj):
+            return self.copy(
+                _class=self.sr_accessor_cls,
+                obj=new_obj,
+                benchmark_rets=new_benchmark_rets,
+                wrapper=new_wrapper
+            )
+        return self.copy(
+            _class=self.df_accessor_cls,
+            obj=new_obj,
+            benchmark_rets=new_benchmark_rets,
+            wrapper=new_wrapper
+        )
 
     @classmethod
     def from_value(cls: tp.Type[ReturnsAccessorT],
@@ -210,6 +248,11 @@ class ReturnsAccessor(GenericAccessor):
         returns = nb.returns_nb(value_2d, init_value)
         returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
         return cls(returns, **kwargs)
+
+    @property
+    def benchmark_rets(self) -> tp.Optional[tp.SeriesFrame]:
+        """Benchmark returns."""
+        return self._benchmark_rets
 
     @property
     def year_freq(self) -> tp.Optional[pd.Timedelta]:
@@ -521,10 +564,12 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def information_ratio(self,
-                          benchmark_rets: tp.ArrayLike,
+                          benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                           ddof: tp.Optional[int] = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.information_ratio_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if ddof is None:
             ddof = self.defaults['ddof']
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -533,12 +578,14 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_information_ratio(self,
-                                  benchmark_rets: tp.ArrayLike,
+                                  benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                                   window: tp.Optional[int] = None,
                                   minp: tp.Optional[int] = None,
                                   ddof: tp.Optional[int] = None,
                                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.information_ratio`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -550,19 +597,25 @@ class ReturnsAccessor(GenericAccessor):
         result = nb.rolling_information_ratio_nb(self.to_2d_array(), window, minp, benchmark_rets, ddof)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def beta(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def beta(self,
+             benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+             wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.beta_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.beta_nb(self.to_2d_array(), benchmark_rets)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_beta(self,
-                     benchmark_rets: tp.ArrayLike,
+                     benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                      window: tp.Optional[int] = None,
                      minp: tp.Optional[int] = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.beta`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -573,10 +626,12 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
     def alpha(self,
-              benchmark_rets: tp.ArrayLike,
+              benchmark_rets: tp.Optional[tp.ArrayLike] = None,
               risk_free: tp.Optional[float] = None,
               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.alpha_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -585,12 +640,14 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_alpha(self,
-                      benchmark_rets: tp.ArrayLike,
+                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                       window: tp.Optional[int] = None,
                       minp: tp.Optional[int] = None,
                       risk_free: tp.Optional[float] = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.alpha`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -694,19 +751,25 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def capture(self,
+                benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.capture_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_capture(self,
-                        benchmark_rets: tp.ArrayLike,
+                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                         window: tp.Optional[int] = None,
                         minp: tp.Optional[int] = None,
                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.capture`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -716,19 +779,25 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def up_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def up_capture(self,
+                   benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.up_capture_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.up_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='up_capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_up_capture(self,
-                           benchmark_rets: tp.ArrayLike,
+                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                            window: tp.Optional[int] = None,
                            minp: tp.Optional[int] = None,
                            wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.up_capture`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -738,19 +807,25 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def down_capture(self, benchmark_rets: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def down_capture(self,
+                     benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.down_capture_nb`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
         result = nb.down_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='down_capture'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
     def rolling_down_capture(self,
-                             benchmark_rets: tp.ArrayLike,
+                             benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
                              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.down_capture`."""
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
@@ -798,6 +873,13 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
         return Drawdowns.from_ts(self.cumulative(start_value=1.), wrapper_kwargs=wrapper_kwargs, **kwargs)
+
+    @property
+    def qs(self):
+        """Quantstats adapter."""
+        from vectorbt.returns.qs_adapter import QSAdapter
+
+        return QSAdapter(self)
 
     # ############# Resolution ############# #
 
@@ -890,7 +972,8 @@ class ReturnsAccessor(GenericAccessor):
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
-                calc_func=lambda benchmark_rets: benchmark_rets.vbt.returns.total() * 100,
+                calc_func='benchmark_rets.vbt.returns.total',
+                post_calc_func=lambda self, out, settings: out * 100,
                 check_has_benchmark_rets=True,
                 tags='returns'
             ),
@@ -1035,11 +1118,19 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
     def __init__(self,
                  obj: tp.Series,
+                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
         GenericSRAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
+        ReturnsAccessor.__init__(
+            self,
+            obj,
+            benchmark_rets=benchmark_rets,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs
+        )
 
     def plot_cumulative(self,
                         benchmark_rets: tp.Optional[tp.ArrayLike] = None,
@@ -1090,6 +1181,8 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
         x_domain = get_domain(xref, fig)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
         fill_to_benchmark = fill_to_benchmark and benchmark_rets is not None
 
         if benchmark_rets is not None:
@@ -1155,8 +1248,16 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
 
     def __init__(self,
                  obj: tp.Frame,
+                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
         GenericDFAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
+        ReturnsAccessor.__init__(
+            self,
+            obj,
+            benchmark_rets=benchmark_rets,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs
+        )

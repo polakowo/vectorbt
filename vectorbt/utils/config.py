@@ -51,12 +51,19 @@ def get_func_kwargs(func: tp.Callable) -> dict:
     }
 
 
-def get_func_arg_names(func: tp.Callable) -> tp.List[str]:
+def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> tp.List[str]:
     """Get argument names of a function."""
     signature = inspect.signature(func)
+    if arg_kind is not None and isinstance(arg_kind, int):
+        arg_kind = (arg_kind,)
+    if arg_kind is None:
+        return [
+            p.name for p in signature.parameters.values()
+            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+        ]
     return [
         p.name for p in signature.parameters.values()
-        if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+        if p.kind in arg_kind
     ]
 
 

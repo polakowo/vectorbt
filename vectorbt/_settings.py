@@ -380,7 +380,7 @@ settings = SettingsConfig(
                         ),
                         has_benchmark_rets=dict(
                             filter_func=lambda self, metric_settings:
-                            metric_settings.get('benchmark_rets', None) is not None,
+                            metric_settings.get('benchmark_rets', self.benchmark_rets) is not None,
                             warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
                         )
                     ),
@@ -390,6 +390,9 @@ settings = SettingsConfig(
                 )
             ),
             plots=Config()  # flex
+        ),
+        qs_adapter=dict(
+            defaults=Config(),  # flex
         ),
         records=dict(
             stats=Config(),  # flex
@@ -488,8 +491,7 @@ settings = SettingsConfig(
                     ),
                     settings=dict(
                         use_asset_returns=False,
-                        incl_open=False,
-                        benchmark_rets=None
+                        incl_open=False
                     ),
                     template_mapping=dict(
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
@@ -500,8 +502,7 @@ settings = SettingsConfig(
                 dict(
                     subplots=['orders', 'trade_pnl', 'cum_returns'],
                     settings=dict(
-                        use_asset_returns=False,
-                        benchmark_rets=None
+                        use_asset_returns=False
                     )
                 )
             )
@@ -686,6 +687,14 @@ Settings applied across `vectorbt.returns`.
 
 ```json
 {settings['returns'].to_doc()}
+```
+
+## settings.qs_adapter
+
+Settings applied across `vectorbt.returns.qs_adapter`.
+
+```json
+{settings['qs_adapter'].to_doc()}
 ```
 
 ## settings.records

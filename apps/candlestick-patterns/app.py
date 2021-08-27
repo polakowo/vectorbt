@@ -31,7 +31,6 @@ from talib._ta_lib import (
 from vectorbt import settings
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.template import deep_substitute
 from vectorbt.portfolio.enums import Direction, ConflictMode
 from vectorbt.portfolio.base import Portfolio
 

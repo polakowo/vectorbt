@@ -147,7 +147,7 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.Union[WrapperFuncT, t
                     def new_prop(self,
                                  _field_name: str = field_name,
                                  _defaults: tp.KwargsLike = defaults) -> MappedArray:
-                        return self.resolve_map_field(_field_name, **_defaults)
+                        return self.get_map_field(_field_name, **_defaults)
 
                     new_prop.__doc__ = f"Mapped array of the field `{field_name}`."
                     new_prop.__name__ = target_name
@@ -181,7 +181,7 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.Union[WrapperFuncT, t
                                             _field_name: str = field_name,
                                             _filter_value: tp.Any = filter_value,
                                             _filter_defaults: tp.KwargsLike = __filter_defaults) -> MappedArray:
-                            filter_mask = self.resolve_field_arr(_field_name) == _filter_value
+                            filter_mask = self.get_field_arr(_field_name) == _filter_value
                             return self.apply_mask(filter_mask, **_filter_defaults)
 
                         new_filter_prop.__doc__ = f"Records filtered by `{field_name} == {filter_value}`."

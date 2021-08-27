@@ -1637,17 +1637,17 @@ class TestChecks:
         assert checks.is_namedtuple(namedtuple('Hello', ['world'])(*range(1)))
         assert not checks.is_namedtuple((0,))
 
-    def test_method_accepts_argument(self):
+    def test_func_accepts_arg(self):
         def test(a, *args, b=2, **kwargs):
             pass
 
-        assert checks.method_accepts_argument(test, 'a')
-        assert not checks.method_accepts_argument(test, 'args')
-        assert checks.method_accepts_argument(test, '*args')
-        assert checks.method_accepts_argument(test, 'b')
-        assert not checks.method_accepts_argument(test, 'kwargs')
-        assert checks.method_accepts_argument(test, '**kwargs')
-        assert not checks.method_accepts_argument(test, 'c')
+        assert checks.func_accepts_arg(test, 'a')
+        assert not checks.func_accepts_arg(test, 'args')
+        assert checks.func_accepts_arg(test, '*args')
+        assert checks.func_accepts_arg(test, 'b')
+        assert not checks.func_accepts_arg(test, 'kwargs')
+        assert checks.func_accepts_arg(test, '**kwargs')
+        assert not checks.func_accepts_arg(test, 'c')
 
     def test_is_deep_equal(self):
         sr = pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='index'), name='name')

@@ -123,7 +123,7 @@ class BaseAccessor(Wrapping):
         return BaseDFAccessor
 
     def indexing_func(self: BaseAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> BaseAccessorT:
-        """Perform indexing on `Wrapping`."""
+        """Perform indexing on `BaseAccessor`."""
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
         if checks.is_series(new_obj):

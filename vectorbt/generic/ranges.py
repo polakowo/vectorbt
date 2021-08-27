@@ -270,9 +270,9 @@ class Ranges(Records):
         See `vectorbt.generic.nb.ranges_to_mask_nb`."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         mask = nb.ranges_to_mask_nb(
-            self.resolve_field_arr('start_idx'),
-            self.resolve_field_arr('end_idx'),
-            self.resolve_field_arr('status'),
+            self.get_field_arr('start_idx'),
+            self.get_field_arr('end_idx'),
+            self.get_field_arr('status'),
             col_map,
             len(self.wrapper.index)
         )
@@ -282,9 +282,9 @@ class Ranges(Records):
     def duration(self) -> MappedArray:
         """Duration of each range (in raw format)."""
         duration = nb.range_duration_nb(
-            self.resolve_field_arr('start_idx'),
-            self.resolve_field_arr('end_idx'),
-            self.resolve_field_arr('status')
+            self.get_field_arr('start_idx'),
+            self.get_field_arr('end_idx'),
+            self.get_field_arr('status')
         )
         return self.map_array(duration)
 
@@ -314,9 +314,9 @@ class Ranges(Records):
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         index_lens = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         coverage = nb.range_coverage_nb(
-            self.resolve_field_arr('start_idx'),
-            self.resolve_field_arr('end_idx'),
-            self.resolve_field_arr('status'),
+            self.get_field_arr('start_idx'),
+            self.get_field_arr('end_idx'),
+            self.get_field_arr('status'),
             col_map,
             index_lens,
             overlapping=overlapping,
@@ -486,18 +486,18 @@ class Ranges(Records):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.resolve_field_arr('id')
-            id_title = self_col.resolve_field_title('id')
+            id_ = self_col.get_field_arr('id')
+            id_title = self_col.get_field_title('id')
 
-            start_idx = self_col.resolve_map_field_to_index('start_idx')
-            start_idx_title = self_col.resolve_field_title('start_idx')
+            start_idx = self_col.get_map_field_to_index('start_idx')
+            start_idx_title = self_col.get_field_title('start_idx')
             if self_col.ts is not None:
                 start_val = self_col.ts.loc[start_idx]
             else:
                 start_val = np.full(len(start_idx), 0)
 
-            end_idx = self_col.resolve_map_field_to_index('end_idx')
-            end_idx_title = self_col.resolve_field_title('end_idx')
+            end_idx = self_col.get_map_field_to_index('end_idx')
+            end_idx_title = self_col.get_field_title('end_idx')
             if self_col.ts is not None:
                 end_val = self_col.ts.loc[end_idx]
             else:
@@ -506,7 +506,7 @@ class Ranges(Records):
             duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
                 self_col.duration.values, to_pd=True, silence_warnings=True))
 
-            status = self_col.resolve_field_arr('status')
+            status = self_col.get_field_arr('status')
 
             # Plot start markers
             start_customdata = id_[:, None]

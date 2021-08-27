@@ -984,19 +984,19 @@ class Trades(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.resolve_field_arr('id')
-            id_title = self_col.resolve_field_title('id')
+            id_ = self_col.get_field_arr('id')
+            id_title = self_col.get_field_title('id')
 
-            exit_idx = self_col.resolve_map_field_to_index('exit_idx')
-            exit_idx_title = self_col.resolve_field_title('exit_idx')
+            exit_idx = self_col.get_map_field_to_index('exit_idx')
+            exit_idx_title = self_col.get_field_title('exit_idx')
 
-            pnl = self_col.resolve_field_arr('pnl')
-            pnl_title = self_col.resolve_field_title('pnl')
+            pnl = self_col.get_field_arr('pnl')
+            pnl_title = self_col.get_field_title('pnl')
 
-            returns = self_col.resolve_field_arr('return')
-            return_title = self_col.resolve_field_title('return')
+            returns = self_col.get_field_arr('return')
+            return_title = self_col.get_field_title('return')
 
-            status = self_col.resolve_field_arr('status')
+            status = self_col.get_field_arr('status')
 
             neutral_mask = pnl == 0
             profit_mask = pnl > 0
@@ -1012,8 +1012,8 @@ class Trades(Ranges):
 
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    parent_id = self_col.resolve_field_arr('parent_id')
-                    parent_id_title = self_col.resolve_field_title('parent_id')
+                    parent_id = self_col.get_field_arr('parent_id')
+                    parent_id_title = self_col.get_field_title('parent_id')
                     customdata = np.stack((
                         id_[mask],
                         parent_id[mask],
@@ -1178,47 +1178,47 @@ class Trades(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.resolve_field_arr('id')
-            id_title = self_col.resolve_field_title('id')
+            id_ = self_col.get_field_arr('id')
+            id_title = self_col.get_field_title('id')
 
-            size = self_col.resolve_field_arr('size')
-            size_title = self_col.resolve_field_title('size')
+            size = self_col.get_field_arr('size')
+            size_title = self_col.get_field_title('size')
 
-            entry_idx = self_col.resolve_map_field_to_index('entry_idx')
-            entry_idx_title = self_col.resolve_field_title('entry_idx')
+            entry_idx = self_col.get_map_field_to_index('entry_idx')
+            entry_idx_title = self_col.get_field_title('entry_idx')
 
-            entry_price = self_col.resolve_field_arr('entry_price')
-            entry_price_title = self_col.resolve_field_title('entry_price')
+            entry_price = self_col.get_field_arr('entry_price')
+            entry_price_title = self_col.get_field_title('entry_price')
 
-            entry_fees = self_col.resolve_field_arr('entry_fees')
-            entry_fees_title = self_col.resolve_field_title('entry_fees')
+            entry_fees = self_col.get_field_arr('entry_fees')
+            entry_fees_title = self_col.get_field_title('entry_fees')
 
-            exit_idx = self_col.resolve_map_field_to_index('exit_idx')
-            exit_idx_title = self_col.resolve_field_title('exit_idx')
+            exit_idx = self_col.get_map_field_to_index('exit_idx')
+            exit_idx_title = self_col.get_field_title('exit_idx')
 
-            exit_price = self_col.resolve_field_arr('exit_price')
-            exit_price_title = self_col.resolve_field_title('exit_price')
+            exit_price = self_col.get_field_arr('exit_price')
+            exit_price_title = self_col.get_field_title('exit_price')
 
-            exit_fees = self_col.resolve_field_arr('exit_fees')
-            exit_fees_title = self_col.resolve_field_title('exit_fees')
+            exit_fees = self_col.get_field_arr('exit_fees')
+            exit_fees_title = self_col.get_field_title('exit_fees')
 
-            direction = self_col.resolve_apply_mapping_arr('direction')
-            direction_title = self_col.resolve_field_title('direction')
+            direction = self_col.get_apply_mapping_arr('direction')
+            direction_title = self_col.get_field_title('direction')
 
-            pnl = self_col.resolve_field_arr('pnl')
-            pnl_title = self_col.resolve_field_title('pnl')
+            pnl = self_col.get_field_arr('pnl')
+            pnl_title = self_col.get_field_title('pnl')
 
-            returns = self_col.resolve_field_arr('return')
-            return_title = self_col.resolve_field_title('return')
+            returns = self_col.get_field_arr('return')
+            return_title = self_col.get_field_title('return')
 
-            status = self_col.resolve_field_arr('status')
+            status = self_col.get_field_arr('status')
 
             duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
                 self_col.duration.values, to_pd=True, silence_warnings=True))
 
             # Plot Entry markers
-            parent_id = self_col.resolve_field_arr('parent_id')
-            parent_id_title = self_col.resolve_field_title('parent_id')
+            parent_id = self_col.get_field_arr('parent_id')
+            parent_id_title = self_col.get_field_title('parent_id')
             entry_customdata = np.stack((
                 id_,
                 parent_id,
@@ -1256,8 +1256,8 @@ class Trades(Ranges):
             # Plot end markers
             def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
-                    parent_id = self_col.resolve_field_arr('parent_id')
-                    parent_id_title = self_col.resolve_field_title('parent_id')
+                    parent_id = self_col.get_field_arr('parent_id')
+                    parent_id_title = self_col.get_field_title('parent_id')
                     exit_customdata = np.stack((
                         id_[mask],
                         parent_id[mask],

@@ -66,7 +66,7 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                     parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,))
                 new_method.__signature__ = source_sig
 
-            new_method.__doc__ = f"See `{path}`"
+            new_method.__doc__ = f"See `{path}`."
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"
             new_method.__name__ = target_name
             setattr(cls, target_name, new_method)

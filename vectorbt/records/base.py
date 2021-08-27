@@ -617,57 +617,57 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                     title = field_name
                 if 'mapping' in dct:
                     if isinstance(dct['mapping'], str) and dct['mapping'] == 'index':
-                        df[title] = self.resolve_map_field_to_index(col_name)
+                        df[title] = self.get_map_field_to_index(col_name)
                     else:
-                        df[title] = self.resolve_apply_mapping_arr(col_name)
+                        df[title] = self.get_apply_mapping_arr(col_name)
         return df
 
-    def resolve_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
+    def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
         """Resolve any setting of the field. Uses `Records.field_config`."""
         return self.field_config.get('settings', {}).get(field, {}).get(setting, default)
 
-    def resolve_field_name(self, field: str) -> str:
+    def get_field_name(self, field: str) -> str:
         """Resolve the name of the field. Uses `Records.field_config`.."""
-        return self.resolve_field_setting(field, 'name', field)
+        return self.get_field_setting(field, 'name', field)
 
-    def resolve_field_title(self, field: str) -> str:
+    def get_field_title(self, field: str) -> str:
         """Resolve the title of the field. Uses `Records.field_config`."""
-        return self.resolve_field_setting(field, 'title', field)
+        return self.get_field_setting(field, 'title', field)
 
-    def resolve_field_mapping(self, field: str) -> tp.Optional[tp.MappingLike]:
+    def get_field_mapping(self, field: str) -> tp.Optional[tp.MappingLike]:
         """Resolve the mapping of the field. Uses `Records.field_config`."""
-        return self.resolve_field_setting(field, 'mapping', None)
+        return self.get_field_setting(field, 'mapping', None)
 
-    def resolve_field_arr(self, field: str) -> tp.Array1d:
+    def get_field_arr(self, field: str) -> tp.Array1d:
         """Resolve the array of the field. Uses `Records.field_config`."""
-        return self.values[self.resolve_field_name(field)]
+        return self.values[self.get_field_name(field)]
 
-    def resolve_map_field(self, field: str, **kwargs) -> MappedArray:
+    def get_map_field(self, field: str, **kwargs) -> MappedArray:
         """Resolve the mapped array of the field. Uses `Records.field_config`."""
-        return self.map_field(self.resolve_field_name(field), mapping=self.resolve_field_mapping(field), **kwargs)
+        return self.map_field(self.get_field_name(field), mapping=self.get_field_mapping(field), **kwargs)
 
-    def resolve_apply_mapping_arr(self, field: str, **kwargs) -> tp.Array1d:
+    def get_apply_mapping_arr(self, field: str, **kwargs) -> tp.Array1d:
         """Resolve the mapped array on the field, with mapping applied. Uses `Records.field_config`."""
-        return self.resolve_map_field(field, **kwargs).apply_mapping().values
+        return self.get_map_field(field, **kwargs).apply_mapping().values
 
-    def resolve_map_field_to_index(self, field: str, **kwargs) -> tp.Index:
+    def get_map_field_to_index(self, field: str, **kwargs) -> tp.Index:
         """Resolve the mapped array on the field, with index applied. Uses `Records.field_config`."""
-        return self.resolve_map_field(field, **kwargs).to_index()
+        return self.get_map_field(field, **kwargs).to_index()
 
     @property
     def id_arr(self) -> tp.Array1d:
         """Get id array."""
-        return self.values[self.resolve_field_name('id')]
+        return self.values[self.get_field_name('id')]
 
     @property
     def col_arr(self) -> tp.Array1d:
         """Get column array."""
-        return self.values[self.resolve_field_name('col')]
+        return self.values[self.get_field_name('col')]
 
     @property
     def idx_arr(self) -> tp.Optional[tp.Array1d]:
         """Get index array."""
-        idx_field_name = self.resolve_field_name('idx')
+        idx_field_name = self.get_field_name('idx')
         if idx_field_name is None:
             return None
         return self.values[idx_field_name]
