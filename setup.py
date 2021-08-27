@@ -21,7 +21,7 @@ setup(
         'vectorbt': ['templates/*.json']
     },
     install_requires=[
-        'numpy>=1.16.5',
+        'numpy>=1.20.0',
         'pandas',
         'scipy',
         'matplotlib',
@@ -49,7 +49,8 @@ setup(
             'ta',
             'pandas_ta',
             'TA-Lib',
-            'python-telegram-bot>=13.4'  # LGPLv3
+            'python-telegram-bot>=13.4',  # LGPLv3
+            'quantstats'
         ],
         'cov': [
             'pytest',
@@ -66,7 +67,7 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: Financial and Insurance Industry',
-        'License :: OSI Approved :: Apache Software License',
+        'License :: Free for non-commercial use',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',

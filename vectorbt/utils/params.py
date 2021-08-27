@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for working with parameters."""
 
 from numba.typed import List
@@ -52,8 +55,8 @@ def create_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
      [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
     ```
     """
-    checks.assert_type(op_tree, tuple)
-    checks.assert_type(op_tree[0], Callable)
+    checks.assert_instance_of(op_tree, tuple)
+    checks.assert_instance_of(op_tree[0], Callable)
     new_op_tree: tp.Tuple = (op_tree[0],)
     for elem in op_tree[1:]:
         if isinstance(elem, tuple) and isinstance(elem[0], Callable):

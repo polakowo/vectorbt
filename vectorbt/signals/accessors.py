@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Custom pandas accessors for signals data.
 
 Methods can be accessed as follows:
@@ -122,7 +125,7 @@ Partition Distance: Std                     NaT
 Name: a, dtype: object
 ```
 
-We can also return duration in absolute units rather than in time units:
+We can also return duration as a floating number rather than a timedelta:
 
 ```python-repl
 >>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))
@@ -179,6 +182,13 @@ Partition Distance: Mean        2 days 00:00:00
 Partition Distance: Std         0 days 00:00:00
 Name: 0, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `SignalsAccessor.subplots`.
+
+This class inherits subplots from `vectorbt.generic.accessors.GenericAccessor`.
 """
 
 import numpy as np
@@ -194,14 +204,14 @@ from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.template import RepEval
 from vectorbt.base import reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.records.mapped_array import MappedArray
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic import plotting
-from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.ranges import Ranges
 from vectorbt.generic import nb as generic_nb
 from vectorbt.signals import nb
-from vectorbt.records.mapped_array import MappedArray
 
-MaybeSeriesFrameTupleT = tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]]
+__pdoc__ = {}
 
 
 class SignalsAccessor(GenericAccessor):
@@ -215,22 +225,22 @@ class SignalsAccessor(GenericAccessor):
         GenericAccessor.__init__(self, obj, **kwargs)
 
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["SignalsSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return SignalsSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["SignalsDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return SignalsDFAccessor
 
     # ############# Overriding ############# #
 
-    def bshift(self, *args, fill_value: bool = False, **kwargs):
+    def bshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.generic.accessors.GenericAccessor.bshift` with `fill_value=False`."""
         return GenericAccessor.bshift(self, *args, fill_value=fill_value, **kwargs)
 
-    def fshift(self, *args, fill_value: bool = False, **kwargs):
+    def fshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.generic.accessors.GenericAccessor.fshift` with `fill_value=False`."""
         return GenericAccessor.fshift(self, *args, fill_value=fill_value, **kwargs)
 
@@ -424,7 +434,7 @@ class SignalsAccessor(GenericAccessor):
               *args,
               entry_first: bool = True,
               broadcast_kwargs: tp.KwargsLike = None,
-              wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
+              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Clean signals.
 
         If one array passed, see `SignalsAccessor.first`.
@@ -509,7 +519,7 @@ class SignalsAccessor(GenericAccessor):
             shape = (shape[0], 1)
 
         if n is not None and prob is not None:
-            raise ValueError("Either n or prob should be set")
+            raise ValueError("Either n or prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
             result = nb.generate_rand_nb(shape, n, seed=seed)
@@ -599,6 +609,8 @@ class SignalsAccessor(GenericAccessor):
             flex_2d = False
             shape = (shape[0], 1)
 
+        if n is not None and (entry_prob is not None or exit_prob is not None):
+            raise ValueError("Either n or any of the entry_prob and exit_prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
             entries, exits = nb.generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
@@ -695,7 +707,7 @@ class SignalsAccessor(GenericAccessor):
                             pick_first: bool = True,
                             chain: bool = False,
                             broadcast_kwargs: tp.KwargsLike = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
+                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when `ts` hits the stop.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
@@ -749,8 +761,6 @@ class SignalsAccessor(GenericAccessor):
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, ts, stop, trailing = reshape_fns.broadcast(
             entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
-        if np.any(stop == 0):
-            warnings.warn("At least one stop value is 0", stacklevel=2)
 
         # Perform generation
         if chain:
@@ -789,9 +799,10 @@ class SignalsAccessor(GenericAccessor):
                                  close: tp.Optional[tp.ArrayLike] = None,
                                  is_open_safe: bool = True,
                                  out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
-                                 sl_stop: tp.Optional[tp.ArrayLike] = np.nan,
-                                 sl_trail: tp.Optional[tp.ArrayLike] = False,
-                                 tp_stop: tp.Optional[tp.ArrayLike] = np.nan,
+                                 sl_stop: tp.ArrayLike = np.nan,
+                                 sl_trail: tp.ArrayLike = False,
+                                 tp_stop: tp.ArrayLike = np.nan,
+                                 reverse: tp.ArrayLike = False,
                                  entry_wait: int = 1,
                                  exit_wait: int = 1,
                                  until_next: bool = True,
@@ -799,7 +810,7 @@ class SignalsAccessor(GenericAccessor):
                                  pick_first: bool = True,
                                  chain: bool = False,
                                  broadcast_kwargs: tp.KwargsLike = None,
-                                 wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
+                                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
 
         !!! hint
@@ -964,15 +975,11 @@ class SignalsAccessor(GenericAccessor):
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
-        keep_raw = (False, True, True, True, True, True, True, True) + (False,) * len(out_args)
+        keep_raw = (False, True, True, True, True, True, True, True, True) + (False,) * len(out_args)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args = reshape_fns.broadcast(
-            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args,
+        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args = reshape_fns.broadcast(
+            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args,
             **broadcast_kwargs, keep_raw=keep_raw)
-        if np.any(sl_stop == 0):
-            warnings.warn("At least one SL stop value is 0", stacklevel=2)
-        if np.any(tp_stop == 0):
-            warnings.warn("At least one TP stop value is 0", stacklevel=2)
         if stop_price_out is None:
             stop_price_out = np.empty_like(entries, dtype=np.float_)
         else:
@@ -998,6 +1005,7 @@ class SignalsAccessor(GenericAccessor):
                 sl_stop,
                 sl_trail,
                 tp_stop,
+                reverse,
                 is_open_safe,
                 entry_wait,
                 exit_wait,
@@ -1024,6 +1032,7 @@ class SignalsAccessor(GenericAccessor):
                 sl_stop,
                 sl_trail,
                 tp_stop,
+                reverse,
                 is_open_safe,
                 exit_wait,
                 until_next,
@@ -1037,424 +1046,146 @@ class SignalsAccessor(GenericAccessor):
                 stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    # ############# Map and reduce ############# #
+    # ############# Ranges ############# #
 
-    def map_between(self,
-                    range_map_func_nb: tp.RangeMapFunc, *args,
-                    other: tp.Optional[tp.ArrayLike] = None,
-                    from_other: bool = False,
-                    use_end_idxs: tp.Optional[bool] = None,
-                    broadcast_kwargs: tp.KwargsLike = None,
-                    group_by: tp.GroupByLike = None,
-                    **kwargs) -> tp.MaybeSeries:
-        """Map using `range_map_func_nb` on the meta from `vectorbt.signals.nb.map_meta_between_nb` and
-        convert the result into an instance of `vectorbt.records.mapped_array.MappedArray`.
+    def between_ranges(self,
+                       other: tp.Optional[tp.ArrayLike] = None,
+                       from_other: bool = False,
+                       broadcast_kwargs: tp.KwargsLike = None,
+                       group_by: tp.GroupByLike = None,
+                       attach_ts: bool = True,
+                       attach_other: bool = False,
+                       **kwargs) -> Ranges:
+        """Wrap the result of `vectorbt.signals.nb.between_ranges_nb`
+        with `vectorbt.generic.ranges.Ranges`.
 
-        If `other` specified, see `vectorbt.signals.nb.map_meta_between_two_nb`.
+        If `other` specified, see `vectorbt.signals.nb.between_two_ranges_nb`.
         Both will broadcast using `vectorbt.base.reshape_fns.broadcast` and `broadcast_kwargs`.
-
-        If `use_end_idxs` is True, uses the index of the second signal as `idx_arr`.
-        Otherwise, uses the index of the first signal. If `use_end_idxs` is None, uses the index
-        of the second signal unless `from_other` is False.
 
         ## Example
 
-        Get average distance between signals in `mask`:
+        One array:
 
         ```python-repl
-        >>> range_len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
+        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+        >>> ranges = mask_sr.vbt.signals.between_ranges()
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
-        >>> mask.vbt.signals.map_between(range_len_map_nb).values
-        array([2., 2., 1., 1.])
+        >>> ranges.records_readable
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                3              5  Closed
+        2         2       0                5              6  Closed
 
-        >>> mask.vbt.signals.map_between(range_len_map_nb).mean()
-        a    NaN
-        b    2.0
-        c    1.0
-        Name: mean, dtype: float64
+        >>> ranges.duration.values
+        array([3, 2, 1])
         ```
 
-        Get all distances between signals in `mask['a']` (source) and `mask['b']` (destination):
+        Two arrays, traversing the signals of the first array:
 
         ```python-repl
-        >>> mask['a'].vbt.signals.map_between(
-        ...     range_len_map_nb, other=mask['b']).values
-        array([0.])
+        >>> mask_sr = pd.Series([True, True, True, False, False])
+        >>> mask_sr2 = pd.Series([False, False, True, False, True])
+        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29e3b80f0>
+
+        >>> ranges.records_readable
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              2  Closed
+        1         1       0                1              2  Closed
+        2         2       0                2              2  Closed
+
+        >>> ranges.duration.values
+        array([2, 1, 0])
         ```
 
-        The other way round:
+        Two arrays, traversing the signals of the second array:
 
         ```python-repl
-        >>> mask['a'].vbt.signals.map_between(
-        ...     range_len_map_nb, other=mask['b'], from_other=True).values
-        array([0., 2., 4.])
+        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
+        >>> ranges
+        <vectorbt.generic.ranges.Ranges at 0x7ff29eccbd68>
+
+        >>> ranges.records_readable
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                2              2  Closed
+        1         1       0                2              4  Closed
+
+        >>> ranges.duration.values
+        array([0, 2])
         ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        checks.assert_not_none(range_map_func_nb)
-        checks.assert_numba_func(range_map_func_nb)
 
         if other is None:
             # One input array
-            from_idxs, to_idxs, cols = nb.map_meta_between_nb(self.to_2d_array())
+            range_records = nb.between_ranges_nb(self.to_2d_array())
             wrapper = self.wrapper
+            to_attach = self.obj
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
-            from_idxs, to_idxs, cols = nb.map_meta_between_two_nb(
+            range_records = nb.between_two_ranges_nb(
                 reshape_fns.to_2d_array(obj),
                 reshape_fns.to_2d_array(other),
                 from_other=from_other
             )
             wrapper = ArrayWrapper.from_obj(obj)
-        mapped_arr = nb.range_map_meta_nb(
-            from_idxs,
-            to_idxs,
-            cols,
-            len(wrapper.columns),
-            range_map_func_nb,
-            *args
-        )
-        if use_end_idxs is None:
-            if other is not None:
-                if from_other:
-                    idx_arr = to_idxs
-                else:
-                    idx_arr = from_idxs
-            else:
-                idx_arr = to_idxs
-        else:
-            if use_end_idxs:
-                idx_arr = to_idxs
-            else:
-                idx_arr = from_idxs
-        return MappedArray(
+            to_attach = other if attach_other else obj
+        return Ranges(
             wrapper,
-            mapped_arr,
-            cols,
-            idx_arr=idx_arr,
+            range_records,
+            ts=to_attach if attach_ts else None,
             **kwargs
         ).regroup(group_by)
 
-    def map_partitions(self,
-                       range_map_func_nb: tp.RangeMapFunc, *args,
-                       use_end_idxs: bool = True,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> tp.MaybeSeries:
-        """Map using `range_map_func_nb` on the meta from `vectorbt.signals.nb.map_meta_partitions_nb` and
-        convert the result into an instance of `vectorbt.records.mapped_array.MappedArray`.
+    def partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+        """Wrap the result of `vectorbt.signals.nb.partition_ranges_nb`
+        with `vectorbt.generic.ranges.Ranges`.
 
         If `use_end_idxs` is True, uses the index of the last signal in each partition as `idx_arr`.
         Otherwise, uses the index of the first signal.
 
         ## Example
 
-        Get average partition length in `mask`:
-
         ```python-repl
-        >>> len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
-
-        >>> mask.vbt.signals.map_partitions(len_map_nb).values
-        array([1., 1., 1., 1., 3.])
-
-        >>> mask.vbt.signals.map_partitions(len_map_nb).mean()
-        a    1.0
-        b    1.0
-        c    3.0
-        Name: mean, dtype: float64
-        ```
-        """
-        checks.assert_not_none(range_map_func_nb)
-        checks.assert_numba_func(range_map_func_nb)
-
-        from_idxs, to_idxs, cols = nb.map_meta_partitions_nb(self.to_2d_array())
-        mapped_arr = nb.range_map_meta_nb(
-            from_idxs,
-            to_idxs,
-            cols,
-            len(self.wrapper.columns),
-            range_map_func_nb,
-            *args
-        )
-        to_idxs -= 1
-        if use_end_idxs:
-            idx_arr = to_idxs
-        else:
-            idx_arr = from_idxs
-        return MappedArray(
-            self.wrapper,
-            mapped_arr,
-            cols,
-            idx_arr=idx_arr,
-            **kwargs
-        ).regroup(group_by)
-
-    def map_between_partitions(self,
-                               range_map_func_nb: tp.RangeMapFunc, *args,
-                               use_end_idxs: bool = True,
-                               group_by: tp.GroupByLike = None,
-                               **kwargs) -> tp.MaybeSeries:
-        """Map using `range_map_func_nb` on the meta from `vectorbt.signals.nb.map_meta_between_partitions_nb`
-        and convert the result into an instance of `vectorbt.records.mapped_array.MappedArray`.
-
-        If `use_end_idxs` is True, uses the index of the first signal in the second partition as `idx_arr`.
-        Otherwise, uses the index of the last signal in the first partition.
-
-        ## Example
-
-        Get average distance between partitions in `mask`:
-
-        ```python-repl
-        >>> len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
-
-        >>> mask.vbt.signals.map_between_partitions(len_map_nb).values
-        array([2., 2.])
-
-        >>> mask.vbt.signals.map_between_partitions(len_map_nb).mean()
-        a    1.0
-        b    1.0
-        c    3.0
-        Name: mean, dtype: float64
-        ```
-        """
-        checks.assert_not_none(range_map_func_nb)
-        checks.assert_numba_func(range_map_func_nb)
-
-        from_idxs, to_idxs, cols = nb.map_meta_between_partitions_nb(self.to_2d_array())
-        mapped_arr = nb.range_map_meta_nb(
-            from_idxs,
-            to_idxs,
-            cols,
-            len(self.wrapper.columns),
-            range_map_func_nb,
-            *args
-        )
-        if use_end_idxs:
-            idx_arr = to_idxs
-        else:
-            idx_arr = from_idxs
-        return MappedArray(
-            self.wrapper,
-            mapped_arr,
-            cols,
-            idx_arr=idx_arr,
-            **kwargs
-        ).regroup(group_by)
-
-    def distance_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
-        """Get a mapped array of distance between signals.
-
-        See `SignalsAccessor.map_between`."""
-        return self.map_between(nb.range_len_map_nb, group_by=group_by, **kwargs)
-
-    def partition_len_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
-        """Get a mapped array of length of partitions.
-
-        See `SignalsAccessor.map_partitions`."""
-        return self.map_partitions(nb.range_len_map_nb, group_by=group_by, **kwargs)
-
-    def partition_distance_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
-        """Get a mapped array of distance between partitions.
-
-        See `SignalsAccessor.map_between_partitions`."""
-        return self.map_between_partitions(nb.range_len_map_nb, group_by=group_by, **kwargs)
-
-    def map_reduce(self,
-                   other: tp.Optional[tp.ArrayLike] = None,
-                   range_map_meta_func_nb: tp.Optional[tp.RangeMapMetaFunc] = None,
-                   range_map_meta_args: tp.ArgsLike = None,
-                   range_map_func_nb: tp.Optional[tp.RangeMapFunc] = None,
-                   range_map_args: tp.ArgsLike = None,
-                   reduce_func_nb: tp.Optional[tp.ReduceFunc] = None,
-                   reduce_args: tp.ArgsLike = None,
-                   broadcast_kwargs: tp.KwargsLike = None,
-                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Map ranges and reduce them per column.
-
-        The process comprises of three steps:
-
-        * Extract meta of all ranges using `range_map_meta_func_nb`
-        * Map each range to a scalar using `range_map_func_nb`
-        * Reduce all scalars in each column using `reduce_func_nb`
-
-        See `vectorbt.signals.nb.range_map_reduce_meta_nb`.
-
-        If `other` specified, will broadcast both using `vectorbt.base.reshape_fns.broadcast`
-        and `broadcast_kwargs`, and passed to `range_map_meta_func_nb`.
-        """
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
-        checks.assert_not_none(range_map_meta_func_nb)
-        checks.assert_not_none(range_map_func_nb)
-        checks.assert_not_none(reduce_func_nb)
-        checks.assert_numba_func(range_map_meta_func_nb)
-        checks.assert_numba_func(range_map_func_nb)
-        checks.assert_numba_func(reduce_func_nb)
-        if range_map_meta_args is None:
-            range_map_meta_args = ()
-        if range_map_args is None:
-            range_map_args = ()
-        if reduce_args is None:
-            reduce_args = ()
-
-        if other is None:
-            # One input array
-            obj = self.obj
-            obj_arr = self.to_2d_array()
-            from_idxs, to_idxs, cols = range_map_meta_func_nb(obj_arr, *range_map_meta_args)
-        else:
-            # Two input arrays
-            obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
-            checks.assert_dtype(other, np.bool_)
-            obj_arr = reshape_fns.to_2d_array(obj)
-            other_arr = reshape_fns.to_2d_array(other)
-            from_idxs, to_idxs, cols = range_map_meta_func_nb(obj_arr, other_arr, *range_map_meta_args)
-
-        result = nb.range_map_reduce_meta_nb(
-            from_idxs,
-            to_idxs,
-            cols,
-            obj_arr.shape[1],
-            range_map_func_nb, range_map_args,
-            reduce_func_nb, reduce_args
-        )
-        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce'), wrap_kwargs)
-        return ArrayWrapper.from_obj(obj).wrap_reduced(result, group_by=False, **wrap_kwargs)
-
-    def map_reduce_between(self,
-                           other: tp.Optional[tp.ArrayLike] = None,
-                           from_other: bool = False,
-                           wrap_kwargs: tp.KwargsLike = None,
-                           **kwargs) -> tp.MaybeSeries:
-        """Map-reduce all ranges between two signals.
-
-        Uses `SignalsAccessor.map_reduce` with `vectorbt.signals.nb.map_meta_between_nb` if `other` is None,
-        otherwise with `vectorbt.signals.nb.map_meta_between_two_nb`.
-
-        ## Example
-
-        The same example as in `SignalsAccessor.map_between`:
-
-        ```python-repl
-        >>> range_len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
-        >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
-
-        >>> mask.vbt.signals.map_reduce_between(
-        ...     range_map_func_nb=range_len_map_nb,
-        ...     reduce_func_nb=mean_reduce_nb)
-        a    NaN
-        b    2.0
-        c    1.0
-        Name: map_reduce_between, dtype: float64
-
-        >>> mask['a'].vbt.signals.map_reduce_between(
-        ...     range_map_func_nb=range_len_map_nb,
-        ...     reduce_func_nb=mean_reduce_nb,
-        ...     other=mask['b'], from_other=True)
-        2.0
-        ```
-        """
-        if other is None:
-            wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_between'), wrap_kwargs)
-            return self.map_reduce(
-                range_map_meta_func_nb=nb.map_meta_between_nb,
-                wrap_kwargs=wrap_kwargs,
-                **kwargs
-            )
-        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_between_two'), wrap_kwargs)
-        return self.map_reduce(
-            other=other,
-            range_map_meta_func_nb=nb.map_meta_between_two_nb,
-            range_map_meta_args=(from_other,),
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
-
-    def map_reduce_partitions(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
-        """Map-reduce all partitions.
-
-        Uses `SignalsAccessor.map_reduce` with `vectorbt.signals.nb.map_meta_partitions_nb`.
-
-        ## Example
-
-        The same example as in `SignalsAccessor.map_partitions`:
-
-        ```python-repl
-        >>> range_len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
-        >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
-
-        >>> mask.vbt.signals.map_reduce_partitions(
-        ...     range_map_func_nb=range_len_map_nb,
-        ...     reduce_func_nb=mean_reduce_nb)
-        a    1.0
-        b    1.0
-        c    3.0
-        Name: map_reduce_partitions, dtype: float64
-        ```
-        """
-        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_partitions'), wrap_kwargs)
-        return self.map_reduce(
-            range_map_meta_func_nb=nb.map_meta_partitions_nb,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
-
-    def map_reduce_between_partitions(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
-        """Map-reduce all ranges between two partitions.
-
-        Uses `SignalsAccessor.map_reduce` with `vectorbt.signals.nb.map_meta_between_partitions_nb`.
-
-        ## Example
-
-        The same example as in `SignalsAccessor.map_partitions`:
-
-        ```python-repl
-        >>> range_len_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
-        >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
-
-        >>> mask.vbt.signals.map_reduce_between_partitions(
-        ...     range_map_func_nb=range_len_map_nb,
-        ...     reduce_func_nb=mean_reduce_nb)
-        a    NaN
-        b    2.0
-        c    NaN
-        Name: map_reduce_between_partitions, dtype: float64
-        ```
-        """
-        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_between_partitions'), wrap_kwargs)
-        return self.map_reduce(
-            range_map_meta_func_nb=nb.map_meta_between_partitions_nb,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
-
-    def avg_distance(self, to: tp.Optional[tp.ArrayLike] = None,
-                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
-        """Calculate the average distance between True values in `self` and optionally `to`.
-
-        See `SignalsAccessor.distance_mapped`.
-
-        ## Example
-
-        ```python-repl
-        >>> mask.vbt.signals.avg_distance()
-        a    NaN
-        b    2.0
-        c    1.0
-        Name: avg_distance, dtype: float64
-
-        >>> mask['a'].vbt.signals.avg_distance(to=mask['b'])
-        0.0
+        >>> mask_sr = pd.Series([True, True, True, False, True, True])
+        >>> mask_sr.vbt.signals.partition_ranges().records_readable
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                4              5    Open
         ```"""
-        wrap_kwargs = merge_dicts(dict(name_or_index='avg_distance'), wrap_kwargs)
-        return self.map_reduce_between(
-            other=to,
-            range_map_func_nb=nb.range_len_map_nb,
-            reduce_func_nb=generic_nb.mean_reduce_nb,
-            wrap_kwargs=wrap_kwargs,
+        range_records = nb.partition_ranges_nb(self.to_2d_array())
+        return Ranges(
+            self.wrapper,
+            range_records,
+            ts=self.obj if attach_ts else None,
             **kwargs
-        )
+        ).regroup(group_by)
+
+    def between_partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+        """Wrap the result of `vectorbt.signals.nb.between_partition_ranges_nb`
+        with `vectorbt.generic.ranges.Ranges`.
+
+        ## Example
+
+        ```python-repl
+        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+        >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+           Range Id  Column  Start Timestamp  End Timestamp  Status
+        0         0       0                0              3  Closed
+        1         1       0                3              5  Closed
+         ```"""
+        range_records = nb.between_partition_ranges_nb(self.to_2d_array())
+        return Ranges(
+            self.wrapper,
+            range_records,
+            ts=self.obj if attach_ts else None,
+            **kwargs
+        ).regroup(group_by)
 
     # ############# Ranking ############# #
 
@@ -1748,23 +1479,8 @@ class SignalsAccessor(GenericAccessor):
     def total_partitions(self, wrap_kwargs: tp.KwargsLike = None,
                          group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """Total number of partitions of True values in each column/group."""
-        wrap_kwargs = merge_dicts(dict(
-            fillna=0,
-            dtype=np.int_,
-            name_or_index='total_partitions'
-        ), wrap_kwargs)
-        total_partitions = self.map_reduce_partitions(
-            range_map_func_nb=nb.range_count_map_nb,
-            reduce_func_nb=generic_nb.sum_reduce_nb,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
-        if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
-            if group_by is None:
-                group_by = self.wrapper.grouper.group_by
-            total_partitions = total_partitions.vbt.squeeze_grouped(
-                generic_nb.sum_squeeze_nb, group_by=group_by)
-        return total_partitions
+        wrap_kwargs = merge_dicts(dict(name_or_index='total_partitions'), wrap_kwargs)
+        return self.partition_ranges(**kwargs).count(group_by=group_by, wrap_kwargs=wrap_kwargs)
 
     def partition_rate(self, wrap_kwargs: tp.KwargsLike = None,
                        group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
@@ -1817,15 +1533,15 @@ class SignalsAccessor(GenericAccessor):
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
-        """Defaults for `GenericAccessor.stats`.
+        """Defaults for `SignalsAccessor.stats`.
 
-        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `signals.stats` in `vectorbt._settings.settings`."""
+        Merges `vectorbt.generic.accessors.GenericAccessor.stats_defaults` and
+        `signals.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         signals_stats_cfg = settings['signals']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            GenericAccessor.stats_defaults.__get__(self),
             signals_stats_cfg
         )
 
@@ -1899,9 +1615,7 @@ class SignalsAccessor(GenericAccessor):
             distance=dict(
                 title=RepEval("f'Distance {\"<-\" if from_other else \"->\"} {other_name}' "
                               "if other is not None else 'Distance'"),
-                calc_func='distance_mapped',
-                pass_other=True,
-                pass_from_other=True,
+                calc_func='between_ranges.duration',
                 post_calc_func=lambda self, out, settings: {
                     'Min': out.min(),
                     'Max': out.max(),
@@ -1924,7 +1638,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             partition_len=dict(
                 title='Partition Length',
-                calc_func='partition_len_mapped',
+                calc_func='partition_ranges.duration',
                 post_calc_func=lambda self, out, settings: {
                     'Min': out.min(),
                     'Max': out.max(),
@@ -1936,7 +1650,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             partition_distance=dict(
                 title='Partition Distance',
-                calc_func='partition_distance_mapped',
+                calc_func='between_partition_ranges.duration',
                 post_calc_func=lambda self, out, settings: {
                     'Min': out.min(),
                     'Max': out.max(),
@@ -1978,6 +1692,28 @@ class SignalsAccessor(GenericAccessor):
             ticktext=['false', 'true']
         )
         return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `SignalsAccessor.plots`.
+
+        Merges `vectorbt.generic.accessors.GenericAccessor.plots_defaults` and
+        `signals.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        signals_plots_cfg = settings['signals']['plots']
+
+        return merge_dicts(
+            GenericAccessor.plots_defaults.__get__(self),
+            signals_plots_cfg
+        )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+SignalsAccessor.override_metrics_doc(__pdoc__)
+SignalsAccessor.override_subplots_doc(__pdoc__)
 
 
 @register_series_vbt_accessor('signals')
@@ -2087,7 +1823,3 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
         GenericDFAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
-
-
-__pdoc__ = dict()
-SignalsAccessor.override_metrics_doc(__pdoc__)

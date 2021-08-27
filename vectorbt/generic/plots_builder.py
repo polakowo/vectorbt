@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Mixin for building plots out of subplots."""
 
 from collections import Counter
@@ -15,22 +18,22 @@ from vectorbt.utils.figure import make_subplots, get_domain
 from vectorbt.base.array_wrapper import Wrapping
 
 
-class MetaPlotBuilderMixin(type):
-    """Meta class that exposes a read-only class property `PlotBuilderMixin.subplots`."""
+class MetaPlotsBuilderMixin(type):
+    """Meta class that exposes a read-only class property `PlotsBuilderMixin.subplots`."""
 
     @property
     def subplots(cls) -> Config:
-        """Subplots supported by `PlotBuilderMixin.plot`."""
+        """Subplots supported by `PlotsBuilderMixin.plots`."""
         return cls._subplots
 
 
-class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
-    """Mixin that implements `PlotBuilderMixin.plot`.
+class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
+    """Mixin that implements `PlotsBuilderMixin.plots`.
 
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
 
     def __init__(self):
-        checks.assert_type(self, Wrapping)
+        checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
         self._subplots = self.__class__._subplots.copy()
@@ -41,15 +44,15 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         return {'_subplots'}
 
     @property
-    def plot_defaults(self) -> tp.Kwargs:
-        """Defaults for `PlotBuilderMixin.plot`.
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `PlotsBuilderMixin.plots`.
 
-        See `plot_builder` in `vectorbt._settings.settings`."""
+        See `plots_builder` in `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        plot_builder_cfg = settings['plot_builder']
+        plots_builder_cfg = settings['plots_builder']
 
         return merge_dicts(
-            plot_builder_cfg,
+            plots_builder_cfg,
             dict(settings=dict(freq=self.wrapper.freq))
         )
 
@@ -60,34 +63,34 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
     @property
     def subplots(self) -> Config:
-        """Subplots supported by `PlotBuilderMixin.plot`.
+        """Subplots supported by `${cls_name}`.
 
         ```json
         ${subplots}
         ```
 
-        Returns `PlotBuilderMixin._subplots`, which gets (deep) copied upon creation of each instance.
+        Returns `${cls_name}._subplots`, which gets (deep) copied upon creation of each instance.
         Thus, changing this config won't affect the class.
 
-        To change subplots, you can either change the config in-place, override `PlotBuilderMixin.subplots`,
-        or overwrite the instance variable `PlotBuilderMixin._subplots`."""
+        To change subplots, you can either change the config in-place, override this property,
+        or overwrite the instance variable `${cls_name}._subplots`."""
         return self._subplots
 
-    def plot(self,
-             subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
-             tags: tp.Optional[tp.MaybeIterable[str]] = None,
-             column: tp.Optional[tp.Label] = None,
-             group_by: tp.GroupByLike = None,
-             silence_warnings: tp.Optional[bool] = None,
-             template_mapping: tp.Optional[tp.Mapping] = None,
-             settings: tp.KwargsLike = None,
-             filters: tp.KwargsLike = None,
-             subplot_settings: tp.KwargsLike = None,
-             show_titles: bool = None,
-             hide_id_labels: bool = None,
-             group_id_labels: bool = None,
-             make_subplots_kwargs: tp.KwargsLike = None,
-             **kwargs) -> tp.Optional[tp.BaseFigure]:  # pragma: no cover
+    def plots(self,
+              subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
+              tags: tp.Optional[tp.MaybeIterable[str]] = None,
+              column: tp.Optional[tp.Label] = None,
+              group_by: tp.GroupByLike = None,
+              silence_warnings: tp.Optional[bool] = None,
+              template_mapping: tp.Optional[tp.Mapping] = None,
+              settings: tp.KwargsLike = None,
+              filters: tp.KwargsLike = None,
+              subplot_settings: tp.KwargsLike = None,
+              show_titles: bool = None,
+              hide_id_labels: bool = None,
+              group_id_labels: bool = None,
+              make_subplots_kwargs: tp.KwargsLike = None,
+              **layout_kwargs) -> tp.Optional[tp.BaseFigure]:
         """Plot various parts of this object.
 
         Args:
@@ -95,14 +98,16 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
                 Each element can be either:
 
-                * a subplot name (see keys in `PlotBuilderMixin.subplots`)
-                * a tuple of a subplot name and a settings dict as in `PlotBuilderMixin.subplots`.
+                * a subplot name (see keys in `PlotsBuilderMixin.subplots`)
+                * a tuple of a subplot name and a settings dict as in `PlotsBuilderMixin.subplots`.
 
                 The settings dict can contain the following keys:
 
                 * `title`: Title of the subplot. Defaults to the name.
                 * `plot_func` (required): Plotting function for custom subplots.
                     Should write the supplied figure `fig` in-place and can return anything (it won't be used).
+                * `xaxis_kwargs`: Layout keyword arguments for the x-axis. Defaults to `dict(title='Index')`.
+                * `yaxis_kwargs`: Layout keyword arguments for the y-axis. Defaults to empty dict.
                 * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
                     `resolve_path_{arg}`, `resolve_{arg}` and `template_mapping`:
                     The same as in `vectorbt.generic.stats_builder.StatsBuilderMixin` for `calc_func`.
@@ -142,7 +147,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
             silence_warnings (bool): See `silence_warnings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
             template_mapping (mapping): See `template_mapping` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 
-                Applied on `settings`, `make_subplots_kwargs`, and `kwargs`, and then on each subplot settings.
+                Applied on `settings`, `make_subplots_kwargs`, and `layout_kwargs`, and then on each subplot settings.
             filters (dict): See `filters` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
             settings (dict): See `settings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
             subplot_settings (dict): See `metric_settings` in `vectorbt.generic.stats_builder.StatsBuilderMixin`.
@@ -152,15 +157,13 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 Two labels are identical if their name, marker style and line style match.
             group_id_labels (bool): Whether to group identical legend labels.
             make_subplots_kwargs (dict): Keyword arguments passed to `plotly.subplots.make_subplots`.
-            **kwargs: Additional keyword arguments.
-
-                Keyword arguments used to update the layout of the figure.
+            **layout_kwargs: Keyword arguments used to update the layout of the figure.
 
         !!! note
-            `PlotBuilderMixin` and `vectorbt.generic.stats_builder.StatsBuilderMixin` are very similar.
+            `PlotsBuilderMixin` and `vectorbt.generic.stats_builder.StatsBuilderMixin` are very similar.
             Some artifacts follow the same concept, just named differently:
 
-            * `plot_defaults` vs `stats_defaults`
+            * `plots_defaults` vs `stats_defaults`
             * `subplots` vs `metrics`
             * `subplot_settings` vs `metric_settings`
 
@@ -175,29 +178,29 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
         # Resolve defaults
         if silence_warnings is None:
-            silence_warnings = self.plot_defaults['silence_warnings']
+            silence_warnings = self.plots_defaults['silence_warnings']
         if show_titles is None:
-            show_titles = self.plot_defaults['show_titles']
+            show_titles = self.plots_defaults['show_titles']
         if hide_id_labels is None:
-            hide_id_labels = self.plot_defaults['hide_id_labels']
+            hide_id_labels = self.plots_defaults['hide_id_labels']
         if group_id_labels is None:
-            group_id_labels = self.plot_defaults['group_id_labels']
-        template_mapping = merge_dicts(self.plot_defaults['template_mapping'], template_mapping)
-        filters = merge_dicts(self.plot_defaults['filters'], filters)
-        settings = merge_dicts(self.plot_defaults['settings'], settings)
-        subplot_settings = merge_dicts(self.plot_defaults['subplot_settings'], subplot_settings)
-        make_subplots_kwargs = merge_dicts(self.plot_defaults['make_subplots_kwargs'], make_subplots_kwargs)
-        kwargs = merge_dicts(self.plot_defaults['kwargs'], kwargs)
+            group_id_labels = self.plots_defaults['group_id_labels']
+        template_mapping = merge_dicts(self.plots_defaults['template_mapping'], template_mapping)
+        filters = merge_dicts(self.plots_defaults['filters'], filters)
+        settings = merge_dicts(self.plots_defaults['settings'], settings)
+        subplot_settings = merge_dicts(self.plots_defaults['subplot_settings'], subplot_settings)
+        make_subplots_kwargs = merge_dicts(self.plots_defaults['make_subplots_kwargs'], make_subplots_kwargs)
+        layout_kwargs = merge_dicts(self.plots_defaults['layout_kwargs'], layout_kwargs)
 
         # Replace templates globally (not used at subplot level)
         if len(template_mapping) > 0:
             sub_settings = deep_substitute(settings, mapping=template_mapping)
             sub_make_subplots_kwargs = deep_substitute(make_subplots_kwargs, mapping=template_mapping)
-            sub_kwargs = deep_substitute(kwargs, mapping=template_mapping)
+            sub_layout_kwargs = deep_substitute(layout_kwargs, mapping=template_mapping)
         else:
             sub_settings = settings
             sub_make_subplots_kwargs = make_subplots_kwargs
-            sub_kwargs = kwargs
+            sub_layout_kwargs = layout_kwargs
 
         # Resolve self
         reself = self.resolve_self(
@@ -208,7 +211,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
         # Prepare subplots
         if subplots is None:
-            subplots = reself.plot_defaults['subplots']
+            subplots = reself.plots_defaults['subplots']
         if subplots == 'all':
             subplots = reself.subplots
         if isinstance(subplots, dict):
@@ -218,7 +221,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
         # Prepare tags
         if tags is None:
-            tags = reself.plot_defaults['tags']
+            tags = reself.plots_defaults['tags']
         if isinstance(tags, str) and tags == 'all':
             tags = None
         if isinstance(tags, (str, tuple)):
@@ -348,7 +351,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         # Any subplots left?
         if len(subplots_dct) == 0:
             if not silence_warnings:
-                warnings.warn("No subplots left to plot", stacklevel=2)
+                warnings.warn("No subplots to plot", stacklevel=2)
             return None
 
         # Set up figure
@@ -381,8 +384,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
             yaxis_spacing = max_yaxis_spacing
         else:
             yaxis_spacing = 0
-        if 'height' in sub_kwargs:
-            height = sub_kwargs.pop('height')
+        if 'height' in sub_layout_kwargs:
+            height = sub_layout_kwargs.pop('height')
         else:
             height = default_height + title_spacing
             if rows > 1:
@@ -391,8 +394,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 height += legend_height - legend_height * rows
                 if shared_xaxes:
                     height += max_xaxis_spacing - max_xaxis_spacing * rows
-        if 'width' in sub_kwargs:
-            width = sub_kwargs.pop('width')
+        if 'width' in sub_layout_kwargs:
+            width = sub_layout_kwargs.pop('width')
         else:
             width = default_width
             if cols > 1:
@@ -437,7 +440,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
             horizontal_spacing=horizontal_spacing,
             **sub_make_subplots_kwargs
         )
-        sub_kwargs = merge_dicts(dict(
+        sub_layout_kwargs = merge_dicts(dict(
+            showlegend=True,
             width=width,
             height=height,
             legend=dict(
@@ -448,8 +452,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 x=1,
                 traceorder='normal'
             )
-        ), sub_kwargs)
-        fig.update_layout(**sub_kwargs)  # final destination for sub_kwargs
+        ), sub_layout_kwargs)
+        fig.update_layout(**sub_layout_kwargs)  # final destination for sub_layout_kwargs
 
         # Plot subplots
         arg_cache_dct = {}
@@ -499,8 +503,8 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 _silence_warnings = final_kwargs.get('silence_warnings')
                 title = final_kwargs.pop('title', subplot_name)
                 plot_func = final_kwargs.pop('plot_func', None)
-                xaxis_title = final_kwargs.pop('xaxis_title', 'Date')
-                yaxis_title = final_kwargs.pop('yaxis_title', title)
+                xaxis_kwargs = final_kwargs.pop('xaxis_kwargs', None)
+                yaxis_kwargs = final_kwargs.pop('yaxis_kwargs', None)
                 resolve_plot_func = final_kwargs.pop('resolve_plot_func', True)
                 use_caching = final_kwargs.pop('use_caching', True)
 
@@ -515,9 +519,12 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                                               args: tp.ArgsLike = None,
                                               kwargs: tp.KwargsLike = None,
                                               call_attr: bool = True,
+                                              _final_kwargs: tp.Kwargs = final_kwargs,
+                                              _opt_arg_names: tp.Set[str] = opt_arg_names,
                                               _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                              _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
+                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
+                                if attr in final_kwargs:
+                                    return final_kwargs[attr]
                                 if args is None:
                                     args = ()
                                 if kwargs is None:
@@ -527,7 +534,7 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                                         return custom_reself.resolve_attr(
                                             attr,
                                             args=args,
-                                            cond_kwargs=_final_kwargs,
+                                            cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
                                             kwargs=kwargs,
                                             custom_arg_names=_custom_arg_names,
                                             cache_dct=_arg_cache_dct,
@@ -589,8 +596,10 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
                 for annotation in fig.layout.annotations:
                     if 'text' in annotation and annotation['text'] == '$title_' + str(i):
                         annotation['text'] = title
-                fig.layout[xaxis]['title'] = xaxis_title
-                fig.layout[yaxis]['title'] = yaxis_title
+                subplot_layout = dict()
+                subplot_layout[xaxis] = merge_dicts(dict(title='Index'), xaxis_kwargs)
+                subplot_layout[yaxis] = merge_dicts(dict(), yaxis_kwargs)
+                fig.update_layout(**subplot_layout)
             except Exception as e:
                 warnings.warn(f"Subplot '{subplot_name}' raised an exception", stacklevel=2)
                 raise e
@@ -663,15 +672,17 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
         # Return the figure
         return fig
 
+    # ############# Docs ############# #
+
     @classmethod
     def build_subplots_doc(cls, source_cls: tp.Optional[type] = None) -> str:
         """Build subplots documentation."""
         if source_cls is None:
-            source_cls = PlotBuilderMixin
+            source_cls = PlotsBuilderMixin
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
         ).substitute(
-            {'subplots': cls.subplots.to_doc()}
+            {'subplots': cls.subplots.to_doc(), 'cls_name': cls.__name__}
         )
 
     @classmethod
@@ -681,4 +692,4 @@ class PlotBuilderMixin(metaclass=MetaPlotBuilderMixin):
 
 
 __pdoc__ = dict()
-PlotBuilderMixin.override_subplots_doc(__pdoc__)
+PlotsBuilderMixin.override_subplots_doc(__pdoc__)

@@ -1,5 +1,5 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
-[![License](https://img.shields.io/pypi/l/vectorbt?color=yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
 [![Build Status](https://travis-ci.com/polakowo/vectorbt.svg?branch=master)](https://travis-ci.com/polakowo/vectorbt)
 [![codecov](https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3)](https://codecov.io/gh/polakowo/vectorbt)
@@ -171,7 +171,7 @@ Max Drawdown Duration                  760 days 00:00:00
 Total Trades                                          54
 Total Closed Trades                                   53
 Total Open Trades                                      1
-Open Trade P&L                              67287.940601
+Open Trade PnL                              67287.940601
 Win Rate [%]                                   52.830189
 Best Trade [%]                               1075.803607
 Worst Trade [%]                               -29.593414
@@ -364,6 +364,7 @@ randnx_n      0      1      2
 - Functions for working with returns
     - Numba-compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
     - Rolling versions of most metrics
+    - Adapter for [quantstats](https://github.com/ranaroussi/quantstats)
 
 ```python-repl
 >>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
@@ -374,7 +375,7 @@ randnx_n      0      1      2
     - Accepts signals, orders, and custom order function
     - Supports long and short positions
     - Supports individual and multi-asset mixed portfolios
-    - Offers metrics and tools for analyzing returns, orders, trades and positions
+    - Offers metrics and tools for analyzing returns, orders, and trades
     - Allows saving and loading from disk using [dill](https://github.com/uqfoundation/dill)
     
 ```python-repl
@@ -437,6 +438,7 @@ sma_timeperiod    2    3
 Start                                        0
 End                                          7
 Period                         8 days 00:00:00
+Coverage [%]                              50.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
@@ -447,13 +449,13 @@ Active Recovery Return [%]               100.0
 Active Recovery Duration       1 days 00:00:00
 Max Drawdown [%]                     33.333333
 Avg Drawdown [%]                     33.333333
-Max Drawdown Duration          2 days 00:00:00
-Avg Drawdown Duration          2 days 00:00:00
+Max Drawdown Duration          1 days 00:00:00
+Avg Drawdown Duration          1 days 00:00:00
 Max Recovery Return [%]                   50.0
 Avg Recovery Return [%]                   50.0
 Max Recovery Duration          1 days 00:00:00
 Avg Recovery Duration          1 days 00:00:00
-Avg Recovery Duration Ratio                0.5
+Avg Recovery Duration Ratio                1.0
 dtype: object
 ```
 
@@ -528,11 +530,19 @@ After making changes, make sure you did not break any functionality:
 pytest
 ```
 
-Please make sure to update tests as appropriate.
+Make sure to update tests as appropriate.
+
+Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 
-This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
+This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license. 
+The source code is open and everyone (individuals and organizations) can use it for free. 
+However, it is not allowed to sell products and services that are mostly just this software.
+
+If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
+
+Installing optional dependencies may be subject to a more restrictive license.
 
 ## Disclaimer
 

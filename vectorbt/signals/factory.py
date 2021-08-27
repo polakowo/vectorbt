@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """A factory for building new signal generators with ease.
 
 The signal factory class `SignalFactory` extends `vectorbt.indicators.factory.IndicatorFactory`
@@ -253,7 +256,7 @@ class SignalFactory(IndicatorFactory):
                     Default is an automatically generated array of shape `input_shape[0]`.
 
                     You can also pass `temp_idx_arr1`, `temp_idx_arr2`, etc. to generate multiple.
-                * `flex_2d`: See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
+                * `flex_2d`: See `vectorbt.base.reshape_fns.flex_select_auto_nb`.
                     Default is provided by the pipeline if `pass_flex_2d` is True.
             pass_cache (bool): Whether to pass cache from `cache_func` to the choice function.
 

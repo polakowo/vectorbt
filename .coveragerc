@@ -16,5 +16,6 @@ omit =
     */utils/module.py
     */utils/requests.py
     */generic/plotting.py
+    */generic/plots_builder.py
     */data/custom.py
     */messaging/telegram.py

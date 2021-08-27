@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Signal generators built with `vectorbt.signals.factory.SignalFactory`."""
 
 import numpy as np
@@ -528,7 +531,7 @@ ohlcstx_config = Config(
         mode='exits',
         input_names=['open', 'high', 'low', 'close'],
         in_output_names=['stop_price', 'stop_type'],
-        param_names=['sl_stop', 'sl_trail', 'tp_stop'],
+        param_names=['sl_stop', 'sl_trail', 'tp_stop', 'reverse'],
         attr_settings=dict(
             stop_type=dict(dtype=StopType)  # creates rand_type_readable
         )
@@ -542,7 +545,7 @@ ohlcstx_func_config = Config(
         exit_settings=dict(
             pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
             pass_in_outputs=['stop_price', 'stop_type'],
-            pass_params=['sl_stop', 'sl_trail', 'tp_stop'],
+            pass_params=['sl_stop', 'sl_trail', 'tp_stop', 'reverse'],
             pass_kwargs=[('is_open_safe', True), 'wait', 'pick_first', 'temp_idx_arr', 'flex_2d'],
         ),
         pass_flex_2d=True,
@@ -557,11 +560,13 @@ ohlcstx_func_config = Config(
         param_settings=dict(
             sl_stop=flex_elem_param_config,
             sl_trail=flex_elem_param_config,
-            tp_stop=flex_elem_param_config
+            tp_stop=flex_elem_param_config,
+            reverse=flex_elem_param_config
         ),
         sl_stop=np.nan,
         sl_trail=False,
         tp_stop=np.nan,
+        reverse=False,
         stop_price=np.nan,
         stop_type=-1
     )

@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Base plotting functions.
 
 Provides functions for visualizing data in an efficient and convenient way.
@@ -135,18 +138,28 @@ class Gauge(Configured, TraceUpdater):
         fig.add_trace(indicator, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, (fig.data[-1],))
-        self.value_range = value_range
-        self.cmap_name = cmap_name
+        self._value_range = value_range
+        self._cmap_name = cmap_name
 
         if value is not None:
             self.update(value)
 
+    @property
+    def value_range(self) -> tp.Tuple[float, float]:
+        """The value range of the gauge."""
+        return self._value_range
+
+    @property
+    def cmap_name(self) -> str:
+        """A matplotlib-compatible colormap name."""
+        return self._cmap_name
+
     def update(self, value: float) -> None:
         """Update the trace data."""
         if self.value_range is None:
-            self.value_range = value, value
+            self._value_range = value, value
         else:
-            self.value_range = min(self.value_range[0], value), max(self.value_range[1], value)
+            self._value_range = min(self.value_range[0], value), max(self.value_range[1], value)
 
         with self.fig.batch_update():
             if self.value_range is not None:
@@ -210,11 +223,14 @@ class Bar(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
+        if data is not None:
+            data = reshape_fns.to_2d_array(data)
+            if trace_names is not None:
+                checks.assert_shape_equal(data, trace_names, (1, 0))
+        else:
             if trace_names is None:
-                raise ValueError("At least trace_names must be passed")
+                raise ValueError("At least data or trace_names must be passed")
         if trace_names is None:
-            data = reshape_fns.to_2d(np.asarray(data))
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
@@ -254,7 +270,7 @@ class Bar(Configured, TraceUpdater):
         ```
         ![](/docs/img/Bar_updated.svg)
         """
-        data = reshape_fns.to_2d(np.asarray(data))
+        data = reshape_fns.to_2d_array(data)
         with self.fig.batch_update():
             for i, bar in enumerate(self.traces):
                 bar.y = data[:, i]
@@ -315,11 +331,14 @@ class Scatter(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
+        if data is not None:
+            data = reshape_fns.to_2d_array(data)
+            if trace_names is not None:
+                checks.assert_shape_equal(data, trace_names, (1, 0))
+        else:
             if trace_names is None:
-                raise ValueError("At least trace_names must be passed")
+                raise ValueError("At least data or trace_names must be passed")
         if trace_names is None:
-            data = reshape_fns.to_2d(data)
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
@@ -350,7 +369,7 @@ class Scatter(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.asarray(data))
+        data = reshape_fns.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -376,7 +395,7 @@ class Histogram(Configured, TraceUpdater):
 
                 Must be of shape (any, `trace_names`).
             trace_names (str or list of str): Trace names, corresponding to columns in pandas.
-            horizontal (bool): Plot horizontally.
+            horizontal (bool): Whether to plot horizontally.
             remove_nan (bool): Whether to remove NaN values.
             from_quantile (float): Filter out data points before this quantile.
 
@@ -422,11 +441,14 @@ class Histogram(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
+        if data is not None:
+            data = reshape_fns.to_2d_array(data)
+            if trace_names is not None:
+                checks.assert_shape_equal(data, trace_names, (1, 0))
+        else:
             if trace_names is None:
-                raise ValueError("At least trace_names must be passed")
+                raise ValueError("At least data or trace_names must be passed")
         if trace_names is None:
-            data = reshape_fns.to_2d(data)
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
@@ -450,17 +472,37 @@ class Histogram(Configured, TraceUpdater):
             fig.add_trace(hist, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
-        self.horizontal = horizontal
-        self.remove_nan = remove_nan
-        self.from_quantile = from_quantile
-        self.to_quantile = to_quantile
+        self._horizontal = horizontal
+        self._remove_nan = remove_nan
+        self._from_quantile = from_quantile
+        self._to_quantile = to_quantile
 
         if data is not None:
             self.update(data)
 
+    @property
+    def horizontal(self):
+        """Whether to plot horizontally."""
+        return self._horizontal
+
+    @property
+    def remove_nan(self):
+        """Whether to remove NaN values."""
+        return self._remove_nan
+
+    @property
+    def from_quantile(self):
+        """Filter out data points before this quantile."""
+        return self._from_quantile
+
+    @property
+    def to_quantile(self):
+        """Filter out data points after this quantile."""
+        return self._to_quantile
+
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.asarray(data))
+        data = reshape_fns.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -528,11 +570,14 @@ class Box(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
+        if data is not None:
+            data = reshape_fns.to_2d_array(data)
+            if trace_names is not None:
+                checks.assert_shape_equal(data, trace_names, (1, 0))
+        else:
             if trace_names is None:
-                raise ValueError("At least trace_names must be passed")
+                raise ValueError("At least data or trace_names must be passed")
         if trace_names is None:
-            data = reshape_fns.to_2d(data)
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
@@ -554,17 +599,37 @@ class Box(Configured, TraceUpdater):
             fig.add_trace(box, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
-        self.horizontal = horizontal
-        self.remove_nan = remove_nan
-        self.from_quantile = from_quantile
-        self.to_quantile = to_quantile
+        self._horizontal = horizontal
+        self._remove_nan = remove_nan
+        self._from_quantile = from_quantile
+        self._to_quantile = to_quantile
 
         if data is not None:
             self.update(data)
 
+    @property
+    def horizontal(self):
+        """Whether to plot horizontally."""
+        return self._horizontal
+
+    @property
+    def remove_nan(self):
+        """Whether to remove NaN values."""
+        return self._remove_nan
+
+    @property
+    def from_quantile(self):
+        """Filter out data points before this quantile."""
+        return self._from_quantile
+
+    @property
+    def to_quantile(self):
+        """Filter out data points after this quantile."""
+        return self._to_quantile
+
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.asarray(data))
+        data = reshape_fns.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -643,11 +708,15 @@ class Heatmap(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
-            if x_labels is None or y_labels is None:
-                raise ValueError("At least x_labels and y_labels must be passed")
+        if data is not None:
+            data = reshape_fns.to_2d_array(data)
+            if x_labels is not None:
+                checks.assert_shape_equal(data, x_labels, (1, 0))
+            if y_labels is not None:
+                checks.assert_shape_equal(data, y_labels, (0, 0))
         else:
-            data = reshape_fns.to_2d(np.asarray(data))
+            if x_labels is None or y_labels is None:
+                raise ValueError("At least data, or x_labels and y_labels must be passed")
         if x_labels is not None:
             x_labels = clean_labels(x_labels)
         if y_labels is not None:
@@ -711,7 +780,7 @@ class Heatmap(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.asarray(data))
+        data = reshape_fns.to_2d_array(data)
 
         with self.fig.batch_update():
             self.traces[0].z = data
@@ -784,16 +853,22 @@ class Volume(Configured, TraceUpdater):
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
-        if data is None:
-            if x_labels is None or y_labels is None or z_labels is None:
-                raise ValueError("At least x_labels, y_labels and z_labels must be passed")
-            x_len = len(x_labels)
-            y_len = len(y_labels)
-            z_len = len(z_labels)
-        else:
+        if data is not None:
             checks.assert_ndim(data, 3)
             data = np.asarray(data)
             x_len, y_len, z_len = data.shape
+            if x_labels is not None:
+                checks.assert_shape_equal(data, x_labels, (0, 0))
+            if y_labels is not None:
+                checks.assert_shape_equal(data, y_labels, (1, 0))
+            if z_labels is not None:
+                checks.assert_shape_equal(data, z_labels, (2, 0))
+        else:
+            if x_labels is None or y_labels is None or z_labels is None:
+                raise ValueError("At least data, or x_labels, y_labels and z_labels must be passed")
+            x_len = len(x_labels)
+            y_len = len(y_labels)
+            z_len = len(z_labels)
         if x_labels is None:
             x_labels = np.arange(x_len)
         else:

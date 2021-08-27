@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Functions for reshaping arrays.
 
 Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,
@@ -311,16 +314,6 @@ def wrap_broadcasted(old_arg: tp.AnyArray,
     return new_arg
 
 
-def broadcast_shape(*args) -> tp.Shape:
-    """Returns the shape of the arrays that would result from broadcasting the
-    supplied arrays against each other."""
-    b = np.broadcast(*args[:32])
-    for pos in range(32, len(args), 31):
-        b = broadcast_to(0, b.shape)
-        b = np.broadcast(b, *args[pos:(pos + 31)])
-    return b.shape
-
-
 BCRT = tp.Union[
     tp.MaybeTuple[tp.AnyArray],
     tp.Tuple[tp.MaybeTuple[tp.AnyArray], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]]
@@ -522,7 +515,7 @@ def broadcast(*args: tp.ArrayLike,
     if to_shape is not None:
         if isinstance(to_shape, int):
             to_shape = (to_shape,)
-        checks.assert_type(to_shape, tuple)
+        checks.assert_instance_of(to_shape, tuple)
         if len(to_shape) > 1:
             is_2d = True
 
@@ -566,7 +559,7 @@ def broadcast(*args: tp.ArrayLike,
 
     # Get final shape
     if to_shape is None:
-        to_shape = broadcast_shape(*arr_args_2d)
+        to_shape = np.broadcast_shapes(*map(lambda x: np.asarray(x).shape, arr_args_2d))
 
     # Perform broadcasting
     new_args = []
@@ -725,7 +718,7 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
     """Get Series with a multi-index.
 
     If DataFrame has been passed, should at maximum have one row or column."""
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     if checks.is_frame(arg):
         if arg.shape[0] == 1:
             arg = arg.iloc[0, :]
@@ -733,7 +726,7 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
             arg = arg.iloc[:, 0]
         else:
             raise ValueError("Supported are either Series or DataFrame with one column/row")
-    checks.assert_type(arg.index, pd.MultiIndex)
+    checks.assert_instance_of(arg.index, pd.MultiIndex)
     return arg
 
 
@@ -819,11 +812,11 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
     d  2.0  4.0  NaN  NaN
     ```
     """
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     df: tp.Frame = to_2d(arg)
     if isinstance(df.index, pd.MultiIndex) or isinstance(df.columns, pd.MultiIndex):
-        checks.assert_type(df.index, pd.MultiIndex)
-        checks.assert_type(df.columns, pd.MultiIndex)
+        checks.assert_instance_of(df.index, pd.MultiIndex)
+        checks.assert_instance_of(df.columns, pd.MultiIndex)
         checks.assert_array_equal(df.index.nlevels, df.columns.nlevels)
         names1, names2 = tuple(df.index.names), tuple(df.columns.names)
     else:
@@ -917,12 +910,12 @@ def unstack_to_df(arg: tp.SeriesFrame,
 
 
 @njit(cache=True)
-def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool) -> tp.Tuple[int, int]:
+def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int, int]:
     """Choose selection index and column based on the array's shape.
 
-    Instead of expensive broadcasting, keep original shape and do indexing in a smart way.
+    Instead of expensive broadcasting, keep the original shape and do indexing in a smart way.
     A nice feature of this is that it has almost no memory footprint and can broadcast in
-    any direction indefinitely.
+    any direction infinitely.
 
     Call it once before using `flex_select_nb`.
 
@@ -950,7 +943,7 @@ def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool) -> tp.Tuple[int, int]:
 
 
 @njit(cache=True)
-def flex_select_nb(i: int, col: int, a: tp.Array, flex_i: int, flex_col: int, flex_2d: bool) -> tp.Any:
+def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, flex_2d: bool = True) -> tp.Any:
     """Select element of `a` as if it has been broadcast."""
     if flex_i == -1:
         flex_i = i
@@ -966,10 +959,7 @@ def flex_select_nb(i: int, col: int, a: tp.Array, flex_i: int, flex_col: int, fl
 
 
 @njit(cache=True)
-def flex_select_auto_nb(i: int, col: int, a: tp.Array, flex_2d: bool) -> tp.Any:
-    """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`.
-
-    !!! note
-        Slower since it must call `flex_choose_i_and_col_nb` each time."""
+def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool = True) -> tp.Any:
+    """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
-    return flex_select_nb(i, col, a, flex_i, flex_col, flex_2d)
+    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d)

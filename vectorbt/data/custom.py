@@ -1,8 +1,11 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Custom data classes that subclass `vectorbt.data.base.Data`."""
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import time
 import warnings
 from functools import wraps
@@ -194,7 +197,7 @@ class YFData(Data):
     ...     interval='1m'
     ... )
     >>> yf_data.get())
-                                     Open        High         Low       Close  \
+                                     Open        High         Low       Close  \\
     Datetime
     2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
     2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
@@ -212,7 +215,7 @@ class YFData(Data):
 
     >>> yf_data = yf_data.update(end='2021-04-12 09:40:00 -0400')
     >>> yf_data.get()
-                                     Open        High         Low       Close  \
+                                     Open        High         Low       Close  \\
     Datetime
     2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
     2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
@@ -301,7 +304,7 @@ class BinanceData(Data):
     ... )
     >>> binance_data.get()
     2021-05-02 14:47:20.478000+00:00 - 2021-05-02 16:47:00+00:00: : 1it [00:00,  3.42it/s]
-                                   Open      High       Low     Close     Volume  \
+                                   Open      High       Low     Close     Volume  \\
     Open time
     2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
     2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
@@ -311,7 +314,7 @@ class BinanceData(Data):
     2021-05-02 16:46:00+00:00  56644.02  56663.43  56605.17  56605.18  27.573654
     2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56627.12   7.719933
 
-                                                    Close time  Quote volume  \
+                                                    Close time  Quote volume  \\
     Open time
     2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
     2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
@@ -321,7 +324,7 @@ class BinanceData(Data):
     2021-05-02 16:46:00+00:00 2021-05-02 16:46:59.999000+00:00  1.561548e+06
     2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  4.371848e+05
 
-                               Number of trades  Taker base volume  \
+                               Number of trades  Taker base volume  \\
     Open time
     2021-05-02 14:48:00+00:00               991          13.771152
     2021-05-02 14:49:00+00:00               816           5.981942
@@ -348,7 +351,7 @@ class BinanceData(Data):
 
     >>> binance_data = binance_data.update()
     >>> binance_data.get()
-                                   Open      High       Low     Close     Volume  \
+                                   Open      High       Low     Close     Volume  \\
     Open time
     2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
     2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
@@ -358,7 +361,7 @@ class BinanceData(Data):
     2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56625.76  14.615437
     2021-05-02 16:48:00+00:00  56625.75  56643.60  56614.32  56623.01   5.895843
 
-                                                    Close time  Quote volume  \
+                                                    Close time  Quote volume  \\
     Open time
     2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
     2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
@@ -368,7 +371,7 @@ class BinanceData(Data):
     2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  8.276017e+05
     2021-05-02 16:48:00+00:00 2021-05-02 16:48:59.999000+00:00  3.338702e+05
 
-                               Number of trades  Taker base volume  \
+                               Number of trades  Taker base volume  \\
     Open time
     2021-05-02 14:48:00+00:00               991          13.771152
     2021-05-02 14:49:00+00:00               816           5.981942
@@ -419,7 +422,8 @@ class BinanceData(Data):
                         end: tp.DatetimeLike = 'now UTC',
                         delay: tp.Optional[float] = 500,
                         limit: int = 500,
-                        show_progress: bool = True) -> tp.Frame:
+                        show_progress: bool = True,
+                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -437,12 +441,15 @@ class BinanceData(Data):
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
+            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
 
         For defaults, see `data.binance` in `vectorbt._settings.settings`.
         """
         if client is None:
             raise ValueError("client must be provided")
 
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {}
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
@@ -464,7 +471,7 @@ class BinanceData(Data):
 
         # Iteratively collect the data
         data: tp.List[list] = []
-        with tqdm(disable=not show_progress) as pbar:
+        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
                 # Fetch the klines for the next interval
@@ -595,7 +602,8 @@ class CCXTData(Data):
                         limit: tp.Optional[int] = 500,
                         retries: int = 3,
                         show_progress: bool = True,
-                        params: tp.Optional[dict] = None) -> tp.Frame:
+                        params: tp.Optional[dict] = None,
+                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -619,6 +627,7 @@ class CCXTData(Data):
             limit (int): The maximum number of returned items.
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
+            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
             params (dict): Exchange-specific key-value parameters.
 
         For defaults, see `data.ccxt` in `vectorbt._settings.settings`.
@@ -629,6 +638,8 @@ class CCXTData(Data):
 
         if config is None:
             config = {}
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {}
         if params is None:
             params = {}
         if isinstance(exchange, str):
@@ -694,7 +705,7 @@ class CCXTData(Data):
 
         # Iteratively collect the data
         data: tp.List[list] = []
-        with tqdm(disable=not show_progress) as pbar:
+        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
                 # Fetch the klines for the next interval

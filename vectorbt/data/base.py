@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Base data class.
 
 Class `Data` allows storing, downloading, updating, and managing data. It stores data
@@ -28,7 +31,7 @@ random returns with provided mean and standard deviation:
 
 >>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'])
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  101.042956  100.920462
 2021-01-02  100.987327  100.956455
 2021-01-03  101.022333  100.955128
@@ -41,13 +44,13 @@ symbol           RANDNX1       RANDNX2
 2021-01-10  101.585689  100.993223
 ```
 
-To provide different keyword arguments for different symbols, we can use `vectorbt.data.base.symbol_dict`:
+To provide different keyword arguments for different symbols, we can use `symbol_dict`:
 
 ```python-repl
 >>> start_value = vbt.symbol_dict({'RANDNX2': 200})
 >>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'], start_value=start_value)
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  101.083324  200.886078
 2021-01-02  101.113405  200.791934
 2021-01-03  101.169194  200.852877
@@ -61,7 +64,7 @@ symbol           RANDNX1       RANDNX2
 ```
 
 In case two symbols have different index or columns, they are automatically aligned based on
-`missing_index` and `missing_columns` (see `data` in `vectorbt._settings.settings`):
+`missing_index` and `missing_columns` respectively (see `data` in `vectorbt._settings.settings`):
 
 ```python-repl
 >>> start_dt = vbt.symbol_dict({'RANDNX2': '2021-01-03'})
@@ -70,7 +73,7 @@ In case two symbols have different index or columns, they are automatically alig
 ...     ['RANDNX1', 'RANDNX2'], start_value=start_value,
 ...     start_dt=start_dt, end_dt=end_dt)
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  101.028054         NaN
 2021-01-02  101.032090         NaN
 2021-01-03  101.038531  200.936283
@@ -89,7 +92,7 @@ Updating can be implemented by overriding the `Data.update_symbol` instance meth
 the same arguments as `Data.download_symbol`. In contrast to the download method, the update
 method is an instance method and can access the data downloaded earlier. It can also access the
 keyword arguments initially passed to the download method, accessible under `Data.download_kwargs`.
-These arguments can be used as default arguments and overriden by arguments passed directly
+Those arguments can be used as default arguments and overriden by arguments passed directly
 to the update method, using `vectorbt.utils.config.merge_dicts`.
 
 Let's define an update method that updates the latest data point and adds two news data points.
@@ -117,7 +120,7 @@ Note that updating data always returns a new `Data` instance.
 
 >>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'], end_dt='2021-01-05')
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -126,7 +129,7 @@ symbol           RANDNX1       RANDNX2
 
 >>> rand_data = rand_data.update()
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -137,7 +140,7 @@ symbol           RANDNX1       RANDNX2
 
 >>> rand_data = rand_data.update()
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -160,7 +163,7 @@ into one data dict and passing it to the `Data.from_data` class method.
 >>> rand_data2 = RandomData.download('RANDNX2', start_value=200, start_dt='2021-01-05')
 >>> merged_data = vbt.Data.from_data(vbt.merge_dicts(rand_data1.data, rand_data2.data))
 >>> merged_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  101.160718         NaN
 2021-01-02  101.421020         NaN
 2021-01-03  101.959176         NaN
@@ -183,7 +186,7 @@ on a `Data` instance, which forwards indexing operation to each Series/DataFrame
 <__main__.RandomData at 0x7fdba4e36198>
 
 >>> rand_data.loc['2021-01-07':'2021-01-09'].get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-07  100.883400  100.874922
 2021-01-08  101.011738  100.780188
 2021-01-09  100.912639  100.934014
@@ -198,7 +201,7 @@ instance to the disk with `Data.save` and load it with `Data.load`:
 >>> rand_data.save('rand_data')
 >>> rand_data = RandomData.load('rand_data')
 >>> rand_data.get()
-symbol           RANDNX1       RANDNX2
+symbol         RANDNX1     RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -209,6 +212,50 @@ symbol           RANDNX1       RANDNX2
 2021-01-08  101.011738  100.780188
 2021-01-09  100.912639  100.934014
 ```
+
+## Stats
+
+!!! hint
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Data.metrics`.
+
+```python-repl
+>>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'])
+
+>>> rand_data.stats(column='a')
+Start                   2021-01-01 00:00:00+00:00
+End                     2021-01-10 00:00:00+00:00
+Period                           10 days 00:00:00
+Total Symbols                                   2
+Null Counts: RANDNX1                            0
+Null Counts: RANDNX2                            0
+dtype: object
+```
+
+`Data.stats` also supports (re-)grouping:
+
+```python-repl
+>>> rand_data.stats(group_by=True)
+Start                   2021-01-01 00:00:00+00:00
+End                     2021-01-10 00:00:00+00:00
+Period                           10 days 00:00:00
+Total Symbols                                   2
+Null Counts: RANDNX1                            0
+Null Counts: RANDNX2                            0
+Name: group, dtype: object
+```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `Data.subplots`.
+
+`Data` class has a single subplot based on `Data.plot`:
+
+```python-repl
+>>> rand_data.plots(settings=dict(base=100)).show_svg()
+```
+
+![](/docs/img/data_plots.svg)
 """
 
 import numpy as np
@@ -219,7 +266,13 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.datetime import is_tz_aware, to_timezone
+from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic import plotting
+
+__pdoc__ = {}
 
 
 class symbol_dict(dict):
@@ -227,10 +280,14 @@ class symbol_dict(dict):
     pass
 
 
+class MetaData(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
 DataT = tp.TypeVar("DataT", bound="Data")
 
 
-class Data(Wrapping):
+class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
     def __init__(self,
@@ -253,8 +310,10 @@ class Data(Wrapping):
             download_kwargs=download_kwargs,
             **kwargs
         )
+        StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
-        checks.assert_type(data, dict)
+        checks.assert_instance_of(data, dict)
         for k, v in data.items():
             checks.assert_meta_equal(v, data[list(data.keys())[0]])
         self._data = data
@@ -268,7 +327,7 @@ class Data(Wrapping):
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
         new_data = {k: pd_indexing_func(v) for k, v in self.data.items()}
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             data=new_data
         )
@@ -598,8 +657,8 @@ class Data(Wrapping):
 
         # Create new instance
         new_index = new_data[self.symbols[0]].index
-        return self.copy(
-            wrapper=self.wrapper.copy(index=new_index),
+        return self.replace(
+            wrapper=self.wrapper.replace(index=new_index),
             data=new_data
         )
 
@@ -654,3 +713,132 @@ class Data(Wrapping):
                 return tuple([concat_data[c] for c in column])
             return concat_data[column]
         return tuple(concat_data.values())
+
+    # ############# Stats ############# #
+
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `Data.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
+        `data.stats` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        data_stats_cfg = settings['data']['stats']
+
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            data_stats_cfg
+        )
+
+    _metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags='wrapper'
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self: len(self.wrapper.index),
+                apply_to_timedelta=True,
+                agg_func=None,
+                tags='wrapper'
+            ),
+            total_symbols=dict(
+                title='Total Symbols',
+                calc_func=lambda self: len(self.symbols),
+                agg_func=None,
+                tags='data'
+            ),
+            null_counts=dict(
+                title='Null Counts',
+                calc_func=lambda self, group_by:
+                {
+                    k: v.isnull().vbt(wrapper=self.wrapper).sum(group_by=group_by)
+                    for k, v in self.data.items()
+                },
+                tags='data'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
+
+    # ############# Plotting ############# #
+
+    def plot(self,
+             column: tp.Optional[tp.Label] = None,
+             base: tp.Optional[float] = None,
+             **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+        """Plot orders.
+
+        Args:
+            column (str): Name of the column to plot.
+            base (float): Rebase all series of a column to a given intial base.
+
+                !!! note
+                    The column should contain prices.
+            kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
+
+        ## Example
+
+        ```python-repl
+        >>> import vectorbt as vbt
+
+        >>> start = '2021-01-01 UTC'  # crypto is in UTC
+        >>> end = '2021-06-01 UTC'
+        >>> data = vbt.YFData.download(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
+
+        >>> data.plot(column='Close', base=1)
+        ```
+
+        ![](/docs/img/data_plot.svg)"""
+        self_col = self.select_one(column=column, group_by=False)
+        data = self_col.get()
+        if base is not None:
+            data = data.vbt.rebase(base)
+        return data.vbt.plot(**kwargs)
+
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `Data.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `data.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        data_plots_cfg = settings['data']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            data_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                check_is_not_grouped=True,
+                plot_func='plot',
+                pass_add_trace_kwargs=True,
+                tags='data'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+Data.override_metrics_doc(__pdoc__)
+Data.override_subplots_doc(__pdoc__)

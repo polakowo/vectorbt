@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Numba-compiled functions.
 
 Provides an arsenal of Numba-compiled functions that are used by indicator

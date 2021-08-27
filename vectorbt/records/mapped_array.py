@@ -1,14 +1,13 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Base class for working with mapped arrays.
 
 This class takes the mapped array and the corresponding column and (optionally) index arrays,
 and offers features to directly process the mapped array without converting it to pandas;
 for example, to compute various statistics by column, such as standard deviation.
 
-## Reducing
-
-Using `MappedArray`, you can then reduce by column as follows:
-
-* Use already provided reducers such as `MappedArray.mean`:
+Consider the following example:
 
 ```python-repl
 >>> import numpy as np
@@ -22,7 +21,15 @@ Using `MappedArray`, you can then reduce by column as follows:
 >>> wrapper = vbt.ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
 >>> ma = vbt.MappedArray(wrapper, a, col_arr, idx_arr=idx_arr)
+```
 
+## Reducing
+
+Using `MappedArray`, you can then reduce by column as follows:
+
+* Use already provided reducers such as `MappedArray.mean`:
+
+```python-repl
 >>> ma.mean()
 a    11.0
 b    14.0
@@ -126,11 +133,11 @@ z  12.0  15.0  18.0
 
 ## Filtering
 
-Use `MappedArray.filter_by_mask` to filter elements per column/group:
+Use `MappedArray.apply_mask` to filter elements per column/group:
 
 ```python-repl
 >>> mask = [True, False, True, False, True, False, True, False, True]
->>> filtered_ma = ma.filter_by_mask(mask)
+>>> filtered_ma = ma.apply_mask(mask)
 >>> filtered_ma.count()
 a    2
 b    1
@@ -171,7 +178,7 @@ There are multiple ways of define grouping:
 
 ```python-repl
 >>> group_by = np.array(['first', 'first', 'second'])
->>> grouped_wrapper = wrapper.copy(group_by=group_by)
+>>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_ma = vbt.MappedArray(grouped_wrapper, a, col_arr, idx_arr=idx_arr)
 
 >>> grouped_ma.mean()
@@ -331,6 +338,20 @@ Min Index                  x
 Max Index                  z
 Name: first, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `MappedArray.subplots`.
+
+`MappedArray` class has a single subplot based on `MappedArray.to_pd` and
+`vectorbt.generic.accessors.GenericAccessor.plot`:
+
+```python-repl
+>>> ma.plots()
+```
+
+![](/docs/img/mapped_to_pd_plot.svg)
 """
 
 import numpy as np
@@ -338,13 +359,14 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method, add_binary_magic_methods, add_unary_magic_methods
+from vectorbt.utils.decorators import cached_method, attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.config import merge_dicts, Config, Configured
 from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
 
@@ -370,12 +392,16 @@ def combine_mapped_with_other(self: MappedArrayT,
         checks.assert_array_equal(self.id_arr, other.id_arr)
         checks.assert_array_equal(self.col_arr, other.col_arr)
         other = other.values
-    return self.copy(mapped_arr=np_func(self.values, other))
+    return self.replace(mapped_arr=np_func(self.values, other))
 
 
-@add_binary_magic_methods(combine_mapped_with_other)
-@add_unary_magic_methods(lambda self, np_func: self.copy(mapped_arr=np_func(self.values)))
-class MappedArray(Wrapping, StatsBuilderMixin):
+class MetaMappedArray(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
+@attach_binary_magic_methods(combine_mapped_with_other)
+@attach_unary_magic_methods(lambda self, np_func: self.replace(mapped_arr=np_func(self.values)))
+class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaMappedArray):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
 
@@ -400,7 +426,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                 It depends upon `wrapper` and `col_arr`, so make sure to invalidate `col_mapper` upon creating
                 a `MappedArray` instance with a modified `wrapper` or `col_arr.
 
-                `MappedArray.copy` does it automatically.
+                `MappedArray.replace` does it automatically.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -439,6 +465,11 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
         if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
 
         self._mapped_arr = mapped_arr
@@ -450,8 +481,8 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             col_mapper = ColumnMapper(wrapper, col_arr)
         self._col_mapper = col_mapper
 
-    def copy(self: MappedArrayT, **kwargs) -> MappedArrayT:
-        """See `vectorbt.utils.config.Configured.copy`.
+    def replace(self: MappedArrayT, **kwargs) -> MappedArrayT:
+        """See `vectorbt.utils.config.Configured.replace`.
 
         Also, makes sure that `MappedArray.col_mapper` is not passed to the new instance."""
         if self.config.get('col_mapper', None) is not None:
@@ -461,7 +492,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             if 'col_arr' in kwargs:
                 if self.col_arr is not kwargs.get('col_arr'):
                     kwargs['col_mapper'] = None
-        return Configured.copy(self, **kwargs)
+        return Configured.replace(self, **kwargs)
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
@@ -480,7 +511,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
             self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
@@ -542,16 +573,16 @@ class MappedArray(Wrapping, StatsBuilderMixin):
              **kwargs) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional).
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         if self.is_sorted(incl_id=incl_id):
-            return self.copy(idx_arr=idx_arr, **kwargs).regroup(group_by)
+            return self.replace(idx_arr=idx_arr, **kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
             ind = np.argsort(self.col_arr)
-        return self.copy(
+        return self.replace(
             mapped_arr=self.values[ind],
             col_arr=self.col_arr[ind],
             id_arr=self.id_arr[ind],
@@ -559,21 +590,22 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self: MappedArrayT,
-                       mask: tp.Array1d,
-                       idx_arr: tp.Optional[tp.Array1d] = None,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> MappedArrayT:
+    def apply_mask(self: MappedArrayT,
+                   mask: tp.Array1d,
+                   idx_arr: tp.Optional[tp.Array1d] = None,
+                   group_by: tp.GroupByLike = None,
+                   **kwargs) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
-        return self.copy(
-            mapped_arr=self.values[mask],
-            col_arr=self.col_arr[mask],
-            id_arr=self.id_arr[mask],
-            idx_arr=idx_arr[mask] if idx_arr is not None else None,
+        mask_indices = np.flatnonzero(mask)
+        return self.replace(
+            mapped_arr=np.take(self.values, mask_indices),
+            col_arr=np.take(self.col_arr, mask_indices),
+            id_arr=np.take(self.id_arr, mask_indices),
+            idx_arr=np.take(idx_arr, mask_indices) if idx_arr is not None else None,
             **kwargs
         ).regroup(group_by)
 
@@ -598,12 +630,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter top N elements from each column/group."""
-        return self.filter_by_mask(self.top_n_mask(n), **kwargs)
+        return self.apply_mask(self.top_n_mask(n), **kwargs)
 
     @cached_method
     def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
-        return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
+        return self.apply_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
     def is_expandable(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
@@ -670,7 +702,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
         See `vectorbt.records.nb.apply_on_mapped_nb`.
 
-        `**kwargs` are passed to `MappedArray.copy`."""
+        `**kwargs` are passed to `MappedArray.replace`."""
         checks.assert_numba_func(apply_func_nb)
         if apply_per_group:
             col_map = self.col_mapper.get_col_map(group_by=group_by)
@@ -678,7 +710,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             col_map = self.col_mapper.get_col_map(group_by=False)
         mapped_arr = nb.apply_on_mapped_nb(self.values, col_map, apply_func_nb, *args)
         mapped_arr = np.asarray(mapped_arr, dtype=dtype)
-        return self.copy(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
+        return self.replace(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
 
     def reduce(self,
                reduce_func_nb: tp.ReduceFunc, *args,
@@ -686,7 +718,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                returns_array: bool = False,
                returns_idx: bool = False,
                to_index: bool = True,
-               fill_value: float = np.nan,
+               fill_value: tp.Scalar = np.nan,
                group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column/group.
@@ -854,15 +886,15 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def sum(self, fill_value: float = 0., group_by: tp.GroupByLike = None,
+    def sum(self, fill_value: tp.Scalar = 0., group_by: tp.GroupByLike = None,
             wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         return self.reduce(
             generic_nb.sum_reduce_nb,
+            fill_value=fill_value,
             returns_array=False,
             returns_idx=False,
-            fill_value=fill_value,
             group_by=group_by,
             wrap_kwargs=wrap_kwargs,
             **kwargs
@@ -897,8 +929,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         )
 
     @cached_method
-    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1,
-                 group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def describe(self,
+                 percentiles: tp.Optional[tp.ArrayLike] = None,
+                 ddof: int = 1,
+                 group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None,
+                 **kwargs) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
@@ -954,6 +990,12 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             Does not take into account missing values."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
@@ -994,6 +1036,23 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
         return value_counts_pd
 
+    @cached_method
+    def apply_mapping(self: MappedArrayT, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> MappedArrayT:
+        """Apply mapping on each element."""
+        if mapping is None:
+            mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        return self.replace(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
+
+    def to_index(self):
+        """Convert to index."""
+        return self.wrapper.index[self.values]
+
     # ############# Stats ############# #
 
     @property
@@ -1001,7 +1060,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         """Defaults for `MappedArray.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `mapped_array.stats` in `vectorbt._settings.settings`."""
+        `mapped_array.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         mapped_array_stats_cfg = settings['mapped_array']['stats']
 
@@ -1095,6 +1154,8 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     def metrics(self) -> Config:
         return self._metrics
 
+    # ############# Plotting ############# #
+
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.histplot(**kwargs)
@@ -1103,6 +1164,37 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         """Plot box plot by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `MappedArray.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `mapped_array.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        mapped_array_plots_cfg = settings['mapped_array']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            mapped_array_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            to_pd_plot=dict(
+                check_is_not_grouped=True,
+                plot_func='to_pd.vbt.plot',
+                pass_trace_names=False,
+                tags='mapped_array'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
 
 __pdoc__ = dict()
 MappedArray.override_metrics_doc(__pdoc__)
+MappedArray.override_subplots_doc(__pdoc__)

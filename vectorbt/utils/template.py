@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for working with templates."""
 
 from copy import copy
@@ -40,7 +43,7 @@ class Sub(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return self.template.substitute(mapping)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"template=\"{self.template.template}\", " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -72,7 +75,7 @@ class Rep(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return mapping[self.key]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"key='{self.key}', " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -104,7 +107,7 @@ class RepEval(SafeToStr):
         mapping = merge_dicts(self.mapping, mapping)
         return eval(self.expression, {}, mapping)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"expression=\"{self.expression}\", " \
                f"mapping={prepare_for_doc(self.mapping)})"
@@ -141,18 +144,49 @@ class RepFunc(SafeToStr):
                 func_kwargs[k] = v
         return self.func(**func_kwargs)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
                f"func={self.func}, " \
                f"mapping={prepare_for_doc(self.mapping)})"
 
 
-def deep_substitute(obj: tp.Any, mapping: tp.Optional[tp.Mapping] = None, safe: bool = False) -> tp.Any:
-    """Traverses an object recursively and substitutes all templates using a mapping.
+def has_templates(obj: tp.Any) -> tp.Any:
+    """Check if the object has any templates."""
+    if isinstance(obj, RepFunc):
+        return True
+    if isinstance(obj, RepEval):
+        return True
+    if isinstance(obj, Rep):
+        return True
+    if isinstance(obj, Sub):
+        return True
+    if isinstance(obj, Template):
+        return True
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if has_templates(v):
+                return True
+    if isinstance(obj, (tuple, list, set, frozenset)):
+        for v in obj:
+            if has_templates(v):
+                return True
+    return False
+
+
+def deep_substitute(obj: tp.Any,
+                    mapping: tp.Optional[tp.Mapping] = None,
+                    safe: bool = False,
+                    make_copy: bool = True) -> tp.Any:
+    """Traverses the object recursively and, if any template found, substitutes it using a mapping.
 
     Traverses tuples, lists, dicts and (frozen-)sets. Does not look for templates in keys.
 
-    If `safe` is True, won't raise an error, but simply return the original template.
+    If `safe` is True, won't raise an error but return the original template.
+
+    !!! note
+        If the object is deep (such as a dict or a list), creates a copy of it if any template found inside,
+        thus loosing the reference to the original. Make sure to do a deep or hybrid copy of the object
+        before proceeding for consistent behavior, or disable `make_copy` to override the original in place.
 
     ## Example
 
@@ -180,6 +214,8 @@ def deep_substitute(obj: tp.Any, mapping: tp.Optional[tp.Mapping] = None, safe: 
     ```"""
     if mapping is None:
         mapping = {}
+    if not has_templates(obj):
+        return obj
     try:
         if isinstance(obj, RepFunc):
             return obj.call(mapping)
@@ -192,11 +228,18 @@ def deep_substitute(obj: tp.Any, mapping: tp.Optional[tp.Mapping] = None, safe: 
         if isinstance(obj, Template):
             return obj.substitute(mapping)
         if isinstance(obj, dict):
-            obj = copy(obj)
+            if make_copy:
+                obj = copy(obj)
             for k, v in obj.items():
                 set_dict_item(obj, k, deep_substitute(v, mapping=mapping, safe=safe), force=True)
             return obj
-        if isinstance(obj, (tuple, list, set, frozenset)):
+        if isinstance(obj, list):
+            if make_copy:
+                obj = copy(obj)
+            for i in range(len(obj)):
+                obj[i] = deep_substitute(obj[i], mapping=mapping, safe=safe)
+            return obj
+        if isinstance(obj, (tuple, set, frozenset)):
             result = []
             for o in obj:
                 result.append(deep_substitute(o, mapping=mapping, safe=safe))

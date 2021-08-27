@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Class for wrapping NumPy arrays into Series/DataFrames.
 
 vectorbt's functionality is based upon the ability to perform the most essential pandas operations
@@ -111,7 +114,7 @@ class ArrayWrapper(Configured, PandasIndexer):
     `**kwargs` are passed to `vectorbt.base.column_grouper.ColumnGrouper`.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`.
+        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.replace`.
 
         Use methods that begin with `get_` to get group-aware results."""
 
@@ -303,7 +306,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 ungrouped_group_idxs[group_lens[:-1]] = 1
                 ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
-                return _self.copy(
+                return _self.replace(
                     index=new_index,
                     columns=ungrouped_columns,
                     ndim=ungrouped_ndim,
@@ -313,7 +316,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             # Selection based on columns
             col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
-            return _self.copy(
+            return _self.replace(
                 index=new_index,
                 columns=new_columns,
                 ndim=new_ndim,
@@ -322,7 +325,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             ), idx_idxs, col_idxs, col_idxs
 
         # Grouping disabled
-        return _self.copy(
+        return _self.replace(
             index=new_index,
             columns=new_columns,
             ndim=new_ndim,
@@ -341,6 +344,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         index = index_fns.get_index(pd_obj, 0)
         columns = index_fns.get_index(pd_obj, 1)
         ndim = pd_obj.ndim
+        kwargs.pop('index', None)
+        kwargs.pop('columns', None)
+        kwargs.pop('ndim', None)
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod
@@ -427,8 +433,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return freq_to_timedelta(self.index.inferred_freq)
         return freq
 
-    def to_timedelta(self, a: tp.MaybeArray[float],
-                    silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, tp.Array]:
+    def to_timedelta(self, a: tp.MaybeArray[float], to_pd: bool = False,
+                     silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbt._settings import settings
         array_wrapper_cfg = settings['array_wrapper']
@@ -441,6 +447,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
                               "define it globally under `settings.array_wrapper`.", stacklevel=2)
             return a
+        if to_pd:
+            return pd.to_timedelta(a * self.freq)
         return a * self.freq
 
     @property
@@ -477,7 +485,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             if self.grouper.is_grouped(group_by=group_by):
                 if not self.grouper.is_group_count_changed(group_by=group_by):
                     grouped_ndim = self.grouped_ndim
-            return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
+            return self.replace(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
         return self  # important for keeping cache
 
     @cached_method
@@ -487,7 +495,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         Replaces columns and other metadata with groups."""
         _self = self.regroup(group_by=group_by, **kwargs)
         if _self.grouper.is_grouped():
-            return _self.copy(
+            return _self.replace(
                 columns=_self.grouper.get_columns(),
                 ndim=_self.grouped_ndim,
                 grouped_ndim=None,
@@ -504,7 +512,7 @@ class ArrayWrapper(Configured, PandasIndexer):
              group_by: tp.GroupByLike = None,
              to_timedelta: bool = False,
              to_index: bool = False,
-             silence_warnings: tp.Optional[bool] = False) -> tp.SeriesFrame:
+             silence_warnings: tp.Optional[bool] = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
 
         Runs the following pipeline:
@@ -575,7 +583,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                      group_by: tp.GroupByLike = None,
                      to_timedelta: bool = False,
                      to_index: bool = False,
-                     silence_warnings: tp.Optional[bool] = False) -> tp.MaybeSeriesFrame:
+                     silence_warnings: tp.Optional[bool] = None) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
@@ -661,6 +669,16 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
 
+    def fill(self, fill_value: tp.Scalar, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Fill a Series/DataFrame."""
+        _self = self.resolve(group_by=group_by)
+        return _self.wrap(np.full(_self.shape_2d, fill_value), **kwargs)
+
+    def fill_reduced(self, fill_value: tp.Scalar, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Fill a reduced Series/DataFrame."""
+        _self = self.resolve(group_by=group_by)
+        return _self.wrap(np.full(_self.shape_2d[1], fill_value), **kwargs)
+
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
@@ -669,7 +687,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
     """Class that uses `ArrayWrapper` globally."""
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
-        checks.assert_type(wrapper, ArrayWrapper)
+        checks.assert_instance_of(wrapper, ArrayWrapper)
         self._wrapper = wrapper
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
@@ -678,7 +696,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
-        return self.copy(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
+        return self.replace(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
 
     @property
     def wrapper(self) -> ArrayWrapper:
@@ -693,7 +711,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         `**kwargs` will be passed to `ArrayWrapper.regroup`."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
+            return self.replace(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
     def resolve_self(self: AttrResolverT,
@@ -715,13 +733,13 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
             silence_warnings = array_wrapper_cfg['silence_warnings']
 
         if 'freq' in cond_kwargs:
-            wrapper_copy = self.wrapper.copy(freq=cond_kwargs['freq'])
+            wrapper_copy = self.wrapper.replace(freq=cond_kwargs['freq'])
 
             if wrapper_copy.freq != self.wrapper.freq:
                 if not silence_warnings:
                     warnings.warn(f"Changing the frequency will create a copy of this object. "
                                   f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
-                self_copy = self.copy(wrapper=wrapper_copy)
+                self_copy = self.replace(wrapper=wrapper_copy)
                 for alias in self.self_aliases:
                     if alias not in custom_arg_names:
                         cond_kwargs[alias] = self_copy
@@ -732,16 +750,40 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         return self
 
     def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
-        """Select one column/group."""
+        """Select one column/group.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
         _self = self.regroup(group_by, **kwargs)
+
+        def _check_out_dim(out: WrappingT) -> WrappingT:
+            if _self.wrapper.grouper.is_grouped():
+                if out.wrapper.grouped_ndim != 1:
+                    raise TypeError("Could not select one group: multiple groups returned")
+            else:
+                if out.wrapper.ndim != 1:
+                    raise TypeError("Could not select one column: multiple columns returned")
+            return out
+
         if column is not None:
             if _self.wrapper.grouper.is_grouped():
+                if _self.wrapper.grouped_ndim == 1:
+                    raise TypeError("This object already contains one group of data")
                 if column not in _self.wrapper.get_columns():
+                    if isinstance(column, int):
+                        if _self.wrapper.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Group '{column}' not found")
             else:
+                if _self.wrapper.ndim == 1:
+                    raise TypeError("This object already contains one column of data")
                 if column not in _self.wrapper.columns:
+                    if isinstance(column, int):
+                        if _self.wrapper.column_only_select:
+                            return _check_out_dim(_self.iloc[column])
+                        return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Column '{column}' not found")
-            return _self[column]
+            return _check_out_dim(_self[column])
         if not _self.wrapper.grouper.is_grouped():
             if _self.wrapper.ndim == 1:
                 return _self
@@ -752,13 +794,25 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
     @staticmethod
     def select_one_from_obj(obj: tp.SeriesFrame, wrapper: ArrayWrapper, column: tp.Any = None) -> tp.MaybeSeries:
-        """Select one column/group from a pandas object."""
+        """Select one column/group from a pandas object.
+
+        `column` can be a label-based position as well as an integer position (if label fails)."""
         if column is not None:
+            if wrapper.ndim == 1:
+                raise TypeError("This object already contains one column of data")
             if wrapper.grouper.is_grouped():
                 if column not in wrapper.get_columns():
+                    if isinstance(column, int):
+                        if isinstance(obj, pd.DataFrame):
+                            return obj.iloc[:, column]
+                        return obj.iloc[column]
                     raise KeyError(f"Group '{column}' not found")
             else:
                 if column not in wrapper.columns:
+                    if isinstance(column, int):
+                        if isinstance(obj, pd.DataFrame):
+                            return obj.iloc[:, column]
+                        return obj.iloc[column]
                     raise KeyError(f"Column '{column}' not found")
             return obj[column]
         if not wrapper.grouper.is_grouped():

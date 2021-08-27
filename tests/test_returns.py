@@ -7,6 +7,12 @@ import vectorbt as vbt
 
 from tests.utils import isclose
 
+qs_available = True
+try:
+    import quantstats as qs
+except ImportError:
+    qs_available = False
+
 day_dt = np.timedelta64(86400000000000)
 
 ts = pd.DataFrame({
@@ -20,15 +26,15 @@ ts = pd.DataFrame({
     datetime(2018, 1, 4),
     datetime(2018, 1, 5)
 ]))
-ret = ts.pct_change()
+rets = ts.pct_change()
 
 seed = 42
 
 np.random.seed(seed)
 benchmark_rets = pd.DataFrame({
-    'a': ret['a'] * np.random.uniform(0.8, 1.2, ret.shape[0]),
-    'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
-    'c': ret['c'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 3
+    'a': rets['a'] * np.random.uniform(0.8, 1.2, rets.shape[0]),
+    'b': rets['b'] * np.random.uniform(0.8, 1.2, rets.shape[0]) * 2,
+    'c': rets['c'] * np.random.uniform(0.8, 1.2, rets.shape[0]) * 3
 })
 
 
@@ -41,7 +47,7 @@ def setup_module():
     vbt.settings.caching.blacklist = []
     vbt.settings.returns.defaults = dict(
         start_value=0.,
-        window=ret.shape[0],
+        window=rets.shape[0],
         minp=1,
         ddof=1,
         risk_free=0.01,
@@ -59,18 +65,26 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_indexing(self):
+        assert rets.vbt.returns['a'].total() == rets['a'].vbt.returns.total()
+
+    def test_benchmark_rets(self):
+        ret_acc = rets.vbt.returns(benchmark_rets=benchmark_rets)
+        pd.testing.assert_frame_equal(ret_acc.benchmark_rets, benchmark_rets)
+        pd.testing.assert_series_equal(ret_acc['a'].benchmark_rets, benchmark_rets['a'])
+
     def test_freq(self):
-        assert ret.vbt.returns.wrapper.freq == day_dt
-        assert ret['a'].vbt.returns.wrapper.freq == day_dt
-        assert ret.vbt.returns(freq='2D').wrapper.freq == day_dt * 2
-        assert ret['a'].vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert rets.vbt.returns.wrapper.freq == day_dt
+        assert rets['a'].vbt.returns.wrapper.freq == day_dt
+        assert rets.vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert rets['a'].vbt.returns(freq='2D').wrapper.freq == day_dt * 2
         assert pd.Series([1, 2, 3]).vbt.returns.wrapper.freq is None
         assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').wrapper.freq == day_dt * 3
         assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
     def test_ann_factor(self):
-        assert ret['a'].vbt.returns(year_freq='365 days').ann_factor == 365
-        assert ret.vbt.returns(year_freq='365 days').ann_factor == 365
+        assert rets['a'].vbt.returns(year_freq='365 days').ann_factor == 365
+        assert rets.vbt.returns(year_freq='365 days').ann_factor == 365
         with pytest.raises(Exception):
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
@@ -123,33 +137,33 @@ class TestAccessors:
 
     def test_annual(self):
         pd.testing.assert_series_equal(
-            ret['a'].vbt.returns.annual(),
+            rets['a'].vbt.returns.annual(),
             pd.Series(
                 np.array([4.]),
                 index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='365D'),
-                name=ret['a'].name
+                name=rets['a'].name
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.annual(),
+            rets.vbt.returns.annual(),
             pd.DataFrame(
                 np.array([[4., -0.8, 0.]]),
                 index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='365D'),
-                columns=ret.columns
+                columns=rets.columns
             )
         )
 
     def test_cumulative(self):
         pd.testing.assert_series_equal(
-            ret['a'].vbt.returns.cumulative(),
+            rets['a'].vbt.returns.cumulative(),
             pd.Series(
                 [0.0, 1.0, 2.0, 3.0, 4.0],
-                index=ret.index,
+                index=rets.index,
                 name='a'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.cumulative(),
+            rets.vbt.returns.cumulative(),
             pd.DataFrame(
                 [
                     [0.0, 0.0, 0.0],
@@ -158,23 +172,23 @@ class TestAccessors:
                     [3.0, -0.6, 1.0],
                     [4.0, -0.8, 0.0]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_total_return(self):
-        assert isclose(ret['a'].vbt.returns.total(), 4.0)
+        assert isclose(rets['a'].vbt.returns.total(), 4.0)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.total(),
+            rets.vbt.returns.total(),
             pd.Series(
                 [4.0, -0.8, 0.0],
-                index=ret.columns,
+                index=rets.columns,
                 name='total_return'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_total(),
+            rets.vbt.returns.rolling_total(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -183,23 +197,23 @@ class TestAccessors:
                     [3.0, -0.6, 1.0],
                     [4.0, -0.8, 0.0]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_annualized_return(self):
-        assert isclose(ret['a'].vbt.returns.annualized(), 1.0587911840678754e+51)
+        assert isclose(rets['a'].vbt.returns.annualized(), 1.0587911840678754e+51)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.annualized(),
+            rets.vbt.returns.annualized(),
             pd.Series(
                 [1.0587911840678754e+51, -1.0, 0.0],
-                index=ret.columns,
+                index=rets.columns,
                 name='annualized_return'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_annualized(),
+            rets.vbt.returns.rolling_annualized(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -208,23 +222,23 @@ class TestAccessors:
                     [8.669103912675328e+54, -1.0, 2.9443342053298444e+27],
                     [1.0587911840678754e+51, -1.0, 0.0]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_annualized_volatility(self):
-        assert isclose(ret['a'].vbt.returns.annualized_volatility(), 6.417884083645567)
+        assert isclose(rets['a'].vbt.returns.annualized_volatility(), 6.417884083645567)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.annualized_volatility(),
+            rets.vbt.returns.annualized_volatility(),
             pd.Series(
                 [6.417884083645567, 2.5122615973129334, 13.509256086106296],
-                index=ret.columns,
+                index=rets.columns,
                 name='annualized_volatility'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_annualized_volatility(),
+            rets.vbt.returns.rolling_annualized_volatility(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -233,23 +247,23 @@ class TestAccessors:
                     [6.62836217969305, 1.2868638306046682, 12.868638306046675],
                     [6.417884083645567, 2.5122615973129334, 13.509256086106296]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_calmar_ratio(self):
-        assert isclose(ret['a'].vbt.returns.calmar_ratio(), np.nan)
+        assert isclose(rets['a'].vbt.returns.calmar_ratio(), np.nan)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.calmar_ratio(),
+            rets.vbt.returns.calmar_ratio(),
             pd.Series(
                 [np.nan, -1.25, 0.0],
-                index=ret.columns,
+                index=rets.columns,
                 name='calmar_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_calmar_ratio(),
+            rets.vbt.returns.rolling_calmar_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -258,23 +272,23 @@ class TestAccessors:
                     [np.nan, -1.6666666666666667, 8.833002615989533e+27],
                     [np.nan, -1.25, 0.0]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_omega_ratio(self):
-        assert isclose(ret['a'].vbt.returns.omega_ratio(risk_free=0.01, required_return=0.1), np.inf)
+        assert isclose(rets['a'].vbt.returns.omega_ratio(risk_free=0.01, required_return=0.1), np.inf)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.omega_ratio(risk_free=0.01, required_return=0.1),
+            rets.vbt.returns.omega_ratio(risk_free=0.01, required_return=0.1),
             pd.Series(
                 [np.inf, 0.0, 1.7327023435781848],
-                index=ret.columns,
+                index=rets.columns,
                 name='omega_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_omega_ratio(),
+            rets.vbt.returns.rolling_omega_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -283,23 +297,23 @@ class TestAccessors:
                     [np.inf, 0.0, 4.305883016460259],
                     [np.inf, 0.0, 1.7327023435781848]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_sharpe_ratio(self):
-        assert isclose(ret['a'].vbt.returns.sharpe_ratio(risk_free=0.01), 29.052280196490333)
+        assert isclose(rets['a'].vbt.returns.sharpe_ratio(risk_free=0.01), 29.052280196490333)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.sharpe_ratio(risk_free=0.01),
+            rets.vbt.returns.sharpe_ratio(risk_free=0.01),
             pd.Series(
                 [29.052280196490333, -48.06592068111974, 4.232900240313306],
-                index=ret.columns,
+                index=rets.columns,
                 name='sharpe_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_sharpe_ratio(),
+            rets.vbt.returns.rolling_sharpe_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -308,33 +322,33 @@ class TestAccessors:
                     [33.101020977359426, -76.89667951041766, 10.746626111906732],
                     [29.052280196490333, -48.06592068111974, 4.232900240313306]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
-            ret.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),
-            pd.Series([np.nan, np.nan, 0.0005355605507117676], index=ret.columns, name='deflated_sharpe_ratio')
+            rets.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),
+            pd.Series([np.nan, np.nan, 0.0005355605507117676], index=rets.columns, name='deflated_sharpe_ratio')
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns.deflated_sharpe_ratio(risk_free=0.03),
-            pd.Series([np.nan, np.nan, 0.0003423112350834066], index=ret.columns, name='deflated_sharpe_ratio')
+            rets.vbt.returns.deflated_sharpe_ratio(risk_free=0.03),
+            pd.Series([np.nan, np.nan, 0.0003423112350834066], index=rets.columns, name='deflated_sharpe_ratio')
         )
 
     def test_downside_risk(self):
-        assert isclose(ret['a'].vbt.returns.downside_risk(required_return=0.1), 0.0)
+        assert isclose(rets['a'].vbt.returns.downside_risk(required_return=0.1), 0.0)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.downside_risk(required_return=0.1),
+            rets.vbt.returns.downside_risk(required_return=0.1),
             pd.Series(
                 [0.0, 8.329186468210578, 7.069987427302981],
-                index=ret.columns,
+                index=rets.columns,
                 name='downside_risk'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_downside_risk(),
+            rets.vbt.returns.rolling_downside_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -343,23 +357,23 @@ class TestAccessors:
                     [0.0, 6.978571699349585, 4.779779942245908],
                     [0.0, 8.329186468210578, 7.069987427302981]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_sortino_ratio(self):
-        assert isclose(ret['a'].vbt.returns.sortino_ratio(required_return=0.1), np.inf)
+        assert isclose(rets['a'].vbt.returns.sortino_ratio(required_return=0.1), np.inf)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.sortino_ratio(required_return=0.1),
+            rets.vbt.returns.sortino_ratio(required_return=0.1),
             pd.Series(
                 [np.inf, -18.441677017667562, 3.4417788692752858],
-                index=ret.columns,
+                index=rets.columns,
                 name='sortino_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_sortino_ratio(),
+            rets.vbt.returns.rolling_sortino_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -368,23 +382,23 @@ class TestAccessors:
                     [np.inf, -18.887182253617894, 22.06052281036573],
                     [np.inf, -18.441677017667562, 3.4417788692752858]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_information_ratio(self):
-        assert isclose(ret['a'].vbt.returns.information_ratio(benchmark_rets['a']), -0.5575108215121097)
+        assert isclose(rets['a'].vbt.returns.information_ratio(benchmark_rets['a']), -0.5575108215121097)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.information_ratio(benchmark_rets),
+            rets.vbt.returns.information_ratio(benchmark_rets),
             pd.Series(
                 [-0.5575108215121097, 1.8751745305884349, -0.3791876496995291],
-                index=ret.columns,
+                index=rets.columns,
                 name='information_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_information_ratio(benchmark_rets),
+            rets.vbt.returns.rolling_information_ratio(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -393,23 +407,23 @@ class TestAccessors:
                     [-0.9036343476254122, 2.183905200180643, -0.6855076064440647],
                     [-0.5575108215121097, 1.8751745305884349, -0.3791876496995291]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_beta(self):
-        assert isclose(ret['a'].vbt.returns.beta(benchmark_rets['a']), 0.7853755858374825)
+        assert isclose(rets['a'].vbt.returns.beta(benchmark_rets['a']), 0.7853755858374825)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.beta(benchmark_rets),
+            rets.vbt.returns.beta(benchmark_rets),
             pd.Series(
                 [0.7853755858374825, 0.4123019930790345, 0.30840682076341036],
-                index=ret.columns,
+                index=rets.columns,
                 name='beta'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_beta(benchmark_rets),
+            rets.vbt.returns.rolling_beta(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -418,23 +432,23 @@ class TestAccessors:
                     [0.7969484728140032, 0.34249231546013587, 0.30111751528469777],
                     [0.7853755858374825, 0.4123019930790345, 0.30840682076341036]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_alpha(self):
-        assert isclose(ret['a'].vbt.returns.alpha(benchmark_rets['a'], risk_free=0.01), 41819510790.213036)
+        assert isclose(rets['a'].vbt.returns.alpha(benchmark_rets['a'], risk_free=0.01), 41819510790.213036)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.alpha(benchmark_rets, risk_free=0.01),
+            rets.vbt.returns.alpha(benchmark_rets, risk_free=0.01),
             pd.Series(
                 [41819510790.213036, -0.9999999939676926, -0.999999999999793],
-                index=ret.columns,
+                index=rets.columns,
                 name='alpha'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_alpha(benchmark_rets),
+            rets.vbt.returns.rolling_alpha(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -443,23 +457,23 @@ class TestAccessors:
                     [974350522.6315696, -0.9999999999999931, -0.9999999996015246],
                     [41819510790.213036, -0.9999999939676926, -0.999999999999793]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_tail_ratio(self):
-        assert isclose(ret['a'].vbt.returns.tail_ratio(), 3.5238095238095237)
+        assert isclose(rets['a'].vbt.returns.tail_ratio(), 3.5238095238095237)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.tail_ratio(),
+            rets.vbt.returns.tail_ratio(),
             pd.Series(
                 [3.5238095238095237, 0.43684210526315786, 1.947368421052631],
-                index=ret.columns,
+                index=rets.columns,
                 name='tail_ratio'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_tail_ratio(),
+            rets.vbt.returns.rolling_tail_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -468,23 +482,23 @@ class TestAccessors:
                     [2.714285714285715, 0.6307692307692306, 3.8000000000000007],
                     [3.5238095238095237, 0.43684210526315786, 1.947368421052631]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_value_at_risk(self):
-        assert isclose(ret['a'].vbt.returns.value_at_risk(cutoff=0.05), 0.26249999999999996)
+        assert isclose(rets['a'].vbt.returns.value_at_risk(cutoff=0.05), 0.26249999999999996)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.value_at_risk(cutoff=0.05),
+            rets.vbt.returns.value_at_risk(cutoff=0.05),
             pd.Series(
                 [0.26249999999999996, -0.47500000000000003, -0.47500000000000003],
-                index=ret.columns,
+                index=rets.columns,
                 name='value_at_risk'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_value_at_risk(),
+            rets.vbt.returns.rolling_value_at_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -493,23 +507,23 @@ class TestAccessors:
                     [0.3499999999999999, -0.325, -0.24999999999999994],
                     [0.26249999999999996, -0.47500000000000003, -0.47500000000000003]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_cond_value_at_risk(self):
-        assert isclose(ret['a'].vbt.returns.cond_value_at_risk(cutoff=0.05), 0.25)
+        assert isclose(rets['a'].vbt.returns.cond_value_at_risk(cutoff=0.05), 0.25)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.cond_value_at_risk(cutoff=0.05),
+            rets.vbt.returns.cond_value_at_risk(cutoff=0.05),
             pd.Series(
                 [0.25, -0.5, -0.5],
-                index=ret.columns,
+                index=rets.columns,
                 name='cond_value_at_risk'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_cond_value_at_risk(),
+            rets.vbt.returns.rolling_cond_value_at_risk(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -518,23 +532,23 @@ class TestAccessors:
                     [0.33333333333333326, -0.33333333333333337, -0.33333333333333337],
                     [0.25, -0.5, -0.5]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_capture(self):
-        assert isclose(ret['a'].vbt.returns.capture(benchmark_rets['a']), 0.0007435597416888084)
+        assert isclose(rets['a'].vbt.returns.capture(benchmark_rets['a']), 0.0007435597416888084)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.capture(benchmark_rets),
+            rets.vbt.returns.capture(benchmark_rets),
             pd.Series(
                 [0.0007435597416888084, 1.0, -0.0],
-                index=ret.columns,
+                index=rets.columns,
                 name='capture'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_capture(benchmark_rets),
+            rets.vbt.returns.rolling_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -543,23 +557,23 @@ class TestAccessors:
                     [9.623155594782632e-06, 1.0, 43620380068493.234],
                     [0.0007435597416888084, 1.0, -0.0]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_up_capture(self):
-        assert isclose(ret['a'].vbt.returns.up_capture(benchmark_rets['a']), 0.0001227848643711666)
+        assert isclose(rets['a'].vbt.returns.up_capture(benchmark_rets['a']), 0.0001227848643711666)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.up_capture(benchmark_rets),
+            rets.vbt.returns.up_capture(benchmark_rets),
             pd.Series(
                 [0.0001227848643711666, np.nan, 1.0907657953912082e-112],
-                index=ret.columns,
+                index=rets.columns,
                 name='up_capture'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_up_capture(benchmark_rets),
+            rets.vbt.returns.rolling_up_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -568,23 +582,23 @@ class TestAccessors:
                     [2.0468688202710215e-07, np.nan, 1.0907657953912082e-112],
                     [0.0001227848643711666, np.nan, 1.0907657953912082e-112]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_down_capture(self):
-        assert isclose(ret['a'].vbt.returns.down_capture(benchmark_rets['a']), np.nan)
+        assert isclose(rets['a'].vbt.returns.down_capture(benchmark_rets['a']), np.nan)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.down_capture(benchmark_rets),
+            rets.vbt.returns.down_capture(benchmark_rets),
             pd.Series(
                 [np.nan, np.nan, np.nan],
-                index=ret.columns,
+                index=rets.columns,
                 name='down_capture'
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_down_capture(benchmark_rets),
+            rets.vbt.returns.rolling_down_capture(benchmark_rets),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -593,22 +607,22 @@ class TestAccessors:
                     [np.nan, 1.0, 1.0],
                     [np.nan, np.nan, np.nan]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_drawdown(self):
         pd.testing.assert_series_equal(
-            ret['a'].vbt.returns.drawdown(),
+            rets['a'].vbt.returns.drawdown(),
             pd.Series(
                 np.array([0., 0., 0., 0., 0.]),
-                index=ret['a'].index,
-                name=ret['a'].name
+                index=rets['a'].index,
+                name=rets['a'].name
             )
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.drawdown(),
+            rets.vbt.returns.drawdown(),
             pd.DataFrame(
                 np.array([
                     [0., 0., 0.],
@@ -624,21 +638,21 @@ class TestAccessors:
                     '2018-01-04',
                     '2018-01-05'
                 ], dtype='datetime64[ns]', freq=None),
-                columns=ret.columns
+                columns=rets.columns
             )
         )
 
     def test_max_drawdown(self):
         assert isclose(
-            ret['a'].vbt.returns.max_drawdown(),
-            ret['a'].vbt.returns.drawdowns.max_drawdown(fill_value=0.)
+            rets['a'].vbt.returns.max_drawdown(),
+            rets['a'].vbt.returns.drawdowns.max_drawdown(fill_value=0.)
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns.max_drawdown(),
-            ret.vbt.returns.drawdowns.max_drawdown(fill_value=0.)
+            rets.vbt.returns.max_drawdown(),
+            rets.vbt.returns.drawdowns.max_drawdown(fill_value=0.)
         )
         pd.testing.assert_frame_equal(
-            ret.vbt.returns.rolling_max_drawdown(),
+            rets.vbt.returns.rolling_max_drawdown(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -647,20 +661,20 @@ class TestAccessors:
                     [0.0, -0.6, -0.33333333333333337],
                     [0.0, -0.8, -0.6666666666666667]
                 ],
-                index=ret.index,
-                columns=ret.columns
+                index=rets.index,
+                columns=rets.columns
             )
         )
 
     def test_drawdowns(self):
-        assert type(ret['a'].vbt.returns.drawdowns) is vbt.Drawdowns
-        assert ret['a'].vbt.returns.drawdowns.wrapper.freq == ret['a'].vbt.wrapper.freq
-        assert ret['a'].vbt.returns.drawdowns.wrapper.ndim == ret['a'].ndim
-        assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim
-        assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown(), ret['a'].vbt.returns.max_drawdown())
+        assert type(rets['a'].vbt.returns.drawdowns) is vbt.Drawdowns
+        assert rets['a'].vbt.returns.drawdowns.wrapper.freq == rets['a'].vbt.wrapper.freq
+        assert rets['a'].vbt.returns.drawdowns.wrapper.ndim == rets['a'].ndim
+        assert rets.vbt.returns.drawdowns.wrapper.ndim == rets.ndim
+        assert isclose(rets['a'].vbt.returns.drawdowns.max_drawdown(), rets['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
-            ret.vbt.returns.drawdowns.max_drawdown(fill_value=0.),
-            ret.vbt.returns.max_drawdown()
+            rets.vbt.returns.drawdowns.max_drawdown(fill_value=0.),
+            rets.vbt.returns.max_drawdown()
         )
 
     def test_stats(self):
@@ -684,7 +698,7 @@ class TestAccessors:
             'Value at Risk'
         ], dtype='object')
         pd.testing.assert_series_equal(
-            ret.vbt.returns.stats(),
+            rets.vbt.returns.stats(),
             pd.Series([
                 pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
                 pd.Timedelta('5 days 00:00:00'), 106.66666666666667, 3.529303946892918e+52,
@@ -697,7 +711,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns.stats(column='a'),
+            rets.vbt.returns.stats(column='a'),
             pd.Series([
                 pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
                 pd.Timedelta('5 days 00:00:00'), 400.0, 1.0587911840678753e+53, 641.7884083645566,
@@ -709,7 +723,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns.stats(column='a', settings=dict(freq='10 days', year_freq='200 days')),
+            rets.vbt.returns.stats(column='a', settings=dict(freq='10 days', year_freq='200 days')),
             pd.Series([
                 pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
                 pd.Timedelta('50 days 00:00:00'), 400.0, 62400.0, 150.23130314433288, np.nan, pd.NaT,
@@ -721,7 +735,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns.stats(column='a', settings=dict(benchmark_rets=benchmark_rets)),
+            rets.vbt.returns.stats(column='a', settings=dict(benchmark_rets=benchmark_rets)),
             pd.Series([
                 pd.Timestamp('2018-01-01 00:00:00'), pd.Timestamp('2018-01-05 00:00:00'),
                 pd.Timedelta('5 days 00:00:00'), 400.0, 451.8597134178033, 1.0587911840678753e+53,
@@ -755,22 +769,42 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            ret['c'].vbt.returns.stats(),
-            ret.vbt.returns.stats(column='c')
+            rets.vbt.returns.stats(column='a', settings=dict(benchmark_rets=benchmark_rets)),
+            rets.vbt.returns(benchmark_rets=benchmark_rets).stats(column='a'),
         )
         pd.testing.assert_series_equal(
-            ret['c'].vbt.returns.stats(),
-            ret.vbt.returns.stats(column='c', group_by=False)
+            rets['c'].vbt.returns.stats(),
+            rets.vbt.returns.stats(column='c')
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns(freq='10d').stats(),
-            ret.vbt.returns.stats(settings=dict(freq='10d'))
+            rets['c'].vbt.returns.stats(),
+            rets.vbt.returns.stats(column='c', group_by=False)
         )
         pd.testing.assert_series_equal(
-            ret.vbt.returns(freq='d', year_freq='400d').stats(),
-            ret.vbt.returns.stats(settings=dict(freq='d', year_freq='400d'))
+            rets.vbt.returns(freq='10d').stats(),
+            rets.vbt.returns.stats(settings=dict(freq='10d'))
         )
-        stats_df = ret.vbt.returns.stats(agg_func=None)
+        pd.testing.assert_series_equal(
+            rets.vbt.returns(freq='d', year_freq='400d').stats(),
+            rets.vbt.returns.stats(settings=dict(freq='d', year_freq='400d'))
+        )
+        stats_df = rets.vbt.returns.stats(agg_func=None)
         assert stats_df.shape == (3, 17)
-        pd.testing.assert_index_equal(stats_df.index, ret.vbt.returns.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.index, rets.vbt.returns.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+    def test_qs(self):
+        if qs_available:
+            pd.testing.assert_series_equal(
+                rets.vbt.returns.qs.sharpe(),
+                qs.stats.sharpe(rets.dropna(), periods=365, trading_year_days=365, rf=0.01)
+            )
+            pd.testing.assert_series_equal(
+                rets.vbt.returns(freq='h', year_freq='252d').qs.sharpe(),
+                qs.stats.sharpe(rets.dropna(), periods=252 * 24, trading_year_days=252 * 24, rf=0.01)
+            )
+            pd.testing.assert_series_equal(
+                rets.vbt.returns(freq='h', year_freq='252d').qs.sharpe(periods=252, trading_year_days=252, rf=0),
+                qs.stats.sharpe(rets.dropna())
+            )
+            assert rets['a'].vbt.returns(benchmark_rets=benchmark_rets['a']).qs.r_squared() == 0.6321016849785153

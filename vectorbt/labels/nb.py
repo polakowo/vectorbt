@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Numba-compiled functions.
 
 Provides an arsenal of Numba-compiled functions that are used by indicator
@@ -20,7 +23,10 @@ from vectorbt.labels.enums import TrendMode
 
 
 @njit(cache=True)
-def future_mean_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1,
+def future_mean_apply_nb(close: tp.Array2d,
+                         window: int,
+                         ewm: bool,
+                         wait: int = 1,
                          adjust: bool = False) -> tp.Array2d:
     """Get the mean of the next period."""
     if ewm:
@@ -33,8 +39,12 @@ def future_mean_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 
 
 
 @njit(cache=True)
-def future_std_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1,
-                        adjust: bool = False, ddof: int = 0) -> tp.Array2d:
+def future_std_apply_nb(close: tp.Array2d,
+                        window: int,
+                        ewm: bool,
+                        wait: int = 1,
+                        adjust: bool = False,
+                        ddof: int = 0) -> tp.Array2d:
     """Get the standard deviation of the next period."""
     if ewm:
         out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust, ddof=ddof)[::-1]
@@ -70,8 +80,11 @@ def fixed_labels_apply_nb(close: tp.Array2d, n: int) -> tp.Array2d:
 
 
 @njit(cache=True)
-def mean_labels_apply_nb(close: tp.Array2d, window: int, ewm: bool,
-                         wait: int = 1, adjust: bool = False) -> tp.Array2d:
+def mean_labels_apply_nb(close: tp.Array2d,
+                         window: int,
+                         ewm: bool,
+                         wait: int = 1,
+                         adjust: bool = False) -> tp.Array2d:
     """Get the percentage change from the current value to the average of the next period."""
     return (future_mean_apply_nb(close, window, ewm, wait, adjust) - close) / close
 
@@ -91,8 +104,10 @@ def get_symmetric_neg_th_nb(pos_th: tp.MaybeArray[float]) -> tp.MaybeArray[float
 
 
 @njit(cache=True)
-def local_extrema_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
-                           neg_th: tp.MaybeArray[float], flex_2d: bool = True) -> tp.Array2d:
+def local_extrema_apply_nb(close: tp.Array2d,
+                           pos_th: tp.MaybeArray[float],
+                           neg_th: tp.MaybeArray[float],
+                           flex_2d: bool = True) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
     Two adjacent peak and trough points should exceed the given threshold parameters.
@@ -109,8 +124,8 @@ def local_extrema_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
         direction = 0
 
         for i in range(1, close.shape[0]):
-            _pos_th = abs(flex_select_auto_nb(prev_i, col, pos_th, flex_2d))
-            _neg_th = abs(flex_select_auto_nb(prev_i, col, neg_th, flex_2d))
+            _pos_th = abs(flex_select_auto_nb(pos_th, prev_i, col, flex_2d))
+            _neg_th = abs(flex_select_auto_nb(neg_th, prev_i, col, flex_2d))
             if _pos_th == 0:
                 raise ValueError("Positive threshold cannot be 0")
             if _neg_th == 0:
@@ -194,8 +209,11 @@ def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.
 
 
 @njit(cache=True)
-def bn_cont_sat_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, pos_th: tp.MaybeArray[float],
-                                neg_th: tp.MaybeArray[float], flex_2d: bool = True) -> tp.Array2d:
+def bn_cont_sat_trend_labels_nb(close: tp.Array2d,
+                                local_extrema: tp.Array2d,
+                                pos_th: tp.MaybeArray[float],
+                                neg_th: tp.MaybeArray[float],
+                                flex_2d: bool = True) -> tp.Array2d:
     """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
     if the percentage change to the next extremum exceeds the threshold set for this range.
     """
@@ -212,8 +230,8 @@ def bn_cont_sat_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, po
             prev_i = idxs[k - 1]
             next_i = idxs[k]
 
-            _pos_th = abs(flex_select_auto_nb(prev_i, col, pos_th, flex_2d))
-            _neg_th = abs(flex_select_auto_nb(prev_i, col, neg_th, flex_2d))
+            _pos_th = abs(flex_select_auto_nb(pos_th, prev_i, col, flex_2d))
+            _neg_th = abs(flex_select_auto_nb(neg_th, prev_i, col, flex_2d))
             if _pos_th == 0:
                 raise ValueError("Positive threshold cannot be 0")
             if _neg_th == 0:
@@ -264,8 +282,11 @@ def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize:
 
 
 @njit(cache=True)
-def trend_labels_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
-                          neg_th: tp.MaybeArray[float], mode: int, flex_2d: bool = True) -> tp.Array2d:
+def trend_labels_apply_nb(close: tp.Array2d,
+                          pos_th: tp.MaybeArray[float],
+                          neg_th: tp.MaybeArray[float],
+                          mode: int,
+                          flex_2d: bool = True) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendMode`."""
     local_extrema = local_extrema_apply_nb(close, pos_th, neg_th, flex_2d)
     if mode == TrendMode.Binary:
@@ -282,8 +303,12 @@ def trend_labels_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
 
 
 @njit(cache=True)
-def breakout_labels_nb(close: tp.Array2d, window: int, pos_th: tp.MaybeArray[float], neg_th: tp.MaybeArray[float],
-                       wait: int = 1, flex_2d: bool = True) -> tp.Array2d:
+def breakout_labels_nb(close: tp.Array2d,
+                       window: int,
+                       pos_th: tp.MaybeArray[float],
+                       neg_th: tp.MaybeArray[float],
+                       wait: int = 1,
+                       flex_2d: bool = True) -> tp.Array2d:
     """For each value, return 1 if any value in the next period is greater than the
     positive threshold (in %), -1 if less than the negative threshold, and 0 otherwise.
 
@@ -294,8 +319,8 @@ def breakout_labels_nb(close: tp.Array2d, window: int, pos_th: tp.MaybeArray[flo
 
     for col in range(close.shape[1]):
         for i in range(close.shape[0]):
-            _pos_th = abs(flex_select_auto_nb(i, col, pos_th, flex_2d))
-            _neg_th = abs(flex_select_auto_nb(i, col, neg_th, flex_2d))
+            _pos_th = abs(flex_select_auto_nb(pos_th, i, col, flex_2d))
+            _neg_th = abs(flex_select_auto_nb(neg_th, i, col, flex_2d))
 
             for j in range(i + wait, min(i + window + wait, close.shape[0])):
                 if _pos_th > 0 and close[j, col] >= close[i, col] * (1 + _pos_th):

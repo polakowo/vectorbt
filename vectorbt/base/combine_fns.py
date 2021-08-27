@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Functions for combining arrays.
 
 Combine functions combine two or more NumPy arrays using a custom function. The emphasis here is
@@ -7,18 +10,24 @@ a single DataFrame is important. All functions are available in both Python and 
 
 import numpy as np
 from numba import njit
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from vectorbt import _typing as tp
 from vectorbt.base import reshape_fns
 
 
-def apply_and_concat_none(n: int, apply_func: tp.Callable, *args, show_progress: bool = False, **kwargs) -> None:
+def apply_and_concat_none(n: int,
+                          apply_func: tp.Callable, *args,
+                          show_progress: bool = False,
+                          tqdm_kwargs: tp.KwargsLike = None,
+                          **kwargs) -> None:
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
     and output nothing. Meant for in-place outputs.
 
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
-    for i in tqdm(range(n), disable=not show_progress):
+    if tqdm_kwargs is None:
+        tqdm_kwargs = {}
+    for i in tqdm(range(n), disable=not show_progress, **tqdm_kwargs):
         apply_func(i, *args, **kwargs)
 
 
@@ -35,15 +44,21 @@ def apply_and_concat_none_nb(n: int, apply_func_nb: tp.Callable, *args) -> None:
         apply_func_nb(i, *args)
 
 
-def apply_and_concat_one(n: int, apply_func: tp.Callable, *args, show_progress: bool = False, **kwargs) -> tp.Array2d:
+def apply_and_concat_one(n: int,
+                         apply_func: tp.Callable, *args,
+                         show_progress: bool = False,
+                         tqdm_kwargs: tp.KwargsLike = None,
+                         **kwargs) -> tp.Array2d:
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
     and concat the results along axis 1.
 
     The result of `apply_func` must be a single 1-dim or 2-dim array.
 
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
+    if tqdm_kwargs is None:
+        tqdm_kwargs = {}
     outputs = []
-    for i in tqdm(range(n), disable=not show_progress):
+    for i in tqdm(range(n), disable=not show_progress, **tqdm_kwargs):
         outputs.append(reshape_fns.to_2d(apply_func(i, *args, **kwargs)))
     return np.column_stack(outputs)
 
@@ -79,13 +94,18 @@ def apply_and_concat_one_nb(n: int, apply_func_nb: tp.Callable, *args) -> tp.Arr
     return output
 
 
-def apply_and_concat_multiple(n: int, apply_func: tp.Callable, *args,
-                              show_progress: bool = False, **kwargs) -> tp.List[tp.Array2d]:
+def apply_and_concat_multiple(n: int,
+                              apply_func: tp.Callable, *args,
+                              show_progress: bool = False,
+                              tqdm_kwargs: tp.KwargsLike = None,
+                              **kwargs) -> tp.List[tp.Array2d]:
     """Identical to `apply_and_concat_one`, except that the result of `apply_func` must be
     multiple 1-dim or 2-dim arrays. Each of these arrays at `i` will be concatenated with the
     array at the same position at `i+1`."""
+    if tqdm_kwargs is None:
+        tqdm_kwargs = {}
     outputs = []
-    for i in tqdm(range(n), disable=not show_progress):
+    for i in tqdm(range(n), disable=not show_progress, **tqdm_kwargs):
         outputs.append(tuple(map(reshape_fns.to_2d, apply_func(i, *args, **kwargs))))
     return list(map(np.column_stack, list(zip(*outputs))))
 
@@ -127,14 +147,19 @@ def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Callable, *args) -> t
     return outputs
 
 
-def select_and_combine(i: int, obj: tp.Any, others: tp.Sequence,
-                       combine_func: tp.Callable, *args, **kwargs) -> tp.AnyArray:
+def select_and_combine(i: int,
+                       obj: tp.Any,
+                       others: tp.Sequence,
+                       combine_func: tp.Callable,
+                       *args, **kwargs) -> tp.AnyArray:
     """Combine `obj` and an element from `others` at `i` using `combine_func`."""
     return combine_func(obj, others[i], *args, **kwargs)
 
 
-def combine_and_concat(obj: tp.Any, others: tp.Sequence,
-                       combine_func: tp.Callable, *args, **kwargs) -> tp.Array2d:
+def combine_and_concat(obj: tp.Any,
+                       others: tp.Sequence,
+                       combine_func: tp.Callable,
+                       *args, **kwargs) -> tp.Array2d:
     """Use `apply_and_concat_one` to combine `obj` with each element from `others` using `combine_func`."""
     return apply_and_concat_one(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)
 
@@ -182,9 +207,13 @@ def combine_multiple_nb(objs: tp.Sequence, combine_func_nb: tp.Callable, *args) 
     return result
 
 
-def ray_apply(n: int, apply_func: tp.Callable, *args, ray_force_init: bool = False,
-              ray_func_kwargs: tp.KwargsLike = None, ray_init_kwargs: tp.KwargsLike = None,
-              ray_shutdown: bool = False, **kwargs) -> tp.List[tp.AnyArray]:
+def ray_apply(n: int,
+              apply_func: tp.Callable, *args,
+              ray_force_init: bool = False,
+              ray_func_kwargs: tp.KwargsLike = None,
+              ray_init_kwargs: tp.KwargsLike = None,
+              ray_shutdown: bool = False,
+              **kwargs) -> tp.List[tp.AnyArray]:
     """Run `apply_func` in distributed manner.
 
     Set `ray_reinit` to True to terminate the Ray runtime and initialize a new one.
@@ -233,6 +262,9 @@ def apply_and_concat_multiple_ray(*args, **kwargs) -> tp.List[tp.Array2d]:
     return list(map(np.column_stack, list(zip(*results))))
 
 
-def combine_and_concat_ray(obj: tp.Any, others: tp.Sequence, combine_func: tp.Callable, *args, **kwargs) -> tp.Array2d:
+def combine_and_concat_ray(obj: tp.Any,
+                           others: tp.Sequence,
+                           combine_func: tp.Callable,
+                           *args, **kwargs) -> tp.Array2d:
     """Distributed version of `combine_and_concat`."""
     return apply_and_concat_one_ray(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)

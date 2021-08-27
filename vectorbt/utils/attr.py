@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for working with class/instance attributes."""
 
 import inspect
@@ -56,7 +59,7 @@ def deep_getattr(obj: tp.Any,
         If your chain includes only attributes and functions without arguments,
         you can represent this chain as a single (but probably long) string.
     """
-    checks.assert_type(attr_chain, (str, tuple, Iterable))
+    checks.assert_instance_of(attr_chain, (str, tuple, Iterable))
 
     if isinstance(attr_chain, str):
         if '.' in attr_chain:

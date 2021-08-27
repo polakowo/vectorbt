@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Mapping utilities."""
 
 import numpy as np
@@ -41,7 +44,8 @@ def apply_mapping(obj: tp.Any,
                   reverse: bool = False,
                   ignore_case: bool = True,
                   ignore_underscores: bool = True,
-                  ignore_other_types: bool = True,
+                  ignore_type: tp.MaybeTuple[tp.DTypeLike] = None,
+                  ignore_missing: bool = False,
                   na_sentinel: tp.Any = None) -> tp.Any:
     """Apply mapping on object using a mapping-like object.
 
@@ -55,11 +59,12 @@ def apply_mapping(obj: tp.Any,
         reverse (bool): See `reverse` in `to_mapping`.
         ignore_case (bool): Whether to ignore the case if the key is a string.
         ignore_underscores (bool): Whether to ignore underscores if the key is a string.
-        ignore_other_types (bool): Whether to ignore other data types. Otherwise, throws an error.
+        ignore_type (dtype_like or tuple): One or multiple types or data types to ignore.
+        ignore_missing (bool): Whether to ignore missing values.
         na_sentinel (any): Value to mark “not found”.
     """
     if mapping_like is None:
-        return na_sentinel
+        return obj
 
     if ignore_case and ignore_underscores:
         key_func = lambda x: x.lower().replace('_', '')
@@ -69,10 +74,11 @@ def apply_mapping(obj: tp.Any,
         key_func = lambda x: x.replace('_', '')
     else:
         key_func = lambda x: x
+    if not isinstance(ignore_type, tuple):
+        ignore_type = (ignore_type,)
 
     mapping = to_mapping(mapping_like, reverse=reverse)
 
-    key_types = set()
     new_mapping = dict()
     for k, v in mapping.items():
         if pd.isnull(k):
@@ -81,21 +87,27 @@ def apply_mapping(obj: tp.Any,
             if isinstance(k, str):
                 k = key_func(k)
             new_mapping[k] = v
-            key_types.add(type(k))
 
-    def _type_in_key_types(x_type: type) -> bool:
-        for key_type in key_types:
-            if x_type is key_type:
+    def _compatible_types(x_type: type, item: tp.Any = None) -> bool:
+        if item is not None:
+            if np.dtype(x_type) == 'O':
+                x_type = type(item)
+        for y_type in ignore_type:
+            if y_type is None:
+                return False
+            if x_type is y_type:
                 return True
             x_dtype = np.dtype(x_type)
-            key_dtype = np.dtype(key_type)
-            if x_dtype is key_dtype:
+            y_dtype = np.dtype(y_type)
+            if x_dtype is y_dtype:
                 return True
-            if np.issubdtype(x_dtype, np.number) and np.issubdtype(key_dtype, np.number):
+            if np.issubdtype(x_dtype, np.integer) and np.issubdtype(y_dtype, np.integer):
                 return True
-            if np.issubdtype(x_dtype, np.bool_) and np.issubdtype(key_dtype, np.bool_):
+            if np.issubdtype(x_dtype, np.floating) and np.issubdtype(y_dtype, np.floating):
                 return True
-            if np.issubdtype(x_dtype, np.flexible) and np.issubdtype(key_dtype, np.flexible):
+            if np.issubdtype(x_dtype, np.bool_) and np.issubdtype(y_dtype, np.bool_):
+                return True
+            if np.issubdtype(x_dtype, np.flexible) and np.issubdtype(y_dtype, np.flexible):
                 return True
         return False
 
@@ -104,10 +116,13 @@ def apply_mapping(obj: tp.Any,
             return na_sentinel
         if isinstance(x, str):
             x = key_func(x)
+        if ignore_missing:
+            try:
+                return new_mapping[x]
+            except KeyError:
+                return x
         return new_mapping[x]
 
-    if _type_in_key_types(type(obj)):
-        return _converter(obj)
     if isinstance(obj, (tuple, list, set, frozenset)):
         result = [apply_mapping(
             v,
@@ -115,46 +130,41 @@ def apply_mapping(obj: tp.Any,
             reverse=reverse,
             ignore_case=ignore_case,
             ignore_underscores=ignore_underscores,
-            ignore_other_types=ignore_other_types,
+            ignore_type=ignore_type,
+            ignore_missing=ignore_missing,
             na_sentinel=na_sentinel
         ) for v in obj]
         return type(obj)(result)
     if isinstance(obj, np.ndarray):
         if obj.size == 0:
             return obj
-        if _type_in_key_types(type(obj.item(0))):
+        if ignore_type is None or not _compatible_types(obj.dtype, obj.item(0)):
+            if obj.ndim == 1:
+                return pd.Series(obj).map(_converter).values
             return np.vectorize(_converter)(obj)
-        if not ignore_other_types:
-            raise ValueError(f"Type is {type(obj.item(0))}, must be one of types {key_types}")
         return obj
     if isinstance(obj, pd.Series):
         if obj.size == 0:
             return obj
-        if _type_in_key_types(type(obj.iloc[0])):
+        if ignore_type is None or not _compatible_types(obj.dtype, obj.iloc[0]):
             return obj.map(_converter)
-        if not ignore_other_types:
-            raise ValueError(f"Type is {type(obj.iloc[0])}, must be one of types {key_types}")
         return obj
     if isinstance(obj, pd.Index):
         if obj.size == 0:
             return obj
-        if _type_in_key_types(type(obj[0])):
+        if ignore_type is None or not _compatible_types(obj.dtype, obj[0]):
             return obj.map(_converter)
-        if not ignore_other_types:
-            raise ValueError(f"Type is {type(obj[0])}, must be one of types {key_types}")
         return obj
     if isinstance(obj, pd.DataFrame):
         if obj.size == 0:
             return obj
         series = []
         for sr_name, sr in obj.iteritems():
-            if _type_in_key_types(type(sr.iloc[0])):
+            if ignore_type is None or not _compatible_types(sr.dtype, sr.iloc[0]):
                 series.append(sr.map(_converter))
             else:
-                if not ignore_other_types:
-                    raise ValueError(f"Type is {type(sr.iloc[0])}, must be one of types {key_types}")
                 series.append(sr)
         return pd.concat(series, axis=1, keys=obj.columns)
-    if not ignore_other_types:
-        raise ValueError(f"Type is {type(obj)}, must be one of types {key_types}")
+    if ignore_type is None or not _compatible_types(type(obj)):
+        return _converter(obj)
     return obj

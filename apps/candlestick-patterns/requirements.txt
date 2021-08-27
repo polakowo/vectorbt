@@ -7,5 +7,5 @@ Flask-Caching>=1.10.1
 TA-Lib>=0.4.21
 ipywidgets>=7.6.3
 matplotlib>=3.4.2
-vectorbt>=0.20.0
+vectorbt>=0.21.0
 yfinance>=0.1.62

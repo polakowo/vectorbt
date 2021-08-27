@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for configuration."""
 
 from copy import copy, deepcopy
@@ -48,12 +51,19 @@ def get_func_kwargs(func: tp.Callable) -> dict:
     }
 
 
-def get_func_arg_names(func: tp.Callable) -> tp.List[str]:
+def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> tp.List[str]:
     """Get argument names of a function."""
     signature = inspect.signature(func)
+    if arg_kind is not None and isinstance(arg_kind, int):
+        arg_kind = (arg_kind,)
+    if arg_kind is None:
+        return [
+            p.name for p in signature.parameters.values()
+            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+        ]
     return [
         p.name for p in signature.parameters.values()
-        if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+        if p.kind in arg_kind
     ]
 
 
@@ -108,7 +118,7 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     Set `nested` to True to copy all child dicts in recursive manner."""
     if dct is None:
         dct = {}
-    checks.assert_type(copy_mode, str)
+    checks.assert_instance_of(copy_mode, str)
     copy_mode = copy_mode.lower()
     if copy_mode not in ['shallow', 'hybrid', 'deep']:
         raise ValueError(f"Copy mode '{copy_mode}' not supported")
@@ -151,8 +161,8 @@ def update_dict(x: InConfigLikeT,
         return
     if y is None:
         return
-    checks.assert_type(x, dict)
-    checks.assert_type(y, dict)
+    checks.assert_instance_of(x, dict)
+    checks.assert_instance_of(y, dict)
 
     for k, v in y.items():
         if nested \
@@ -423,14 +433,14 @@ class Config(PickleableDict, Documented):
         dict.__init__(self, dct)
 
         # Store params in an instance variable
-        checks.assert_type(copy_kwargs, dict)
-        checks.assert_type(reset_dct, dict)
-        checks.assert_type(reset_dct_copy_kwargs, dict)
-        checks.assert_type(frozen_keys, bool)
-        checks.assert_type(readonly, bool)
-        checks.assert_type(nested, bool)
-        checks.assert_type(convert_dicts, (bool, type))
-        checks.assert_type(as_attrs, bool)
+        checks.assert_instance_of(copy_kwargs, dict)
+        checks.assert_instance_of(reset_dct, dict)
+        checks.assert_instance_of(reset_dct_copy_kwargs, dict)
+        checks.assert_instance_of(frozen_keys, bool)
+        checks.assert_instance_of(readonly, bool)
+        checks.assert_instance_of(nested, bool)
+        checks.assert_instance_of(convert_dicts, (bool, type))
+        checks.assert_instance_of(as_attrs, bool)
 
         self.__dict__['_copy_kwargs_'] = copy_kwargs
         self.__dict__['_reset_dct_'] = reset_dct
@@ -611,8 +621,10 @@ class Config(PickleableDict, Documented):
 
         return self_copy
 
-    def merge_with(self: ConfigT, other: InConfigLikeT,
-                   nested: tp.Optional[bool] = None, **kwargs) -> OutConfigLikeT:
+    def merge_with(self: ConfigT,
+                   other: InConfigLikeT,
+                   nested: tp.Optional[bool] = None,
+                   **kwargs) -> OutConfigLikeT:
         """Merge with another dict into one single dict.
 
         See `merge_dicts`."""
@@ -748,35 +760,44 @@ class Configured(Pickleable, Documented):
             if isinstance(base_cls, Configured)
         }
 
-    def copy(self: ConfiguredT,
-             copy_mode: tp.Optional[str] = 'shallow',
-             nested: tp.Optional[bool] = None,
-             _class: tp.Optional[type] = None,
-             **new_config) -> ConfiguredT:
-        """Copy config and writeable attributes to initialize a new instance.
+    def replace(self: ConfiguredT,
+                copy_mode_: tp.Optional[str] = 'shallow',
+                nested_: tp.Optional[bool] = None,
+                cls_: tp.Optional[type] = None,
+                **new_config) -> ConfiguredT:
+        """Create a new instance by copying and (optionally) changing the config.
 
         !!! warning
-            This "copy" operation won't return a copy of the instance but a new instance
+            This operation won't return a copy of the instance but a new instance
             initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
-        if _class is None:
-            _class = self.__class__
-        new_config = self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested)
-        new_instance = _class(**new_config)
+        if cls_ is None:
+            cls_ = self.__class__
+        new_config = self.config.merge_with(new_config, copy_mode=copy_mode_, nested=nested_)
+        new_instance = cls_(**new_config)
         for attr in self.writeable_attrs:
             attr_obj = getattr(self, attr)
             if isinstance(attr_obj, Config):
                 attr_obj = attr_obj.copy(
-                    copy_mode=copy_mode,
-                    nested=nested
+                    copy_mode=copy_mode_,
+                    nested=nested_
                 )
             else:
-                if copy_mode is not None:
-                    if copy_mode == 'hybrid':
+                if copy_mode_ is not None:
+                    if copy_mode_ == 'hybrid':
                         attr_obj = copy(attr_obj)
-                    elif copy_mode == 'deep':
+                    elif copy_mode_ == 'deep':
                         attr_obj = deepcopy(attr_obj)
             setattr(new_instance, attr, attr_obj)
         return new_instance
+
+    def copy(self: ConfiguredT,
+             copy_mode: tp.Optional[str] = 'shallow',
+             nested: tp.Optional[bool] = None,
+             cls: tp.Optional[type] = None) -> ConfiguredT:
+        """Create a new instance by copying the config.
+
+        See `Configured.replace`."""
+        return self.replace(copy_mode_=copy_mode, nested_=nested, cls_=cls)
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""

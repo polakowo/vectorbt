@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Functions for working with index/columns.
 
 Index functions perform operations on index objects, such as stacking, combining,
@@ -23,7 +26,7 @@ def to_any_index(index_like: tp.IndexLike) -> tp.Index:
 
 def get_index(arg: tp.SeriesFrame, axis: int) -> tp.Index:
     """Get index of `arg` by `axis`."""
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     checks.assert_in(axis, (0, 1))
 
     if axis == 0:
@@ -176,7 +179,7 @@ def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any], strict: bool
 
 def select_levels(index: tp.Index, level_names: tp.MaybeLevelSequence) -> tp.Index:
     """Build a new index by selecting one or multiple `level_names` from `index`."""
-    checks.assert_type(index, pd.MultiIndex)
+    checks.assert_instance_of(index, pd.MultiIndex)
 
     if isinstance(level_names, (int, str)):
         return index.get_level_values(level_names)
@@ -335,7 +338,7 @@ def pick_levels(index: tp.Index,
         required_levels = []
     if optional_levels is None:
         optional_levels = []
-    checks.assert_type(index, pd.MultiIndex)
+    checks.assert_instance_of(index, pd.MultiIndex)
 
     n_opt_set = len(list(filter(lambda x: x is not None, optional_levels)))
     n_req_set = len(list(filter(lambda x: x is not None, required_levels)))
@@ -352,7 +355,7 @@ def pick_levels(index: tp.Index,
     for level in optional_levels:
         level_pos = None
         if level is not None:
-            checks.assert_type(level, (int, str))
+            checks.assert_instance_of(level, (int, str))
             if isinstance(level, str):
                 level_pos = index.names.index(level)
             else:
@@ -367,7 +370,7 @@ def pick_levels(index: tp.Index,
     for level in required_levels:
         level_pos = None
         if level is not None:
-            checks.assert_type(level, (int, str))
+            checks.assert_instance_of(level, (int, str))
             if isinstance(level, str):
                 level_pos = index.names.index(level)
             else:

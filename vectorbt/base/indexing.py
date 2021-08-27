@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Classes for indexing.
 
 The main purpose of indexing classes is to provide pandas-like indexing to user-defined classes
@@ -149,7 +152,7 @@ class ParamLoc(LocBase):
     Uses `mapper` to establish link between columns and parameter values."""
 
     def __init__(self, mapper: tp.Series, indexing_func: tp.Callable, level_name: tp.Level = None, **kwargs) -> None:
-        checks.assert_type(mapper, pd.Series)
+        checks.assert_instance_of(mapper, pd.Series)
 
         if mapper.dtype == 'O':
             # If params are objects, we must cast them to string first
@@ -210,8 +213,8 @@ class ParamLoc(LocBase):
 def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
                        pd_indexing_func: tp.Callable) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
-    checks.assert_type(mapper, pd.Series)
-    checks.assert_type(ref_obj, (pd.Series, pd.DataFrame))
+    checks.assert_instance_of(mapper, pd.Series)
+    checks.assert_instance_of(ref_obj, (pd.Series, pd.DataFrame))
 
     df_range_mapper = reshape_fns.broadcast_to(np.arange(len(mapper.index)), ref_obj)
     loced_range_mapper = pd_indexing_func(df_range_mapper)

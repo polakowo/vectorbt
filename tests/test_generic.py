@@ -74,6 +74,9 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_indexing(self):
+        assert df.vbt['a'].min() == df['a'].vbt.min()
+
     def test_set_by_mask(self):
         np.testing.assert_array_equal(
             nb.set_by_mask_1d_nb(
@@ -231,6 +234,10 @@ class TestAccessors:
         pd.testing.assert_series_equal(df['a'].vbt.pct_change(), df['a'].pct_change(fill_method=None))
         np.testing.assert_array_equal(df['a'].vbt.pct_change().values, nb.pct_change_1d_nb(df['a'].values))
         pd.testing.assert_frame_equal(df.vbt.pct_change(), df.pct_change(fill_method=None))
+
+    def test_bfill(self):
+        pd.testing.assert_series_equal(df['b'].vbt.bfill(), df['b'].bfill())
+        pd.testing.assert_frame_equal(df.vbt.bfill(), df.bfill())
 
     def test_ffill(self):
         pd.testing.assert_series_equal(df['a'].vbt.ffill(), df['a'].ffill())

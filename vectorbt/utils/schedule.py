@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Utilities for scheduling jobs."""
 
 from datetime import datetime, timedelta, time as dt_time
@@ -86,7 +89,7 @@ class ScheduleManager:
     def __init__(self, scheduler: tp.Optional[AsyncScheduler] = None) -> None:
         if scheduler is None:
             scheduler = AsyncScheduler()
-        checks.assert_type(scheduler, AsyncScheduler)
+        checks.assert_instance_of(scheduler, AsyncScheduler)
 
         self._scheduler = scheduler
         self._async_task = None

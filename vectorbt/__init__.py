@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Ultimate Python library for time series analysis and backtesting at scale.
 
 While there are many great backtesting packages for Python, vectorbt combines an extremely fast backtester 
@@ -534,8 +537,11 @@ reduce the memory footprint, and you as a user always have 90-95% control over m
 (just like a market order, but you can easily build upon it to implement limit and stop orders).
 This means order execution is effectively state-less - it simply receives a command with inputs and gives you the
 result of the execution including the new cash balance and other metrics. There is no list of pending orders.
-Update: `Portfolio.from_signals` now supports stop orders.
+
+    Update: `Portfolio.from_signals` now supports stop orders.
 - *One order limit*: Only one order command per symbol and bar - although this can (and probably will) be expanded.
+
+    Update: `Portfolio.from_order_func` with `flexible` option supports multiple orders.
 - *Limited support for parallelization*: Read [this](https://github.com/polakowo/vectorbt/issues/129#issuecomment-823596039).
 - *Python skills required*: Having an intermediate knowledge of Pandas, NumPy, and broadcasting principles is a must.
 
@@ -572,7 +578,7 @@ Note: you must run the notebook to play with the widgets.
 - If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
 - For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
 
-## How to contribute
+## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
@@ -591,11 +597,19 @@ After making changes, make sure you did not break any functionality:
 pytest
 ```
 
-Please make sure to update tests as appropriate.
+Make sure to update tests as appropriate.
+
+Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 
-This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
+This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license.
+The source code is open and everyone (individuals and organizations) can use it for free.
+However, it is not allowed to sell products and services that are mostly just this software.
+
+If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
+
+Installing optional dependencies may be subject to a more restrictive license.
 
 ## Disclaimer
 

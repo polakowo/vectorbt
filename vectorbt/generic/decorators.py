@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Class and function decorators."""
 
 import inspect
@@ -9,7 +12,7 @@ from vectorbt.utils.config import merge_dicts, Config, get_func_arg_names
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
 
-def add_nb_methods(config: Config) -> WrapperFuncT:
+def attach_nb_methods(config: Config) -> WrapperFuncT:
     """Class decorator to add Numba methods.
 
     `config` should contain target method names (keys) and dictionaries (values) with the following keys:
@@ -27,7 +30,7 @@ def add_nb_methods(config: Config) -> WrapperFuncT:
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         from vectorbt.base.array_wrapper import Wrapping
 
-        checks.assert_subclass(cls, Wrapping)
+        checks.assert_subclass_of(cls, Wrapping)
 
         for target_name, settings in config.items():
             func = settings['func']
@@ -63,7 +66,7 @@ def add_nb_methods(config: Config) -> WrapperFuncT:
                     parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,))
                 new_method.__signature__ = source_sig
 
-            new_method.__doc__ = f"See `{path}`"
+            new_method.__doc__ = f"See `{path}`."
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"
             new_method.__name__ = target_name
             setattr(cls, target_name, new_method)
@@ -72,7 +75,7 @@ def add_nb_methods(config: Config) -> WrapperFuncT:
     return wrapper
 
 
-def add_transform_methods(config: Config) -> WrapperFuncT:
+def attach_transform_methods(config: Config) -> WrapperFuncT:
     """Class decorator to add transformation methods.
 
     `config` should contain target method names (keys) and dictionaries (values) with the following keys:
@@ -87,7 +90,7 @@ def add_transform_methods(config: Config) -> WrapperFuncT:
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         from vectorbt.generic.accessors import TransformerT
 
-        checks.assert_subclass(cls, "GenericAccessor")
+        checks.assert_subclass_of(cls, "GenericAccessor")
 
         for target_name, settings in config.items():
             transformer = settings['transformer']

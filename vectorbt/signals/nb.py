@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Numba-compiled functions.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors
@@ -28,8 +31,8 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
+from vectorbt.generic.enums import range_dt, RangeStatus
 from vectorbt.signals.enums import StopType
-from vectorbt.records import nb as records_nb
 
 
 # ############# Generation ############# #
@@ -298,7 +301,7 @@ def rand_choice_nb(from_i: int, to_i: int, col: int, n: tp.MaybeArray[int]) -> t
 
     `n` uses flexible indexing."""
     ns = np.asarray(n)
-    size = min(to_i - from_i, flex_select_auto_nb(0, col, ns, True))
+    size = min(to_i - from_i, flex_select_auto_nb(ns, 0, col, True))
     return from_i + np.random.choice(to_i - from_i, size=size, replace=False)
 
 
@@ -332,7 +335,7 @@ def rand_by_prob_choice_nb(from_i: int,
     probs = np.asarray(prob)
     j = 0
     for i in range(from_i, to_i):
-        if np.random.uniform(0, 1) < flex_select_auto_nb(i, col, probs, flex_2d):  # [0, 1)
+        if np.random.uniform(0, 1) < flex_select_auto_nb(probs, i, col, flex_2d):  # [0, 1)
             temp_idx_arr[j] = i
             j += 1
             if pick_first:
@@ -445,7 +448,7 @@ def generate_rand_enex_nb(shape: tp.Shape,
             exits[both_idxs[1::2], col] = True
     else:
         for col in range(shape[1]):
-            _n = flex_select_auto_nb(0, col, ns, True)
+            _n = flex_select_auto_nb(ns, 0, col, True)
             if _n == 1:
                 entry_idx = np.random.randint(0, shape[0] - exit_wait)
                 entries[entry_idx, col] = True
@@ -564,7 +567,7 @@ def first_choice_nb(from_i: int, to_i: int, col: int, a: tp.Array2d) -> tp.Array
 def stop_choice_nb(from_i: int,
                    to_i: int,
                    col: int,
-                   ts: tp.Array,
+                   ts: tp.ArrayLike,
                    stop: tp.MaybeArray[float],
                    trailing: tp.MaybeArray[bool],
                    wait: int,
@@ -592,15 +595,12 @@ def stop_choice_nb(from_i: int,
                 If `wait` is greater than 0, trailing stop won't update at bars that come before `from_i`.
         pick_first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
-        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."""
-    stops = np.asarray(stop)
-    trailings = np.asarray(trailing)
-
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`."""
     j = 0
     init_i = from_i - wait
-    init_ts = flex_select_auto_nb(init_i, col, ts, flex_2d)
-    init_stop = flex_select_auto_nb(init_i, col, stops, flex_2d)
-    init_trailing = flex_select_auto_nb(init_i, col, trailings, flex_2d)
+    init_ts = flex_select_auto_nb(ts, init_i, col, flex_2d)
+    init_stop = flex_select_auto_nb(np.asarray(stop), init_i, col, flex_2d)
+    init_trailing = flex_select_auto_nb(np.asarray(trailing), init_i, col, flex_2d)
     max_high = min_low = init_ts
 
     for i in range(from_i, to_i):
@@ -616,7 +616,7 @@ def stop_choice_nb(from_i: int,
                 curr_stop_price = init_ts * (1 + init_stop)
 
         # Check if stop price is within bar
-        curr_ts = flex_select_auto_nb(i, col, ts, flex_2d)
+        curr_ts = flex_select_auto_nb(ts, i, col, flex_2d)
         if not np.isnan(init_stop):
             if init_stop >= 0:
                 exit_signal = curr_ts >= curr_stop_price
@@ -639,7 +639,7 @@ def stop_choice_nb(from_i: int,
 
 @njit
 def generate_stop_ex_nb(entries: tp.Array2d,
-                        ts: tp.Array,
+                        ts: tp.ArrayLike,
                         stop: tp.MaybeArray[float],
                         trailing: tp.MaybeArray[bool],
                         wait: int,
@@ -724,15 +724,16 @@ def generate_stop_enex_nb(entries: tp.Array2d,
 def ohlc_stop_choice_nb(from_i: int,
                         to_i: int,
                         col: int,
-                        open: tp.Array,
-                        high: tp.Array,
-                        low: tp.Array,
-                        close: tp.Array,
+                        open: tp.ArrayLike,
+                        high: tp.ArrayLike,
+                        low: tp.ArrayLike,
+                        close: tp.ArrayLike,
                         stop_price_out: tp.Array2d,
                         stop_type_out: tp.Array2d,
                         sl_stop: tp.MaybeArray[float],
                         sl_trail: tp.MaybeArray[bool],
                         tp_stop: tp.MaybeArray[float],
+                        reverse: tp.MaybeArray[bool],
                         is_open_safe: bool,
                         wait: int,
                         pick_first: bool,
@@ -770,6 +771,7 @@ def ohlc_stop_choice_nb(from_i: int,
         tp_stop (float or array_like): Percentage value for take profit.
 
             Can be per frame, column, row, or element-wise. Set to `np.nan` to disable.
+        reverse (bool or array_like): Whether to do the opposite, i.e.: prices are followed downwards.
         is_open_safe (bool): Whether entry price comes right at or before open.
 
             If True and wait is 0, can use high/low at entry bar. Otherwise uses only close.
@@ -782,26 +784,27 @@ def ohlc_stop_choice_nb(from_i: int,
                 trailing stop won't update at bars that come before `from_i`.
         pick_first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array of int): Empty integer array used to temporarily store indices.
-        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_select_auto_nb`.
     """
-    sl_stops = np.asarray(sl_stop)
-    sl_trails = np.asarray(sl_trail)
-    tp_stops = np.asarray(tp_stop)
-
     init_i = from_i - wait
-    init_open = flex_select_auto_nb(init_i, col, open, flex_2d)
-    init_sl_stop = abs(flex_select_auto_nb(init_i, col, sl_stops, flex_2d))
-    init_sl_trail = abs(flex_select_auto_nb(init_i, col, sl_trails, flex_2d))
-    init_tp_stop = abs(flex_select_auto_nb(init_i, col, tp_stops, flex_2d))
-    max_p = init_open
+    init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
+    init_sl_stop = flex_select_auto_nb(np.asarray(sl_stop), init_i, col, flex_2d)
+    if init_sl_stop < 0:
+        raise ValueError("Stop value must be 0 or greater")
+    init_sl_trail = flex_select_auto_nb(np.asarray(sl_trail), init_i, col, flex_2d)
+    init_tp_stop = flex_select_auto_nb(np.asarray(tp_stop), init_i, col, flex_2d)
+    if init_tp_stop < 0:
+        raise ValueError("Stop value must be 0 or greater")
+    init_reverse = flex_select_auto_nb(np.asarray(reverse), init_i, col, flex_2d)
+    max_p = min_p = init_open
     j = 0
 
     for i in range(from_i, to_i):
         # Resolve current bar
-        _open = flex_select_auto_nb(i, col, open, flex_2d)
-        _high = flex_select_auto_nb(i, col, high, flex_2d)
-        _low = flex_select_auto_nb(i, col, low, flex_2d)
-        _close = flex_select_auto_nb(i, col, close, flex_2d)
+        _open = flex_select_auto_nb(open, i, col, flex_2d)
+        _high = flex_select_auto_nb(high, i, col, flex_2d)
+        _low = flex_select_auto_nb(low, i, col, flex_2d)
+        _close = flex_select_auto_nb(close, i, col, flex_2d)
         if np.isnan(_open):
             _open = _close
         if np.isnan(_low):
@@ -812,11 +815,20 @@ def ohlc_stop_choice_nb(from_i: int,
         # Calculate stop price
         if not np.isnan(init_sl_stop):
             if init_sl_trail:
-                curr_sl_stop_price = max_p * (1 - init_sl_stop)
+                if init_reverse:
+                    curr_sl_stop_price = min_p * (1 + init_sl_stop)
+                else:
+                    curr_sl_stop_price = max_p * (1 - init_sl_stop)
             else:
-                curr_sl_stop_price = init_open * (1 - init_sl_stop)
+                if init_reverse:
+                    curr_sl_stop_price = init_open * (1 + init_sl_stop)
+                else:
+                    curr_sl_stop_price = init_open * (1 - init_sl_stop)
         if not np.isnan(init_tp_stop):
-            curr_tp_stop_price = init_open * (1 + init_tp_stop)
+            if init_reverse:
+                curr_tp_stop_price = init_open * (1 - init_tp_stop)
+            else:
+                curr_tp_stop_price = init_open * (1 + init_tp_stop)
 
         # Check if stop price is within bar
         if i > init_i or is_open_safe:
@@ -830,7 +842,8 @@ def ohlc_stop_choice_nb(from_i: int,
 
         exit_signal = False
         if not np.isnan(init_sl_stop):
-            if curr_low <= curr_sl_stop_price:
+            if (not init_reverse and curr_low <= curr_sl_stop_price) or \
+                    (init_reverse and curr_high >= curr_sl_stop_price):
                 exit_signal = True
                 stop_price_out[i, col] = curr_sl_stop_price
                 if init_sl_trail:
@@ -838,7 +851,8 @@ def ohlc_stop_choice_nb(from_i: int,
                 else:
                     stop_type_out[i, col] = StopType.StopLoss
         if not exit_signal and not np.isnan(init_tp_stop):
-            if curr_high >= curr_tp_stop_price:
+            if (not init_reverse and curr_high >= curr_tp_stop_price) or \
+                    (init_reverse and curr_low <= curr_tp_stop_price):
                 exit_signal = True
                 stop_price_out[i, col] = curr_tp_stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
@@ -850,6 +864,8 @@ def ohlc_stop_choice_nb(from_i: int,
 
         # Keep track of highest high if trailing
         if init_sl_trail:
+            if curr_low < min_p:
+                min_p = curr_low
             if curr_high > max_p:
                 max_p = curr_high
 
@@ -858,15 +874,16 @@ def ohlc_stop_choice_nb(from_i: int,
 
 @njit
 def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
-                             open: tp.Array,
-                             high: tp.Array,
-                             low: tp.Array,
-                             close: tp.Array,
+                             open: tp.ArrayLike,
+                             high: tp.ArrayLike,
+                             low: tp.ArrayLike,
+                             close: tp.ArrayLike,
                              stop_price_out: tp.Array2d,
                              stop_type_out: tp.Array2d,
                              sl_stop: tp.MaybeArray[float],
                              sl_trail: tp.MaybeArray[bool],
                              tp_stop: tp.MaybeArray[float],
+                             reverse: tp.MaybeArray[bool],
                              is_open_safe: bool,
                              wait: int,
                              until_next: bool,
@@ -902,6 +919,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
     ...     sl_stop=0.1,
     ...     sl_trail=True,
     ...     tp_stop=0.1,
+    ...     reverse=False,
     ...     is_open_safe=True,
     ...     wait=1,
     ...     until_next=True,
@@ -951,6 +969,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         sl_stop,
         sl_trail,
         tp_stop,
+        reverse,
         is_open_safe,
         wait,
         pick_first,
@@ -961,15 +980,16 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
 
 @njit
 def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
-                               open: tp.Array,
-                               high: tp.Array,
-                               low: tp.Array,
-                               close: tp.Array,
+                               open: tp.ArrayLike,
+                               high: tp.ArrayLike,
+                               low: tp.ArrayLike,
+                               close: tp.ArrayLike,
                                stop_price_out: tp.Array2d,
                                stop_type_out: tp.Array2d,
                                sl_stop: tp.MaybeArray[float],
                                sl_trail: tp.MaybeArray[bool],
                                tp_stop: tp.MaybeArray[float],
+                               reverse: tp.MaybeArray[bool],
                                is_open_safe: bool,
                                entry_wait: int,
                                exit_wait: int,
@@ -1000,6 +1020,7 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
             sl_stop,
             sl_trail,
             tp_stop,
+            reverse,
             is_open_safe,
             exit_wait,
             pick_first,
@@ -1013,14 +1034,10 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
 
 
 @njit(cache=True)
-def map_meta_between_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two signals in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def between_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two signals in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -1028,28 +1045,26 @@ def map_meta_between_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                from_idxs_out[k] = from_i
-                to_idxs_out[k] = to_i
-                cols_out[k] = col
-                k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                range_records[ridx]['id'] = ridx
+                range_records[ridx]['col'] = col
+                range_records[ridx]['start_idx'] = from_i
+                range_records[ridx]['end_idx'] = to_i
+                range_records[ridx]['status'] = RangeStatus.Closed
+                ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_between_two_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two signals in `a` and `b`.
+def between_two_ranges_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two signals in `a` and `b`.
 
     If `from_other` is False, returns ranges from each in `a` to the succeeding in `b`.
     Otherwise, returns ranges from each in `b` to the preceding in `a`.
 
     When `a` and `b` overlap (two signals at the same time), the distance between overlapping
-    signals is still considered and `from_i` would match `to_i`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+    signals is still considered and `from_i` would match `to_i`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -1061,31 +1076,31 @@ def map_meta_between_two_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = Fal
                         valid_a_idxs = a_idxs[a_idxs <= to_i]
                         if len(valid_a_idxs) > 0:
                             from_i = valid_a_idxs[-1]  # preceding in a
-                            from_idxs_out[k] = from_i
-                            to_idxs_out[k] = to_i
-                            cols_out[k] = col
-                            k += 1
+                            range_records[ridx]['id'] = ridx
+                            range_records[ridx]['col'] = col
+                            range_records[ridx]['start_idx'] = from_i
+                            range_records[ridx]['end_idx'] = to_i
+                            range_records[ridx]['status'] = RangeStatus.Closed
+                            ridx += 1
                 else:
                     for j, from_i in enumerate(a_idxs):
                         valid_b_idxs = b_idxs[b_idxs >= from_i]
                         if len(valid_b_idxs) > 0:
                             to_i = valid_b_idxs[0]  # succeeding in b
-                            from_idxs_out[k] = from_i
-                            to_idxs_out[k] = to_i
-                            cols_out[k] = col
-                            k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                            range_records[ridx]['id'] = ridx
+                            range_records[ridx]['col'] = col
+                            range_records[ridx]['start_idx'] = from_i
+                            range_records[ridx]['end_idx'] = to_i
+                            range_records[ridx]['status'] = RangeStatus.Closed
+                            ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each partition of signals in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each partition of signals in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -1097,30 +1112,30 @@ def map_meta_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
                 is_partition = True
             elif is_partition:
                 to_i = i
-                from_idxs_out[k] = from_i
-                to_idxs_out[k] = to_i
-                cols_out[k] = col
-                k += 1
+                range_records[ridx]['id'] = ridx
+                range_records[ridx]['col'] = col
+                range_records[ridx]['start_idx'] = from_i
+                range_records[ridx]['end_idx'] = to_i
+                range_records[ridx]['status'] = RangeStatus.Closed
+                ridx += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
-                    to_i = a.shape[0]
-                    from_idxs_out[k] = from_i
-                    to_idxs_out[k] = to_i
-                    cols_out[k] = col
-                    k += 1
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+                    to_i = a.shape[0] - 1
+                    range_records[ridx]['id'] = ridx
+                    range_records[ridx]['col'] = col
+                    range_records[ridx]['start_idx'] = from_i
+                    range_records[ridx]['end_idx'] = to_i
+                    range_records[ridx]['status'] = RangeStatus.Open
+                    ridx += 1
+    return range_records[:ridx]
 
 
 @njit(cache=True)
-def map_meta_between_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
-    """Map meta of each range between two partitions in `a`.
-
-    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
-    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
-    k = 0
+def between_partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbt.generic.enums.range_dt` for each range between two partitions in `a`."""
+    range_records = np.empty(a.shape[0] * a.shape[1], dtype=range_dt)
+    ridx = 0
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -1129,81 +1144,17 @@ def map_meta_between_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
             if a[i, col]:
                 if not is_partition and from_i != -1:
                     to_i = i
-                    from_idxs_out[k] = from_i
-                    to_idxs_out[k] = to_i
-                    cols_out[k] = col
-                    k += 1
+                    range_records[ridx]['id'] = ridx
+                    range_records[ridx]['col'] = col
+                    range_records[ridx]['start_idx'] = from_i
+                    range_records[ridx]['end_idx'] = to_i
+                    range_records[ridx]['status'] = RangeStatus.Closed
+                    ridx += 1
                 is_partition = True
                 from_i = i
             else:
                 is_partition = False
-    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
-
-
-@njit
-def range_map_meta_nb(from_idxs: tp.Array1d,
-                      to_idxs: tp.Array1d,
-                      cols: tp.Array2d,
-                      n_cols: int,
-                      range_map_func_nb: tp.RangeMapFunc,
-                      *args) -> tp.Array1d:
-    """Map meta of each range using `range_map_func_nb`.
-
-    Applies `range_map_func_nb` on each range `[from_i, to_i)`. Should accept index of the start of the
-    range `from_i`, index of the end of the range `to_i`, index of the column `col`, and `*range_map_args`.
-    """
-    out = np.full(cols.shape[0], np.nan, dtype=np.float_)
-    col_range = records_nb.col_range_nb(cols, n_cols)
-
-    for col in range(n_cols):
-        from_k = col_range[col, 0]
-        to_k = col_range[col, 1]
-        if from_k != -1 and to_k != -1:
-            for k in range(from_k, to_k):
-                out[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *args)
-    return out
-
-
-@njit
-def range_map_reduce_meta_nb(from_idxs: tp.Array1d,
-                             to_idxs: tp.Array1d,
-                             cols: tp.Array2d,
-                             n_cols: int,
-                             range_map_func_nb: tp.RangeMapFunc,
-                             range_map_args: tp.Args,
-                             reduce_func_nb: tp.ReduceFunc,
-                             reduce_args: tp.Args) -> tp.Array1d:
-    """Map meta of each range range_map_func_nb` and reduce per column using `reduce_func_nb`.
-
-    `range_map_func_nb` is the same as for `map_meta`.
-
-    Applies `reduce_func_nb` on all mapper results in a column. Should accept index of the column,
-    the array of results from `range_map_func_nb` for that column, and `*reduce_args`.
-    """
-    out = np.full(n_cols, np.nan, dtype=np.float_)
-    map_res = np.empty(cols.shape[0], dtype=np.float_)
-    col_range = records_nb.col_range_nb(cols, n_cols)
-
-    for col in range(n_cols):
-        from_k = col_range[col, 0]
-        to_k = col_range[col, 1]
-        if from_k != -1 and to_k != -1:
-            for k in range(from_k, to_k):
-                map_res[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *range_map_args)
-            out[col] = reduce_func_nb(col, map_res[from_k:to_k], *reduce_args)
-    return out
-
-
-@njit(cache=True)
-def range_len_map_nb(from_i: int, to_i: int, col: int) -> int:
-    """Range length mapper."""
-    return to_i - from_i
-
-
-@njit(cache=True)
-def range_count_map_nb(from_i: int, to_i: int, col: int) -> int:
-    """Range count mapper."""
-    return 1
+    return range_records[:ridx]
 
 
 # ############# Ranking ############# #

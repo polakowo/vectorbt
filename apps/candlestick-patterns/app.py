@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 # Run this app with `python app.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
 
@@ -28,7 +31,6 @@ from talib._ta_lib import (
 from vectorbt import settings
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.template import deep_substitute
 from vectorbt.portfolio.enums import Direction, ConflictMode
 from vectorbt.portfolio.base import Portfolio
 
@@ -80,16 +82,6 @@ stats_table_columns = ["Metric", "Buy & Hold", "Random (Median)", "Strategy", "Z
 directions = Direction._fields
 conflict_modes = ConflictMode._fields
 plot_types = ['OHLC', 'Candlestick']
-
-# Populate subplots
-all_subplots = {}
-for k, v in Portfolio.subplots.items():
-    trades_sub_v = deep_substitute(v, mapping=dict(use_positions=False), safe=True)
-    all_subplots[k] = trades_sub_v
-    positions_sub_v = deep_substitute(v, mapping=dict(use_positions=True), safe=True)
-    if positions_sub_v['title'] != v['title']:
-        positions_sub_v['use_positions'] = True
-        all_subplots[k.replace('trade', 'position')] = positions_sub_v
 
 # Colors
 color_schema = settings['plotting']['color_schema']
@@ -296,7 +288,7 @@ app.layout = html.Div(
                                                                     id="subplot_dropdown",
                                                                     options=[
                                                                         {"value": k, "label": v['title']}
-                                                                        for k, v in all_subplots.items()
+                                                                        for k, v in Portfolio.subplots.items()
                                                                     ],
                                                                     multi=True,
                                                                     value=default_subplots,
@@ -1315,7 +1307,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     # Align initial cash across main and random strategies
     aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)))
     # Fixate initial cash for indexing
-    aligned_portfolio = aligned_portfolio.copy(
+    aligned_portfolio = aligned_portfolio.replace(
         init_cash=aligned_portfolio.init_cash
     )
     # Separate portfolios
@@ -1387,7 +1379,7 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         )
     height = int(6 / 21 * 2 / 3 * window_width)
     fig = main_portfolio.plot(
-        subplots={k: all_subplots[k] for k in subplots},
+        subplots=subplots,
         subplot_settings=subplot_settings,
         **merge_dicts(
             default_layout,

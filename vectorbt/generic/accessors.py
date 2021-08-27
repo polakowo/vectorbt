@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Custom pandas accessors for generic data.
 
 Methods can be accessed as follows:
@@ -183,6 +186,19 @@ Min Index                  y
 Max Index                  z
 Name: 0, dtype: object
 ```
+
+## Plots
+
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots` and `GenericAccessor.subplots`.
+
+`GenericAccessor` class has a single subplot based on `GenericAccessor.plot`:
+
+```python-repl
+>>> df2.vbt.plots()
+```
+
+![](/docs/img/generic_plots.svg)
 """
 
 import numpy as np
@@ -212,10 +228,12 @@ from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import plotting, nb
+from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.decorators import add_nb_methods, add_transform_methods
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
@@ -240,6 +258,13 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
+__pdoc__ = {}
+
+
+class MetaGenericAccessor(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
 GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
 SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
 
@@ -255,8 +280,6 @@ class TransformerT(tp.Protocol):
         ...
 
 
-__pdoc__ = {}
-
 nb_config = Config(
     {
         'shuffle': dict(func=nb.shuffle_nb, path='vectorbt.generic.nb.shuffle_nb'),
@@ -265,6 +288,7 @@ nb_config = Config(
         'fshift': dict(func=nb.fshift_nb, path='vectorbt.generic.nb.fshift_nb'),
         'diff': dict(func=nb.diff_nb, path='vectorbt.generic.nb.diff_nb'),
         'pct_change': dict(func=nb.pct_change_nb, path='vectorbt.generic.nb.pct_change_nb'),
+        'bfill': dict(func=nb.bfill_nb, path='vectorbt.generic.nb.bfill_nb'),
         'ffill': dict(func=nb.ffill_nb, path='vectorbt.generic.nb.ffill_nb'),
         'cumsum': dict(func=nb.nancumsum_nb, path='vectorbt.generic.nb.nancumsum_nb'),
         'cumprod': dict(func=nb.nancumprod_nb, path='vectorbt.generic.nb.nancumprod_nb'),
@@ -276,8 +300,8 @@ nb_config = Config(
         'expanding_mean': dict(func=nb.expanding_mean_nb, path='vectorbt.generic.nb.expanding_mean_nb'),
         'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
     },
-    as_attrs=False,
-    readonly=True
+    readonly=True,
+    as_attrs=False
 )
 """_"""
 
@@ -323,8 +347,8 @@ transform_config = Config(
             docstring="See `sklearn.preprocessing.PowerTransformer`."
         )
     },
-    as_attrs=False,
-    readonly=True
+    readonly=True,
+    as_attrs=False
 )
 """_"""
 
@@ -336,28 +360,34 @@ __pdoc__['transform_config'] = f"""Config of transform methods to be added to `G
 """
 
 
-@add_nb_methods(nb_config)
-@add_transform_methods(transform_config)
-class GenericAccessor(BaseAccessor, StatsBuilderMixin):
+@attach_nb_methods(nb_config)
+@attach_transform_methods(transform_config)
+class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaGenericAccessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
     def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
+        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+        StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
+
         if mapping is not None:
+            if isinstance(mapping, str):
+                if mapping.lower() == 'index':
+                    mapping = self.wrapper.index
+                elif mapping.lower() == 'columns':
+                    mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         self._mapping = mapping
 
-        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
-        StatsBuilderMixin.__init__(self)
-
     @property
-    def sr_accessor_cls(self):
+    def sr_accessor_cls(self) -> tp.Type["GenericSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return GenericSRAccessor
 
     @property
-    def df_accessor_cls(self):
+    def df_accessor_cls(self) -> tp.Type["GenericDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return GenericDFAccessor
 
@@ -952,6 +982,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, str):
+            if mapping.lower() == 'index':
+                mapping = self.wrapper.index
+            elif mapping.lower() == 'columns':
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -1018,7 +1054,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             silence_warnings=silence_warnings
         )
         if 'mapping' in cond_kwargs:
-            self_copy = reself.copy(mapping=cond_kwargs['mapping'])
+            self_copy = reself.replace(mapping=cond_kwargs['mapping'])
 
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:
@@ -1040,7 +1076,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """Defaults for `GenericAccessor.stats`.
 
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `generic.stats` in `vectorbt._settings.settings`."""
+        `generic.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
         generic_stats_cfg = settings['generic']['stats']
 
@@ -1143,17 +1179,28 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
+    def ranges(self) -> Ranges:
+        """`GenericAccessor.get_ranges` with default arguments."""
+        return self.get_ranges()
+
+    def get_ranges(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Ranges:
+        """Generate range records.
+
+        See `vectorbt.generic.ranges.Ranges`."""
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+
+    @property
     def drawdowns(self) -> Drawdowns:
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
-        return Drawdowns.from_ts(self.obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
+        wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(self,
                   dropna: bool = True,
@@ -1229,6 +1276,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def zscore(self, **kwargs) -> tp.SeriesFrame:
         """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
         return self.scale(with_mean=True, with_std=True, **kwargs)
+
+    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Rebase all series to a given intial base.
+
+        This makes comparing/plotting different series together easier.
+        Will forward and backward fill NaN values."""
+        result = nb.bfill_nb(nb.ffill_nb(self.to_2d_array()))
+        result = result / result[0] * base
+        return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Splitting ############# #
 
@@ -1648,6 +1704,40 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             return box.fig
         return box
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `GenericAccessor.plots`.
+
+        Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `generic.plots` from `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        generic_plots_cfg = settings['generic']['plots']
+
+        return merge_dicts(
+            PlotsBuilderMixin.plots_defaults.__get__(self),
+            generic_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot=dict(
+                check_is_not_grouped=True,
+                plot_func='plot',
+                pass_trace_names=False,
+                tags='generic'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+GenericAccessor.override_metrics_doc(__pdoc__)
+GenericAccessor.override_subplots_doc(__pdoc__)
+
 
 class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
     """Accessor on top of data of any type. For Series only.
@@ -1724,7 +1814,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
@@ -1855,7 +1945,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             add_trace_kwargs = {}
 
         obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
-        checks.assert_type(other, pd.Series)
+        checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             if 'width' in plotting_cfg['layout']:
@@ -2373,6 +2463,3 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                    **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
-
-
-GenericAccessor.override_metrics_doc(__pdoc__)

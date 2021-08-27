@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Named tuples and enumerated types.
 
 Defines enums and other schemas for `vectorbt.portfolio`."""
@@ -11,7 +14,10 @@ __all__ = [
     'RejectedOrderError',
     'InitCashMode',
     'CallSeqType',
+    'AccumulationMode',
     'ConflictMode',
+    'DirectionConflictMode',
+    'OppositeEntryMode',
     'StopEntryPrice',
     'StopExitPrice',
     'StopExitMode',
@@ -20,10 +26,10 @@ __all__ = [
     'Direction',
     'OrderStatus',
     'OrderSide',
-    'StatusInfo',
+    'OrderStatusInfo',
     'TradeDirection',
     'TradeStatus',
-    'TradeType',
+    'TradesType',
     'ProcessOrderState',
     'ExecuteOrderState',
     'SimulationContext',
@@ -32,14 +38,15 @@ __all__ = [
     'SegmentContext',
     'OrderContext',
     'PostOrderContext',
+    'FlexOrderContext',
     'Order',
     'NoOrder',
     'OrderResult',
     'AdjustSLContext',
     'AdjustTPContext',
+    'SignalContext',
     'order_dt',
     'trade_dt',
-    'position_dt',
     'log_dt'
 ]
 
@@ -101,11 +108,45 @@ Attributes:
 """
 
 
+class AccumulationModeT(tp.NamedTuple):
+    Disabled: int = 0
+    Both: int = 1
+    AddOnly: int = 2
+    RemoveOnly: int = 3
+
+
+AccumulationMode = AccumulationModeT()
+"""_"""
+
+__pdoc__['AccumulationMode'] = f"""Accumulation mode.
+
+```json
+{to_doc(AccumulationMode)}
+```
+
+Accumulation allows gradually increasing and decreasing positions by a size.
+
+Attributes:
+    Disabled: Disable accumulation.
+    Both: Allow both adding to and removing from the position.
+    AddOnly: Allow accumulation to only add to the position.
+    RemoveOnly: Allow accumulation to only remove from the position.
+    
+!!! note
+    Accumulation acts differently for exits and opposite entries: exits reduce the current position
+    but won't enter the opposite one, while opposite entries reduce the position by the same amount,
+    but as soon as this position is closed, they begin to increase the opposite position.
+
+    The behavior for opposite entries can be changed by `OppositeEntryMode` and for stop orders by `StopExitMode`.
+"""
+
+
 class ConflictModeT(tp.NamedTuple):
     Ignore: int = 0
     Entry: int = 1
     Exit: int = 2
-    Opposite: int = 3
+    Adjacent: int = 3
+    Opposite: int = 4
 
 
 ConflictMode = ConflictModeT()
@@ -121,9 +162,74 @@ What should happen if both entry and exit signals occur simultaneously?
 
 Attributes:
     Ignore: Ignore both signals.
-    Entry: Execute entry signal.
-    Exit: Execute exit signal.
-    Opposite: Execute opposite signal. Takes effect only when in position.
+    Entry: Execute the entry signal.
+    Exit: Execute the exit signal.
+    Adjacent: Execute the adjacent signal.
+    
+        Takes effect only when in position, otherwise ignores.
+    Opposite: Execute the opposite signal.
+    
+        Takes effect only when in position, otherwise ignores.
+"""
+
+
+class DirectionConflictModeT(tp.NamedTuple):
+    Ignore: int = 0
+    Long: int = 1
+    Short: int = 2
+    Adjacent: int = 3
+    Opposite: int = 4
+
+
+DirectionConflictMode = DirectionConflictModeT()
+"""_"""
+
+__pdoc__['DirectionConflictMode'] = f"""Direction conflict mode.
+
+```json
+{to_doc(DirectionConflictMode)}
+```
+
+What should happen if both long and short entry signals occur simultaneously?
+
+Attributes:
+    Ignore: Ignore both entry signals.
+    Long: Execute the long entry signal.
+    Short: Execute the short entry signal.
+    Adjacent: Execute the adjacent entry signal. 
+    
+        Takes effect only when in position, otherwise ignores.
+    Opposite: Execute the opposite entry signal. 
+    
+        Takes effect only when in position, otherwise ignores.
+"""
+
+
+class OppositeEntryModeT(tp.NamedTuple):
+    Ignore: int = 0
+    Close: int = 1
+    CloseReduce: int = 2
+    Reverse: int = 3
+    ReverseReduce: int = 4
+
+
+OppositeEntryMode = OppositeEntryModeT()
+"""_"""
+
+__pdoc__['OppositeEntryMode'] = f"""Opposite entry mode.
+
+```json
+{to_doc(OppositeEntryMode)}
+```
+
+What should happen if an entry signal of opposite direction occurs before an exit signal?
+
+Attributes:
+    Ignore: Ignore the opposite entry signal.
+    Close: Close the current position.
+    CloseReduce: Close the current position or reduce it if accumulation is enabled.
+    Reverse: Reverse the current position.
+    ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
 """
 
 
@@ -174,28 +280,40 @@ Which price to use when exiting a position upon a stop signal?
 Attributes:
     StopLimit: Stop price as from a limit order.
     
-        If the stop was hit before, it becomes the opening price.
+        If the stop was hit before, the opening price at the next bar is used.
         User-defined slippage is not applied.
     StopMarket: Stop price as from a market order.
     
-        If the stop was hit before, it becomes the opening price.
+        If the stop was hit before, the opening price at the next bar is used.
         User-defined slippage is applied.
     Price: Default price.
                 
         User-defined slippage is applied.
     
-        !!! warning
+        !!! note
             Make sure to use `StopExitPrice.Price` only together with `StopEntryPrice.Close`.
             Otherwise, there is no proof that the price comes after the stop price.
     Close: Closing price.
     
         User-defined slippage is applied.
+        
+!!! note
+    We can execute only one signal per asset and bar. This means the following:
+    
+    1) Stop signal cannot be processed at the same bar as the entry signal.
+    
+    2) When dealing with stop orders, we have another signal - stop signal - that may be in a conflict 
+    with the signals placed by the user. To choose between both, we assume that any stop signal comes 
+    before any other signal in time. Thus, make sure to always execute ordinary signals using the 
+    closing price when using stop orders. Otherwise, you're looking into the future.
 """
 
 
 class StopExitModeT(tp.NamedTuple):
     Close: int = 0
-    Exit: int = 1
+    CloseReduce: int = 1
+    Reverse: int = 2
+    ReverseReduce: int = 3
 
 
 StopExitMode = StopExitModeT()
@@ -210,8 +328,11 @@ __pdoc__['StopExitMode'] = f"""Stop exit mode.
 How to exit the current position upon a stop signal?
 
 Attributes:
-    Close: Close the position (regardless of accumulation or direction).
-    Exit: Handle as an exit signal.
+    Close: Close the current position.
+    CloseReduce: Close the current position or reduce it if accumulation is enabled.
+    Reverse: Reverse the current position.
+    ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
+            
 """
 
 
@@ -292,7 +413,7 @@ Attributes:
 class DirectionT(tp.NamedTuple):
     LongOnly: int = 0
     ShortOnly: int = 1
-    All: int = 2
+    Both: int = 2
 
 
 Direction = DirectionT()
@@ -307,7 +428,7 @@ __pdoc__['Direction'] = f"""Position direction.
 Attributes:
     LongOnly: Only long positions.
     ShortOnly: Only short positions.
-    All: Both long and short positions.
+    Both: Both long and short positions.
 """
 
 
@@ -349,7 +470,7 @@ __pdoc__['OrderSide'] = f"""Order side.
 """
 
 
-class StatusInfoT(tp.NamedTuple):
+class OrderStatusInfoT(tp.NamedTuple):
     SizeNaN: int = 0
     PriceNaN: int = 1
     ValPriceNaN: int = 2
@@ -366,13 +487,13 @@ class StatusInfoT(tp.NamedTuple):
     PartialFill: int = 13
 
 
-StatusInfo = StatusInfoT()
+OrderStatusInfo = OrderStatusInfoT()
 """_"""
 
-__pdoc__['StatusInfo'] = f"""Order status information.
+__pdoc__['OrderStatusInfo'] = f"""Order status information.
 
 ```json
-{to_doc(StatusInfo)}
+{to_doc(OrderStatusInfo)}
 ```
 """
 
@@ -434,18 +555,19 @@ __pdoc__['TradeStatus'] = f"""Event status.
 """
 
 
-class TradeTypeT(tp.NamedTuple):
-    Trade: int = 0
-    Position: int = 1
+class TradesTypeT(tp.NamedTuple):
+    EntryTrades: int = 0
+    ExitTrades: int = 1
+    Positions: int = 2
 
 
-TradeType = TradeTypeT()
+TradesType = TradesTypeT()
 """_"""
 
-__pdoc__['TradeType'] = f"""Trade type.
+__pdoc__['TradesType'] = f"""Trades type.
 
 ```json
-{to_doc(TradeType)}
+{to_doc(TradesType)}
 ```
 """
 
@@ -491,14 +613,18 @@ __pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
 
 class SimulationContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -528,23 +654,18 @@ A tuple with exactly two elements: the number of rows and columns.
 One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
 where the first axis are rows (minutes) and the second axis are columns (assets).
 """
-__pdoc__['SimulationContext.close'] = """Latest asset price at each time step.
-
-Has shape `SimulationContext.target_shape`.
-"""
-__pdoc__['SimulationContext.group_lens'] = """Number of columns per each group.
+__pdoc__['SimulationContext.group_lens'] = """Number of columns in each group.
 
 Even if columns are not grouped, `group_lens` contains ones - one column per group.
 
 ## Example
 
 In pairs trading, `group_lens` would be `np.array([2])`, while three independent
-columns would require `group_lens` of `np.array([1, 1, 1])`.
+columns would be represented by `group_lens` of `np.array([1, 1, 1])`.
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column or group with cash sharing.
 
-If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, 
-otherwise has shape `(target_shape[1],)`.
+If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(target_shape[1],)`.
 
 ## Example
 
@@ -560,6 +681,8 @@ Controls the sequence in which `order_func_nb` is executed within each segment.
 Has shape `SimulationContext.target_shape` and each value must exist in the range `[0, group_len)`.
 
 !!! note
+    To use `sort_call_seq_nb`, should be generated using `CallSeqType.Default`.
+
     To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
 ## Example
@@ -574,16 +697,26 @@ np.array([
 ])
 ```
 """
-__pdoc__['SimulationContext.segment_mask'] = """Mask of whether order functions of a particular segment 
-should be executed.
+__pdoc__['SimulationContext.segment_mask'] = """Mask of whether a particular segment should be executed.
 
 A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
-The segment pre- and postprocessing functions are executed regardless of the mask.
+If a segment is inactive, any callback function inside of it will not be executed.
+You can still execute the segment's pre- and postprocessing function by enabling 
+`SimulationContext.call_pre_segment` and `SimulationContext.call_post_segment` respectively.
 
-You can change this mask in-place to dynamically disable future segments.
+Utilizes flexible indexing using `vectorbt.base.reshape_fns.flex_select_auto_nb` and `flex_2d`, 
+so it can be passed as 
 
-Has shape `(target_shape[0], group_lens.shape[0])`.
+* 2-dim array, 
+* 1-dim array per column (requires `flex_2d=True`), 
+* 1-dim array per row (requires `flex_2d=False`), and
+* a scalar. 
+
+Broadcasts to the shape `(target_shape[0], group_lens.shape[0])`.
+
+!!! note
+    To modify the array in place, make sure to build an array of the full shape.
 
 ## Example
 
@@ -594,13 +727,49 @@ np.array([[ True, False],
           [False,  True]])
 ```
 
-Only the first group is executed in the first row and only the second group is executed
-in the second row.
+The first group is only executed in the first row and the second group is only executed in the second row.
+"""
+__pdoc__['SimulationContext.call_pre_segment'] = """Whether to call `pre_segment_func_nb` regardless of 
+`SimulationContext.segment_mask`."""
+__pdoc__['SimulationContext.call_post_segment'] = """Whether to call `post_segment_func_nb` regardless of 
+`SimulationContext.segment_mask`.
+
+Allows, for example, to write user-defined arrays such as returns at the end of each segment."""
+__pdoc__['SimulationContext.close'] = """Latest asset price at each time step.
+
+Utilizes flexible indexing using `vectorbt.base.reshape_fns.flex_select_auto_nb` and `flex_2d`, 
+so it can be passed as 
+
+* 2-dim array, 
+* 1-dim array per column (requires `flex_2d=True`), 
+* 1-dim array per row (requires `flex_2d=False`), and
+* a scalar. 
+
+Broadcasts to the shape `SimulationContext.target_shape`.
+
+!!! note
+    To modify the array in place, make sure to build an array of the full shape.
 """
 __pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
 
 Otherwise, unknown `SimulationContext.close` will lead to NaN in valuation price at the next timestamp."""
-__pdoc__['SimulationContext.update_value'] = "Whether to update group value after each filled order."
+__pdoc__['SimulationContext.update_value'] = """Whether to update group value after each filled order.
+
+Otherwise, stays the same for all columns in the group (the value is calculated
+only once, before executing any order).
+
+The change is marginal and mostly driven by transaction costs and slippage."""
+__pdoc__['SimulationContext.fill_pos_record'] = """Whether to fill position record.
+
+Disable this to make simulation a bit faster for simple use cases."""
+__pdoc__['SimulationContext.flex_2d'] = """Whether the elements in a 1-dim array should be treated per
+column rather than per row.
+
+This flag is set automatically when using `vectorbt.portfolio.base.Portfolio.from_order_func` depending upon 
+whether there is any argument that has been broadcast to 2 dimensions.
+
+Has only effect when using flexible indexing, for example, with `vectorbt.base.reshape_fns.flex_select_auto_nb`.
+"""
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
 It's a 1-dimensional array with records of type `order_dt`.
@@ -735,7 +904,7 @@ Similar to `SimulationContext.last_oidx` but for log records.
 """
 __pdoc__['SimulationContext.last_pos_record'] = """Latest position record of each column.
 
-It's a 1-dimensional array with records of type `position_dt`.
+It's a 1-dimensional array with records of type `trade_dt`.
 
 Has shape `(target_shape[1],)`.
 
@@ -799,14 +968,18 @@ Here's order info from `order_func_nb` and the updated position info from `post_
 
 class GroupContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -873,14 +1046,18 @@ If columns are not grouped, equals to `from_col + 1`.
 
 class RowContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -916,14 +1093,18 @@ Has range `[0, target_shape[0])`.
 
 class SegmentContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -942,7 +1123,7 @@ class SegmentContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
 
 
 __pdoc__['SegmentContext'] = """A named tuple representing the context of a segment.
@@ -979,14 +1160,18 @@ You can use `pre_segment_func_nb` to override `call_seq_now`.
 
 class OrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1005,7 +1190,7 @@ class OrderContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
     col: int
     call_idx: int
     cash_now: float
@@ -1053,14 +1238,18 @@ __pdoc__['OrderContext.pos_record_now'] = "`SimulationContext.last_pos_record` f
 
 class PostOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
-    close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Array2d
-    segment_mask: tp.Array2d
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
     ffill_val_price: bool
     update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
@@ -1079,7 +1268,7 @@ class PostOrderContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    call_seq_now: tp.Array1d
+    call_seq_now: tp.Optional[tp.Array1d]
     col: int
     call_idx: int
     cash_before: float
@@ -1143,11 +1332,65 @@ __pdoc__['PostOrderContext.return_now'] = "`OrderContext.return_now` after execu
 __pdoc__['PostOrderContext.pos_record_now'] = "`OrderContext.pos_record_now` after execution."
 
 
+class FlexOrderContext(tp.NamedTuple):
+    target_shape: tp.Shape
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Optional[tp.Array2d]
+    segment_mask: tp.ArrayLike
+    call_pre_segment: bool
+    call_post_segment: bool
+    close: tp.ArrayLike
+    ffill_val_price: bool
+    update_value: bool
+    fill_pos_record: bool
+    flex_2d: bool
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_position: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
+    last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
+    last_oidx: tp.Array1d
+    last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    call_seq_now: None
+    call_idx: int
+
+
+__pdoc__['FlexOrderContext'] = """A named tuple representing the context of a flexible order.
+
+Contains all fields from `SegmentContext` plus the current call index.
+
+Passed to `flex_order_func_nb`.
+"""
+for field in FlexOrderContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `SimulationContext.{field}`."
+    elif field in GroupContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `GroupContext.{field}`."
+    elif field in RowContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `RowContext.{field}`."
+    elif field in SegmentContext._fields:
+        __pdoc__['FlexOrderContext.' + field] = f"See `SegmentContext.{field}`."
+__pdoc__['FlexOrderContext.call_idx'] = "Index of the current call."
+
+
 class Order(tp.NamedTuple):
     size: float = np.inf
     price: float = np.inf
     size_type: int = SizeType.Amount
-    direction: int = Direction.All
+    direction: int = Direction.Both
     fees: float = 0.0
     fixed_fees: float = 0.0
     slippage: float = 0.0
@@ -1174,7 +1417,7 @@ For any fixed size:
 * Set to any number to buy/sell some fixed amount or value.
     Longs are limited by the current cash balance, while shorts are only limited if `Order.lock_cash`.
 * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
-    If `Order.direction` is not `Direction.All`, `-np.inf` will close the position.
+    If `Order.direction` is not `Direction.Both`, `-np.inf` will close the position.
 * Set to `np.nan` or 0 to skip.
 
 For any target size:
@@ -1199,6 +1442,8 @@ __pdoc__['Order.fees'] = """Fees in percentage of the order value.
 Note that 0.01 = 1%."""
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = """Slippage in percentage of `Order.price`. 
+
+Slippage is a penalty applied on the price.
 
 Note that 0.01 = 1%."""
 __pdoc__['Order.min_size'] = """Minimum size in both directions. 
@@ -1262,7 +1507,7 @@ __pdoc__['OrderResult.price'] = "Filled price per unit, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
-__pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
+__pdoc__['OrderResult.status_info'] = "See `OrderStatusInfo`."
 
 
 class AdjustSLContext(tp.NamedTuple):
@@ -1326,12 +1571,32 @@ __pdoc__['AdjustTPContext.init_i'] = "See `AdjustSLContext.init_i`."
 __pdoc__['AdjustTPContext.init_price'] = "See `AdjustSLContext.curr_price`."
 __pdoc__['AdjustTPContext.curr_stop'] = "See `AdjustSLContext.curr_stop`."
 
+
+class SignalContext(tp.NamedTuple):
+    i: int
+    col: int
+    position_now: float
+    val_price_now: float
+    flex_2d: bool
+
+
+__pdoc__['AdjustSLContext'] = "A named tuple representing the context for generation of signals."
+__pdoc__['AdjustSLContext.i'] = """Index of the current row.
+
+Has range `[0, target_shape[0])`."""
+__pdoc__['AdjustSLContext.col'] = """Current column.
+
+Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
+__pdoc__['AdjustSLContext.position_now'] = "Latest position."
+__pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
+__pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbt.base.reshape_fns.flex_select_auto_nb`."
+
 # ############# Records ############# #
 
 order_dt = np.dtype([
     ('id', np.int_),
-    ('idx', np.int_),
     ('col', np.int_),
+    ('idx', np.int_),
     ('size', np.float_),
     ('price', np.float_),
     ('fees', np.float_),
@@ -1360,7 +1625,7 @@ _trade_fields = [
     ('return', np.float_),
     ('direction', np.int_),
     ('status', np.int_),
-    ('position_id', np.int_)
+    ('parent_id', np.int_)
 ]
 
 trade_dt = np.dtype(_trade_fields, align=True)
@@ -1373,43 +1638,31 @@ __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 ```
 """
 
-_position_fields = _trade_fields[:-1]
-
-position_dt = np.dtype(_position_fields, align=True)
-"""_"""
-
-__pdoc__['position_dt'] = f"""`np.dtype` of position records.
-
-```json
-{to_doc(position_dt)}
-```
-"""
-
 _log_fields = [
     ('id', np.int_),
-    ('idx', np.int_),
-    ('col', np.int_),
     ('group', np.int_),
+    ('col', np.int_),
+    ('idx', np.int_),
     ('cash', np.float_),
     ('position', np.float_),
     ('debt', np.float_),
     ('free_cash', np.float_),
     ('val_price', np.float_),
     ('value', np.float_),
-    ('size', np.float_),
-    ('price', np.float_),
-    ('size_type', np.int_),
-    ('direction', np.int_),
-    ('fees', np.float_),
-    ('fixed_fees', np.float_),
-    ('slippage', np.float_),
-    ('min_size', np.float_),
-    ('max_size', np.float_),
-    ('reject_prob', np.float_),
-    ('lock_cash', np.bool_),
-    ('allow_partial', np.bool_),
-    ('raise_reject', np.bool_),
-    ('log', np.bool_),
+    ('req_size', np.float_),
+    ('req_price', np.float_),
+    ('req_size_type', np.int_),
+    ('req_direction', np.int_),
+    ('req_fees', np.float_),
+    ('req_fixed_fees', np.float_),
+    ('req_slippage', np.float_),
+    ('req_min_size', np.float_),
+    ('req_max_size', np.float_),
+    ('req_reject_prob', np.float_),
+    ('req_lock_cash', np.bool_),
+    ('req_allow_partial', np.bool_),
+    ('req_raise_reject', np.bool_),
+    ('req_log', np.bool_),
     ('new_cash', np.float_),
     ('new_position', np.float_),
     ('new_debt', np.float_),

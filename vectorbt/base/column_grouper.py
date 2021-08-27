@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Class that exposes methods to group columns.
 
 Class `ColumnGrouper` stores metadata related to grouping columns. It can return, for example,
@@ -114,7 +117,7 @@ class ColumnGrouper(Configured):
         Columns should build groups that are coherent and sorted for using `get_group_lens_nb`.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `ColumnGrouper.copy`."""
+        This class is meant to be immutable. To change any attribute, use `ColumnGrouper.replace`."""
 
     def __init__(self, columns: tp.Index, group_by: tp.GroupByLike = None, allow_enable: bool = True,
                  allow_disable: bool = True, allow_modify: bool = True) -> None:
@@ -127,7 +130,7 @@ class ColumnGrouper(Configured):
             allow_modify=allow_modify
         )
 
-        checks.assert_type(columns, pd.Index)
+        checks.assert_instance_of(columns, pd.Index)
         self._columns = columns
         if group_by is None or group_by is False:
             self._group_by = None

@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Root pandas accessors.
 
 An accessor adds additional “namespace” to pandas objects.
@@ -62,7 +65,7 @@ class Accessor:
         if isinstance(obj, (pd.Series, pd.DataFrame)):
             accessor_obj = self._accessor(obj)
         elif isinstance(obj, Configured):
-            accessor_obj = obj.copy(_class=self._accessor)
+            accessor_obj = obj.replace(cls_=self._accessor)
         else:
             accessor_obj = self._accessor(obj.obj)
         return accessor_obj
@@ -122,11 +125,11 @@ class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
         GenericDFAccessor.__init__(self, obj, **kwargs)
 
 
-def register_series_vbt_accessor(name: str) -> tp.Callable:
-    """Decorator to register a custom `pd.Series` accessor on top of the `vbt` accessor."""
-    return register_accessor(name, Vbt_SRAccessor)
+def register_series_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_SRAccessor) -> tp.Callable:
+    """Decorator to register a `pd.Series` accessor on top of a parent accessor."""
+    return register_accessor(name, parent)
 
 
-def register_dataframe_vbt_accessor(name: str) -> tp.Callable:
-    """Decorator to register a custom `pd.DataFrame` accessor on top of the `vbt` accessor."""
-    return register_accessor(name, Vbt_DFAccessor)
+def register_dataframe_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_DFAccessor) -> tp.Callable:
+    """Decorator to register a `pd.DataFrame` accessor on top of a parent accessor."""
+    return register_accessor(name, parent)

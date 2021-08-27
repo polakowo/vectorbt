@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """A factory for building new indicators with ease.
 
 The indicator factory class `IndicatorFactory` offers a convenient way to create technical
@@ -392,10 +395,10 @@ broadcasting and one for element-wise broadcasting:
 ... def apply_func_nb(price, window, lower, upper, flex_2d):
 ...     output = np.full(price.shape, np.nan, dtype=np.float_)
 ...     for col in range(price.shape[1]):
-...         _window = flex_select_auto_nb(0, col, window, flex_2d)
+...         _window = flex_select_auto_nb(window, 0, col, flex_2d)
 ...         for i in range(_window, price.shape[0]):
-...             _lower = flex_select_auto_nb(i, col, lower, flex_2d)
-...             _upper = flex_select_auto_nb(i, col, upper, flex_2d)
+...             _lower = flex_select_auto_nb(lower, i, col, flex_2d)
+...             _upper = flex_select_auto_nb(upper, i, col, flex_2d)
 ...             mean = np.mean(price[i - _window:i, col])
 ...             output[i, col] = _lower < mean < _upper
 ...     return output
@@ -1084,6 +1087,12 @@ Name: (2, b), dtype: float64
 2020-01-05  4.5  1.5
 ```
 
+## TA-Lib
+
+Indicator factory also provides a class method `IndicatorFactory.from_talib`
+that can be used to wrap any function from TA-Lib. It automatically fills all the
+neccessary information, such as input, parameter and output names.
+
 ## Stats
 
 !!! hint
@@ -1114,11 +1123,41 @@ sum_diff    170.0
 Name: a, dtype: float64
 ```
 
-## TA-Lib
+## Plots
 
-Indicator factory also provides a class method `IndicatorFactory.from_talib`
-that can be used to wrap any function from TA-Lib. It automatically fills all the
-neccessary information, such as input, parameter and output names.
+!!! hint
+    See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
+
+Similarly to stats, we can attach subplots to any new indicator class:
+
+```python-repl
+>>> @njit
+... def apply_func_nb(price):
+...     return price ** 2, price ** 3
+
+>>> def plot_outputs(out1, out2, column=None, fig=None):
+...     fig = out1[column].rename('out1').vbt.plot(fig=fig)
+...     fig = out2[column].rename('out2').vbt.plot(fig=fig)
+
+>>> MyInd = vbt.IndicatorFactory(
+...     input_names=['price'],
+...     output_names=['out1', 'out2'],
+...     subplots=dict(
+...         plot_outputs=dict(
+...             plot_func=plot_outputs,
+...             resolve_out1=True,
+...             resolve_out2=True
+...         )
+...     )
+... ).from_apply_func(
+...     apply_func_nb
+... )
+
+>>> myind = MyInd.run(price)
+>>> myind.plots(column='a')
+```
+
+![](/docs/img/IndicatorFactory_plots.svg)
 """
 
 import numpy as np
@@ -1147,6 +1186,7 @@ from vectorbt.base.indexing import build_param_indexer
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.accessors import BaseAccessor
 from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -1974,9 +2014,12 @@ def run_pipeline(
            other_list
 
 
-def combine_objs(obj: tp.SeriesFrame, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
-                 *args, level_name: tp.Optional[str] = None, keys: tp.Optional[tp.IndexLike] = None,
-                 allow_multiple: bool = True, **kwargs) -> tp.SeriesFrame:
+def combine_objs(obj: tp.SeriesFrame,
+                 other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
+                 *args, level_name: tp.Optional[str] = None,
+                 keys: tp.Optional[tp.IndexLike] = None,
+                 allow_multiple: bool = True,
+                 **kwargs) -> tp.SeriesFrame:
     """Combines/compares `obj` to `other`, for example, to generate signals.
 
     Both will broadcast together.
@@ -1995,7 +2038,11 @@ RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOu
 RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
-class IndicatorBase(Wrapping, StatsBuilderMixin):
+class MetaIndicatorBase(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
+    pass
+
+
+class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaIndicatorBase):
     """Indicator base class.
 
     Properties should be set before instantiation."""
@@ -2065,6 +2112,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             level_names=level_names
         )
         StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
         if input_mapper is not None:
             checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
@@ -2076,7 +2124,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             checks.assert_len_equal(param_list[0], params)
         for mapper in mapper_list:
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
         checks.assert_len_equal(level_names, param_list)
 
         setattr(self, '_short_name', short_name)
@@ -2126,7 +2174,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin):
             # Tuple mapper is a list because of its complex data type
             mapper_list.append(getattr(self, f'_{param_name}_mapper')[col_idxs_arr])
 
-        return self.copy(
+        return self.replace(
             wrapper=new_wrapper,
             input_list=input_list,
             input_mapper=input_mapper,
@@ -2172,7 +2220,9 @@ class IndicatorFactory:
                  custom_output_props: tp.KwargsLike = None,
                  attr_settings: tp.KwargsLike = None,
                  metrics: tp.Optional[tp.Kwargs] = None,
-                 stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None) -> None:
+                 stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None,
+                 subplots: tp.Optional[tp.Kwargs] = None,
+                 plots_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None) -> None:
         """A factory for creating new indicators.
 
         Initialize `IndicatorFactory` to create a skeleton and then use a class method
@@ -2217,6 +2267,12 @@ class IndicatorFactory:
             stats_defaults (callable or dict): Defaults for `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
 
                 If dict, will be converted into a property.
+            subplots (dict): Subplots supported by `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
+
+                If dict, will be converted to `vectorbt.utils.config.Config`.
+            plots_defaults (callable or dict): Defaults for `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`.
+
+                If dict, will be converted into a property.
 
         !!! note
             The `__init__` method is not used for running the indicator, for this use `run`.
@@ -2225,14 +2281,14 @@ class IndicatorFactory:
         """
         # Check and save parameters
         self.class_name = class_name
-        checks.assert_type(class_name, str)
+        checks.assert_instance_of(class_name, str)
 
         self.class_docstring = class_docstring
-        checks.assert_type(class_docstring, str)
+        checks.assert_instance_of(class_docstring, str)
 
         self.module_name = module_name
         if module_name is not None:
-            checks.assert_type(module_name, str)
+            checks.assert_instance_of(module_name, str)
 
         if short_name is None:
             if class_name == 'Indicator':
@@ -2240,10 +2296,10 @@ class IndicatorFactory:
             else:
                 short_name = class_name.lower()
         self.short_name = short_name
-        checks.assert_type(short_name, str)
+        checks.assert_instance_of(short_name, str)
 
         self.prepend_name = prepend_name
-        checks.assert_type(prepend_name, bool)
+        checks.assert_instance_of(prepend_name, bool)
 
         if input_names is None:
             input_names = []
@@ -2279,19 +2335,19 @@ class IndicatorFactory:
 
         if output_flags is None:
             output_flags = {}
-        checks.assert_type(output_flags, dict)
+        checks.assert_instance_of(output_flags, dict)
         if len(output_flags) > 0:
             checks.assert_dict_valid(output_flags, all_output_names)
         self.output_flags = output_flags
 
         if custom_output_props is None:
             custom_output_props = {}
-        checks.assert_type(custom_output_props, dict)
+        checks.assert_instance_of(custom_output_props, dict)
         self.custom_output_props = custom_output_props
 
         if attr_settings is None:
             attr_settings = {}
-        checks.assert_type(attr_settings, dict)
+        checks.assert_instance_of(attr_settings, dict)
         all_attr_names = input_names + all_output_names + list(custom_output_props.keys())
         if len(attr_settings) > 0:
             checks.assert_dict_valid(attr_settings, all_attr_names)
@@ -2541,6 +2597,22 @@ class IndicatorFactory:
                     return stats_defaults(self)
             stats_defaults_prop.__name__ = "stats_defaults"
             setattr(Indicator, "stats_defaults", property(stats_defaults_prop))
+
+        # Prepare plots
+        if subplots is not None:
+            if not isinstance(subplots, Config):
+                subplots = Config(subplots, copy_kwargs=dict(copy_mode='deep'))
+            setattr(Indicator, "_subplots", subplots.copy())
+
+        if plots_defaults is not None:
+            if isinstance(plots_defaults, dict):
+                def plots_defaults_prop(self, _plots_defaults: tp.Kwargs = plots_defaults) -> tp.Kwargs:
+                    return _plots_defaults
+            else:
+                def plots_defaults_prop(self, _plots_defaults: tp.Kwargs = plots_defaults) -> tp.Kwargs:
+                    return plots_defaults(self)
+            plots_defaults_prop.__name__ = "plots_defaults"
+            setattr(Indicator, "plots_defaults", property(plots_defaults_prop))
 
         # Save indicator
         self.Indicator = Indicator

@@ -1,3 +1,6 @@
+# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
+
 """Global settings.
 
 `settings` config is also accessible via `vectorbt.settings`.
@@ -135,7 +138,9 @@ settings = SettingsConfig(
                 dict(
                     enableRateLimit=True
                 )
-            )
+            ),
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         plotting=dict(
             use_widgets=True,
@@ -253,7 +258,7 @@ settings = SettingsConfig(
             ),
             metric_settings=Config(),  # flex
         ),
-        plot_builder=dict(
+        plots_builder=dict(
             subplots='all',
             tags='all',
             silence_warnings=False,
@@ -289,7 +294,7 @@ settings = SettingsConfig(
             hide_id_labels=True,
             group_id_labels=True,
             make_subplots_kwargs=Config(),  # flex
-            kwargs=Config(),  # flex
+            layout_kwargs=Config(),  # flex
         ),
         generic=dict(
             stats=Config(  # flex
@@ -304,7 +309,12 @@ settings = SettingsConfig(
                         incl_all_keys=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
+        ),
+        ranges=dict(
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         drawdowns=dict(
             stats=Config(  # flex
@@ -313,7 +323,8 @@ settings = SettingsConfig(
                         incl_active=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         ohlcv=dict(
             plot_type='OHLC',
@@ -324,7 +335,8 @@ settings = SettingsConfig(
                 close='Close',
                 volume='Volume'
             ),
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         signals=dict(
             stats=Config(
@@ -341,7 +353,8 @@ settings = SettingsConfig(
                         from_other=False
                     )
                 )
-            )  # flex
+            ),  # flex
+            plots=Config()  # flex
         ),
         returns=dict(
             year_freq='365 days',
@@ -367,7 +380,7 @@ settings = SettingsConfig(
                         ),
                         has_benchmark_rets=dict(
                             filter_func=lambda self, metric_settings:
-                            metric_settings.get('benchmark_rets', None) is not None,
+                            metric_settings.get('benchmark_rets', self.benchmark_rets) is not None,
                             warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
                         )
                     ),
@@ -375,10 +388,15 @@ settings = SettingsConfig(
                         check_is_not_grouped=True
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
+        ),
+        qs_adapter=dict(
+            defaults=Config(),  # flex
         ),
         records=dict(
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         mapped_array=dict(
             stats=Config(  # flex
@@ -393,28 +411,25 @@ settings = SettingsConfig(
                         incl_all_keys=False
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         orders=dict(
-            stats=Config()  # flex
+            stats=Config(),  # flex
+            plots=Config()  # flex
         ),
         trades=dict(
             stats=Config(  # flex
                 dict(
-                    filters=dict(
-                        is_positions=dict(
-                            filter_func=lambda self, metric_settings: self.is_positions
-                        )
-                    ),
                     settings=dict(
                         incl_open=False
                     ),
                     template_mapping=dict(
-                        trades_tag=RepEval("'positions' if self.is_positions else 'trades'"),
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
-            )
+            ),
+            plots=Config()  # flex
         ),
         logs=dict(
             stats=Config()  # flex
@@ -433,7 +448,6 @@ settings = SettingsConfig(
             lock_cash=False,
             allow_partial=True,
             raise_reject=False,
-            close_first=False,
             val_price=np.inf,
             accumulate=False,
             sl_stop=np.nan,
@@ -442,13 +456,16 @@ settings = SettingsConfig(
             stop_entry_price='close',
             stop_exit_price='stoplimit',
             stop_conflict_mode='exit',
-            stop_exit_mode='close',
-            stop_update_mode='override',
+            upon_stop_exit='close',
+            upon_stop_update='override',
             use_stops=None,
             log=False,
-            conflict_mode='ignore',
+            upon_long_conflict='ignore',
+            upon_short_conflict='ignore',
+            upon_dir_conflict='ignore',
+            upon_opposite_entry='reversereduce',
             signal_direction='longonly',
-            order_direction='all',
+            order_direction='both',
             cash_sharing=False,
             call_pre_segment=False,
             call_post_segment=False,
@@ -456,10 +473,13 @@ settings = SettingsConfig(
             update_value=False,
             fill_pos_record=True,
             row_wise=False,
+            flexible=False,
             use_numba=True,
             seed=None,
             freq=None,
+            attach_call_seq=False,
             fillna_close=True,
+            trades_type='exittrades',
             stats=Config(  # flex
                 dict(
                     filters=dict(
@@ -471,33 +491,18 @@ settings = SettingsConfig(
                     ),
                     settings=dict(
                         use_asset_returns=False,
-                        use_positions=False,
                         incl_open=False
                     ),
                     template_mapping=dict(
-                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
                         incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
                     )
                 )
             ),
-            plot=Config(  # flex
+            plots=Config(  # flex
                 dict(
-                    subplots=['orders', 'trade_returns', 'cum_returns'],
-                    filters=dict(
-                        has_year_freq=dict(
-                            filter_func=lambda self, subplot_settings:
-                            subplot_settings['year_freq'] is not None,
-                            warning_message=Sub("Subplot '$subplot_name' requires year frequency to be set")
-                        )
-                    ),
+                    subplots=['orders', 'trade_pnl', 'cum_returns'],
                     settings=dict(
-                        use_asset_returns=False,
-                        use_positions=False,
-                        incl_open=True
-                    ),
-                    template_mapping=dict(
-                        trades_tag=RepEval("'positions' if use_positions else 'trades'"),
-                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+                        use_asset_returns=False
                     )
                 )
             )
@@ -628,12 +633,12 @@ Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 {settings['stats_builder'].to_doc()}
 ```
 
-## settings.plot_builder
+## settings.plots_builder
 
-Settings applied to `vectorbt.generic.plot_builder.PlotBuilderMixin`.
+Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
 
 ```json
-{settings['plot_builder'].to_doc()}
+{settings['plots_builder'].to_doc()}
 ```
 
 ## settings.generic
@@ -642,6 +647,14 @@ Settings applied across `vectorbt.generic`.
 
 ```json
 {settings['generic'].to_doc()}
+```
+
+## settings.generic.ranges
+
+Settings applied across `vectorbt.generic.ranges`.
+
+```json
+{settings['ranges'].to_doc()}
 ```
 
 ## settings.generic.drawdowns
@@ -674,6 +687,14 @@ Settings applied across `vectorbt.returns`.
 
 ```json
 {settings['returns'].to_doc()}
+```
+
+## settings.qs_adapter
+
+Settings applied across `vectorbt.returns.qs_adapter`.
+
+```json
+{settings['qs_adapter'].to_doc()}
 ```
 
 ## settings.records
