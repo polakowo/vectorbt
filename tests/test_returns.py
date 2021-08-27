@@ -10,7 +10,7 @@ from tests.utils import isclose
 qs_available = True
 try:
     import quantstats as qs
-except ImportError:
+except:
     qs_available = False
 
 day_dt = np.timedelta64(86400000000000)

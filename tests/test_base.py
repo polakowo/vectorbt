@@ -19,7 +19,7 @@ try:
     import ray
 
     ray.init(ignore_reinit_error=True)
-except ImportError:
+except:
     ray_available = False
 
 day_dt = np.timedelta64(86400000000000)

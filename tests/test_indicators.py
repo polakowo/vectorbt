@@ -13,25 +13,25 @@ try:
     import ray
 
     ray.init(ignore_reinit_error=True)
-except ImportError:
+except:
     ray_available = False
 
 ta_available = True
 try:
     import ta
-except ImportError:
+except:
     ta_available = False
 
 pandas_ta_available = True
 try:
     import pandas_ta
-except ImportError:
+except:
     pandas_ta_available = False
 
 talib_available = True
 try:
     import talib
-except ImportError:
+except:
     talib_available = False
 
 seed = 42
