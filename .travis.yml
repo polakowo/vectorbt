@@ -56,6 +56,9 @@ jobs:
         - mv docs/vectorbt/* docs
         - rmdir docs/vectorbt
         - mv docs/site/* .
+        - touch CNAME
+        - echo 'vectorbt.dev' > CNAME
+        - touch .nojekyll
       deploy:
         - provider: pages
           skip_cleanup: true

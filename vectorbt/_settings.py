@@ -5,7 +5,18 @@
 
 `settings` config is also accessible via `vectorbt.settings`.
 
+Here are the main properties of the `settings` config:
+
+* It's a nested config, that is, a config that consists of multiple sub-configs.
+    one per sub-package (e.g., 'data'), module (e.g., 'array_wrapper'), or even class (e.g., 'configured').
+    Each sub-config may consist of other sub-configs.
+* It has frozen keys - you cannot add other sub-configs or remove the existing ones, but you can modify them.
+* Each sub-config can either inherit the properties of the parent one by using `dict` or overwrite them
+    by using its own `vectorbt.utils.config.Config`. The main reason for defining an own config is to allow
+    adding new keys (e.g., 'plotting.layout').
+
 For example, you can change default width and height of each plot:
+
 ```python-repl
 >>> import vectorbt as vbt
 
@@ -13,9 +24,32 @@ For example, you can change default width and height of each plot:
 >>> vbt.settings['plotting']['layout']['height'] = 400
 ```
 
-Changes take effect immediately.
+The main sub-configs such as for plotting can be also accessed/modified using the dot notation:
+
+```
+>>> vbt.settings.plotting['layout']['width'] = 800
+```
+
+Some sub-configs allow the dot notation too but this depends whether they inherit the rules of the root config.
+
+```plaintext
+>>> vbt.settings.data - ok
+>>> vbt.settings.data.binance - ok
+>>> vbt.settings.data.binance.api_key - error
+>>> vbt.settings.data.binance['api_key'] - ok
+```
+
+Since this is only visible when looking at the source code, the advice is to always use the bracket notation.
 
 !!! note
+    Any change takes effect immediately. But whether its reflected immediately depends upon the place
+    that accesses the settings. For example, changing 'array_wrapper.freq` has an immediate effect because
+    the value is resolved every time `vectorbt.base.array_wrapper.ArrayWrapper.freq` is called.
+    On the other hand, changing 'portfolio.fillna_close' has only effect on `vectorbt.portfolio.base.Portfolio`
+    instances created in the future, not the existing ones, because the value is resolved upon the construction.
+    But mostly you can still force-update the default value by replacing the instance using
+    `vectorbt.portfolio.base.Portfolio.replace`.
+
     All places in vectorbt import `settings` from `vectorbt._settings.settings`, not from `vectorbt`.
     Overwriting `vectorbt.settings` only overwrites the reference created for the user.
     Consider updating the settings config instead of replacing it.

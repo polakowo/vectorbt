@@ -308,6 +308,18 @@ array([[10, 10, 10],
 10
 ```
 
+## Defaults
+
+If you look at the arguments of each class method, you will notice that most of them default to None.
+None has a special meaning in vectorbt: it's a command to pull the default value from the global settings config
+- `vectorbt._settings.settings`. The branch for the `Portfolio` can be found under the key 'portfolio'.
+For example, the default size used in `Portfolio.from_signals` and `Portfolio.from_orders` is `np.inf`:
+
+```python-repl
+>>> vbt.settings.portfolio['size']
+inf
+```
+
 ## Grouping
 
 One of the key features of `Portfolio` is the ability to group columns. Groups can be specified by
