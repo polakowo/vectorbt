@@ -29,7 +29,7 @@ from numba import njit
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
+from vectorbt.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic.enums import range_dt, RangeStatus
 from vectorbt.signals.enums import StopType

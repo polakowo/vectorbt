@@ -1418,10 +1418,10 @@ import pandas as pd
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum import map_enum_fields
+from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.template import RepEval, deep_substitute
-from vectorbt.utils.random import set_seed
+from vectorbt.utils.random_ import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import get_domain
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array

@@ -144,7 +144,7 @@ from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_se
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
+from vectorbt.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.drawdowns import Drawdowns

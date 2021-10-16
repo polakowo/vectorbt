@@ -11,7 +11,7 @@ import logging
 import inspect
 
 from vectorbt import _typing as tp
-from vectorbt.utils.datetime import tzaware_to_naive_time
+from vectorbt.utils.datetime_ import tzaware_to_naive_time
 from vectorbt.utils import checks
 
 logger = logging.getLogger(__name__)

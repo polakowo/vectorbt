@@ -17,7 +17,7 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.params import to_typed_list
-from vectorbt.utils.enum import map_enum_fields
+from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
 from vectorbt.signals.nb import (

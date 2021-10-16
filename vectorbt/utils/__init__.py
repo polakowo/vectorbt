@@ -7,9 +7,9 @@ from vectorbt.utils.config import atomic_dict, merge_dicts, Config, Configured, 
 from vectorbt.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
 from vectorbt.utils.decorators import CacheCondition, cached_property, cached_method
 from vectorbt.utils.figure import Figure, FigureWidget, make_figure, make_subplots
-from vectorbt.utils.random import set_seed
-from vectorbt.utils.image import save_animation
-from vectorbt.utils.schedule import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
+from vectorbt.utils.random_ import set_seed
+from vectorbt.utils.image_ import save_animation
+from vectorbt.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
 
 __all__ = [
     'atomic_dict',

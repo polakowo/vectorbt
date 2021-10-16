@@ -9,7 +9,7 @@ from copy import deepcopy
 import vectorbt as vbt
 from vectorbt.portfolio.enums import *
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt.utils.random import set_seed
+from vectorbt.utils.random_ import set_seed
 from vectorbt.portfolio import nb
 
 from tests.utils import record_arrays_close

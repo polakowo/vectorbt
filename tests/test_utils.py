@@ -14,15 +14,15 @@ from vectorbt.utils import (
     checks,
     config,
     decorators,
-    math,
-    array,
-    random,
+    math_,
+    array_,
+    random_,
     mapping,
-    enum,
+    enum_,
     params,
-    attr,
-    datetime,
-    schedule,
+    attr_,
+    datetime_,
+    schedule_,
     tags,
     template
 )
@@ -1481,7 +1481,7 @@ class TestDecorators:
         vbt.settings.caching.reset()
 
 
-# ############# attr.py ############# #
+# ############# attr_.py ############# #
 
 class TestAttr:
     def test_deep_getattr(self):
@@ -1510,20 +1510,20 @@ class TestAttr:
                 return 0
 
         with pytest.raises(Exception):
-            _ = attr.deep_getattr(A(), 'a')
+            _ = attr_.deep_getattr(A(), 'a')
         with pytest.raises(Exception):
-            _ = attr.deep_getattr(A(), ('a',))
+            _ = attr_.deep_getattr(A(), ('a',))
         with pytest.raises(Exception):
-            _ = attr.deep_getattr(A(), ('a', 1))
+            _ = attr_.deep_getattr(A(), ('a', 1))
         with pytest.raises(Exception):
-            _ = attr.deep_getattr(A(), ('a', (1,)))
-        assert attr.deep_getattr(A(), ('a', (1,), {'y': 1})) == 2
-        assert attr.deep_getattr(C(), 'c') == 0
-        assert attr.deep_getattr(C(), ['c']) == 0
-        assert attr.deep_getattr(C(), ['b', ('b', (1,))]) == 1
-        assert attr.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
-        assert attr.deep_getattr(C(), 'b.b_prop') == 1
-        assert callable(attr.deep_getattr(C(), 'b.a.a', call_last_attr=False))
+            _ = attr_.deep_getattr(A(), ('a', (1,)))
+        assert attr_.deep_getattr(A(), ('a', (1,), {'y': 1})) == 2
+        assert attr_.deep_getattr(C(), 'c') == 0
+        assert attr_.deep_getattr(C(), ['c']) == 0
+        assert attr_.deep_getattr(C(), ['b', ('b', (1,))]) == 1
+        assert attr_.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
+        assert attr_.deep_getattr(C(), 'b.b_prop') == 1
+        assert callable(attr_.deep_getattr(C(), 'b.a.a', call_last_attr=False))
 
 
 # ############# checks.py ############# #
@@ -1962,7 +1962,7 @@ class TestChecks:
             checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, f=5)), [['a', 'b', 'c'], ['d', 'e']])
 
 
-# ############# math.py ############# #
+# ############# math_.py ############# #
 
 class TestMath:
     def test_is_close(self):
@@ -1970,130 +1970,130 @@ class TestMath:
         b = 0.1 + 0.2
 
         # test scalar
-        assert math.is_close_nb(a, a)
-        assert math.is_close_nb(a, b)
-        assert math.is_close_nb(-a, -b)
-        assert not math.is_close_nb(-a, b)
-        assert not math.is_close_nb(a, -b)
-        assert math.is_close_nb(1e10 + a, 1e10 + b)
+        assert math_.is_close_nb(a, a)
+        assert math_.is_close_nb(a, b)
+        assert math_.is_close_nb(-a, -b)
+        assert not math_.is_close_nb(-a, b)
+        assert not math_.is_close_nb(a, -b)
+        assert math_.is_close_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not math.is_close_nb(np.nan, b)
-        assert not math.is_close_nb(a, np.nan)
+        assert not math_.is_close_nb(np.nan, b)
+        assert not math_.is_close_nb(a, np.nan)
 
         # test np.inf
-        assert not math.is_close_nb(np.inf, b)
-        assert not math.is_close_nb(a, np.inf)
-        assert not math.is_close_nb(-np.inf, b)
-        assert not math.is_close_nb(a, -np.inf)
-        assert not math.is_close_nb(-np.inf, -np.inf)
-        assert not math.is_close_nb(np.inf, np.inf)
-        assert not math.is_close_nb(-np.inf, np.inf)
+        assert not math_.is_close_nb(np.inf, b)
+        assert not math_.is_close_nb(a, np.inf)
+        assert not math_.is_close_nb(-np.inf, b)
+        assert not math_.is_close_nb(a, -np.inf)
+        assert not math_.is_close_nb(-np.inf, -np.inf)
+        assert not math_.is_close_nb(np.inf, np.inf)
+        assert not math_.is_close_nb(-np.inf, np.inf)
 
     def test_is_close_or_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert math.is_close_or_less_nb(a, a)
-        assert math.is_close_or_less_nb(a, b)
-        assert math.is_close_or_less_nb(-a, -b)
-        assert math.is_close_or_less_nb(-a, b)
-        assert not math.is_close_or_less_nb(a, -b)
-        assert math.is_close_or_less_nb(1e10 + a, 1e10 + b)
+        assert math_.is_close_or_less_nb(a, a)
+        assert math_.is_close_or_less_nb(a, b)
+        assert math_.is_close_or_less_nb(-a, -b)
+        assert math_.is_close_or_less_nb(-a, b)
+        assert not math_.is_close_or_less_nb(a, -b)
+        assert math_.is_close_or_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not math.is_close_or_less_nb(np.nan, b)
-        assert not math.is_close_or_less_nb(a, np.nan)
+        assert not math_.is_close_or_less_nb(np.nan, b)
+        assert not math_.is_close_or_less_nb(a, np.nan)
 
         # test np.inf
-        assert not math.is_close_or_less_nb(np.inf, b)
-        assert math.is_close_or_less_nb(a, np.inf)
-        assert math.is_close_or_less_nb(-np.inf, b)
-        assert not math.is_close_or_less_nb(a, -np.inf)
-        assert not math.is_close_or_less_nb(-np.inf, -np.inf)
-        assert not math.is_close_or_less_nb(np.inf, np.inf)
-        assert math.is_close_or_less_nb(-np.inf, np.inf)
+        assert not math_.is_close_or_less_nb(np.inf, b)
+        assert math_.is_close_or_less_nb(a, np.inf)
+        assert math_.is_close_or_less_nb(-np.inf, b)
+        assert not math_.is_close_or_less_nb(a, -np.inf)
+        assert not math_.is_close_or_less_nb(-np.inf, -np.inf)
+        assert not math_.is_close_or_less_nb(np.inf, np.inf)
+        assert math_.is_close_or_less_nb(-np.inf, np.inf)
 
     def test_is_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert not math.is_less_nb(a, a)
-        assert not math.is_less_nb(a, b)
-        assert not math.is_less_nb(-a, -b)
-        assert math.is_less_nb(-a, b)
-        assert not math.is_less_nb(a, -b)
-        assert not math.is_less_nb(1e10 + a, 1e10 + b)
+        assert not math_.is_less_nb(a, a)
+        assert not math_.is_less_nb(a, b)
+        assert not math_.is_less_nb(-a, -b)
+        assert math_.is_less_nb(-a, b)
+        assert not math_.is_less_nb(a, -b)
+        assert not math_.is_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not math.is_less_nb(np.nan, b)
-        assert not math.is_less_nb(a, np.nan)
+        assert not math_.is_less_nb(np.nan, b)
+        assert not math_.is_less_nb(a, np.nan)
 
         # test np.inf
-        assert not math.is_less_nb(np.inf, b)
-        assert math.is_less_nb(a, np.inf)
-        assert math.is_less_nb(-np.inf, b)
-        assert not math.is_less_nb(a, -np.inf)
-        assert not math.is_less_nb(-np.inf, -np.inf)
-        assert not math.is_less_nb(np.inf, np.inf)
-        assert math.is_less_nb(-np.inf, np.inf)
+        assert not math_.is_less_nb(np.inf, b)
+        assert math_.is_less_nb(a, np.inf)
+        assert math_.is_less_nb(-np.inf, b)
+        assert not math_.is_less_nb(a, -np.inf)
+        assert not math_.is_less_nb(-np.inf, -np.inf)
+        assert not math_.is_less_nb(np.inf, np.inf)
+        assert math_.is_less_nb(-np.inf, np.inf)
 
     def test_is_addition_zero(self):
         a = 0.3
         b = 0.1 + 0.2
 
-        assert not math.is_addition_zero_nb(a, b)
-        assert math.is_addition_zero_nb(-a, b)
-        assert math.is_addition_zero_nb(a, -b)
-        assert not math.is_addition_zero_nb(-a, -b)
+        assert not math_.is_addition_zero_nb(a, b)
+        assert math_.is_addition_zero_nb(-a, b)
+        assert math_.is_addition_zero_nb(a, -b)
+        assert not math_.is_addition_zero_nb(-a, -b)
 
     def test_add_nb(self):
         a = 0.3
         b = 0.1 + 0.2
 
-        assert math.add_nb(a, b) == a + b
-        assert math.add_nb(-a, b) == 0
-        assert math.add_nb(a, -b) == 0
-        assert math.add_nb(-a, -b) == -(a + b)
+        assert math_.add_nb(a, b) == a + b
+        assert math_.add_nb(-a, b) == 0
+        assert math_.add_nb(a, -b) == 0
+        assert math_.add_nb(-a, -b) == -(a + b)
 
 
-# ############# array.py ############# #
+# ############# array_.py ############# #
 
 class TestArray:
     def test_is_sorted(self):
-        assert array.is_sorted(np.array([0, 1, 2, 3, 4]))
-        assert array.is_sorted(np.array([0, 1]))
-        assert array.is_sorted(np.array([0]))
-        assert not array.is_sorted(np.array([1, 0]))
-        assert not array.is_sorted(np.array([0, 1, 2, 4, 3]))
+        assert array_.is_sorted(np.array([0, 1, 2, 3, 4]))
+        assert array_.is_sorted(np.array([0, 1]))
+        assert array_.is_sorted(np.array([0]))
+        assert not array_.is_sorted(np.array([1, 0]))
+        assert not array_.is_sorted(np.array([0, 1, 2, 4, 3]))
         # nb
-        assert array.is_sorted_nb(np.array([0, 1, 2, 3, 4]))
-        assert array.is_sorted_nb(np.array([0, 1]))
-        assert array.is_sorted_nb(np.array([0]))
-        assert not array.is_sorted_nb(np.array([1, 0]))
-        assert not array.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
+        assert array_.is_sorted_nb(np.array([0, 1, 2, 3, 4]))
+        assert array_.is_sorted_nb(np.array([0, 1]))
+        assert array_.is_sorted_nb(np.array([0]))
+        assert not array_.is_sorted_nb(np.array([1, 0]))
+        assert not array_.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
 
     def test_insert_argsort_nb(self):
         a = np.random.uniform(size=1000)
         A = a.copy()
         I = np.arange(len(A))
-        array.insert_argsort_nb(A, I)
+        array_.insert_argsort_nb(A, I)
         np.testing.assert_array_equal(np.sort(a), A)
         np.testing.assert_array_equal(a[I], A)
 
     def test_get_ranges_arr(self):
         np.testing.assert_array_equal(
-            array.get_ranges_arr(0, 3),
+            array_.get_ranges_arr(0, 3),
             np.array([0, 1, 2])
         )
         np.testing.assert_array_equal(
-            array.get_ranges_arr(0, [1, 2, 3]),
+            array_.get_ranges_arr(0, [1, 2, 3]),
             np.array([0, 0, 1, 0, 1, 2])
         )
         np.testing.assert_array_equal(
-            array.get_ranges_arr([0, 3], [3, 6]),
+            array_.get_ranges_arr([0, 3], [3, 6]),
             np.array([0, 1, 2, 3, 4, 5])
         )
 
@@ -2104,52 +2104,52 @@ class TestArray:
 
         set_seed()
         np.testing.assert_array_almost_equal(
-            array.uniform_summing_to_one_nb(10),
+            array_.uniform_summing_to_one_nb(10),
             np.array([
                 5.808361e-02, 9.791091e-02, 2.412011e-05, 2.185215e-01,
                 2.241184e-01, 2.456528e-03, 1.308789e-01, 1.341822e-01,
                 8.453816e-02, 4.928569e-02
             ])
         )
-        assert np.sum(array.uniform_summing_to_one_nb(10)) == 1
+        assert np.sum(array_.uniform_summing_to_one_nb(10)) == 1
 
     def test_renormalize(self):
-        assert array.renormalize(0, (0, 10), (0, 1)) == 0
-        assert array.renormalize(10, (0, 10), (0, 1)) == 1
+        assert array_.renormalize(0, (0, 10), (0, 1)) == 0
+        assert array_.renormalize(10, (0, 10), (0, 1)) == 1
         np.testing.assert_array_equal(
-            array.renormalize(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
+            array_.renormalize(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
             np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
         )
         np.testing.assert_array_equal(
-            array.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
+            array_.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
             np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
         )
 
     def test_min_rel_rescale(self):
         np.testing.assert_array_equal(
-            array.min_rel_rescale(np.array([2, 4, 6]), (10, 20)),
+            array_.min_rel_rescale(np.array([2, 4, 6]), (10, 20)),
             np.array([10., 15., 20.])
         )
         np.testing.assert_array_equal(
-            array.min_rel_rescale(np.array([5, 6, 7]), (10, 20)),
+            array_.min_rel_rescale(np.array([5, 6, 7]), (10, 20)),
             np.array([10., 12., 14.])
         )
         np.testing.assert_array_equal(
-            array.min_rel_rescale(np.array([5, 5, 5]), (10, 20)),
+            array_.min_rel_rescale(np.array([5, 5, 5]), (10, 20)),
             np.array([10., 10., 10.])
         )
 
     def test_max_rel_rescale(self):
         np.testing.assert_array_equal(
-            array.max_rel_rescale(np.array([2, 4, 6]), (10, 20)),
+            array_.max_rel_rescale(np.array([2, 4, 6]), (10, 20)),
             np.array([10., 15., 20.])
         )
         np.testing.assert_array_equal(
-            array.max_rel_rescale(np.array([5, 6, 7]), (10, 20)),
+            array_.max_rel_rescale(np.array([5, 6, 7]), (10, 20)),
             np.array([14.285714285714286, 17.142857142857142, 20.])
         )
         np.testing.assert_array_equal(
-            array.max_rel_rescale(np.array([5, 5, 5]), (10, 20)),
+            array_.max_rel_rescale(np.array([5, 5, 5]), (10, 20)),
             np.array([20., 20., 20.])
         )
 
@@ -2160,18 +2160,18 @@ class TestArray:
 
         set_seed()
         np.testing.assert_array_equal(
-            array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70),
+            array_.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70),
             np.array([17, 14, 22, 17])
         )
-        assert np.sum(array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70)) == 70
+        assert np.sum(array_.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70)) == 70
 
 
-# ############# random.py ############# #
+# ############# random_.py ############# #
 
 
 class TestRandom:
     def test_set_seed(self):
-        random.set_seed(seed)
+        random_.set_seed(seed)
 
         def test_seed():
             return np.random.uniform(0, 1)
@@ -2229,137 +2229,137 @@ class TestMapping:
         assert mapping.apply_mapping(np.array(['world']), mapping_like={'world': 'hello'})[0] == 'hello'
 
 
-# ############# enum.py ############# #
+# ############# enum_.py ############# #
 
 
 class TestEnum:
     def test_map_enum_fields(self):
-        assert enum.map_enum_fields(0, Enum) == 0
-        assert enum.map_enum_fields(10, Enum) == 10
+        assert enum_.map_enum_fields(0, Enum) == 0
+        assert enum_.map_enum_fields(10, Enum) == 10
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(10., Enum)
-        assert enum.map_enum_fields('Attr1', Enum) == 0
-        assert enum.map_enum_fields('attr1', Enum) == 0
+            _ = enum_.map_enum_fields(10., Enum)
+        assert enum_.map_enum_fields('Attr1', Enum) == 0
+        assert enum_.map_enum_fields('attr1', Enum) == 0
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields('hello', Enum)
-        assert enum.map_enum_fields('attr1', Enum) == 0
-        assert enum.map_enum_fields(('attr1', 'attr2'), Enum) == (0, 1)
-        assert enum.map_enum_fields([['attr1', 'attr2']], Enum) == [[0, 1]]
+            _ = enum_.map_enum_fields('hello', Enum)
+        assert enum_.map_enum_fields('attr1', Enum) == 0
+        assert enum_.map_enum_fields(('attr1', 'attr2'), Enum) == (0, 1)
+        assert enum_.map_enum_fields([['attr1', 'attr2']], Enum) == [[0, 1]]
         np.testing.assert_array_equal(
-            enum.map_enum_fields(np.array([]), Enum),
+            enum_.map_enum_fields(np.array([]), Enum),
             np.array([])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(np.array([[0., 1.]]), Enum)
+            _ = enum_.map_enum_fields(np.array([[0., 1.]]), Enum)
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(np.array([[False, True]]), Enum)
+            _ = enum_.map_enum_fields(np.array([[False, True]]), Enum)
         np.testing.assert_array_equal(
-            enum.map_enum_fields(np.array([[0, 1]]), Enum),
+            enum_.map_enum_fields(np.array([[0, 1]]), Enum),
             np.array([[0, 1]])
         )
         np.testing.assert_array_equal(
-            enum.map_enum_fields(np.array([['attr1', 'attr2']]), Enum),
+            enum_.map_enum_fields(np.array([['attr1', 'attr2']]), Enum),
             np.array([[0, 1]])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(np.array([['attr1', 1]]), Enum)
+            _ = enum_.map_enum_fields(np.array([['attr1', 1]]), Enum)
         pd.testing.assert_series_equal(
-            enum.map_enum_fields(pd.Series([]), Enum),
+            enum_.map_enum_fields(pd.Series([]), Enum),
             pd.Series([])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(pd.Series([0., 1.]), Enum)
+            _ = enum_.map_enum_fields(pd.Series([0., 1.]), Enum)
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(pd.Series([False, True]), Enum)
+            _ = enum_.map_enum_fields(pd.Series([False, True]), Enum)
         pd.testing.assert_series_equal(
-            enum.map_enum_fields(pd.Series([0, 1]), Enum),
+            enum_.map_enum_fields(pd.Series([0, 1]), Enum),
             pd.Series([0, 1])
         )
         pd.testing.assert_series_equal(
-            enum.map_enum_fields(pd.Series(['attr1', 'attr2']), Enum),
+            enum_.map_enum_fields(pd.Series(['attr1', 'attr2']), Enum),
             pd.Series([0, 1])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(pd.Series(['attr1', 0]), Enum)
+            _ = enum_.map_enum_fields(pd.Series(['attr1', 0]), Enum)
         pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([]), Enum),
+            enum_.map_enum_fields(pd.DataFrame([]), Enum),
             pd.DataFrame([])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum)
+            _ = enum_.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum)
         pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([[0, 1]]), Enum),
+            enum_.map_enum_fields(pd.DataFrame([[0, 1]]), Enum),
             pd.DataFrame([[0, 1]])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([['attr1', 'attr2']]), Enum),
+            enum_.map_enum_fields(pd.DataFrame([['attr1', 'attr2']]), Enum),
             pd.DataFrame([[0, 1]])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_fields(pd.DataFrame([[0, 'attr2']]), Enum),
+            enum_.map_enum_fields(pd.DataFrame([[0, 'attr2']]), Enum),
             pd.DataFrame([[0, 1]])
         )
 
     def test_map_enum_values(self):
-        assert enum.map_enum_values(0, Enum) == 'Attr1'
-        assert enum.map_enum_values(-1, Enum) is None
+        assert enum_.map_enum_values(0, Enum) == 'Attr1'
+        assert enum_.map_enum_values(-1, Enum) is None
         with pytest.raises(Exception):
-            _ = enum.map_enum_values(-2, Enum)
-        assert enum.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
-        assert enum.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
-        assert enum.map_enum_values('hello', Enum) == 'hello'
+            _ = enum_.map_enum_values(-2, Enum)
+        assert enum_.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
+        assert enum_.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
+        assert enum_.map_enum_values('hello', Enum) == 'hello'
         np.testing.assert_array_equal(
-            enum.map_enum_values(np.array([]), Enum),
+            enum_.map_enum_values(np.array([]), Enum),
             np.array([])
         )
         np.testing.assert_array_equal(
-            enum.map_enum_values(np.array([[0., 1.]]), Enum),
+            enum_.map_enum_values(np.array([[0., 1.]]), Enum),
             np.array([['Attr1', 'Attr2']])
         )
         np.testing.assert_array_equal(
-            enum.map_enum_values(np.array([['Attr1', 'Attr2']]), Enum),
+            enum_.map_enum_values(np.array([['Attr1', 'Attr2']]), Enum),
             np.array([['Attr1', 'Attr2']])
         )
         np.testing.assert_array_equal(
-            enum.map_enum_values(np.array([[0, 'Attr2']]), Enum),
+            enum_.map_enum_values(np.array([[0, 'Attr2']]), Enum),
             np.array([['0', 'Attr2']])
         )
         pd.testing.assert_series_equal(
-            enum.map_enum_values(pd.Series([]), Enum),
+            enum_.map_enum_values(pd.Series([]), Enum),
             pd.Series([])
         )
         pd.testing.assert_series_equal(
-            enum.map_enum_values(pd.Series([0., 1.]), Enum),
+            enum_.map_enum_values(pd.Series([0., 1.]), Enum),
             pd.Series(['Attr1', 'Attr2'])
         )
         pd.testing.assert_series_equal(
-            enum.map_enum_values(pd.Series([0, 1]), Enum),
+            enum_.map_enum_values(pd.Series([0, 1]), Enum),
             pd.Series(['Attr1', 'Attr2'])
         )
         pd.testing.assert_series_equal(
-            enum.map_enum_values(pd.Series(['Attr1', 'Attr2']), Enum),
+            enum_.map_enum_values(pd.Series(['Attr1', 'Attr2']), Enum),
             pd.Series(['Attr1', 'Attr2'])
         )
         with pytest.raises(Exception):
-            _ = enum.map_enum_values(pd.Series([0, 'Attr2']), Enum)
+            _ = enum_.map_enum_values(pd.Series([0, 'Attr2']), Enum)
         pd.testing.assert_frame_equal(
-            enum.map_enum_values(pd.DataFrame([]), Enum),
+            enum_.map_enum_values(pd.DataFrame([]), Enum),
             pd.DataFrame([])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_values(pd.DataFrame([[0., 1.]]), Enum),
+            enum_.map_enum_values(pd.DataFrame([[0., 1.]]), Enum),
             pd.DataFrame([['Attr1', 'Attr2']])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_values(pd.DataFrame([[0, 1]]), Enum),
+            enum_.map_enum_values(pd.DataFrame([[0, 1]]), Enum),
             pd.DataFrame([['Attr1', 'Attr2']])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_values(pd.DataFrame([['Attr1', 'Attr2']]), Enum),
+            enum_.map_enum_values(pd.DataFrame([['Attr1', 'Attr2']]), Enum),
             pd.DataFrame([['Attr1', 'Attr2']])
         )
         pd.testing.assert_frame_equal(
-            enum.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum),
+            enum_.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum),
             pd.DataFrame([['Attr1', 'Attr2']])
         )
 
@@ -2388,90 +2388,90 @@ class TestParams:
                ]
 
 
-# ############# datetime.py ############# #
+# ############# datetime_.py ############# #
 
 class TestDatetime:
     def test_to_timedelta(self):
-        assert datetime.freq_to_timedelta('d') == pd.to_timedelta('1d')
+        assert datetime_.freq_to_timedelta('d') == pd.to_timedelta('1d')
 
     def test_get_utc_tz(self):
-        assert datetime.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
+        assert datetime_.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
 
     def test_get_local_tz(self):
-        assert datetime.get_local_tz().utcoffset(_datetime.now()) == _datetime.now().astimezone(None).utcoffset()
+        assert datetime_.get_local_tz().utcoffset(_datetime.now()) == _datetime.now().astimezone(None).utcoffset()
 
     def test_convert_tzaware_time(self):
-        assert datetime.convert_tzaware_time(
-            _time(12, 0, 0, tzinfo=datetime.get_utc_tz()), _timezone(_timedelta(hours=2))) == \
+        assert datetime_.convert_tzaware_time(
+            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()), _timezone(_timedelta(hours=2))) == \
                _time(14, 0, 0, tzinfo=_timezone(_timedelta(hours=2)))
 
     def test_tzaware_to_naive_time(self):
-        assert datetime.tzaware_to_naive_time(
-            _time(12, 0, 0, tzinfo=datetime.get_utc_tz()), _timezone(_timedelta(hours=2))) == _time(14, 0, 0)
+        assert datetime_.tzaware_to_naive_time(
+            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()), _timezone(_timedelta(hours=2))) == _time(14, 0, 0)
 
     def test_naive_to_tzaware_time(self):
-        assert datetime.naive_to_tzaware_time(
+        assert datetime_.naive_to_tzaware_time(
             _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
-               datetime.convert_tzaware_time(
-                   _time(12, 0, 0, tzinfo=datetime.get_local_tz()), _timezone(_timedelta(hours=2)))
+               datetime_.convert_tzaware_time(
+                   _time(12, 0, 0, tzinfo=datetime_.get_local_tz()), _timezone(_timedelta(hours=2)))
 
     def test_convert_naive_time(self):
-        assert datetime.convert_naive_time(
+        assert datetime_.convert_naive_time(
             _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
-               datetime.tzaware_to_naive_time(
-                   _time(12, 0, 0, tzinfo=datetime.get_local_tz()), _timezone(_timedelta(hours=2)))
+               datetime_.tzaware_to_naive_time(
+                   _time(12, 0, 0, tzinfo=datetime_.get_local_tz()), _timezone(_timedelta(hours=2)))
 
     def test_is_tz_aware(self):
-        assert not datetime.is_tz_aware(pd.Timestamp('2020-01-01'))
-        assert datetime.is_tz_aware(pd.Timestamp('2020-01-01', tz=datetime.get_utc_tz()))
+        assert not datetime_.is_tz_aware(pd.Timestamp('2020-01-01'))
+        assert datetime_.is_tz_aware(pd.Timestamp('2020-01-01', tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime.to_timezone('UTC') == _timezone.utc
-        assert datetime.to_timezone('Europe/Berlin') == _timezone(_timedelta(hours=2))
-        assert datetime.to_timezone('Europe/Berlin', to_py_timezone=False) == pytz.timezone('Europe/Berlin')
-        assert datetime.to_timezone('+0500') == _timezone(_timedelta(hours=5))
-        assert datetime.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert datetime.to_timezone(pytz.timezone('Europe/Berlin')) == _timezone(_timedelta(hours=2))
-        assert datetime.to_timezone(1) == _timezone(_timedelta(hours=1))
-        assert datetime.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
+        assert datetime_.to_timezone('UTC') == _timezone.utc
+        assert datetime_.to_timezone('Europe/Berlin') == _timezone(_timedelta(hours=2))
+        assert datetime_.to_timezone('Europe/Berlin', to_py_timezone=False) == pytz.timezone('Europe/Berlin')
+        assert datetime_.to_timezone('+0500') == _timezone(_timedelta(hours=5))
+        assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
+        assert datetime_.to_timezone(pytz.timezone('Europe/Berlin')) == _timezone(_timedelta(hours=2))
+        assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
+        assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
-            _ = datetime.to_timezone('+05')
+            _ = datetime_.to_timezone('+05')
 
     def test_to_tzaware_datetime(self):
-        assert datetime.to_tzaware_datetime(0.5) == \
-               _datetime(1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime.get_utc_tz())
-        assert datetime.to_tzaware_datetime(0) == \
-               _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime.get_utc_tz())
-        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01').value) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
-        assert datetime.to_tzaware_datetime('2020-01-01') == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
-        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01')) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
-        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01', tz=datetime.get_utc_tz())) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
-        assert datetime.to_tzaware_datetime(_datetime(2020, 1, 1)) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
-        assert datetime.to_tzaware_datetime(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
-        assert datetime.to_tzaware_datetime(
-            _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()), tz=datetime.get_local_tz()) == \
-               _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()).astimezone(datetime.get_local_tz())
+        assert datetime_.to_tzaware_datetime(0.5) == \
+               _datetime(1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(0) == \
+               _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01').value) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime('2020-01-01') == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
+        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01')) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
+        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01', tz=datetime_.get_utc_tz())) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1)) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
+        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(
+            _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()), tz=datetime_.get_local_tz()) == \
+               _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()).astimezone(datetime_.get_local_tz())
         with pytest.raises(Exception):
-            _ = datetime.to_tzaware_datetime('2020-01-001')
+            _ = datetime_.to_tzaware_datetime('2020-01-001')
 
     def test_datetime_to_ms(self):
-        assert datetime.datetime_to_ms(_datetime(2020, 1, 1)) == \
+        assert datetime_.datetime_to_ms(_datetime(2020, 1, 1)) == \
                1577836800000 - _datetime(2020, 1, 1).astimezone(None).utcoffset().total_seconds() * 1000
-        assert datetime.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == 1577836800000
+        assert datetime_.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == 1577836800000
 
 
-# ############# schedule.py ############# #
+# ############# schedule_.py ############# #
 
 
 class TestScheduleManager:
     def test_every(self):
-        manager = schedule.ScheduleManager()
+        manager = schedule_.ScheduleManager()
         job = manager.every()
         assert job.interval == 1
         assert job.unit == 'seconds'
@@ -2502,11 +2502,11 @@ class TestScheduleManager:
         assert job.at_time == _time(10, 30)
         assert job.start_day is None
 
-        job = manager.every('day', _time(9, 30, tzinfo=datetime.get_utc_tz()))
+        job = manager.every('day', _time(9, 30, tzinfo=datetime_.get_utc_tz()))
         assert job.interval == 1
         assert job.unit == 'days'
-        assert job.at_time == datetime.tzaware_to_naive_time(
-            _time(9, 30, tzinfo=datetime.get_utc_tz()), datetime.get_local_tz())
+        assert job.at_time == datetime_.tzaware_to_naive_time(
+            _time(9, 30, tzinfo=datetime_.get_utc_tz()), datetime_.get_local_tz())
         assert job.start_day is None
 
         job = manager.every('monday')
@@ -2535,7 +2535,7 @@ class TestScheduleManager:
             if kwargs['call_count'] == 5:
                 raise KeyboardInterrupt
 
-        manager = schedule.ScheduleManager()
+        manager = schedule_.ScheduleManager()
         manager.every().do(job_func, kwargs)
         manager.start()
         assert kwargs['call_count'] == 5
@@ -2546,9 +2546,9 @@ class TestScheduleManager:
         def job_func(kwargs):
             kwargs['call_count'] += 1
             if kwargs['call_count'] == 5:
-                raise schedule.CancelledError
+                raise schedule_.CancelledError
 
-        manager = schedule.ScheduleManager()
+        manager = schedule_.ScheduleManager()
         manager.every().do(job_func, kwargs)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(manager.async_start())

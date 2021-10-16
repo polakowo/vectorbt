@@ -14,7 +14,7 @@ from numba import njit
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.array import is_sorted
+from vectorbt.utils.array_ import is_sorted
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.config import Configured
 from vectorbt.base import index_fns

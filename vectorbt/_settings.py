@@ -80,7 +80,7 @@ import plotly.io as pio
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import Config
-from vectorbt.utils.datetime import get_local_tz, get_utc_tz
+from vectorbt.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
 from vectorbt.utils.template import Sub, RepEval
 from vectorbt.base.array_wrapper import ArrayWrapper

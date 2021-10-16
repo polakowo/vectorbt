@@ -6,7 +6,7 @@
 import logging
 
 from vectorbt import _typing as tp
-from vectorbt.utils.schedule import ScheduleManager
+from vectorbt.utils.schedule_ import ScheduleManager
 from vectorbt.utils.config import Configured
 from vectorbt.data.base import Data
 

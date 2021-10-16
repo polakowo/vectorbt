@@ -22,7 +22,7 @@ import math
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.figure import make_figure
-from vectorbt.utils.array import renormalize
+from vectorbt.utils.array_ import renormalize
 from vectorbt.utils.colors import rgb_from_cmap
 from vectorbt.utils.config import Configured, resolve_dict
 from vectorbt.base import reshape_fns

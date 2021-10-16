@@ -11,7 +11,7 @@ import warnings
 from functools import wraps
 
 from vectorbt import _typing as tp
-from vectorbt.utils.datetime import (
+from vectorbt.utils.datetime_ import (
     get_utc_tz,
     get_local_tz,
     to_tzaware_datetime,

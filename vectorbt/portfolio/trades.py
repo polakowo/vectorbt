@@ -488,7 +488,7 @@ from vectorbt import _typing as tp
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
+from vectorbt.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbt.utils.template import RepEval
 from vectorbt.utils.decorators import cached_method, cached_property
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array

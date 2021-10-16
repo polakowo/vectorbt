@@ -640,7 +640,7 @@ from vectorbt.labels import *
 from vectorbt.messaging import *
 
 # Import all submodules
-from vectorbt.utils.module import import_submodules
+from vectorbt.utils.module_ import import_submodules
 
 # silence NumbaExperimentalFeatureWarning
 import warnings

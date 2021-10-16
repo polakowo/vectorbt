@@ -1176,9 +1176,9 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
 from vectorbt.utils.config import merge_dicts, resolve_dict, Config, Default
-from vectorbt.utils.random import set_seed
+from vectorbt.utils.random_ import set_seed
 from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
-from vectorbt.utils.enum import map_enum_fields
+from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.docs import to_doc
 from vectorbt.base import index_fns, reshape_fns, combine_fns

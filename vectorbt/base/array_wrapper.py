@@ -92,10 +92,10 @@ import warnings
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import Configured, merge_dicts
-from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
-from vectorbt.utils.array import get_ranges_arr
+from vectorbt.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
+from vectorbt.utils.array_ import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.attr import AttrResolver, AttrResolverT
+from vectorbt.utils.attr_ import AttrResolver, AttrResolverT
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
