@@ -1,4 +1,4 @@
-# vectorbt: Swiss knife for quants
+# vectorbt: Hyperfast framework for quants.
 
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
 [![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
@@ -11,21 +11,25 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
----
+## [Main Features](#main-features) · [Installation](#installation) · [Usage](#usage) · [Resources](#resources) · [License](#license)
 
-vectorbt is a backtesting library on steroids — it operates entirely on pandas and NumPy objects, and is 
-accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
+Tired of slow backtesting and hyperparameter optimization? :snail:
 
-In contrast to other backtesters, vectorbt represents data as nd-arrays.
+vectorbt takes a novel approach: it operates entirely on pandas and NumPy objects, and is accelerated by 
+[Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for the simulation of many thousands 
+of configurations in a matter of **seconds**. :tiger2:
+
+In contrast to other backtesters, vectorbt represents data as arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
-compiled operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
-[ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
+compiled operations with Numba. It also integrates [Plotly](https://github.com/plotly/plotly.py) and 
+[Jupyter Widgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
 to Tableau right in the Jupyter notebook. Due to high performance, vectorbt can process large amounts of 
 data even without GPU and parallelization and enables the user to interact with data-hungry widgets 
 without significant delays.
 
 With vectorbt, you can
-* Build your pipelines in a few lines of code
+* Enjoy the best of both worlds: the ecosystem of Python and the speed of C
+* Build your pipelines in a few lines of code, even with limited knowledge of Python
 * Retain full control over execution (as opposed to web-based services such as TradingView)
 * Optimize your trading strategy against many parameters, assets, and periods in one go
 * Uncover hidden patterns in financial markets
@@ -33,6 +37,8 @@ With vectorbt, you can
 * Supercharge pandas and your favorite tools to run much faster
 * Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
 * Fetch and process data periodically, send Telegram notifications, and more
+
+## Main Features
 
 ## Installation
 
@@ -69,18 +75,17 @@ remain intact in the working directory on the host. See [Jupyter Docker Stacks -
 
 There are two types of images: 
 
-* [polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt): vanilla version (default)
-* [polakowo/vectorbt-full](https://hub.docker.com/r/polakowo/vectorbt-full): full version (with optional dependencies)
+* **[polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt)**: vanilla version (default)
+* **[polakowo/vectorbt-full](https://hub.docker.com/r/polakowo/vectorbt-full)**: full version (with optional dependencies)
 
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
 and comes with Jupyter environment, vectorbt, and other scientific packages installed.
 
-## Examples
+## Usage
 
-Start backtesting with just a couple of lines:
+vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
 
-Here is how much profit we would have made if we invested $100 into Bitcoin in 2014 and held 
-(Note: first time compiling with Numba may take a while):
+Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
 
 ```python
 import vectorbt as vbt
@@ -95,7 +100,7 @@ pf.total_profit()
 8961.008555963961
 ```
 
-The crossover of 10-day SMA and 50-day SMA:
+Buy whenever 10-day SMA crosses above 50-day SMA and sell when opposite:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -111,7 +116,7 @@ pf.total_profit()
 16423.251963801864
 ```
 
-Generate 1,000 random strategies and test them on BTC and ETH:
+Generate 1,000 strategies with random signals and test them on BTC and ETH:
 
 ```python
 import numpy as np
@@ -231,255 +236,13 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
 
-## How it works?
-
-vectorbt combines pandas, NumPy, and Numba sauce to obtain orders-of-magnitude speedup over other libraries. 
-It natively works on pandas objects while performing all computations using NumPy and Numba under the hood. 
-This way, it is often much faster than pandas alone:
-
-```python-repl
->>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
-
-# pandas
->>> %timeit big_ts.expanding().max()
-48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
-
-# vectorbt
->>> %timeit big_ts.vbt.expanding_max()
-8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-```
-
-In contrast to other backtesters, vectorbt is optimized for working with multi-dimensional data: 
-it treats the index of a Series/DataFrame as a time axis and columns as distinct configurations that 
-should be backtested, and performs computations on the entire array at once, without slow Python loops.
-
-To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
-(see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
-This way, users can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
-method is flexible towards inputs and can work on both Series and DataFrames.
-
-## Features
-
-- Extends pandas using a custom `vbt` accessor
-    -> Compatible with any library
-- For high performance, most operations are done strictly using NumPy and Numba 
-    -> Much faster than comparable operations in pandas
-    
-```python-repl
-# pandas
->>> %timeit big_ts + 1
-242 ms ± 3.58 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
-# vectorbt
->>> %timeit big_ts.vbt + 1
-3.32 ms ± 19.7 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-```
-    
-- Functions for combining, transforming, and indexing NumPy and pandas objects
-    - Smart broadcasting for pandas
-    
-```python-repl
-# pandas
->>> pd.Series([1, 2, 3]) + pd.DataFrame([[1, 2, 3]])
-   0  1  2
-0  2  4  6
-
-# vectorbt
->>> pd.Series([1, 2, 3]).vbt + pd.DataFrame([[1, 2, 3]])
-   0  1  2
-0  2  3  4
-1  3  4  5
-2  4  5  6
-```
-   
-- Compiled versions of common pandas functions, such as rolling, groupby, and resample
-
-```python-repl
-# pandas
->>> %timeit big_ts.rolling(2).apply(np.mean, raw=True)
-7.32 s ± 431 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
-# vectorbt
->>> mean_nb = njit(lambda col, i, x: np.mean(x))
->>> %timeit big_ts.vbt.rolling_apply(2, mean_nb)
-86.2 ms ± 7.97 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-```
-
-- Splitting functions for time series cross-validation
-    - Supports [scikit-learn](https://github.com/scikit-learn/scikit-learn) splitters
-
-```python-repl
->>> pd.Series([1, 2, 3, 4, 5]).vbt.expanding_split()[0]
-split_idx    0    1    2    3  4
-0          1.0  1.0  1.0  1.0  1
-1          NaN  2.0  2.0  2.0  2
-2          NaN  NaN  3.0  3.0  3
-3          NaN  NaN  NaN  4.0  4
-4          NaN  NaN  NaN  NaN  5
-```
-
-- Transformation functions for rescaling and normalization
-- Drawdown analysis
-
-```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot().show()
-```
-
-![drawdowns.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.svg)
-
-- Functions for working with signals
-    - Entry, exit, and random signal generators
-    - Stop signal, ranking, and map-reduce functions
-    
-```python-repl
->>> pd.Series([False, True, True, True]).vbt.signals.first()
-0    False
-1     True
-2    False
-3    False
-dtype: bool
-```
-
-- Signal factory for building signal generators
-    - Includes basic generators such for random signal generation
-
-```python-repl
->>> randnx = vbt.RANDNX.run(n=[0, 1, 2], input_shape=(6,), seed=42)
->>> randnx.entries
-randnx_n      0      1      2
-0         False   True   True
-1         False  False  False
-2         False  False  False
-3         False  False   True
-4         False  False  False
-5         False  False  False
->>> randnx.exits
-randnx_n      0      1      2
-0         False  False  False
-1         False  False   True
-2         False  False  False
-3         False   True  False
-4         False  False   True
-5         False  False  False
-```
-    
-- Functions for working with returns
-    - Numba-compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
-    - Rolling versions of most metrics
-    - Adapter for [quantstats](https://github.com/ranaroussi/quantstats)
-
-```python-repl
->>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
-5.515130702591433
-```
-    
-- Class for modeling portfolios
-    - Accepts signals, orders, and custom order function
-    - Supports long and short positions
-    - Supports individual and multi-asset mixed portfolios
-    - Offers metrics and tools for analyzing returns, orders, and trades
-    - Allows saving and loading from disk using [dill](https://github.com/uqfoundation/dill)
-    
-```python-repl
->>> price = [1., 2., 3., 2., 1.]
->>> entries = [True, False, True, False, False]
->>> exits = [False, True, False, True, False]
->>> pf = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
->>> pf.trades.plot().show()
-```
-
-![trades.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.svg)
-
-- Indicator factory for building complex technical indicators with ease
-    - Includes technical indicators with full Numba support
-        - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
-    - Each indicator has methods for generating signals and plotting
-    - Each indicator takes arbitrary parameter combinations, from arrays to Cartesian products
-    - Supports [ta](https://github.com/bukosabino/ta), [pandas-ta](https://github.com/twopirllc/pandas-ta), and [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
-
-```python-repl
->>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
->>> vbt.MA.run(price, [2, 3]).ma  # vectorbt
-ma_window    2    3
-0          NaN  NaN
-1          1.5  NaN
-2          2.5  2.0
-3          3.5  3.0
-4          4.5  4.0
-
->>> vbt.ta('SMAIndicator').run(price, [2, 3]).sma_indicator  # ta
-smaindicator_window    2    3
-0                    NaN  NaN
-1                    1.5  NaN
-2                    2.5  2.0
-3                    3.5  3.0
-4                    4.5  4.0
-
->>> vbt.pandas_ta('SMA').run(price, [2, 3]).sma  # pandas-ta
-sma_length    2    3
-0           NaN  NaN
-1           1.5  NaN
-2           2.5  2.0
-3           3.5  3.0
-4           4.5  4.0
-
->>> vbt.talib('SMA').run(price, [2, 3]).real  # TA-Lib
-sma_timeperiod    2    3
-0               NaN  NaN
-1               1.5  NaN
-2               2.5  2.0
-3               3.5  3.0
-4               4.5  4.0
-```
-
-- Tailored statistics for many backtesting components
-  
-```python-repl
->>> pd.Series([1, 2, 3, 2, 3, 2, 1, 2]).vbt(freq='d').drawdowns.stats()
-Start                                        0
-End                                          7
-Period                         8 days 00:00:00
-Coverage [%]                              50.0
-Total Records                                2
-Total Recovered Drawdowns                    1
-Total Active Drawdowns                       1
-Active Drawdown [%]                  33.333333
-Active Duration                3 days 00:00:00
-Active Recovery [%]                       50.0
-Active Recovery Return [%]               100.0
-Active Recovery Duration       1 days 00:00:00
-Max Drawdown [%]                     33.333333
-Avg Drawdown [%]                     33.333333
-Max Drawdown Duration          1 days 00:00:00
-Avg Drawdown Duration          1 days 00:00:00
-Max Recovery Return [%]                   50.0
-Avg Recovery Return [%]                   50.0
-Max Recovery Duration          1 days 00:00:00
-Avg Recovery Duration          1 days 00:00:00
-Avg Recovery Duration Ratio                1.0
-dtype: object
-```
-
-- Label generation for ML models
-
-```python-repl
->>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
->>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
-``` 
-
-![local_extrema.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.svg)
-
-- Classes for downloading and (periodically) updating data
-    - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
-    - Allows creation of new data classes with ease
-- Telegram bot based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-- Interactive Plotly-based widgets for visual data analysis
+And this is just the tip of the iceberg of what's possible. Check out [Resources](#resources) to learn more.
 
 ## Resources
 
 ### Documentation
 
-Head over to the [documentation](https://vectorbt.dev/docs/index.html) to get started.
+Head over to the [documentation](https://vectorbt.dev/) to get started.
 
 ### Notebooks
 
@@ -503,7 +266,7 @@ Note: you must run the notebook to play with the widgets.
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
-## Getting Help
+### Getting Help
 
 - If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
 - For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
@@ -511,29 +274,6 @@ Note: you must run the notebook to play with the widgets.
   - Alternatively, you can ask on [Gitter](https://gitter.im/vectorbt/community)
 - If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
 - For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
-
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-First, you need to install vectorbt from the repository:
-
-```bash
-pip uninstall vectorbt
-git clone https://github.com/polakowo/vectorbt.git
-cd vectorbt
-pip install -e .
-```
-
-After making changes, make sure you did not break any functionality:
-
-```bash
-pytest
-```
-
-Make sure to update tests as appropriate.
-
-Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 
