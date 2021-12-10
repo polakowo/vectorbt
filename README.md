@@ -1,4 +1,4 @@
-# vectorbt
+# vectorbt :boom:
 
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
 [![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
@@ -396,7 +396,6 @@ randnx_n      0      1      2
     - Each indicator has methods for generating signals and plotting
     - Each indicator takes arbitrary parameter combinations, from arrays to Cartesian products
     - Supports [ta](https://github.com/bukosabino/ta), [pandas-ta](https://github.com/twopirllc/pandas-ta), and [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
-    - Supports parallelization with [Ray](https://github.com/ray-project/ray)
 
 ```python-repl
 >>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
