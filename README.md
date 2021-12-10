@@ -1,3 +1,5 @@
+# vectorbt
+
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
 [![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet)](https://pypi.org/project/vectorbt)
@@ -8,8 +10,6 @@
 [![Binder](https://img.shields.io/badge/launch-binder-d6604a)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab)
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
-
-# vectorbt
 
 vectorbt is a backtesting library on steroids — it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
@@ -125,7 +125,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_ti
 fig.show()
 ```
 
-> ![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
+![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
 
 For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
 dual SMA crossover strategy on BTC, USD, and LTC:
@@ -148,7 +148,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-> <img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif">
+<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif">
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -194,7 +194,7 @@ The same for plotting:
 pf[(10, 20, 'ETH-USD')].plot().show()
 ```
 
-> ![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
+![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
 Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
@@ -227,7 +227,7 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-> <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
 
 ## How it works?
 
@@ -323,7 +323,7 @@ split_idx    0    1    2    3  4
 >>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot().show()
 ```
 
-> ![drawdowns.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.svg)
+![drawdowns.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.svg)
 
 - Functions for working with signals
     - Entry, exit, and random signal generators
@@ -386,7 +386,7 @@ randnx_n      0      1      2
 >>> pf.trades.plot().show()
 ```
 
-> ![trades.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.svg)
+![trades.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.svg)
 
 - Indicator factory for building complex technical indicators with ease
     - Includes technical indicators with full Numba support
@@ -466,7 +466,7 @@ dtype: object
 >>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
 ``` 
 
-> ![local_extrema.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.svg)
+![local_extrema.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.svg)
 
 - Classes for downloading and (periodically) updating data
     - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
@@ -531,6 +531,8 @@ pytest
 ```
 
 Make sure to update tests as appropriate.
+
+Please note: contribution to this project requires signing a Contributor Licence Agreement (CLA).
 
 ## License
 
