@@ -125,7 +125,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_ti
 fig.show()
 ```
 
-<img href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg" style="box-shadow: rgba(149, 157, 165, 0.2) 0px 8px 24px;">
+<img src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg" style="box-shadow: rgba(149, 157, 165, 0.2) 0px 8px 24px;">
 
 For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
 dual SMA crossover strategy on BTC, USD, and LTC:
