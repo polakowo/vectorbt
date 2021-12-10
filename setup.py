@@ -38,8 +38,7 @@ setup(
         'requests',
         'pytz',
         'typing_extensions; python_version < "3.8"',
-        'mypy_extensions',
-        'kaleido'
+        'mypy_extensions'
     ],
     extras_require={
         'full': [
