@@ -12,13 +12,13 @@ Accessing and analyzing this information for yourself could give you an informat
 ## Installation
 
 ```bash
-pip install vectorbt
+pip install -U vectorbt
 ```
 
 To also install optional dependencies:
 
 ```bash
-pip install vectorbt[full]
+pip install -U "vectorbt[full]"
 ```
 
 See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.

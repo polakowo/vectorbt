@@ -11,6 +11,8 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
+---
+
 vectorbt is a backtesting library on steroids — it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
@@ -35,13 +37,13 @@ With vectorbt, you can
 ## Installation
 
 ```bash
-pip install vectorbt
+pip install -U vectorbt
 ```
 
 To also install optional dependencies:
 
 ```bash
-pip install vectorbt[full]
+pip install -U "vectorbt[full]"
 ```
 
 See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.
