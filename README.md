@@ -11,8 +11,8 @@
     <img src="https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3" /></a>
   <a href="https://vectorbt.dev/" alt="Website">
     <img src="https://img.shields.io/website?url=https://vectorbt.dev/" /></a>
-  <a href="https://pepy.tech/badge/vectorbt" alt="Downloads">
-    <img src="https://pepy.tech/project/vectorbt" /></a>
+  <a href="https://pepy.tech/project/vectorbt" alt="Downloads">
+    <img src="https://pepy.tech/badge/vectorbt" /></a>
   <a href="https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab" alt="Downloads">
     <img src="https://img.shields.io/badge/launch-binder-d6604a" /></a>
   <a href="https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge" alt="Join the chat at https://gitter.im/vectorbt/community">
