@@ -3366,10 +3366,26 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
+            records_readable['Request Size Granularity'].values,
+            np.array([
+                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            ])
+        )
+        np.testing.assert_array_equal(
             records_readable['Request Rejection Prob'].values,
             np.array([
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Request Lock Cash'].values,
+            np.array([
+                False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
+                False, False
             ])
         )
         np.testing.assert_array_equal(

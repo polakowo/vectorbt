@@ -116,7 +116,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 If `resolve_plot_func` is True, the plotting function may "request" any of the
                 following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `vectorbt.utils.attr.AttrResolver.self_aliases`: original object
+                * Each of `vectorbt.utils.attr_.AttrResolver.self_aliases`: original object
                     (ungrouped, with no column selected)
                 * `group_by`: won't be passed if it was used in resolving the first attribute of `plot_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
@@ -134,7 +134,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `silence_warnings`
                 * Any argument from `settings`
                 * Any attribute of this object if it meant to be resolved
-                    (see `vectorbt.utils.attr.AttrResolver.resolve_attr`)
+                    (see `vectorbt.utils.attr_.AttrResolver.resolve_attr`)
 
                 !!! note
                     Layout-related resolution arguments such as `add_trace_kwargs` are unavailable

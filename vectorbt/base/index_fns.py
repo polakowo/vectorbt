@@ -51,10 +51,16 @@ def index_from_values(values: tp.ArrayLikeSequence, name: tp.Optional[str] = Non
         if v is None or isinstance(v, scalar_types):
             value_names.append(v)
         elif isinstance(v, np.ndarray):
-            if np.isclose(v, v.item(0), equal_nan=True).all():
-                value_names.append(v.item(0))
+            if np.issubdtype(v.dtype, np.floating):
+                if np.isclose(v, v.item(0), equal_nan=True).all():
+                    value_names.append(v.item(0))
+                else:
+                    value_names.append('array_%d' % i)
             else:
-                value_names.append('array_%d' % i)
+                if np.equal(v, v.item(0)).all():
+                    value_names.append(v.item(0))
+                else:
+                    value_names.append('array_%d' % i)
         else:
             value_names.append('%s_%d' % (str(type(v).__name__), i))
     return pd.Index(value_names, name=name)

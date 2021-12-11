@@ -17,10 +17,6 @@ from vectorbt.base import (
 ray_available = True
 try:
     import ray
-
-    if ray.is_initialized():
-        ray.shutdown()
-    ray.init()
 except:
     ray_available = False
 
@@ -66,9 +62,13 @@ def setup_module():
     vbt.settings.caching.enabled = False
     vbt.settings.caching.whitelist = []
     vbt.settings.caching.blacklist = []
+    if ray_available:
+        ray.init(local_mode=True, num_cpus=1)
 
 
 def teardown_module():
+    if ray_available:
+        ray.shutdown()
     vbt.settings.reset()
 
 
@@ -3025,7 +3025,7 @@ class TestAccessors:
             pd.testing.assert_frame_equal(
                 sr2.vbt.apply_and_concat(
                     3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                    keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
+                    keys=['a', 'b', 'c'], use_ray=True
                 ),
                 target
             )
@@ -3090,7 +3090,7 @@ class TestAccessors:
             pd.testing.assert_frame_equal(
                 df2.vbt.apply_and_concat(
                     3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                    keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
+                    keys=['a', 'b', 'c'], use_ray=True
                 ),
                 target2
             )
@@ -3244,8 +3244,7 @@ class TestAccessors:
                     [10, df4], 10, b=100,
                     combine_func=combine_func,
                     concat=True,
-                    use_ray=True,
-                    ray_shutdown=True
+                    use_ray=True
                 ),
                 target2
             )

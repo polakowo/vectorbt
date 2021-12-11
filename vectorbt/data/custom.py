@@ -257,10 +257,10 @@ class YFData(Data):
             period (str): Period.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
         """
         import yfinance as yf
@@ -434,10 +434,10 @@ class BinanceData(Data):
                 See `binance.enums`.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
@@ -616,10 +616,10 @@ class CCXTData(Data):
             timeframe (str): Timeframe supported by the exchange.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note

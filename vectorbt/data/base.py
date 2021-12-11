@@ -477,10 +477,10 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             data (dict): Dictionary of array-like objects keyed by symbol.
             tz_localize (timezone_like): If the index is tz-naive, convert to a timezone.
 
-                See `vectorbt.utils.datetime.to_timezone`.
+                See `vectorbt.utils.datetime_.to_timezone`.
             tz_convert (timezone_like): Convert the index from one timezone to another.
 
-                See `vectorbt.utils.datetime.to_timezone`.
+                See `vectorbt.utils.datetime_.to_timezone`.
             missing_index (str): See `Data.align_index`.
             missing_columns (str): See `Data.align_columns`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.

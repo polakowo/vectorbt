@@ -152,7 +152,7 @@ class TelegramBot(Configured):
         self.giphy_kwargs = giphy_kwargs
         default_kwargs = dict()
         passed_kwargs = dict()
-        for k in get_func_kwargs(Updater):
+        for k in get_func_kwargs(Updater.__init__):
             if k in telegram_cfg:
                 default_kwargs[k] = telegram_cfg[k]
             if k in kwargs:

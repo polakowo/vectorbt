@@ -11,10 +11,6 @@ import vectorbt as vbt
 ray_available = True
 try:
     import ray
-
-    if ray.is_initialized():
-        ray.shutdown()
-    ray.init()
 except:
     ray_available = False
 
@@ -46,9 +42,13 @@ def setup_module():
     vbt.settings.caching.enabled = False
     vbt.settings.caching.whitelist = []
     vbt.settings.caching.blacklist = []
+    if ray_available:
+        ray.init(local_mode=True, num_cpus=1)
 
 
 def teardown_module():
+    if ray_available:
+        ray.shutdown()
     vbt.settings.reset()
 
 
@@ -338,7 +338,7 @@ class TestFactory:
                 F.from_apply_func(apply_func, var_args=True)
                     .run(ts, np.arange(10), 10, b=100).out,
                 F.from_apply_func(apply_func, var_args=True)
-                    .run(ts, np.arange(10), 10, b=100, use_ray=True, ray_shutdown=True).out,
+                    .run(ts, np.arange(10), 10, b=100, use_ray=True).out,
             )
 
     def test_no_inputs(self):
@@ -1952,7 +1952,7 @@ class TestFactory:
             )
         )
         pd.testing.assert_frame_equal(
-            obj.out_above(2, crossover=True),
+            obj.out_crossed_above(2),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -2192,6 +2192,8 @@ class TestFactory:
             'o1',
             'o1_above',
             'o1_below',
+            'o1_crossed_above',
+            'o1_crossed_below',
             'o1_equal',
             'o1_stats',
             'o2',
@@ -2230,6 +2232,8 @@ class TestFactory:
             'ts',
             'ts_above',
             'ts_below',
+            'ts_crossed_above',
+            'ts_crossed_below',
             'ts_equal',
             'ts_stats',
             'tuple_loc',

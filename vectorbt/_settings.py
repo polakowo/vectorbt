@@ -479,6 +479,7 @@ settings = SettingsConfig(
             reject_prob=0.,
             min_size=1e-8,
             max_size=np.inf,
+            size_granularity=np.nan,
             lock_cash=False,
             allow_partial=True,
             raise_reject=False,
@@ -624,7 +625,7 @@ Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
 
 ## settings.datetime
 
-Settings applied across `vectorbt.utils.datetime`.
+Settings applied across `vectorbt.utils.datetime_`.
 
 ```json
 {settings['datetime'].to_doc()}

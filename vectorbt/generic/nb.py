@@ -1741,3 +1741,39 @@ def dd_recovery_duration_ratio_nb(start_idx_arr: tp.Array1d,
 def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -> tp.Array1d:
     """Return the recovery return of each drawdown record."""
     return (end_val_arr - valley_val_arr) / valley_val_arr
+
+
+# ############# Crossover ############# #
+
+@njit(cache=True)
+def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp.Array1d:
+    """Get the crossover of the first array going above the second array."""
+    out = np.empty(arr1.shape, dtype=np.bool_)
+    was_below = False
+    crossed_ago = -1
+
+    for i in range(arr1.shape[0]):
+        if was_below:
+            if arr1[i] > arr2[i]:
+                crossed_ago += 1
+                out[i] = crossed_ago == wait
+            elif crossed_ago != -1 or (np.isnan(arr1[i]) or np.isnan(arr2[i])):
+                crossed_ago = -1
+                was_below = False
+                out[i] = False
+            else:
+                out[i] = False
+        else:
+            if arr1[i] < arr2[i]:
+                was_below = True
+            out[i] = False
+    return out
+
+
+@njit(cache=True)
+def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Array2d:
+    """2-dim version of `crossed_above_1d_nb`."""
+    out = np.empty(arr1.shape, dtype=np.bool_)
+    for col in range(arr1.shape[1]):
+        out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait)
+    return out
