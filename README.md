@@ -153,8 +153,8 @@ pf.total_profit()
 ```python
 fast_ma = vbt.MA.run(price, 10)
 slow_ma = vbt.MA.run(price, 50)
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
 
 pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
 pf.total_profit()
@@ -191,8 +191,8 @@ price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 
 windows = np.arange(2, 101)
 fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fast', 'slow'])
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
 
 pf_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
 pf = vbt.Portfolio.from_signals(price, entries, exits, **pf_kwargs)

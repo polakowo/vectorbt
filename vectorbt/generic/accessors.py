@@ -1228,6 +1228,57 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """Get returns of this object."""
         return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
 
+    # ############# Crossover ############# #
+
+    def crossed_above(self,
+                      other: tp.SeriesFrame,
+                      wait: int = 0,
+                      broadcast_kwargs: tp.KwargsLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Generate crossover above another array.
+
+        See `vectorbt.generic.nb.crossed_above_nb`.
+
+        ## Example
+        ```python-repl
+        >>> df['b'].vbt.crossed_above(df['c'])
+        2020-01-01    False
+        2020-01-02    False
+        2020-01-03    False
+        2020-01-04    False
+        2020-01-05    False
+        dtype: bool
+        >>> df['a'].vbt.crossed_above(df['b'])
+        2020-01-01    False
+        2020-01-02    False
+        2020-01-03    False
+        2020-01-04     True
+        2020-01-05    False
+        dtype: bool
+        >>> df['a'].vbt.crossed_above(df['b'], wait=1)
+        2020-01-01    False
+        2020-01-02    False
+        2020-01-03    False
+        2020-01-04    False
+        2020-01-05     True
+        dtype: bool
+        ```"""
+        self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        out = nb.crossed_above_nb(reshape_fns.to_2d_array(self_obj), reshape_fns.to_2d_array(other_obj), wait=wait)
+        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def crossed_below(self,
+                      other: tp.SeriesFrame,
+                      wait: int = 0,
+                      broadcast_kwargs: tp.KwargsLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Generate crossover below another array.
+
+        See `vectorbt.generic.nb.crossed_above_nb` but in reversed order."""
+        self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        out = nb.crossed_above_nb(reshape_fns.to_2d_array(other_obj), reshape_fns.to_2d_array(self_obj), wait=wait)
+        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
     # ############# Transformation ############# #
 
     def transform(self, transformer: TransformerT, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:

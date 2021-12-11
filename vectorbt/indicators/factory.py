@@ -113,8 +113,8 @@ Now the same using `IndicatorFactory`:
 ... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
 >>> myind = MyInd.run(price, [2, 3])
->>> above_signals = myind.price_above(myind.ma, crossover=True)
->>> below_signals = myind.price_below(myind.ma, crossover=True)
+>>> above_signals = myind.price_crossed_above(myind.ma)
+>>> below_signals = myind.price_crossed_below(myind.ma)
 ```
 
 The `IndicatorFactory` class is used to construct indicator classes from UDFs. First, we provide
@@ -155,7 +155,7 @@ myind_2_window        3                   4
 2020-01-04     3.0  3.0  2.5  3.5  2.5  3.5
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
->>> myind1.ma_above(myind2.ma, crossover=True)
+>>> myind1.ma_crossed_above(myind2.ma)
 myind_1_window                          2             3
 myind_2_window            3             4             4
                    a      b      a      b      a      b
@@ -1187,6 +1187,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.accessors import BaseAccessor
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic import nb as generic_nb
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -2455,13 +2456,11 @@ class IndicatorFactory:
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
         def assign_combine_method(func_name: str,
                                   combine_func: tp.Callable,
+                                  def_kwargs: tp.Kwargs,
                                   attr_name: str,
                                   docstring: str) -> None:
             def combine_method(self: IndicatorBaseT,
                                other: tp.MaybeTupleList[tp.Union[IndicatorBaseT, tp.ArrayLike, BaseAccessor]],
-                               crossover: bool = False,
-                               wait: int = 0,
-                               after_false: bool = True,
                                level_name: tp.Optional[str] = None,
                                allow_multiple: bool = True,
                                _prepend_name: bool = prepend_name,
@@ -2488,10 +2487,8 @@ class IndicatorFactory:
                     combine_func=combine_func,
                     level_name=level_name,
                     allow_multiple=allow_multiple,
-                    **kwargs
+                    **merge_dicts(def_kwargs, kwargs)
                 )
-                if crossover:
-                    return out.vbt.signals.nth(wait, after_false=after_false)
                 return out
 
             combine_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'
@@ -2543,18 +2540,17 @@ class IndicatorFactory:
 
             elif np.issubdtype(dtype, np.number):
                 func_info = [
-                    ('above', np.greater),
-                    ('below', np.less),
-                    ('equal', np.equal)
+                    ('above', np.greater, dict()),
+                    ('below', np.less, dict()),
+                    ('equal', np.equal, dict()),
+                    ('crossed_above', lambda x, y, wait=0: generic_nb.crossed_above_nb(x, y, wait), dict(to_2d=True)),
+                    ('crossed_below', lambda x, y, wait=0: generic_nb.crossed_above_nb(y, x, wait), dict(to_2d=True))
                 ]
-                for func_name, np_func in func_info:
+                for func_name, np_func, def_kwargs in func_info:
                     method_docstring = f"""Return True for each element where `{attr_name}` is {func_name} `other`. 
-        
-                    Set `crossover` to True to return the first True after crossover. Specify `wait` to return 
-                    True only when `{attr_name}` is {func_name} for a number of time steps in a row after crossover.
                 
                     See `vectorbt.indicators.factory.combine_objs`."""
-                    assign_combine_method(func_name, np_func, attr_name, method_docstring)
+                    assign_combine_method(func_name, np_func, def_kwargs, attr_name, method_docstring)
 
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
@@ -2565,15 +2561,15 @@ class IndicatorFactory:
 
             elif np.issubdtype(dtype, np.bool_):
                 func_info = [
-                    ('and', np.logical_and),
-                    ('or', np.logical_or),
-                    ('xor', np.logical_xor)
+                    ('and', np.logical_and, dict()),
+                    ('or', np.logical_or, dict()),
+                    ('xor', np.logical_xor, dict())
                 ]
-                for func_name, np_func in func_info:
+                for func_name, np_func, def_kwargs in func_info:
                     method_docstring = f"""Return `{attr_name} {func_name.upper()} other`. 
 
                     See `vectorbt.indicators.factory.combine_objs`."""
-                    assign_combine_method(func_name, np_func, attr_name, method_docstring)
+                    assign_combine_method(func_name, np_func, def_kwargs, attr_name, method_docstring)
 
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)

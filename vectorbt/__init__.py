@@ -305,7 +305,7 @@ average, and sell when opposite.
 >>> fast_ma = vbt.MA.run(btc_price, 10, short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 Date
 2019-01-01 00:00:00+00:00    False
@@ -317,7 +317,7 @@ Date
 2020-01-01 00:00:00+00:00    False
 Freq: D, Length: 366, dtype: bool
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 Date
 2019-01-01 00:00:00+00:00    False
@@ -345,7 +345,7 @@ average over the entire price series and stores it as a distinct column.
 >>> fast_ma = vbt.MA.run(btc_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 fast_window                   10     20
 slow_window                   30     30
@@ -360,7 +360,7 @@ Date
 
 [366 rows x 2 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 fast_window                   10     20
 slow_window                   30     30
@@ -415,7 +415,7 @@ Date
 >>> fast_ma = vbt.MA.run(comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 fast_window                          10            20
 slow_window                          30            30
@@ -431,7 +431,7 @@ Date
 
 [366 rows x 4 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 fast_window                          10            20
 slow_window                          30            30
@@ -487,8 +487,8 @@ symbol              BTC         ETH           BTC         ETH
 >>> fast_ma = vbt.MA.run(mult_comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(mult_comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 
 >>> pf = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> pf.total_return()
