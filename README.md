@@ -11,11 +11,13 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-## [Installation](#installation) · [Main Features](#main-features) · [Usage](#usage) · [Resources](#resources) · [License](#license)
+## [Installation](#installation) · [Main Features](#main-features) · [Usage](#usage-magic_wand) · [Resources](#resources) · [License](#license)
 
-vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
-[Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for the simulation of many thousands 
-of strategies in a matter of **seconds** :dash:
+![#f03c15](https://via.placeholder.com/15/f03c15/000000?text=+) Lost time on slow backtesting, hyperparameter optimization, and strategy development?
+
+![#50C62B](https://via.placeholder.com/15/50C62B/000000?text=+) Search no more — vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
+[Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for testing of many thousands 
+of strategies in **seconds**.
 
 In contrast to other backtesters, vectorbt represents complex data as (structured) NumPy arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
@@ -77,7 +79,7 @@ There are two types of images:
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
 and comes with Jupyter environment, vectorbt, and other scientific packages installed.
 
-## Main Features :joystick:
+## Main Features
 
 ### Pandas
 
