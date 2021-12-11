@@ -1,4 +1,4 @@
-# vectorbt: Hyperfast framework for quants.
+# vectorbt: Powerful toolkit for quants.
 
 [![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://pypi.org/project/vectorbt)
 [![License](https://img.shields.io/badge/license-Fair%20Code-yellow)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
@@ -11,15 +11,13 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-## [Main Features](#main-features) · [Installation](#installation) · [Usage](#usage) · [Resources](#resources) · [License](#license)
+## [Installation](#installation) · [Features](#features) · [Usage](#usage) · [Resources](#resources) · [License](#license)
 
-Tired of slow backtesting and hyperparameter optimization? :snail:
-
-vectorbt takes a novel approach: it operates entirely on pandas and NumPy objects, and is accelerated by 
+vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
 [Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for the simulation of many thousands 
-of configurations in a matter of **seconds**. :tiger2:
+of strategies in a matter of **seconds** :stopwatch:
 
-In contrast to other backtesters, vectorbt represents data as arrays.
+In contrast to other backtesters, vectorbt represents complex data as (structured) NumPy arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
 compiled operations with Numba. It also integrates [Plotly](https://github.com/plotly/plotly.py) and 
 [Jupyter Widgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
@@ -28,17 +26,15 @@ data even without GPU and parallelization and enables the user to interact with 
 without significant delays.
 
 With vectorbt, you can
-* Enjoy the best of both worlds: the ecosystem of Python and the speed of C
-* Build your pipelines in a few lines of code, even with limited knowledge of Python
-* Retain full control over execution (as opposed to web-based services such as TradingView)
-* Optimize your trading strategy against many parameters, assets, and periods in one go
-* Uncover hidden patterns in financial markets
-* Analyze time series and engineer new features for ML models
+* Backtest strategies in **a couple of lines** of Python code
+* Enjoy the best of both worlds: the ecosystem of Python and **the speed of C**
+* Retain **full control** over execution (as opposed to web-based services such as TradingView)
+* Optimize your trading strategy against many parameters, assets, and periods **in one go**
+* Uncover **hidden patterns** in financial markets
+* Analyze time series and engineer new features for **ML models**
 * Supercharge pandas and your favorite tools to run much faster
-* Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
+* Visualize strategy performance using **interactive charts and dashboards** (both in Jupyter and browser)
 * Fetch and process data periodically, send Telegram notifications, and more
-
-## Main Features
 
 ## Installation
 
@@ -80,6 +76,58 @@ There are two types of images:
 
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
 and comes with Jupyter environment, vectorbt, and other scientific packages installed.
+
+## Features
+
+### Pandas
+
+- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of pandas to easily switch between pandas and vectorbt functionality. **[>>](https://vectorbt.dev/docs/generic/accessors.html)**
+- [x] **Flexible broadcasting**: Mechanism for broadcasting array-like objects of arbitrary shapes, including pandas objects with MultiIndex.
+- [x] **Pandas utilities**: Grouping columns, wrapping NumPy arrays, transforming pandas objects and their indexes, and more. **[>>](https://vectorbt.dev/docs/base/index.html)**
+
+### Data
+
+- [x] **Data acquisition**: Supports various data providers, such as **[Yahoo Finance](https://github.com/ranaroussi/yfinance)**, **[Binance](https://github.com/sammchardy/python-binance)**, and **[CCXT](https://github.com/ccxt/ccxt)**. Can merge multiple symbols with different index, as well as update them. **[>>](https://vectorbt.dev/docs/data/custom.html)**
+- [x] **Data generation**: Supports various (random) data generators, such as **[GBM](https://en.wikipedia.org/wiki/Geometric_Brownian_motion)**. **[>>](https://vectorbt.dev/docs/data/custom.html)**
+- [x] **Scheduled data updates**: Can periodically update any previously downloaded data. **[>>](https://vectorbt.dev/docs/data/updater.html)**
+- [x] **Data preparation**: Transformation, rescaling, and normalization of data. Custom splitters for cross-validation. Supports **[Scikit-Learn](https://github.com/scikit-learn/scikit-learn)** splitters, such as for K-Folds cross-validation. **[>>](https://vectorbt.dev/docs/generic/accessors.html)**
+- [x] **Labeling for ML**: Discrete and continuous label generation for effective training of ML models. **[>>](https://vectorbt.dev/docs/labels/generators.html)**
+
+### Indicators
+
+- [x] **Technical indicators**: Most popular technical indicators with full Numba support, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the vectorbt's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products. **[>>](https://vectorbt.dev/docs/indicators/basic.html)**
+- [x] **Indicator factory**: Sophisticated factory for building custom technical indicators of any complexity. Takes a function and does all the magic for you: generates an indicator skeleton that takes inputs and parameters of any shape and type, and runs the vectorbt's indicator engine. The easiest and most flexible way to create indicators you will find in open source. **[>>](https://vectorbt.dev/docs/indicators/factory.html)**
+
+### Signals
+
+- [x] **Signal analysis**: Generation, mapping and reducing, ranking, and distribution analysis of entry and exit signals. **[>>](https://vectorbt.dev/docs/signals/accessors.html)**
+- [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support. **[>>](https://vectorbt.dev/docs/signals/generators.html)**
+- [x] **Signal factory**: Signal factory based on indicator factory specialized for iterative signal generation. **[>>](https://vectorbt.dev/docs/signals/factory.html)**
+
+### Modeling
+
+- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for best performance and memory consumption. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across vectorbt into a single behemoth class. **[>>](https://vectorbt.dev/docs/portfolio/base.html)**
+
+### Performance
+
+- [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their highly-optimized rolling versions. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**. **[>>](https://vectorbt.dev/docs/returns/accessors.html)**
+- [x] **Stats builder**: Class for building statistics out of custom metrics. Implements a preset of tailored statistics for many backtesting components, such as signals, returns, and portfolio. **[>>](https://vectorbt.dev/docs/generic/stats_builder.html)**
+- [x] **Records and mapped arrays**: In-house data structures for analyzing complex data, such as simulation logs. Fully compiled with Numba. **[>>](https://vectorbt.dev/docs/records/index.html)**
+- [x] **Trade analysis**: Retrospective analysis of trades from various view points. Supports entry trades, exit trades, and positions. **[>>](https://vectorbt.dev/docs/portfolio/trades.html)**
+- [x] **Drawdown analysis**: Drawdown statistics of any numeric time series. **[>>](https://vectorbt.dev/docs/generic/drawdowns.html)**
+
+### Plotting
+
+- [x] **Data visualization**: Numerous flexible data plotting functions distributed across vectorbt.
+- [x] **Figures and widgets**: Custom interactive figures and widgets using **[Plotly](https://github.com/plotly/plotly.py)**, such as Heatmap and Volume. All custom widgets have dedicated methods for efficiently updating their state. **[>>](https://vectorbt.dev/docs/generic/plotting.html)**
+- [x] **Plot builder**: Class for building plots out of custom subplots. Implements a preset of tailored subplots for many backtesting components, such as signals, returns, and portfolio. **[>>](https://vectorbt.dev/docs/generic/plots_builder.html)**
+
+### Extra
+
+- [x] **Notifications**: Telegram bot based on **[Python Telegram Bot](https://github.com/python-telegram-bot/python-telegram-bot)**. **[>>](https://vectorbt.dev/docs/messaging/telegram.html)**
+- [x] **General utilities**: Scheduling using **[schedule](https://github.com/dbader/schedule)**, templates, decorators, configs, and more. **[>>](https://vectorbt.dev/docs/utils/index.html)**
+- [x] **Caching**: Property and method decorators for caching most frequently used objects.
+- [x] **Persistance**: Most Python objects including data and portfolio can be saved to a file and retrieved back using **[Dill](https://github.com/uqfoundation/dill)**.
 
 ## Usage
 
