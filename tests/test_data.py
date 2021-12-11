@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 import pytest
+import pytz
 
 import vectorbt as vbt
 from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.datetime_ import to_timezone
 
 seed = 42
 
@@ -210,15 +212,15 @@ class TestData:
         )
         index2 = pd.DatetimeIndex(
             [
-                '2020-01-01 02:00:00',
-                '2020-01-02 02:00:00',
-                '2020-01-03 02:00:00',
-                '2020-01-04 02:00:00',
-                '2020-01-05 02:00:00'
+                '2020-01-01 00:00:00',
+                '2020-01-02 00:00:00',
+                '2020-01-03 00:00:00',
+                '2020-01-04 00:00:00',
+                '2020-01-05 00:00:00'
             ],
             freq='D',
-            tz=timezone(timedelta(hours=2))
-        )
+            tz=pytz.utc
+        ).tz_convert(to_timezone('Europe/Berlin'))
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), tz_localize='UTC', tz_convert='Europe/Berlin').data[0],
             pd.Series(
@@ -458,15 +460,15 @@ class TestData:
         )
         index2 = pd.DatetimeIndex(
             [
-                '2020-01-01 02:00:00',
-                '2020-01-02 02:00:00',
-                '2020-01-03 02:00:00',
-                '2020-01-04 02:00:00',
-                '2020-01-05 02:00:00'
+                '2020-01-01 00:00:00',
+                '2020-01-02 00:00:00',
+                '2020-01-03 00:00:00',
+                '2020-01-04 00:00:00',
+                '2020-01-05 00:00:00'
             ],
             freq='D',
-            tz=timezone(timedelta(hours=2))
-        )
+            tz=pytz.utc
+        ).tz_convert(to_timezone('Europe/Berlin'))
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), tz_localize='UTC', tz_convert='Europe/Berlin')
                 .update(tz_localize=None).data[0],

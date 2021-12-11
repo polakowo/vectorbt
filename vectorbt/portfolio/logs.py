@@ -160,6 +160,9 @@ logs_field_config = Config(
             req_max_size=dict(
                 title='Request Max Size'
             ),
+            req_size_granularity=dict(
+                title='Request Size Granularity'
+            ),
             req_reject_prob=dict(
                 title='Request Rejection Prob'
             ),

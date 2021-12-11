@@ -1396,6 +1396,7 @@ class Order(tp.NamedTuple):
     slippage: float = 0.0
     min_size: float = 0.0
     max_size: float = np.inf
+    size_granularity: float = np.nan
     reject_prob: float = 0.0
     lock_cash: bool = False
     allow_partial: bool = True
@@ -1452,6 +1453,13 @@ Lower than that will be rejected."""
 __pdoc__['Order.max_size'] = """Maximum size in both directions. 
 
 Higher than that will be partly filled."""
+__pdoc__['Order.size_granularity'] = """Granularity of the size.
+
+For example, granularity of 1.0 makes the quantity to behave like an integer. 
+Placing an order of 12.5 shares (in any direction) will order exactly 12.0 shares.
+
+!!! note
+    The filled size remains a floating number."""
 __pdoc__['Order.reject_prob'] = """Probability of rejecting this order to simulate a random rejection event.
 
 Not everything goes smoothly in real life. Use random rejections to test your order management for robustness."""
@@ -1472,20 +1480,21 @@ __pdoc__['Order.log'] = """Whether to log this order by filling a log record.
 Remember to increase `max_logs`."""
 
 NoOrder = Order(
-    np.nan,
-    np.nan,
-    -1,
-    -1,
-    np.nan,
-    np.nan,
-    np.nan,
-    np.nan,
-    np.nan,
-    np.nan,
-    False,
-    False,
-    False,
-    False
+    size=np.nan,
+    price=np.nan,
+    size_type=-1,
+    direction=-1,
+    fees=np.nan,
+    fixed_fees=np.nan,
+    slippage=np.nan,
+    min_size=np.nan,
+    max_size=np.nan,
+    size_granularity=np.nan,
+    reject_prob=np.nan,
+    lock_cash=False,
+    allow_partial=False,
+    raise_reject=False,
+    log=False
 )
 """_"""
 
@@ -1658,6 +1667,7 @@ _log_fields = [
     ('req_slippage', np.float_),
     ('req_min_size', np.float_),
     ('req_max_size', np.float_),
+    ('req_size_granularity', np.float_),
     ('req_reject_prob', np.float_),
     ('req_lock_cash', np.bool_),
     ('req_allow_partial', np.bool_),
