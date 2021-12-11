@@ -44,7 +44,7 @@ other Numba-compatible types.
     To mitigate this issue, avoid repeating lots of micro-transactions of the same sign.
     For example, reduce by `np.inf` or `position_now` to close a long/short position.
 
-    See `vectorbt.utils.math` for current tolerance values.
+    See `vectorbt.utils.math_` for current tolerance values.
 """
 
 import numpy as np

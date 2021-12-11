@@ -1364,7 +1364,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ![](/docs/img/portfolio_plot_custom.svg)
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
-the path to this function (see `vectorbt.utils.attr.deep_getattr` for the path format).
+the path to this function (see `vectorbt.utils.attr_.deep_getattr` for the path format).
 You can additionally use templates to make some parameters to depend upon passed keyword arguments:
 
 ```python-repl

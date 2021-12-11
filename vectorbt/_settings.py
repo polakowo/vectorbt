@@ -625,7 +625,7 @@ Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
 
 ## settings.datetime
 
-Settings applied across `vectorbt.utils.datetime`.
+Settings applied across `vectorbt.utils.datetime_`.
 
 ```json
 {settings['datetime'].to_doc()}
