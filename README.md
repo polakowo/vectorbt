@@ -11,7 +11,7 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-## [Installation](#installation) · [Main Features](#main-features) · [Usage](#usage-magic_wand) · [Resources](#resources) · [License](#license)
+## [Installation](#installation) · [Features](#zap-features) · [Usage](#sparkles-usage) · [Resources](#resources) · [License](#license)
 
 vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
 [Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for testing of many thousands 
@@ -77,7 +77,7 @@ There are two types of images:
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
 and comes with Jupyter environment, vectorbt, and other scientific packages installed.
 
-## Main Features
+## :zap: Features
 
 ### Pandas
 
@@ -129,7 +129,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 - [x] **Caching**: Property and method decorators for caching most frequently used objects.
 - [x] **Persistance**: Most Python objects including data and portfolio can be saved to a file and retrieved back using **[Dill](https://github.com/uqfoundation/dill)**.
 
-## Usage :magic_wand:
+## :sparkles: Usage
 
 vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
 

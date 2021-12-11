@@ -5,6 +5,8 @@
 <%def name="mobile()" filter="minify_css">
 :root {
     --highlight-color: #e82;
+    --docsearch-primary-color: #e82;
+    --docsearch-searchbox-focus-background: #ebedf0;
 }
 
 body {
@@ -547,19 +549,10 @@ a.badge-dark.focus {
     margin-bottom: 15px;
 }
 
-#search_input {
-    display: inline-block;
+.DocSearch-Button {
     width: 100%;
-    height: 40px;
-    padding: .375rem .75rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    color: white;
-    background: #282c34 !important;
-    border: none;
-    border-radius: 6px;
-    border-bottom: 1px solid #e82;
-    outline: none;
+    margin: 0px;
+    height: 38px;
 }
 
 .algolia-autocomplete {

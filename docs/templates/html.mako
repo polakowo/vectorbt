@@ -288,14 +288,7 @@
 
     <%include file="logo.mako"/>
 
-    <div class="search-container">
-        <input
-            id="search_input"
-            type="text"
-            placeholder="Search"
-            title="Search"
-        />
-    </div>
+    <div class="search-container" id="docsearch"></div>
 
     <div class="scrollable-index">
     <h1 class="index-caption">Index</h1>
@@ -378,7 +371,7 @@
   % endif
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0-2/css/all.min.css" integrity="sha256-46r060N2LrChLLb5zowXQ72/iKKNiw/lAmygmHExk/o=" crossorigin="anonymous" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@alpha" />
   <link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
   <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
   <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
@@ -437,16 +430,13 @@
     </script>
 % endif
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@docsearch/js@alpha"></script>
 <script type="text/javascript">
 docsearch({
-    apiKey: 'ac97cfdd96a6e6fcdc67c570adaeaf94',
-    indexName: 'vectorbt',
-    inputSelector: '#search_input',
-    autocompleteOptions: {
-        autoWidth: false
-    },
-    debug: true // Set debug to true if you want to inspect the dropdown
+  container: '#docsearch',
+  appId: 'KNQTBBHKVB',
+  indexName: 'vectorbt',
+  apiKey: 'a945e6e8f1cb2fdc30e936936aa3307b',
 });
 </script>
 

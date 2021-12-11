@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Ultimate Python library for time series analysis and backtesting at scale.
+"""Find your trading edge, using the most powerful toolkit for backtesting, algorithmic trading, and research.
 
 While there are many great backtesting packages for Python, vectorbt combines an extremely fast backtester 
 and a data science tool: it excels at processing performance and offers interactive tools to explore complex 
@@ -525,26 +525,6 @@ There is much more to backtesting than simply stacking columns: vectorbt offers 
 most parts of a backtesting pipeline, from building indicators and generating signals, to
 modeling portfolio performance and visualizing results.
 
-## Limitations
-
-In its current shape, vectorbt is a raw (but fast-evolving) backtesting engine.
-
-- *High RAM usage*: Probably the main challenge of using vectorbt is high RAM usage since you need to keep
-a bunch of (sometimes huge) arrays in memory. But there is plenty of tricks already implemented to
-reduce the memory footprint, and you as a user always have 90-95% control over memory management
-(avoid array materialization, disable caching, split data, etc.)
-- *No built-in order management*: Once you issue an order command, it gets executed/rejected immediately
-(just like a market order, but you can easily build upon it to implement limit and stop orders).
-This means order execution is effectively state-less - it simply receives a command with inputs and gives you the
-result of the execution including the new cash balance and other metrics. There is no list of pending orders.
-
-    Update: `Portfolio.from_signals` now supports stop orders.
-- *One order limit*: Only one order command per symbol and bar - although this can (and probably will) be expanded.
-
-    Update: `Portfolio.from_order_func` with `flexible` option supports multiple orders.
-- *Limited support for parallelization*: Read [this](https://github.com/polakowo/vectorbt/issues/129#issuecomment-823596039).
-- *Python skills required*: Having an intermediate knowledge of Pandas, NumPy, and broadcasting principles is a must.
-
 ## Resources
 
 ### Notebooks
@@ -569,7 +549,7 @@ Note: you must run the notebook to play with the widgets.
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
-## Getting Help
+### Getting Help
 
 - If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
 - For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
