@@ -621,6 +621,7 @@ __pdoc__ = {}
 
 # Import version
 from vectorbt._version import __version__ as _version
+
 __version__ = _version
 
 # Most important modules

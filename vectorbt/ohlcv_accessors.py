@@ -92,11 +92,11 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_vbt_accessor
-from vectorbt.utils.figure import make_figure, make_subplots
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbt.generic import nb
+from vectorbt.generic.accessors import GenericAccessor, GenericDFAccessor
+from vectorbt.root_accessors import register_dataframe_vbt_accessor
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.figure import make_figure, make_subplots
 
 __pdoc__ = {}
 
@@ -164,7 +164,6 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         if len(to_concat) == 0:
             return None
         return pd.concat(to_concat, axis=1)
-
 
     @property
     def volume(self) -> tp.Optional[tp.Series]:

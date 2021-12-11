@@ -6,9 +6,9 @@
 import logging
 
 from vectorbt import _typing as tp
-from vectorbt.utils.schedule_ import ScheduleManager
-from vectorbt.utils.config import Configured
 from vectorbt.data.base import Data
+from vectorbt.utils.config import Configured
+from vectorbt.utils.schedule_ import ScheduleManager
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,7 @@ class DataUpdater(Configured):
     Freq: S, Length: 81, dtype: float64
     ```
     """
+
     def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:
         Configured.__init__(
             self,

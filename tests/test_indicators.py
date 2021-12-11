@@ -1,10 +1,11 @@
+from collections import namedtuple
+from datetime import datetime
+from itertools import product
+
 import numpy as np
 import pandas as pd
-from numba import njit
-from datetime import datetime
 import pytest
-from itertools import product
-from collections import namedtuple
+from numba import njit
 
 import vectorbt as vbt
 

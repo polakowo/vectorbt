@@ -258,19 +258,20 @@ Name: group, dtype: object
 ![](/docs/img/data_plots.svg)
 """
 
-import numpy as np
-import pandas as pd
 import warnings
 
+import numpy as np
+import pandas as pd
+
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.datetime_ import is_tz_aware, to_timezone
-from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic import plotting
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.datetime_ import is_tz_aware, to_timezone
+from vectorbt.utils.decorators import cached_method
 
 __pdoc__ = {}
 

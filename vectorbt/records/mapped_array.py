@@ -358,17 +358,17 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method, attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbt.utils.mapping import to_mapping, apply_mapping
-from vectorbt.utils.config import merge_dicts, Config, Configured
-from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.generic import nb as generic_nb
-from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts, Config, Configured
+from vectorbt.utils.decorators import cached_method, attach_binary_magic_methods, attach_unary_magic_methods
+from vectorbt.utils.mapping import to_mapping, apply_mapping
 
 MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
 IndexingMetaT = tp.Tuple[

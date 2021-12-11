@@ -73,19 +73,20 @@ True
 Bonus: You can do the same with any sub-config inside `settings`!
 """
 
-import numpy as np
 import json
 import pkgutil
-import plotly.io as pio
-import plotly.graph_objects as go
 
+import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+
+from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.column_grouper import ColumnGrouper
+from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
 from vectorbt.utils.template import Sub, RepEval
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.column_grouper import ColumnGrouper
-from vectorbt.records.col_mapper import ColumnMapper
 
 __pdoc__ = {}
 

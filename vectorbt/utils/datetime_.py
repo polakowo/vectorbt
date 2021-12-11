@@ -3,12 +3,13 @@
 
 """Utilities for working with dates and time."""
 
+import copy
+from datetime import datetime, timezone, timedelta, tzinfo, time
+
+import dateparser
 import numpy as np
 import pandas as pd
-import dateparser
-from datetime import datetime, timezone, timedelta, tzinfo, time
 import pytz
-import copy
 
 from vectorbt import _typing as tp
 

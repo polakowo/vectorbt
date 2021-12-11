@@ -6,10 +6,11 @@
 Index functions perform operations on index objects, such as stacking, combining,
 and cleansing MultiIndex levels. "Index" in pandas context is referred to both index and columns."""
 
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
 from numba import njit
-from datetime import datetime, timedelta
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks

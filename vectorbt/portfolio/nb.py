@@ -51,17 +51,17 @@ import numpy as np
 from numba import njit
 
 from vectorbt import _typing as tp
+from vectorbt.base.reshape_fns import flex_select_auto_nb
+from vectorbt.generic import nb as generic_nb
+from vectorbt.portfolio.enums import *
+from vectorbt.returns import nb as returns_nb
+from vectorbt.utils.array_ import insert_argsort_nb
 from vectorbt.utils.math_ import (
     is_close_nb,
     is_close_or_less_nb,
     is_less_nb,
     add_nb
 )
-from vectorbt.utils.array_ import insert_argsort_nb
-from vectorbt.base.reshape_fns import flex_select_auto_nb
-from vectorbt.generic import nb as generic_nb
-from vectorbt.returns import nb as returns_nb
-from vectorbt.portfolio.enums import *
 
 
 # ############# Order processing ############# #

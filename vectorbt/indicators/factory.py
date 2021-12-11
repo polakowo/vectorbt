@@ -1160,34 +1160,35 @@ Similarly to stats, we can attach subplots to any new indicator class:
 ![](/docs/img/IndicatorFactory_plots.svg)
 """
 
+import inspect
+import itertools
+import warnings
+from collections import Counter
+from collections import OrderedDict
+from datetime import datetime, timedelta
+from types import ModuleType
+
 import numpy as np
 import pandas as pd
 from numba import njit
 from numba.typed import List
-import itertools
-import inspect
-from collections import OrderedDict
-import warnings
-from datetime import datetime, timedelta
-from types import ModuleType
-from collections import Counter
 
 from vectorbt import _typing as tp
+from vectorbt.base import index_fns, reshape_fns, combine_fns
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.base.indexing import build_param_indexer
+from vectorbt.generic import nb as generic_nb
+from vectorbt.generic.accessors import BaseAccessor
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import classproperty, cached_property
 from vectorbt.utils.config import merge_dicts, resolve_dict, Config, Default
-from vectorbt.utils.random_ import set_seed
-from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
+from vectorbt.utils.decorators import classproperty, cached_property
+from vectorbt.utils.docs import to_doc
 from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.utils.mapping import to_mapping, apply_mapping
-from vectorbt.utils.docs import to_doc
-from vectorbt.base import index_fns, reshape_fns, combine_fns
-from vectorbt.base.indexing import build_param_indexer
-from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic.accessors import BaseAccessor
-from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plots_builder import PlotsBuilderMixin
-from vectorbt.generic import nb as generic_nb
+from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
+from vectorbt.utils.random_ import set_seed
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -3873,7 +3874,6 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 fillna(bool): if True, fill nan values.
         ```
         """
-        import ta
 
         ind_cls = cls.find_ta_indicator(cls_name)
         config = cls.parse_ta_config(ind_cls)

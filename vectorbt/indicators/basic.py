@@ -63,12 +63,12 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
+from vectorbt.generic import nb as generic_nb
+from vectorbt.indicators import nb
+from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.figure import make_figure
-from vectorbt.utils.colors import adjust_opacity
-from vectorbt.generic import nb as generic_nb
-from vectorbt.indicators.factory import IndicatorFactory
-from vectorbt.indicators import nb
 
 # ############# MA ############# #
 
@@ -395,7 +395,7 @@ class _RSI(RSI):
              levels: tp.Tuple[float, float] = (30, 70),
              rsi_trace_kwargs: tp.KwargsLike = None,
              add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x', 
+             xref: str = 'x',
              yref: str = 'y',
              fig: tp.Optional[tp.BaseFigure] = None,
              **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover

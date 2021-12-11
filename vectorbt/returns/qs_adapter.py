@@ -98,15 +98,15 @@ We can still override any argument by overriding its default or by passing it di
 -1.5912029345745982
 ```
 """
-import pandas as pd
 from inspect import getmembers, isfunction, signature, Parameter
-import warnings
+
+import pandas as pd
 import quantstats as qs
 
 from vectorbt import _typing as tp
+from vectorbt.returns.accessors import ReturnsAccessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, get_func_arg_names, Configured
-from vectorbt.returns.accessors import ReturnsAccessor
 
 
 def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.Type[tp.T]:

@@ -7,8 +7,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.utils.config import Config
-from vectorbt.utils.figure import make_figure
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
@@ -19,6 +17,8 @@ from vectorbt.signals.nb import (
     ohlc_stop_choice_nb,
     rand_choice_nb
 )
+from vectorbt.utils.config import Config
+from vectorbt.utils.figure import make_figure
 
 # ############# RAND ############# #
 

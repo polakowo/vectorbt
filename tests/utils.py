@@ -1,5 +1,6 @@
-import numpy as np
 import hashlib
+
+import numpy as np
 
 # non-randomized hash function
 hash = lambda s: int(hashlib.sha512(s.encode('utf-8')).hexdigest()[:16], 16)

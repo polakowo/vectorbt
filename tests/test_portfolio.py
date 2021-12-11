@@ -1,18 +1,18 @@
+from copy import deepcopy
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
+import pytest
 from numba import njit, typeof
 from numba.typed import List
-from datetime import datetime, timedelta
-import pytest
-from copy import deepcopy
 
 import vectorbt as vbt
-from vectorbt.portfolio.enums import *
-from vectorbt.generic.enums import drawdown_dt
-from vectorbt.utils.random_ import set_seed
-from vectorbt.portfolio import nb
-
 from tests.utils import record_arrays_close
+from vectorbt.generic.enums import drawdown_dt
+from vectorbt.portfolio import nb
+from vectorbt.portfolio.enums import *
+from vectorbt.utils.random_ import set_seed
 
 seed = 42
 

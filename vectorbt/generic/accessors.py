@@ -201,12 +201,12 @@ Name: 0, dtype: object
 ![](/docs/img/generic_plots.svg)
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
-from scipy import stats
 from numba.typed import Dict
-import warnings
-from sklearn.utils.validation import check_is_fitted
+from scipy import stats
 from sklearn.exceptions import NotFittedError
 from sklearn.preprocessing import (
     Binarizer,
@@ -218,23 +218,24 @@ from sklearn.preprocessing import (
     QuantileTransformer,
     PowerTransformer
 )
+from sklearn.utils.validation import check_is_fitted
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.config import Config, merge_dicts, resolve_dict
-from vectorbt.utils.figure import make_figure, make_subplots
-from vectorbt.utils.mapping import apply_mapping, to_mapping
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import plotting, nb
-from vectorbt.generic.ranges import Ranges
+from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.generic.drawdowns import Drawdowns
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plots_builder import PlotsBuilderMixin
-from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.records.mapped_array import MappedArray
+from vectorbt.utils import checks
+from vectorbt.utils.config import Config, merge_dicts, resolve_dict
+from vectorbt.utils.figure import make_figure, make_subplots
+from vectorbt.utils.mapping import apply_mapping, to_mapping
 
 try:  # pragma: no cover
     import bottleneck as bn

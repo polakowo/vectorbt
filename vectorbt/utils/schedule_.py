@@ -3,16 +3,17 @@
 
 """Utilities for scheduling jobs."""
 
-from datetime import datetime, timedelta, time as dt_time
-import time
-from schedule import Scheduler, Job, CancelJob
 import asyncio
-import logging
 import inspect
+import logging
+import time
+from datetime import datetime, timedelta, time as dt_time
+
+from schedule import Scheduler, Job, CancelJob
 
 from vectorbt import _typing as tp
-from vectorbt.utils.datetime_ import tzaware_to_naive_time
 from vectorbt.utils import checks
+from vectorbt.utils.datetime_ import tzaware_to_naive_time
 
 logger = logging.getLogger(__name__)
 

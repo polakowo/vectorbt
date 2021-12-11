@@ -9,24 +9,25 @@ such as entry and exit functions and the names of inputs, parameters, and output
 stand-alone class capable of generating signals for an arbitrary combination of inputs and parameters.
 """
 
-import numpy as np
-from numba import njit
 import inspect
 
+import numpy as np
+from numba import njit
+
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.params import to_typed_list
-from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
+from vectorbt.signals.enums import FactoryMode
 from vectorbt.signals.nb import (
     generate_nb,
     generate_ex_nb,
     generate_enex_nb,
     first_choice_nb
 )
-from vectorbt.signals.enums import FactoryMode
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.enum_ import map_enum_fields
+from vectorbt.utils.params import to_typed_list
 
 
 class SignalFactory(IndicatorFactory):

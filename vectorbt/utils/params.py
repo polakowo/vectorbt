@@ -3,9 +3,10 @@
 
 """Utilities for working with parameters."""
 
-from numba.typed import List
 import itertools
 from collections.abc import Callable
+
+from numba.typed import List
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks

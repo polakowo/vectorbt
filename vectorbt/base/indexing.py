@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
 from vectorbt.base import index_fns, reshape_fns
+from vectorbt.utils import checks
 
 
 class IndexingError(Exception):
@@ -281,6 +281,7 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
     1  2  2  4  4
     ```
     """
+
     class ParamIndexer(IndexingBase):
         def __init__(self, param_mappers: tp.Sequence[tp.Series],
                      level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:

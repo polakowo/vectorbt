@@ -3,10 +3,10 @@
 
 """Modules for working with portfolios."""
 
-from vectorbt.portfolio.enums import *
 from vectorbt.portfolio.base import Portfolio
-from vectorbt.portfolio.orders import Orders
+from vectorbt.portfolio.enums import *
 from vectorbt.portfolio.logs import Logs
+from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 
 __all__ = [

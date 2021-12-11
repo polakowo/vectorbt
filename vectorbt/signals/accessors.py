@@ -191,25 +191,26 @@ Name: 0, dtype: object
 This class inherits subplots from `vectorbt.generic.accessors.GenericAccessor`.
 """
 
-import numpy as np
-import pandas as pd
 import warnings
 
+import numpy as np
+import pandas as pd
+
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.template import RepEval
 from vectorbt.base import reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.records.mapped_array import MappedArray
-from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
-from vectorbt.generic import plotting
-from vectorbt.generic.ranges import Ranges
 from vectorbt.generic import nb as generic_nb
+from vectorbt.generic import plotting
+from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
+from vectorbt.generic.ranges import Ranges
+from vectorbt.records.mapped_array import MappedArray
+from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.signals import nb
+from vectorbt.utils import checks
+from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.decorators import class_or_instancemethod
+from vectorbt.utils.template import RepEval
 
 __pdoc__ = {}
 

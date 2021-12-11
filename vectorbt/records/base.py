@@ -389,23 +389,24 @@ Alternatively, we can override the `_field_config` class attribute.
     You can stop inheritance by not decorating or passing `merge_configs=False` to the decorator.
 """
 
-import numpy as np
-import pandas as pd
 import inspect
 import string
 
+import numpy as np
+import pandas as pd
+
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.config import merge_dicts, Config, Configured
-from vectorbt.utils.attr_ import get_dict_attr
-from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records import nb
-from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.col_mapper import ColumnMapper
+from vectorbt.records.mapped_array import MappedArray
+from vectorbt.utils import checks
+from vectorbt.utils.attr_ import get_dict_attr
+from vectorbt.utils.config import merge_dicts, Config, Configured
+from vectorbt.utils.decorators import cached_method
 
 __pdoc__ = {}
 

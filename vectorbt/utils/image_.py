@@ -3,10 +3,10 @@
 
 """Utilities for images."""
 
-import numpy as np
 import imageio
-from tqdm.auto import tqdm
+import numpy as np
 import plotly.graph_objects as go
+from tqdm.auto import tqdm
 
 from vectorbt import _typing as tp
 

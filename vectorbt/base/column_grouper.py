@@ -13,12 +13,11 @@ import pandas as pd
 from numba import njit
 
 from vectorbt import _typing as tp
+from vectorbt.base import index_fns
 from vectorbt.utils import checks
 from vectorbt.utils.array_ import is_sorted
-from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.config import Configured
-from vectorbt.base import index_fns
-
+from vectorbt.utils.decorators import cached_method
 
 GroupByT = tp.Union[None, bool, tp.Index]
 

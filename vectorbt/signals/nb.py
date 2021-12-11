@@ -25,14 +25,14 @@ These only accept NumPy arrays and other Numba-compatible types.
 
     Returned indices should be absolute."""
 
-from numba import njit
 import numpy as np
+from numba import njit
 
 from vectorbt import _typing as tp
-from vectorbt.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic.enums import range_dt, RangeStatus
 from vectorbt.signals.enums import StopType
+from vectorbt.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 
 
 # ############# Generation ############# #

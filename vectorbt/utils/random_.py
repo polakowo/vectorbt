@@ -4,6 +4,7 @@
 """Utilities for random number generation."""
 
 import random
+
 import numpy as np
 from numba import njit
 
@@ -19,4 +20,3 @@ def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     set_seed_nb(seed)
-

@@ -3,10 +3,10 @@
 
 """Utilities for modules."""
 
-import inspect
-import sys
 import importlib
+import inspect
 import pkgutil
+import sys
 from types import ModuleType
 
 from vectorbt import _typing as tp

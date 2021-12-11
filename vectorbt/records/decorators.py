@@ -3,16 +3,16 @@
 
 """Class and function decorators."""
 
-from functools import partial
-import re
 import keyword
+import re
+from functools import partial
 
 from vectorbt import _typing as tp
+from vectorbt.records.mapped_array import MappedArray
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.mapping import to_mapping
-from vectorbt.records.mapped_array import MappedArray
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 

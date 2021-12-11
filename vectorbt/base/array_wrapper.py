@@ -85,21 +85,22 @@ It can also be indexed as a regular pandas object and integrates `vectorbt.base.
 Class `Wrapping` is a convenience class meant to be subclassed by classes that do not want to subclass
 `ArrayWrapper` but rather use it as an attribute (which is a better SE design pattern anyway!)."""
 
-import numpy as np
-import pandas as pd
 import warnings
 
+import numpy as np
+import pandas as pd
+
 from vectorbt import _typing as tp
+from vectorbt.base import index_fns, reshape_fns
+from vectorbt.base.column_grouper import ColumnGrouper
+from vectorbt.base.indexing import IndexingError, PandasIndexer
+from vectorbt.base.reshape_fns import to_pd_array
 from vectorbt.utils import checks
+from vectorbt.utils.array_ import get_ranges_arr
+from vectorbt.utils.attr_ import AttrResolver, AttrResolverT
 from vectorbt.utils.config import Configured, merge_dicts
 from vectorbt.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
-from vectorbt.utils.array_ import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.attr_ import AttrResolver, AttrResolverT
-from vectorbt.base import index_fns, reshape_fns
-from vectorbt.base.indexing import IndexingError, PandasIndexer
-from vectorbt.base.column_grouper import ColumnGrouper
-from vectorbt.base.reshape_fns import to_pd_array
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray, tp.MaybeArray, tp.Array1d]

@@ -3,10 +3,11 @@
 
 """Utilities for requests."""
 
+from urllib.parse import urlencode
+
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from urllib.parse import urlencode
 
 from vectorbt import _typing as tp
 

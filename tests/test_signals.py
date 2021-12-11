@@ -1,14 +1,14 @@
-import vectorbt as vbt
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from numba import njit
-from datetime import datetime
 import pytest
+from numba import njit
 
+import vectorbt as vbt
+from tests.utils import record_arrays_close
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.enums import range_dt
-
-from tests.utils import record_arrays_close
 
 seed = 42
 

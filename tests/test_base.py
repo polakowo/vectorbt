@@ -1,8 +1,9 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from numba import njit
 import pytest
-from datetime import datetime
+from numba import njit
 
 import vectorbt as vbt
 from vectorbt.base import (

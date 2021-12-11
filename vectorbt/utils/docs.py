@@ -4,6 +4,7 @@
 """Utilities for documentation."""
 
 import json
+
 import numpy as np
 
 from vectorbt import _typing as tp

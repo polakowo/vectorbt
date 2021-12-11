@@ -1416,28 +1416,28 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum_ import map_enum_fields
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.template import RepEval, deep_substitute
-from vectorbt.utils.random_ import set_seed
-from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.figure import get_domain
-from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.signals.generators import RANDNX, RPROBNX
-from vectorbt.returns.accessors import ReturnsAccessor
-from vectorbt.returns import nb as returns_nb
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.portfolio import nb
+from vectorbt.portfolio.decorators import attach_returns_acc_methods
+from vectorbt.portfolio.enums import *
+from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
-from vectorbt.portfolio.logs import Logs
-from vectorbt.portfolio.enums import *
-from vectorbt.portfolio.decorators import attach_returns_acc_methods
+from vectorbt.returns import nb as returns_nb
+from vectorbt.returns.accessors import ReturnsAccessor
+from vectorbt.signals.generators import RANDNX, RPROBNX
+from vectorbt.utils import checks
+from vectorbt.utils.colors import adjust_opacity
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.enum_ import map_enum_fields
+from vectorbt.utils.figure import get_domain
+from vectorbt.utils.random_ import set_seed
+from vectorbt.utils.template import RepEval, deep_substitute
 
 try:
     import quantstats as qs

@@ -29,9 +29,9 @@ array([nan, 1.5, 2.5, 3.5])
 
 import numpy as np
 from numba import njit, generated_jit
+from numba.core.types import Omitted
 from numba.np.numpy_support import as_dtype
 from numba.typed import Dict
-from numba.core.types import Omitted
 
 from vectorbt import _typing as tp
 from vectorbt.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
@@ -349,7 +349,6 @@ def bfill_nb(a: tp.Array2d) -> tp.Array2d:
     for col in range(a.shape[1]):
         out[:, col] = bfill_1d_nb(a[:, col])
     return out
-
 
 
 @njit(cache=True)

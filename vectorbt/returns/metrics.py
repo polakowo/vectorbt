@@ -12,7 +12,7 @@ from vectorbt import _typing as tp
 def approx_exp_max_sharpe(mean_sharpe: float, var_sharpe: float, nb_trials: int) -> float:
     """Expected Maximum Sharpe Ratio."""
     return mean_sharpe + np.sqrt(var_sharpe) * \
-        ((1 - np.euler_gamma) * norm.ppf(1 - 1 / nb_trials) + np.euler_gamma * norm.ppf(1 - 1 / (nb_trials * np.e)))
+           ((1 - np.euler_gamma) * norm.ppf(1 - 1 / nb_trials) + np.euler_gamma * norm.ppf(1 - 1 / (nb_trials * np.e)))
 
 
 def deflated_sharpe_ratio(*, est_sharpe: tp.Array1d, var_sharpe: float, nb_trials: int,

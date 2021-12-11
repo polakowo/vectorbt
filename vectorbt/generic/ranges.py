@@ -116,18 +116,17 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.base.reshape_fns import to_pd_array, to_2d_array
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.generic.enums import RangeStatus, range_dt
-from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.base.reshape_fns import to_pd_array, to_2d_array
 from vectorbt.generic import nb
+from vectorbt.generic.enums import RangeStatus, range_dt
 from vectorbt.records.base import Records
-from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.decorators import override_field_config, attach_fields
+from vectorbt.records.mapped_array import MappedArray
+from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.figure import make_figure, get_domain
 
 __pdoc__ = {}
 

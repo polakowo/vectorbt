@@ -3,9 +3,10 @@
 
 """Class and function decorators."""
 
+import inspect
 from functools import wraps, lru_cache
 from threading import RLock
-import inspect
+
 import numpy as np
 
 from vectorbt import _typing as tp
@@ -518,7 +519,7 @@ BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 
 def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
-                             config: tp.Optional[Config] = None) -> WrapperFuncT:
+                                config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add binary magic methods to a class.
 
     `translate_func` should
@@ -576,7 +577,7 @@ UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
 
 
 def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
-                            config: tp.Optional[Config] = None) -> WrapperFuncT:
+                               config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add unary magic methods to a class.
 
     `translate_func` should

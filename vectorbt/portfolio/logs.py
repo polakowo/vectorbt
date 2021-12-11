@@ -88,10 +88,7 @@ This class does not have any subplots.
 import pandas as pd
 
 from vectorbt import _typing as tp
-from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_dict
-from vectorbt.records.base import Records
-from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.portfolio.enums import (
     log_dt,
     SizeType,
@@ -100,6 +97,9 @@ from vectorbt.portfolio.enums import (
     OrderStatus,
     OrderStatusInfo
 )
+from vectorbt.records.base import Records
+from vectorbt.records.decorators import attach_fields, override_field_config
+from vectorbt.utils.config import merge_dicts, Config
 
 __pdoc__ = {}
 

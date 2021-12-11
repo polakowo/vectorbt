@@ -6,17 +6,18 @@
 Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,
 and unstacking."""
 
+import functools
+from collections.abc import Sequence
+
 import numpy as np
-from numpy.lib.stride_tricks import _broadcast_shape
 import pandas as pd
 from numba import njit
-from collections.abc import Sequence
-import functools
+from numpy.lib.stride_tricks import _broadcast_shape
 
 from vectorbt import _typing as tp
+from vectorbt.base import index_fns, array_wrapper
 from vectorbt.utils import checks
 from vectorbt.utils.config import resolve_dict
-from vectorbt.base import index_fns, array_wrapper
 
 
 def to_any_array(arg: tp.ArrayLike, raw: bool = False) -> tp.AnyArray:

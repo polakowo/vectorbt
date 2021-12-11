@@ -1,14 +1,14 @@
-import vectorbt as vbt
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from numba import njit
-from datetime import datetime
 import pytest
+from numba import njit
 
+import vectorbt as vbt
+from tests.utils import record_arrays_close
 from vectorbt.generic.enums import range_dt, drawdown_dt
 from vectorbt.portfolio.enums import order_dt, trade_dt, log_dt
-
-from tests.utils import record_arrays_close
 
 day_dt = np.timedelta64(86400000000000)
 

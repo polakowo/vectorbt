@@ -4,15 +4,16 @@
 """Class for mapping column arrays."""
 
 from vectorbt import _typing as tp
-from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.records import nb
+from vectorbt.utils.decorators import cached_property, cached_method
 
 
 class ColumnMapper(Wrapping):
     """Used by `vectorbt.records.base.Records` and `vectorbt.records.mapped_array.MappedArray`
     classes to make use of column and group metadata."""
+
     def __init__(self, wrapper: ArrayWrapper, col_arr: tp.Array1d, **kwargs) -> None:
         Wrapping.__init__(
             self,
@@ -92,5 +93,3 @@ class ColumnMapper(Wrapping):
     def is_sorted(self) -> bool:
         """Check whether column array is sorted."""
         return nb.is_col_sorted_nb(self.col_arr)
-
-

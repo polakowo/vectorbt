@@ -3,22 +3,23 @@
 
 """Custom data classes that subclass `vectorbt.data.base.Data`."""
 
-import numpy as np
-import pandas as pd
-from tqdm.auto import tqdm
 import time
 import warnings
 from functools import wraps
 
+import numpy as np
+import pandas as pd
+from tqdm.auto import tqdm
+
 from vectorbt import _typing as tp
+from vectorbt.data.base import Data
+from vectorbt.utils.config import merge_dicts, get_func_kwargs
 from vectorbt.utils.datetime_ import (
     get_utc_tz,
     get_local_tz,
     to_tzaware_datetime,
     datetime_to_ms
 )
-from vectorbt.utils.config import merge_dicts, get_func_kwargs
-from vectorbt.data.base import Data
 
 try:
     from binance.client import Client as ClientT

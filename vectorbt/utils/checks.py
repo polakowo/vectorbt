@@ -4,13 +4,14 @@
 """Utilities for validation during runtime."""
 
 import os
+from collections.abc import Hashable, Mapping
+from inspect import signature, getmro
+from keyword import iskeyword
+
+import dill
 import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
-from inspect import signature, getmro
-import dill
-from collections.abc import Hashable, Mapping
-from keyword import iskeyword
 
 from vectorbt import _typing as tp
 

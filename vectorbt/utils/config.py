@@ -3,11 +3,12 @@
 
 """Utilities for configuration."""
 
-from copy import copy, deepcopy
-from collections import namedtuple
-import dill
 import inspect
 import pickle
+from collections import namedtuple
+from copy import copy, deepcopy
+
+import dill
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
