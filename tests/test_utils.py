@@ -2427,15 +2427,15 @@ class TestDatetime:
 
     def test_to_timezone(self):
         assert datetime_.to_timezone('UTC') == _timezone.utc
-        assert datetime_.to_timezone('Europe/Berlin') == _timezone(_timedelta(hours=2))
+        assert isinstance(datetime_.to_timezone('Europe/Berlin'), _timezone)
         assert datetime_.to_timezone('Europe/Berlin', to_py_timezone=False) == pytz.timezone('Europe/Berlin')
         assert datetime_.to_timezone('+0500') == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert datetime_.to_timezone(pytz.timezone('Europe/Berlin')) == _timezone(_timedelta(hours=2))
+        assert isinstance(datetime_.to_timezone(pytz.timezone('Europe/Berlin')), _timezone)
         assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
         assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
-            _ = datetime_.to_timezone('+05')
+            datetime_.to_timezone('+05')
 
     def test_to_tzaware_datetime(self):
         assert datetime_.to_tzaware_datetime(0.5) == \
