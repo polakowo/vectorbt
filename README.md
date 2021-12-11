@@ -11,11 +11,11 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-## [Installation](#installation) · [Features](#features) · [Usage](#usage) · [Resources](#resources) · [License](#license)
+## [Installation](#installation) · [Main Features](#main-features) · [Usage](#usage) · [Resources](#resources) · [License](#license)
 
 vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
 [Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for the simulation of many thousands 
-of strategies in a matter of **seconds** :stopwatch:
+of strategies in a matter of **seconds** :dash:
 
 In contrast to other backtesters, vectorbt represents complex data as (structured) NumPy arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
@@ -77,7 +77,7 @@ There are two types of images:
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
 and comes with Jupyter environment, vectorbt, and other scientific packages installed.
 
-## Features
+## Main Features :joystick:
 
 ### Pandas
 
@@ -120,7 +120,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 
 - [x] **Data visualization**: Numerous flexible data plotting functions distributed across vectorbt.
 - [x] **Figures and widgets**: Custom interactive figures and widgets using **[Plotly](https://github.com/plotly/plotly.py)**, such as Heatmap and Volume. All custom widgets have dedicated methods for efficiently updating their state. **[>>](https://vectorbt.dev/docs/generic/plotting.html)**
-- [x] **Plot builder**: Class for building plots out of custom subplots. Implements a preset of tailored subplots for many backtesting components, such as signals, returns, and portfolio. **[>>](https://vectorbt.dev/docs/generic/plots_builder.html)**
+- [x] **Plots builder**: Class for building plots out of custom subplots. Implements a preset of tailored subplots for many backtesting components, such as signals, returns, and portfolio. **[>>](https://vectorbt.dev/docs/generic/plots_builder.html)**
 
 ### Extra
 
@@ -129,11 +129,11 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 - [x] **Caching**: Property and method decorators for caching most frequently used objects.
 - [x] **Persistance**: Most Python objects including data and portfolio can be saved to a file and retrieved back using **[Dill](https://github.com/uqfoundation/dill)**.
 
-## Usage
+## Usage :magic_wand:
 
 vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
 
-Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
+* Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
 
 ```python
 import vectorbt as vbt
@@ -148,7 +148,7 @@ pf.total_profit()
 8961.008555963961
 ```
 
-Buy whenever 10-day SMA crosses above 50-day SMA and sell when opposite:
+* Buy whenever 10-day SMA crosses above 50-day SMA and sell when opposite:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -164,7 +164,7 @@ pf.total_profit()
 16423.251963801864
 ```
 
-Generate 1,000 strategies with random signals and test them on BTC and ETH:
+* Generate 1,000 strategies with random signals and test them on BTC and ETH:
 
 ```python
 import numpy as np
@@ -182,7 +182,7 @@ fig.show()
 
 ![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
 
-For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
+* For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
 dual SMA crossover strategy on BTC, USD, and LTC:
 
 ```python
@@ -252,7 +252,8 @@ pf[(10, 20, 'ETH-USD')].plot().show()
 ![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
-Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
+
+* Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "ADA-USD"]
