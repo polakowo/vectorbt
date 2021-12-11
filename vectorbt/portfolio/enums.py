@@ -1438,15 +1438,22 @@ Final price will depend upon slippage.
     Make sure to use timestamps that come between (and ideally not including) the current open and close."""
 __pdoc__['Order.size_type'] = "See `SizeType`."
 __pdoc__['Order.direction'] = "See `Direction`."
-__pdoc__['Order.fees'] = """Fees in percentage of the order value. 
+__pdoc__['Order.fees'] = """Fees in percentage of the order value.
 
-Note that 0.01 = 1%."""
+Negative trading fees like -0.05 means earning 0.05% per trade instead of paying a fee.
+
+!!! note
+    0.01 = 1%."""
+__pdoc__['Order.fixed_fees'] = """Fixed amount of fees to pay for this order.
+
+Similar to `Order.fees`, can be negative."""
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = """Slippage in percentage of `Order.price`. 
 
 Slippage is a penalty applied on the price.
 
-Note that 0.01 = 1%."""
+!!! note
+    0.01 = 1%."""
 __pdoc__['Order.min_size'] = """Minimum size in both directions. 
 
 Lower than that will be rejected."""

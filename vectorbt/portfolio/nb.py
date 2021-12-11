@@ -431,18 +431,18 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         raise ValueError("position is negative but order.direction is Direction.LongOnly")
     if order.direction == Direction.ShortOnly and position > 0:
         raise ValueError("position is positive but order.direction is Direction.ShortOnly")
-    if not np.isfinite(order.fees) or order.fees < 0:
-        raise ValueError("order.fees must be finite and 0 or greater")
-    if not np.isfinite(order.fixed_fees) or order.fixed_fees < 0:
-        raise ValueError("order.fixed_fees must be finite and 0 or greater")
+    if not np.isfinite(order.fees):
+        raise ValueError("order.fees must be finite")
+    if not np.isfinite(order.fixed_fees):
+        raise ValueError("order.fixed_fees must be finite")
     if not np.isfinite(order.slippage) or order.slippage < 0:
         raise ValueError("order.slippage must be finite and 0 or greater")
     if not np.isfinite(order.min_size) or order.min_size < 0:
         raise ValueError("order.min_size must be finite and 0 or greater")
-    if order.max_size <= 0:
+    if np.isnan(order.max_size) or order.max_size <= 0:
         raise ValueError("order.max_size must be greater than 0")
-    if order.size_granularity <= 0:
-        raise ValueError("order.size_granularity must be greater than 0")
+    if np.isinf(order.size_granularity) or order.size_granularity <= 0:
+        raise ValueError("order.size_granularity must be either NaN or finite and greater than 0")
     if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
         raise ValueError("order.reject_prob must be between 0 and 1")
 
