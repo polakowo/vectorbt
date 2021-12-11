@@ -13,9 +13,7 @@
 
 ## [Installation](#installation) · [Main Features](#main-features) · [Usage](#usage-magic_wand) · [Resources](#resources) · [License](#license)
 
-![#f03c15](https://via.placeholder.com/15/f03c15/000000?text=+) Lost time on slow backtesting, hyperparameter optimization, and strategy development?
-
-![#50C62B](https://via.placeholder.com/15/50C62B/000000?text=+) Search no more — vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
+vectorbt takes a novel approach to backtesting: it operates entirely on pandas and NumPy objects, and is accelerated by 
 [Numba](https://github.com/numba/numba) to analyze any data at speed and scale. This allows for testing of many thousands 
 of strategies in **seconds**.
 
