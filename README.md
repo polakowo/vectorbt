@@ -124,7 +124,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 
 - [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across vectorbt into a single behemoth class. **[>>](https://vectorbt.dev/docs/portfolio/base.html)**
 
-### Performance
+### Analysis
 
 - [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their highly-optimized rolling versions. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**. **[>>](https://vectorbt.dev/docs/returns/accessors.html)**
 - [x] **Stats builder**: Class for building statistics out of custom metrics. Implements a preset of tailored statistics for many backtesting components, such as signals, returns, and portfolio. **[>>](https://vectorbt.dev/docs/generic/stats_builder.html)**
