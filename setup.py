@@ -50,7 +50,7 @@ setup(
             'pandas_ta',
             'TA-Lib',
             'python-telegram-bot>=13.4',  # LGPLv3
-            'quantstats'
+            'quantstats>=0.0.37'
         ],
         'cov': [
             'pytest',

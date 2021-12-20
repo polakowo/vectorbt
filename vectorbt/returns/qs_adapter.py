@@ -53,7 +53,7 @@ for the use in quantstats.
 >>> qs_defaults = dict(
 ...     benchmark=benchmark_rets,
 ...     periods=365,
-...     trading_year_days=365,
+...     periods_per_year=365,
 ...     rf=0.001
 ... )
 >>> ret_acc_qs = rets.vbt.returns.qs(defaults=qs_defaults)
@@ -70,7 +70,7 @@ It also merges the defaults defined in the settings, the defaults passed to `Ret
 and the defaults passed to `QSAdapter` itself, and matches them with the argument names listed
 in the function's signature.
 
-For example, the `periods` and `trading_year_days` arguments default to the annualization factor
+For example, the `periods` and `periods_per_year` arguments default to the annualization factor
 `ReturnsAccessor.ann_factor`, which itself is based on the `freq` argument. This makes the results
 produced by quantstats and vectorbt at least somewhat similar.
 
@@ -143,8 +143,8 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                                     pass_kwargs['benchmark'] = self.returns_accessor.benchmark_rets
                             elif arg_name == 'periods':
                                 pass_kwargs['periods'] = int(self.returns_accessor.ann_factor)
-                            elif arg_name == 'trading_year_days':
-                                pass_kwargs['trading_year_days'] = int(self.returns_accessor.ann_factor)
+                            elif arg_name == 'periods_per_year':
+                                pass_kwargs['periods_per_year'] = int(self.returns_accessor.ann_factor)
                         else:
                             pass_kwargs[arg_name] = kwargs[arg_name]
 
