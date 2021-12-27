@@ -163,6 +163,12 @@ settings = SettingsConfig(
             tz_convert=get_utc_tz(),
             missing_index='nan',
             missing_columns='raise',
+            alpaca=Config(
+                dict(
+                    key_id=None,
+                    secret_key=None
+                )
+            ),
             binance=Config(  # flex
                 dict(
                     api_key=None,

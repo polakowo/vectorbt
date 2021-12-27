@@ -103,7 +103,7 @@ and comes with Jupyter environment, vectorbt, and other scientific packages inst
 
 ### Data
 
-- [x] **Data acquisition**: Supports various data providers, such as **[Yahoo Finance](https://github.com/ranaroussi/yfinance)**, **[Binance](https://github.com/sammchardy/python-binance)**, and **[CCXT](https://github.com/ccxt/ccxt)**. Can merge multiple symbols with different index, as well as update them. **[>>](https://vectorbt.dev/docs/data/custom.html)**
+- [x] **Data acquisition**: Supports various data providers, such as **[Yahoo Finance](https://github.com/ranaroussi/yfinance)**, **[Binance](https://github.com/sammchardy/python-binance)** **[CCXT](https://github.com/ccxt/ccxt)** and **[Alpaca](https://github.com/alpacahq/alpaca-trade-api-python)**. Can merge multiple symbols with different index, as well as update them. **[>>](https://vectorbt.dev/docs/data/custom.html)**
 - [x] **Data generation**: Supports various (random) data generators, such as **[GBM](https://en.wikipedia.org/wiki/Geometric_Brownian_motion)**. **[>>](https://vectorbt.dev/docs/data/custom.html)**
 - [x] **Scheduled data updates**: Can periodically update any previously downloaded data. **[>>](https://vectorbt.dev/docs/data/updater.html)**
 - [x] **Data preparation**: Transformation, rescaling, and normalization of data. Custom splitters for cross-validation. Supports **[Scikit-Learn](https://github.com/scikit-learn/scikit-learn)** splitters, such as for K-Folds cross-validation. **[>>](https://vectorbt.dev/docs/generic/accessors.html)**

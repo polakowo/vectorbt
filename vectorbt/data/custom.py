@@ -757,3 +757,152 @@ class CCXTData(Data):
         download_kwargs['show_progress'] = False
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
+
+class AlpacaData(Data):
+    """`Data` for data coming from `python-binance`.
+
+    ## Example
+
+    Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> alpaca_data = vbt.AlpacaData.download(
+    ...     "AAPL",
+    ...     start='2 hours ago UTC',
+    ...     end='15 minutes ago UTC',
+    ...     interval='1m'
+    ... )
+    >>> alpaca_data.get()
+                                Open      High       Low     Close      Volume
+    timestamp                                                                
+    2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
+    2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
+    2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
+    2021-12-27 14:07:00+00:00  177.0399  177.0400  177.0300  177.0400    1100
+    2021-12-27 14:08:00+00:00  177.0400  177.0400  176.9700  176.9900   19943
+    ...                             ...       ...       ...       ...     ...
+    2021-12-27 15:44:00+00:00  178.0000  178.0079  177.9311  177.9710  106395
+    2021-12-27 15:45:00+00:00  177.9700  178.0564  177.9430  177.9600  153325
+    2021-12-27 15:46:00+00:00  177.9500  178.0000  177.8289  177.8850  162778
+    2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
+    2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
+
+    [105 rows x 5 columns]
+
+    >>> import time
+    >>> time.sleep(60)
+
+    >>> alpaca_data = alpaca_data.update()
+    >>> alpaca_data.get()
+                                Open      High       Low     Close      Volume
+    timestamp                                                                
+    2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
+    2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
+    2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
+    2021-12-27 14:07:00+00:00  177.0399  177.0400  177.0300  177.0400    1100
+    2021-12-27 14:08:00+00:00  177.0400  177.0400  176.9700  176.9900   19943
+    ...                             ...       ...       ...       ...     ...
+    2021-12-27 15:45:00+00:00  177.9700  178.0564  177.9430  177.9600  153325
+    2021-12-27 15:46:00+00:00  177.9500  178.0000  177.8289  177.8850  162778
+    2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
+    2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
+    2021-12-27 15:49:00+00:00  178.0100  178.0700  177.9700  178.0650  185037
+
+    [106 rows x 5 columns]
+    ```"""
+
+    @classmethod
+    def download_symbol(cls,
+                        symbol: str,
+                        timeframe: str = '1d',
+                        start: tp.DatetimeLike = 0,
+                        end: tp.DatetimeLike = 'now UTC',
+                        adjustment: str = 'all',
+                        limit: int = 500,
+                        **kwargs) -> tp.Frame:
+        """Download the symbol.
+
+        Args:
+            symbol (str): Symbol.
+            timeframe (str): Timeframe of data. Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m' 
+                Note: Data from the latest 15 minutes is not available with a free data plan.
+                See: https://alpaca.markets/data
+
+            start (any): Start datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): End datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            adjustment (str): Specifies the corporate action adjustment for the stocks. 
+                Enum: `raw`, `split`, `dividend` or `all`.
+            limit (int): The maximum number of returned items.
+
+        For defaults, see `data.alpaca` in `vectorbt._settings.settings`.
+        """
+        from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame, REST
+        _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
+
+        if len(timeframe) < 2:
+            raise ValueError("invalid timeframe")
+            
+        amount_str = timeframe[:-1]
+        unit_str = timeframe[-1]
+
+        if not amount_str.isnumeric() or unit_str not in _timeframe_units:
+            raise ValueError("invalid timeframe")
+        
+        amount = int(amount_str)
+        unit = _timeframe_units[unit_str]
+
+        _timeframe = TimeFrame(amount, unit)
+
+        start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
+        end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
+
+        from vectorbt._settings import settings
+        alpaca_cfg = settings['data']['alpaca']
+        
+        client_kwargs = dict()
+        for k in get_func_kwargs(REST):
+            if k in kwargs:
+                client_kwargs[k] = kwargs.pop(k)
+
+        client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
+        
+        client = REST(**client_kwargs)
+
+        df = client.get_bars(symbol=symbol, 
+                             timeframe=_timeframe,
+                             start=start_ts,
+                             end=end_ts,
+                             adjustment=adjustment, 
+                             limit=limit).df
+        # filter for OHLCV
+        # remove extra columns
+        df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
+
+        # capitalize
+        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
+
+        df['Open'] = df['Open'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Close'] = df['Close'].astype(float)
+        df['Volume'] = df['Volume'].astype(float)
+
+        return df
+
+
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        """Update the symbol.
+
+        `**kwargs` will override keyword arguments passed to `AlpacaData.download_symbol`."""
+        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
+        download_kwargs['start'] = self.data[symbol].index[-1]
+        download_kwargs['show_progress'] = False
+        kwargs = merge_dicts(download_kwargs, kwargs)
+        return self.download_symbol(symbol, **kwargs)
