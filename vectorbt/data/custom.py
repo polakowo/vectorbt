@@ -819,8 +819,9 @@ class AlpacaData(Data):
                         timeframe: str = '1d',
                         start: tp.DatetimeLike = 0,
                         end: tp.DatetimeLike = 'now UTC',
-                        adjustment: str = 'all',
+                        adjustment: tp.Optional[str] = 'all',
                         limit: int = 500,
+                        exchange: tp.Optional[str] = 'CBSE',
                         **kwargs) -> tp.Frame:
         """Download the symbol.
 
@@ -839,10 +840,25 @@ class AlpacaData(Data):
             adjustment (str): Specifies the corporate action adjustment for the stocks. 
                 Enum: `raw`, `split`, `dividend` or `all`.
             limit (int): The maximum number of returned items.
+            exchange (str): For crypto symbols. Which exchange you wish to retrieve data from.
+                Enum: `FTX`, `ERSX`, `CBSE`
 
         For defaults, see `data.alpaca` in `vectorbt._settings.settings`.
         """
+        from vectorbt._settings import settings
         from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame, REST
+        
+        alpaca_cfg = settings['data']['alpaca']
+        
+        client_kwargs = dict()
+        for k in get_func_kwargs(REST):
+            if k in kwargs:
+                client_kwargs[k] = kwargs.pop(k)
+
+        client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
+        
+        client = REST(**client_kwargs)
+
         _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
 
         if len(timeframe) < 2:
@@ -862,30 +878,31 @@ class AlpacaData(Data):
         start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
         end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
 
-        from vectorbt._settings import settings
-        alpaca_cfg = settings['data']['alpaca']
         
-        client_kwargs = dict()
-        for k in get_func_kwargs(REST):
-            if k in kwargs:
-                client_kwargs[k] = kwargs.pop(k)
+        def _is_crypto_symbol(symbol):
+            return len(symbol) == 6 and "USD" in symbol
 
-        client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
+        if _is_crypto_symbol(symbol):
+            df = client.get_crypto_bars(symbol=symbol,
+                                    timeframe=_timeframe,
+                                    start=start_ts,
+                                    end=end_ts,
+                                    limit=limit,
+                                    exchanges=exchange).df
+        else:
+            df = client.get_bars(symbol=symbol, 
+                                timeframe=_timeframe,
+                                start=start_ts,
+                                end=end_ts,
+                                adjustment=adjustment, 
+                                limit=limit).df
         
-        client = REST(**client_kwargs)
-
-        df = client.get_bars(symbol=symbol, 
-                             timeframe=_timeframe,
-                             start=start_ts,
-                             end=end_ts,
-                             adjustment=adjustment, 
-                             limit=limit).df
         # filter for OHLCV
         # remove extra columns
         df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
 
         # capitalize
-        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, inplace=True)
+        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume', 'exchange':'Exchange'}, inplace=True)
 
         df['Open'] = df['Open'].astype(float)
         df['High'] = df['High'].astype(float)
