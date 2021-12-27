@@ -759,7 +759,7 @@ class CCXTData(Data):
         return self.download_symbol(symbol, **kwargs)
 
 class AlpacaData(Data):
-    """`Data` for data coming from `python-binance`.
+    """`Data` for data coming from `alpaca-trade-api`.
 
     ## Example
 
