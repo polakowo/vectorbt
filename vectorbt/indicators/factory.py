@@ -3495,8 +3495,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         return TALibIndicator
 
     @classmethod
-    def parse_pandas_ta_config(cls, func: tp.Callable, test_input_names: tp.Optional[tp.Sequence[str]] = None,
-                               test_index_len: int = 50) -> tp.Kwargs:
+    def parse_pandas_ta_config(cls,
+                               func: tp.Callable,
+                               test_input_names: tp.Optional[tp.Sequence[str]] = None,
+                               test_index_len: int = 100) -> tp.Kwargs:
         """Get the config of a pandas-ta indicator."""
         if test_input_names is None:
             test_input_names = {'open_', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'dividends', 'split'}
