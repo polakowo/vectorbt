@@ -580,201 +580,226 @@ settings.register_templates()
 
 __pdoc__['settings'] = f"""Global settings config.
 
-settings.numba:
-    Settings applied to Numba.
-    
-    ```json
-    {settings['numba'].to_doc()}
-    ```
+__numba__
 
-settings.config:
-    Settings applied to `vectorbt.utils.config.Config`.
-    
-    ```json
-    {settings['config'].to_doc()}
-    ```
+Settings applied to Numba.
 
-settings.configured:
-    Settings applied to `vectorbt.utils.config.Configured`.
-    
-    ```json
-    {settings['configured'].to_doc()}
-    ```
+```json
+{settings['numba'].to_doc()}
+```
 
-settings.caching:
-    Settings applied across `vectorbt.utils.decorators`.
-    
-    See `vectorbt.utils.decorators.should_cache`.
-    
-    ```json
-    {settings['caching'].to_doc()}
-    ```
+__config__
 
-settings.broadcasting:
-    Settings applied across `vectorbt.base.reshape_fns`.
-    
-    ```json
-    {settings['broadcasting'].to_doc()}
-    ```
+Settings applied to `vectorbt.utils.config.Config`.
 
-settings.array_wrapper:
-    Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
-    
-    ```json
-    {settings['array_wrapper'].to_doc()}
-    ```
+```json
+{settings['config'].to_doc()}
+```
 
-settings.datetime:
-    Settings applied across `vectorbt.utils.datetime_`.
-    
-    ```json
-    {settings['datetime'].to_doc()}
-    ```
+__configured__
 
-settings.data:
-    Settings applied across `vectorbt.data`.
+Settings applied to `vectorbt.utils.config.Configured`.
+
+```json
+{settings['configured'].to_doc()}
+```
+
+__caching__
+
+Settings applied across `vectorbt.utils.decorators`.
+
+See `vectorbt.utils.decorators.should_cache`.
+
+```json
+{settings['caching'].to_doc()}
+```
+
+__broadcasting__
+
+Settings applied across `vectorbt.base.reshape_fns`.
+
+```json
+{settings['broadcasting'].to_doc()}
+```
+
+__array_wrapper__
+
+Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
+
+```json
+{settings['array_wrapper'].to_doc()}
+```
+
+__datetime__
+
+Settings applied across `vectorbt.utils.datetime_`.
+
+```json
+{settings['datetime'].to_doc()}
+```
+
+__data__
+
+Settings applied across `vectorbt.data`.
+
+```json
+{settings['data'].to_doc()}
+```
     
-    ```json
-    {settings['data'].to_doc()}
-    ```
-    
-settings.data.binance:
+* binance:
     See `binance.client.Client`.
-    
-settings.data.ccxt:
+
+* ccxt:
     See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys). 
     Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.
 
-settings.plotting:
-    Settings applied to plotting Plotly figures.
-    
-    ```json
-    {settings['plotting'].to_doc(replace={
-        'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
-        'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
-        'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
-    }, path='settings.plotting')}
-    ```
+__plotting__
 
-settings.stats_builder:
-    Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
-    
-    ```json
-    {settings['stats_builder'].to_doc()}
-    ```
+Settings applied to plotting Plotly figures.
 
-settings.plots_builder:
-    Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
-    
-    ```json
-    {settings['plots_builder'].to_doc()}
-    ```
+```json
+{settings['plotting'].to_doc(replace={
+    'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
+    'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
+    'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
+}, path='settings.plotting')}
+```
 
-settings.generic:
-    Settings applied across `vectorbt.generic`.
-    
-    ```json
-    {settings['generic'].to_doc()}
-    ```
+__stats_builder__
 
-settings.generic.ranges:
-    Settings applied across `vectorbt.generic.ranges`.
-    
-    ```json
-    {settings['ranges'].to_doc()}
-    ```
+Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 
-settings.generic.drawdowns:
-    Settings applied across `vectorbt.generic.drawdowns`.
-    
-    ```json
-    {settings['drawdowns'].to_doc()}
-    ```
+```json
+{settings['stats_builder'].to_doc()}
+```
 
-settings.ohlcv:
-    Settings applied across `vectorbt.ohlcv_accessors`.
-    
-    ```json
-    {settings['ohlcv'].to_doc()}
-    ```
+__plots_builder__
 
-settings.signals:
-    Settings applied across `vectorbt.signals`.
-    
-    ```json
-    {settings['signals'].to_doc()}
-    ```
+Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
 
-settings.returns:
-    Settings applied across `vectorbt.returns`.
-    
-    ```json
-    {settings['returns'].to_doc()}
-    ```
+```json
+{settings['plots_builder'].to_doc()}
+```
 
-settings.qs_adapter:
-    Settings applied across `vectorbt.returns.qs_adapter`.
-    
-    ```json
-    {settings['qs_adapter'].to_doc()}
-    ```
+__generic__
 
-settings.records:
-    Settings applied across `vectorbt.records.base`.
-    
-    ```json
-    {settings['records'].to_doc()}
-    ```
+Settings applied across `vectorbt.generic`.
 
-settings.mapped_array:
-    Settings applied across `vectorbt.records.mapped_array`.
-    
-    ```json
-    {settings['mapped_array'].to_doc()}
-    ```
+```json
+{settings['generic'].to_doc()}
+```
 
-settings.orders:
-    Settings applied across `vectorbt.portfolio.orders`.
-    
-    ```json
-    {settings['orders'].to_doc()}
-    ```
+__ranges__
 
-settings.trades:
-    Settings applied across `vectorbt.portfolio.trades`.
-    
-    ```json
-    {settings['trades'].to_doc()}
-    ```
+Settings applied across `vectorbt.generic.ranges`.
 
-settings.logs:
-    Settings applied across `vectorbt.portfolio.logs`.
-    
-    ```json
-    {settings['logs'].to_doc()}
-    ```
+```json
+{settings['ranges'].to_doc()}
+```
 
-settings.portfolio:
-    Settings applied to `vectorbt.portfolio.base.Portfolio`.
-    
-    ```json
-    {settings['portfolio'].to_doc()}
-    ```
+__drawdowns__
 
-settings.messaging:
-    Settings applied across `vectorbt.messaging`.
-    
-    ```json
-    {settings['messaging'].to_doc()}
-    ```
+Settings applied across `vectorbt.generic.drawdowns`.
 
-settings.messaging.telegram:
+```json
+{settings['drawdowns'].to_doc()}
+```
+
+__ohlcv__
+
+Settings applied across `vectorbt.ohlcv_accessors`.
+
+```json
+{settings['ohlcv'].to_doc()}
+```
+
+__signals__
+
+Settings applied across `vectorbt.signals`.
+
+```json
+{settings['signals'].to_doc()}
+```
+
+__returns__
+
+Settings applied across `vectorbt.returns`.
+
+```json
+{settings['returns'].to_doc()}
+```
+
+__qs_adapter__
+
+Settings applied across `vectorbt.returns.qs_adapter`.
+
+```json
+{settings['qs_adapter'].to_doc()}
+```
+
+__records__
+
+Settings applied across `vectorbt.records.base`.
+
+```json
+{settings['records'].to_doc()}
+```
+
+__mapped_array__
+
+Settings applied across `vectorbt.records.mapped_array`.
+
+```json
+{settings['mapped_array'].to_doc()}
+```
+
+__orders__
+
+Settings applied across `vectorbt.portfolio.orders`.
+
+```json
+{settings['orders'].to_doc()}
+```
+
+__trades__
+
+Settings applied across `vectorbt.portfolio.trades`.
+
+```json
+{settings['trades'].to_doc()}
+```
+
+__logs__
+
+Settings applied across `vectorbt.portfolio.logs`.
+
+```json
+{settings['logs'].to_doc()}
+```
+
+__portfolio__
+
+Settings applied to `vectorbt.portfolio.base.Portfolio`.
+
+```json
+{settings['portfolio'].to_doc()}
+```
+
+__messaging__
+    
+Settings applied across `vectorbt.messaging`.
+
+```json
+{settings['messaging'].to_doc()}
+```
+
+* telegram:
     Settings applied to [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
     
     Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
     For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
     `telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
 
-settings.messaging.giphy:
+* giphy:
     Settings applied to [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
 """

@@ -1486,96 +1486,95 @@ def run_pipeline(
         (`np.ndarray`), list of parameter arrays (`np.ndarray`), list of parameter mappers (`np.ndarray`),
         list of outputs that are outside of `num_ret_outputs`.
 
-    ## Explanation
+    Explanation:
+        Here is a subset of tasks that the function `run_pipeline` does:
 
-    Here is a subset of tasks that the function `run_pipeline` does:
+        * Takes one or multiple array objects in `input_list` and broadcasts them.
 
-    * Takes one or multiple array objects in `input_list` and broadcasts them.
+        ```pycon
+        >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        >>> input_list = vbt.base.reshape_fns.broadcast(sr, df)
+        >>> input_list[0]
+           a  b
+        x  1  1
+        y  2  2
+        >>> input_list[1]
+           a  b
+        x  3  4
+        y  5  6
+        ```
 
-    ```pycon
-    >>> sr = pd.Series([1, 2], index=['x', 'y'])
-    >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-    >>> input_list = vbt.base.reshape_fns.broadcast(sr, df)
-    >>> input_list[0]
-       a  b
-    x  1  1
-    y  2  2
-    >>> input_list[1]
-       a  b
-    x  3  4
-    y  5  6
-    ```
+        * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and
+            broadcasts them.
 
-    * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and
-        broadcasts them.
+        ```pycon
+        >>> p1, p2, p3 = 1, [2, 3, 4], [False]
+        >>> param_list = vbt.base.reshape_fns.broadcast(p1, p2, p3)
+        >>> param_list[0]
+        array([1, 1, 1])
+        >>> param_list[1]
+        array([2, 3, 4])
+        >>> param_list[2]
+        array([False, False, False])
+        ```
 
-    ```pycon
-    >>> p1, p2, p3 = 1, [2, 3, 4], [False]
-    >>> param_list = vbt.base.reshape_fns.broadcast(p1, p2, p3)
-    >>> param_list[0]
-    array([1, 1, 1])
-    >>> param_list[1]
-    array([2, 3, 4])
-    >>> param_list[2]
-    array([False, False, False])
-    ```
+        * Performs calculation using `custom_func` to build output arrays (`output_list`) and
+            other objects (`other_list`, optionally).
 
-    * Performs calculation using `custom_func` to build output arrays (`output_list`) and
-        other objects (`other_list`, optionally).
+        ```pycon
+        >>> def custom_func(ts1, ts2, p1, p2, p3, *args, **kwargs):
+        ...     return np.hstack((
+        ...         ts1 + ts2 + p1[0] * p2[0],
+        ...         ts1 + ts2 + p1[1] * p2[1],
+        ...         ts1 + ts2 + p1[2] * p2[2],
+        ...     ))
 
-    ```pycon
-    >>> def custom_func(ts1, ts2, p1, p2, p3, *args, **kwargs):
-    ...     return np.hstack((
-    ...         ts1 + ts2 + p1[0] * p2[0],
-    ...         ts1 + ts2 + p1[1] * p2[1],
-    ...         ts1 + ts2 + p1[2] * p2[2],
-    ...     ))
+        >>> output = custom_func(*input_list, *param_list)
+        >>> output
+        array([[ 6,  7,  7,  8,  8,  9],
+               [ 9, 10, 10, 11, 11, 12]])
+        ```
 
-    >>> output = custom_func(*input_list, *param_list)
-    >>> output
-    array([[ 6,  7,  7,  8,  8,  9],
-           [ 9, 10, 10, 11, 11, 12]])
-    ```
+        * Creates new column hierarchy based on parameters and level names.
 
-    * Creates new column hierarchy based on parameters and level names.
+        ```pycon
+        >>> p1_columns = pd.Index(param_list[0], name='p1')
+        >>> p2_columns = pd.Index(param_list[1], name='p2')
+        >>> p3_columns = pd.Index(param_list[2], name='p3')
+        >>> p_columns = vbt.base.index_fns.stack_indexes([p1_columns, p2_columns, p3_columns])
+        >>> new_columns = vbt.base.index_fns.combine_indexes([p_columns, input_list[0].columns])
 
-    ```pycon
-    >>> p1_columns = pd.Index(param_list[0], name='p1')
-    >>> p2_columns = pd.Index(param_list[1], name='p2')
-    >>> p3_columns = pd.Index(param_list[2], name='p3')
-    >>> p_columns = vbt.base.index_fns.stack_indexes([p1_columns, p2_columns, p3_columns])
-    >>> new_columns = vbt.base.index_fns.combine_indexes([p_columns, input_list[0].columns])
+        >>> output_df = pd.DataFrame(output, columns=new_columns)
+        >>> output_df
+        p1                                         1
+        p2             2             3             4
+        p3  False  False  False  False  False  False
+                a      b      a      b      a      b
+        0       6      7      7      8      8      9
+        1       9     10     10     11     11     12
+        ```
 
-    >>> output_df = pd.DataFrame(output, columns=new_columns)
-    >>> output_df
-    p1                                         1
-    p2             2             3             4
-    p3  False  False  False  False  False  False
-            a      b      a      b      a      b
-    0       6      7      7      8      8      9
-    1       9     10     10     11     11     12
-    ```
+        * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
+            This is done to be able to compare them and generate signals, since we cannot compare NumPy
+            arrays that have totally different shapes, such as (2, 2) and (2, 6).
 
-    * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
-        This is done to be able to compare them and generate signals, since we cannot compare NumPy
-        arrays that have totally different shapes, such as (2, 2) and (2, 6).
+        ```pycon
+        >>> new_input_list = [
+        ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
+        ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
+        ... ]
+        >>> new_input_list[0]
+        p1                                         1
+        p2             2             3             4
+        p3  False  False  False  False  False  False
+                a      b      a      b      a      b
+        0       1      1      1      1      1      1
+        1       2      2      2      2      2      2
+        ```
 
-    ```pycon
-    >>> new_input_list = [
-    ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
-    ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
-    ... ]
-    >>> new_input_list[0]
-    p1                                         1
-    p2             2             3             4
-    p3  False  False  False  False  False  False
-            a      b      a      b      a      b
-    0       1      1      1      1      1      1
-    1       2      2      2      2      2      2
-    ```
-
-    * Builds parameter mappers that will link parameters from `param_list` to columns in
-        `input_list` and `output_list`. This is done to enable column indexing using parameter values.
+        * Builds parameter mappers that will link parameters from `param_list` to columns in
+            `input_list` and `output_list`. This is done to enable column indexing using parameter values.
     """
     if require_input_shape:
         checks.assert_not_none(input_shape)
