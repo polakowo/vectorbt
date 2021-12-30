@@ -757,9 +757,11 @@ class CCXTData(Data):
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
 
+
 class AlpacaData(Data):
-    """`Data` for data coming from `alpaca-trade-api`. 
-    Sign up for Alpaca API keys here: https://app.alpaca.markets/signup
+    """`Data` for data coming from `alpaca-trade-api`.
+
+    Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
     
     Usage:
         * Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
@@ -779,11 +781,7 @@ class AlpacaData(Data):
         2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
         2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
         2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
-        2021-12-27 14:07:00+00:00  177.0399  177.0400  177.0300  177.0400    1100
-        2021-12-27 14:08:00+00:00  177.0400  177.0400  176.9700  176.9900   19943
         ...                             ...       ...       ...       ...     ...
-        2021-12-27 15:44:00+00:00  178.0000  178.0079  177.9311  177.9710  106395
-        2021-12-27 15:45:00+00:00  177.9700  178.0564  177.9430  177.9600  153325
         2021-12-27 15:46:00+00:00  177.9500  178.0000  177.8289  177.8850  162778
         2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
         2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
@@ -800,11 +798,7 @@ class AlpacaData(Data):
         2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
         2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
         2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
-        2021-12-27 14:07:00+00:00  177.0399  177.0400  177.0300  177.0400    1100
-        2021-12-27 14:08:00+00:00  177.0400  177.0400  176.9700  176.9900   19943
         ...                             ...       ...       ...       ...     ...
-        2021-12-27 15:45:00+00:00  177.9700  178.0564  177.9430  177.9600  153325
-        2021-12-27 15:46:00+00:00  177.9500  178.0000  177.8289  177.8850  162778
         2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
         2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
         2021-12-27 15:49:00+00:00  178.0100  178.0700  177.9700  178.0650  185037
@@ -827,9 +821,13 @@ class AlpacaData(Data):
 
         Args:
             symbol (str): Symbol.
-            timeframe (str): Timeframe of data. Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m' 
-                Note: Data from the latest 15 minutes is not available with a free data plan.
-                See: https://alpaca.markets/data
+            timeframe (str): Timeframe of data.
+
+                Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m'.
+                See https://alpaca.markets/data.
+
+                !!! note
+                    Data from the latest 15 minutes is not available with a free data plan.
 
             start (any): Start datetime.
 
@@ -838,38 +836,40 @@ class AlpacaData(Data):
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             adjustment (str): Specifies the corporate action adjustment for the stocks. 
-                Enum: `raw`, `split`, `dividend` or `all`.
+
+                Allowed are `raw`, `split`, `dividend` or `all`.
             limit (int): The maximum number of returned items.
             exchange (str): For crypto symbols. Which exchange you wish to retrieve data from.
-                Enum: `FTX`, `ERSX`, `CBSE`
+
+                Allowed are `FTX`, `ERSX`, `CBSE`
 
         For defaults, see `data.alpaca` in `vectorbt._settings.settings`.
         """
         from vectorbt._settings import settings
         from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame, REST
-        
+
         alpaca_cfg = settings['data']['alpaca']
-        
+
         client_kwargs = dict()
         for k in get_func_kwargs(REST):
             if k in kwargs:
                 client_kwargs[k] = kwargs.pop(k)
 
         client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
-        
+
         client = REST(**client_kwargs)
 
         _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
 
         if len(timeframe) < 2:
             raise ValueError("invalid timeframe")
-            
+
         amount_str = timeframe[:-1]
         unit_str = timeframe[-1]
 
         if not amount_str.isnumeric() or unit_str not in _timeframe_units:
             raise ValueError("invalid timeframe")
-        
+
         amount = int(amount_str)
         unit = _timeframe_units[unit_str]
 
@@ -878,31 +878,41 @@ class AlpacaData(Data):
         start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
         end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
 
-        
         def _is_crypto_symbol(symbol):
             return len(symbol) == 6 and "USD" in symbol
 
         if _is_crypto_symbol(symbol):
-            df = client.get_crypto_bars(symbol=symbol,
-                                    timeframe=_timeframe,
-                                    start=start_ts,
-                                    end=end_ts,
-                                    limit=limit,
-                                    exchanges=exchange).df
+            df = client.get_crypto_bars(
+                symbol=symbol,
+                timeframe=_timeframe,
+                start=start_ts,
+                end=end_ts,
+                limit=limit,
+                exchanges=exchange
+            ).df
         else:
-            df = client.get_bars(symbol=symbol, 
-                                timeframe=_timeframe,
-                                start=start_ts,
-                                end=end_ts,
-                                adjustment=adjustment, 
-                                limit=limit).df
-        
+            df = client.get_bars(
+                symbol=symbol,
+                timeframe=_timeframe,
+                start=start_ts,
+                end=end_ts,
+                adjustment=adjustment,
+                limit=limit
+            ).df
+
         # filter for OHLCV
         # remove extra columns
         df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
 
         # capitalize
-        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume', 'exchange':'Exchange'}, inplace=True)
+        df.rename(columns={
+            'open': 'Open',
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume',
+            'exchange': 'Exchange'
+        }, inplace=True)
 
         df['Open'] = df['Open'].astype(float)
         df['High'] = df['High'].astype(float)
@@ -911,8 +921,6 @@ class AlpacaData(Data):
         df['Volume'] = df['Volume'].astype(float)
 
         return df
-
-
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         """Update the symbol.
