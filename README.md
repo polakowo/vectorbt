@@ -1,6 +1,6 @@
 <div align="center">
 	<br>
-	<img src="docs/docs/assets/logo/header.svg">
+	<img src="docs/docs/assets/images/logo/header.svg">
 	<br>
 </div>
 <br>
@@ -194,7 +194,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_ti
 fig.show()
 ```
 
-![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_rand_scatter.svg)
+![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg)
 
 * For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
 dual SMA crossover strategy on BTC, USD, and LTC:
@@ -217,7 +217,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_dmac_heatmap.gif">
+<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -263,7 +263,7 @@ The same for plotting:
 pf[(10, 20, 'ETH-USD')].plot().show()
 ```
 
-![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_dmac_portfolio.svg)
+![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_portfolio.svg)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
 
@@ -297,7 +297,7 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
 
 And this is just the tip of the iceberg of what's possible. Check out [Resources](#resources) to learn more.
 
