@@ -79,6 +79,12 @@ extra_javascript:
 extra_css:
   - assets/stylesheets/extra.css
 
+# Plugins
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
 # Page tree
 nav:
   - Getting started:
