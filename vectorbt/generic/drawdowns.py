@@ -12,7 +12,7 @@ they subclass `vectorbt.generic.ranges.Ranges`.
 
 Using `Drawdowns.from_ts`, you can generate drawdown records for any time series and analyze them right away.
 
-```python-repl
+```pycon
 >>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
@@ -48,7 +48,7 @@ Timedelta('66 days 00:00:00')
 
 Moreover, all generic accessors have a property `drawdowns` and a method `get_drawdowns`:
 
-```python-repl
+```pycon
 >>> # vectorbt.generic.accessors.GenericAccessor.drawdowns.coverage
 >>> price.vbt.drawdowns.coverage()
 0.9354838709677419
@@ -59,7 +59,7 @@ Moreover, all generic accessors have a property `drawdowns` and a method `get_dr
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Drawdowns.metrics`.
 
-```python-repl
+```pycon
 >>> df = pd.DataFrame({
 ...     'a': [1, 2, 1, 3, 2],
 ...     'b': [2, 3, 1, 2, 1]
@@ -95,7 +95,7 @@ Name: a, dtype: object
 By default, the metrics `max_dd`, `avg_dd`, `max_dd_duration`, and `avg_dd_duration` do
 not include active drawdowns. To change that, pass `incl_active=True`:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].stats(settings=dict(incl_active=True))
 Start                                        0
 End                                          4
@@ -123,7 +123,7 @@ Name: a, dtype: object
 
 `Drawdowns.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].stats(group_by=True)
 UserWarning: Metric 'active_dd' does not support grouped data
 UserWarning: Metric 'active_duration' does not support grouped data
@@ -157,11 +157,11 @@ Name: group, dtype: object
 
 `Drawdowns` class has a single subplot based on `Drawdowns.plot`:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].plots()
 ```
 
-![](/docs/img/drawdowns_plots.svg)
+![](/assets/images/drawdowns_plots.svg)
 """
 
 import numpy as np
@@ -663,19 +663,18 @@ class Drawdowns(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
+            >>> from datetime import datetime, timedelta
+            >>> import pandas as pd
 
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> from datetime import datetime, timedelta
-        >>> import pandas as pd
+            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='1 day')).plot()
+            ```
 
-        >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='1 day')).plot()
-        ```
-
-        ![](/docs/img/drawdowns_plot.svg)
+            ![](/assets/images/drawdowns_plot.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

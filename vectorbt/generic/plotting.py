@@ -85,19 +85,19 @@ class Gauge(Configured, TraceUpdater):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> gauge = vbt.plotting.Gauge(
+            ...     value=2,
+            ...     value_range=(1, 3),
+            ...     label='My Gauge'
+            ... )
+            >>> gauge.fig
+            ```
 
-        >>> gauge = vbt.plotting.Gauge(
-        ...     value=2,
-        ...     value_range=(1, 3),
-        ...     label='My Gauge'
-        ... )
-        >>> gauge.fig
-        ```
-        ![](/docs/img/Gauge.svg)
+            ![](/assets/images/Gauge.svg)
         """
         Configured.__init__(
             self,
@@ -195,19 +195,19 @@ class Bar(Configured, TraceUpdater):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> bar = vbt.plotting.Bar(
+            ...     data=[[1, 2], [3, 4]],
+            ...     trace_names=['a', 'b'],
+            ...     x_labels=['x', 'y']
+            ... )
+            >>> bar.fig
+            ```
 
-        >>> bar = vbt.plotting.Bar(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
-        >>> bar.fig
-        ```
-        ![](/docs/img/Bar.svg)
+            ![](/assets/images/Bar.svg)
         """
         Configured.__init__(
             self,
@@ -263,13 +263,13 @@ class Bar(Configured, TraceUpdater):
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> bar.update([[2, 1], [4, 3]])
+            >>> bar.fig
+            ```
 
-        ```python-repl
-        >>> bar.update([[2, 1], [4, 3]])
-        >>> bar.fig
-        ```
-        ![](/docs/img/Bar_updated.svg)
+            ![](/assets/images/Bar_updated.svg)
         """
         data = reshape_fns.to_2d_array(data)
         with self.fig.batch_update():
@@ -303,19 +303,19 @@ class Scatter(Configured, TraceUpdater):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> scatter = vbt.plotting.Scatter(
+            ...     data=[[1, 2], [3, 4]],
+            ...     trace_names=['a', 'b'],
+            ...     x_labels=['x', 'y']
+            ... )
+            >>> scatter.fig
+            ```
 
-        >>> scatter = vbt.plotting.Scatter(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
-        >>> scatter.fig
-        ```
-        ![](/docs/img/Scatter.svg)
+            ![](/assets/images/Scatter.svg)
         """
         Configured.__init__(
             self,
@@ -411,18 +411,18 @@ class Histogram(Configured, TraceUpdater):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> hist = vbt.plotting.Histogram(
+            ...     data=[[1, 2], [3, 4], [2, 1]],
+            ...     trace_names=['a', 'b']
+            ... )
+            >>> hist.fig
+            ```
 
-        >>> hist = vbt.plotting.Histogram(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
-        >>> hist.fig
-        ```
-        ![](/docs/img/Histogram.svg)
+            ![](/assets/images/Histogram.svg)
         """
         Configured.__init__(
             self,
@@ -540,18 +540,18 @@ class Box(Configured, TraceUpdater):
 
         For keyword arguments, see `Histogram`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> box = vbt.plotting.Box(
+            ...     data=[[1, 2], [3, 4], [2, 1]],
+            ...     trace_names=['a', 'b']
+            ... )
+            >>> box.fig
+            ```
 
-        >>> box = vbt.plotting.Box(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
-        >>> box.fig
-        ```
-        ![](/docs/img/Box.svg)
+            ![](/assets/images/Box.svg)
         """
         Configured.__init__(
             self,
@@ -677,19 +677,19 @@ class Heatmap(Configured, TraceUpdater):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> heatmap = vbt.plotting.Heatmap(
+            ...     data=[[1, 2], [3, 4]],
+            ...     x_labels=['a', 'b'],
+            ...     y_labels=['x', 'y']
+            ... )
+            >>> heatmap.fig
+            ```
 
-        >>> heatmap = vbt.plotting.Heatmap(
-        ...     data=[[1, 2], [3, 4]],
-        ...     x_labels=['a', 'b'],
-        ...     y_labels=['x', 'y']
-        ... )
-        >>> heatmap.fig
-        ```
-        ![](/docs/img/Heatmap.svg)
+            ![](/assets/images/Heatmap.svg)
         """
         Configured.__init__(
             self,
@@ -817,22 +817,21 @@ class Volume(Configured, TraceUpdater):
             Figure widgets have currently problems displaying NaNs.
             Use `.show()` method for rendering.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
+            >>> import numpy as np
 
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import numpy as np
+            >>> volume = vbt.plotting.Volume(
+            ...     data=np.random.randint(1, 10, size=(3, 3, 3)),
+            ...     x_labels=['a', 'b', 'c'],
+            ...     y_labels=['d', 'e', 'f'],
+            ...     z_labels=['g', 'h', 'i']
+            ... )
+            >>> volume.fig
+            ```
 
-        >>> volume = vbt.plotting.Volume(
-        ...     data=np.random.randint(1, 10, size=(3, 3, 3)),
-        ...     x_labels=['a', 'b', 'c'],
-        ...     y_labels=['d', 'e', 'f'],
-        ...     z_labels=['g', 'h', 'i']
-        ... )
-        >>> volume.fig
-        ```
-
-        ![](/docs/img/Volume.svg)
+            ![](/assets/images/Volume.svg)
         """
         Configured.__init__(
             self,

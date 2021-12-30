@@ -49,44 +49,43 @@ class _RAND(RAND):
         Parameter `n` can be either a single value (per frame) or a NumPy array (per column).
         To generate multiple combinations, pass it as a list.
 
-    ## Example
+    Usage:
+        * Test three different entry counts values:
 
-    Test three different entry counts values:
+        ```pycon
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import vectorbt as vbt
+        >>> rand = vbt.RAND.run(input_shape=(6,), n=[1, 2, 3], seed=42)
 
-    >>> rand = vbt.RAND.run(input_shape=(6,), n=[1, 2, 3], seed=42)
+        >>> rand.entries
+        rand_n      1      2      3
+        0        True   True   True
+        1       False  False   True
+        2       False  False  False
+        3       False   True  False
+        4       False  False   True
+        5       False  False  False
+        ```
 
-    >>> rand.entries
-    rand_n      1      2      3
-    0        True   True   True
-    1       False  False   True
-    2       False  False  False
-    3       False   True  False
-    4       False  False   True
-    5       False  False  False
-    ```
+        * Entry count can also be set per column:
 
-    Entry count can also be set per column:
+        ```pycon
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import numpy as np
+        >>> rand = vbt.RAND.run(input_shape=(8, 2), n=[np.array([1, 2]), 3], seed=42)
 
-    >>> rand = vbt.RAND.run(input_shape=(8, 2), n=[np.array([1, 2]), 3], seed=42)
-
-    >>> rand.entries
-    rand_n      1      2      3      3
-                0      1      0      1
-    0       False  False   True  False
-    1        True  False  False  False
-    2       False  False  False   True
-    3       False   True   True  False
-    4       False  False  False  False
-    5       False  False  False   True
-    6       False  False   True  False
-    7       False   True  False   True
-    ```
+        >>> rand.entries
+        rand_n      1      2      3      3
+                    0      1      0      1
+        0       False  False   True  False
+        1        True  False  False  False
+        2       False  False  False   True
+        3       False   True   True  False
+        4       False  False  False  False
+        5       False  False  False   True
+        6       False  False   True  False
+        7       False   True  False   True
+        ```
     """
     pass
 
@@ -114,26 +113,25 @@ class _RANDX(RANDX):
 
     See `RAND` for notes on parameters.
 
-    ## Example
+    Usage:
+        * Generate an exit for each entry:
 
-    Generate an exit for each entry:
+        ```pycon
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
 
-    ```python-repl
-    >>> import vectorbt as vbt
-    >>> import pandas as pd
+        >>> entries = pd.Series([True, False, False, True, False, False])
+        >>> randx = vbt.RANDX.run(entries, seed=42)
 
-    >>> entries = pd.Series([True, False, False, True, False, False])
-    >>> randx = vbt.RANDX.run(entries, seed=42)
-
-    >>> randx.exits
-    0    False
-    1    False
-    2     True
-    3    False
-    4     True
-    5    False
-    dtype: bool
-    ```
+        >>> randx.exits
+        0    False
+        1    False
+        2     True
+        3    False
+        4     True
+        5    False
+        dtype: bool
+        ```
     """
     pass
 
@@ -166,36 +164,35 @@ class _RANDNX(RANDNX):
 
     See `RAND` for notes on parameters.
 
-    ## Example
+    Usage:
+        * Test three different entry and exit counts:
 
-    Test three different entry and exit counts:
+        ```pycon
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import vectorbt as vbt
+        >>> randnx = vbt.RANDNX.run(
+        ...     input_shape=(6,),
+        ...     n=[1, 2, 3],
+        ...     seed=42)
 
-    >>> randnx = vbt.RANDNX.run(
-    ...     input_shape=(6,),
-    ...     n=[1, 2, 3],
-    ...     seed=42)
+        >>> randnx.entries
+        randnx_n      1      2      3
+        0          True   True   True
+        1         False  False  False
+        2         False   True   True
+        3         False  False  False
+        4         False  False   True
+        5         False  False  False
 
-    >>> randnx.entries
-    randnx_n      1      2      3
-    0          True   True   True
-    1         False  False  False
-    2         False   True   True
-    3         False  False  False
-    4         False  False   True
-    5         False  False  False
-
-    >>> randnx.exits
-    randnx_n      1      2      3
-    0         False  False  False
-    1          True   True   True
-    2         False  False  False
-    3         False   True   True
-    4         False  False  False
-    5         False  False   True
-    ```
+        >>> randnx.exits
+        randnx_n      1      2      3
+        0         False  False  False
+        1          True   True   True
+        2         False  False  False
+        3         False   True   True
+        4         False  False  False
+        5         False  False   True
+        ```
     """
     pass
 
@@ -233,39 +230,39 @@ class _RPROB(RPROB):
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
-    ## Example
+    Usage:
+        * Generate three columns with different entry probabilities:
 
-    Generate three columns with different entry probabilities:
+        ```pycon
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import vectorbt as vbt
+        >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=[0., 0.5, 1.], seed=42)
 
-    >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=[0., 0.5, 1.], seed=42)
+        >>> rprob.entries
+        rprob_prob    0.0    0.5   1.0
+        0           False   True  True
+        1           False   True  True
+        2           False  False  True
+        3           False  False  True
+        4           False  False  True
+        ```
 
-    >>> rprob.entries
-    rprob_prob    0.0    0.5   1.0
-    0           False   True  True
-    1           False   True  True
-    2           False  False  True
-    3           False  False  True
-    4           False  False  True
-    ```
+        * Probability can also be set per row, column, or element:
 
-    Probability can also be set per row, column, or element:
+        ```pycon
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import numpy as np
+        >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=np.array([0., 0., 1., 1., 1.]), seed=42)
 
-    >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=np.array([0., 0., 1., 1., 1.]), seed=42)
-
-    >>> rprob.entries
-    0    False
-    1    False
-    2     True
-    3     True
-    4     True
-    Name: array_0, dtype: bool
-    ```"""
+        >>> rprob.entries
+        0    False
+        1    False
+        2     True
+        3     True
+        4     True
+        Name: array_0, dtype: bool
+        ```
+    """
     pass
 
 
@@ -374,70 +371,69 @@ class _RPROBNX(RPROBNX):
 
     See `RPROB` for notes on parameters.
 
-    ## Example
+    Usage:
+        * Test all probability combinations:
 
-    Test all probability combinations:
+        ```pycon
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import vectorbt as vbt
+        >>> rprobnx = vbt.RPROBNX.run(
+        ...     input_shape=(5,),
+        ...     entry_prob=[0.5, 1.],
+        ...     exit_prob=[0.5, 1.],
+        ...     param_product=True,
+        ...     seed=42)
 
-    >>> rprobnx = vbt.RPROBNX.run(
-    ...     input_shape=(5,),
-    ...     entry_prob=[0.5, 1.],
-    ...     exit_prob=[0.5, 1.],
-    ...     param_product=True,
-    ...     seed=42)
+        >>> rprobnx.entries
+        rprobnx_entry_prob    0.5    0.5    1.0    0.5
+        rprobnx_exit_prob     0.5    1.0    0.5    1.0
+        0                    True   True   True   True
+        1                   False  False  False  False
+        2                   False  False  False   True
+        3                   False  False  False  False
+        4                   False  False   True   True
 
-    >>> rprobnx.entries
-    rprobnx_entry_prob    0.5    0.5    1.0    0.5
-    rprobnx_exit_prob     0.5    1.0    0.5    1.0
-    0                    True   True   True   True
-    1                   False  False  False  False
-    2                   False  False  False   True
-    3                   False  False  False  False
-    4                   False  False   True   True
+        >>> rprobnx.exits
+        rprobnx_entry_prob    0.5    0.5    1.0    1.0
+        rprobnx_exit_prob     0.5    1.0    0.5    1.0
+        0                   False  False  False  False
+        1                   False   True  False   True
+        2                   False  False  False  False
+        3                   False  False   True   True
+        4                    True  False  False  False
+        ```
 
-    >>> rprobnx.exits
-    rprobnx_entry_prob    0.5    0.5    1.0    1.0
-    rprobnx_exit_prob     0.5    1.0    0.5    1.0
-    0                   False  False  False  False
-    1                   False   True  False   True
-    2                   False  False  False  False
-    3                   False  False   True   True
-    4                    True  False  False  False
-    ```
+        * Probabilities can also be set per row, column, or element:
 
-    Probabilities can also be set per row, column, or element:
+        ```pycon
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import numpy as np
+        >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
+        >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
+        >>> rprobnx = vbt.RPROBNX.run(
+        ...     input_shape=(5,),
+        ...     entry_prob=[entry_prob1, entry_prob2],
+        ...     exit_prob=1.,
+        ...     seed=42)
 
-    >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
-    >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
-    >>> rprobnx = vbt.RPROBNX.run(
-    ...     input_shape=(5,),
-    ...     entry_prob=[entry_prob1, entry_prob2],
-    ...     exit_prob=1.,
-    ...     seed=42)
+        >>> rprobnx.entries
+        rprobnx_entry_prob array_0 array_1
+        rprobnx_exit_prob      1.0     1.0
+        0                     True   False
+        1                    False    True
+        2                     True   False
+        3                    False    True
+        4                     True   False
 
-    >>> rprobnx.entries
-    rprobnx_entry_prob array_0 array_1
-    rprobnx_exit_prob      1.0     1.0
-    0                     True   False
-    1                    False    True
-    2                     True   False
-    3                    False    True
-    4                     True   False
-
-    >>> rprobnx.exits
-    rprobnx_entry_prob array_0 array_1
-    rprobnx_exit_prob      1.0     1.0
-    0                    False   False
-    1                     True   False
-    2                    False    True
-    3                     True   False
-    4                    False    True
-    ```
+        >>> rprobnx.exits
+        rprobnx_entry_prob array_0 array_1
+        rprobnx_exit_prob      1.0     1.0
+        0                    False   False
+        1                     True   False
+        2                    False    True
+        3                     True   False
+        4                    False    True
+        ```
     """
     pass
 
@@ -676,13 +672,12 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
 
     if entries_attr == 'entries':
         plot.__doc__ += """
-    ## Example
+    Usage:
+        ```pycon
+        >>> ohlcstx.iloc[:, 0].plot()
+        ```
         
-    ```python-repl
-    >>> ohlcstx.iloc[:, 0].plot()
-    ```
-    
-    ![](/docs/img/OHLCSTX.svg)
+        ![](/assets/images/OHLCSTX.svg)
     """
     return plot
 
@@ -696,73 +691,72 @@ class _OHLCSTX(OHLCSTX):
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
-    ## Example
+    Usage:
+        * Test each stop type:
 
-    Test each stop type:
+        ```pycon
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import vectorbt as vbt
-    >>> import pandas as pd
-    >>> import numpy as np
+        >>> entries = pd.Series([True, False, False, False, False, False])
+        >>> price = pd.DataFrame({
+        ...     'open': [10, 11, 12, 11, 10, 9],
+        ...     'high': [11, 12, 13, 12, 11, 10],
+        ...     'low': [9, 10, 11, 10, 9, 8],
+        ...     'close': [10, 11, 12, 11, 10, 9]
+        ... })
+        >>> ohlcstx = vbt.OHLCSTX.run(
+        ...     entries,
+        ...     price['open'], price['high'], price['low'], price['close'],
+        ...     sl_stop=[0.1, 0.1, np.nan],
+        ...     sl_trail=[False, True, False],
+        ...     tp_stop=[np.nan, np.nan, 0.1])
 
-    >>> entries = pd.Series([True, False, False, False, False, False])
-    >>> price = pd.DataFrame({
-    ...     'open': [10, 11, 12, 11, 10, 9],
-    ...     'high': [11, 12, 13, 12, 11, 10],
-    ...     'low': [9, 10, 11, 10, 9, 8],
-    ...     'close': [10, 11, 12, 11, 10, 9]
-    ... })
-    >>> ohlcstx = vbt.OHLCSTX.run(
-    ...     entries,
-    ...     price['open'], price['high'], price['low'], price['close'],
-    ...     sl_stop=[0.1, 0.1, np.nan],
-    ...     sl_trail=[False, True, False],
-    ...     tp_stop=[np.nan, np.nan, 0.1])
+        >>> ohlcstx.entries
+        ohlcstx_sl_stop     0.1    0.1    NaN
+        ohlcstx_sl_trail  False   True  False
+        ohlcstx_tp_stop     NaN    NaN    0.1
+        0                  True   True   True
+        1                 False  False  False
+        2                 False  False  False
+        3                 False  False  False
+        4                 False  False  False
+        5                 False  False  False
 
-    >>> ohlcstx.entries
-    ohlcstx_sl_stop     0.1    0.1    NaN
-    ohlcstx_sl_trail  False   True  False
-    ohlcstx_tp_stop     NaN    NaN    0.1
-    0                  True   True   True
-    1                 False  False  False
-    2                 False  False  False
-    3                 False  False  False
-    4                 False  False  False
-    5                 False  False  False
+        >>> ohlcstx.exits
+        ohlcstx_sl_stop     0.1    0.1    NaN
+        ohlcstx_sl_trail  False   True  False
+        ohlcstx_tp_stop     NaN    NaN    0.1
+        0                 False  False  False
+        1                 False  False   True
+        2                 False  False  False
+        3                 False   True  False
+        4                  True  False  False
+        5                 False  False  False
 
-    >>> ohlcstx.exits
-    ohlcstx_sl_stop     0.1    0.1    NaN
-    ohlcstx_sl_trail  False   True  False
-    ohlcstx_tp_stop     NaN    NaN    0.1
-    0                 False  False  False
-    1                 False  False   True
-    2                 False  False  False
-    3                 False   True  False
-    4                  True  False  False
-    5                 False  False  False
+        >>> ohlcstx.stop_price
+        ohlcstx_sl_stop     0.1    0.1    NaN
+        ohlcstx_sl_trail  False   True  False
+        ohlcstx_tp_stop     NaN    NaN    0.1
+        0                   NaN    NaN    NaN
+        1                   NaN    NaN   11.0
+        2                   NaN    NaN    NaN
+        3                   NaN   11.7    NaN
+        4                   9.0    NaN    NaN
+        5                   NaN    NaN    NaN
 
-    >>> ohlcstx.stop_price
-    ohlcstx_sl_stop     0.1    0.1    NaN
-    ohlcstx_sl_trail  False   True  False
-    ohlcstx_tp_stop     NaN    NaN    0.1
-    0                   NaN    NaN    NaN
-    1                   NaN    NaN   11.0
-    2                   NaN    NaN    NaN
-    3                   NaN   11.7    NaN
-    4                   9.0    NaN    NaN
-    5                   NaN    NaN    NaN
-
-    >>> ohlcstx.stop_type_readable
-    ohlcstx_sl_stop        0.1        0.1         NaN
-    ohlcstx_sl_trail     False       True       False
-    ohlcstx_tp_stop        NaN        NaN         0.1
-    0                     None       None        None
-    1                     None       None  TakeProfit
-    2                     None       None        None
-    3                     None  TrailStop        None
-    4                 StopLoss       None        None
-    5                     None       None        None
-    ```
+        >>> ohlcstx.stop_type_readable
+        ohlcstx_sl_stop        0.1        0.1         NaN
+        ohlcstx_sl_trail     False       True       False
+        ohlcstx_tp_stop        NaN        NaN         0.1
+        0                     None       None        None
+        1                     None       None  TakeProfit
+        2                     None       None        None
+        3                     None  TrailStop        None
+        4                 StopLoss       None        None
+        5                     None       None        None
+        ```
     """
 
     plot = _bind_ohlcstx_plot(OHLCSTX, 'entries')

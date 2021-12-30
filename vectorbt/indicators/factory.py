@@ -33,7 +33,7 @@ Each generated class includes the following features:
 
 Consider the following price DataFrame composed of two columns, one per asset:
 
-```python-repl
+```pycon
 >>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
@@ -66,7 +66,7 @@ crossover with price. In particular, we want to test two different window sizes:
 
 A naive way of doing this:
 
-```python-repl
+```pycon
 >>> ma_df = pd.DataFrame.vbt.concat(
 ...     price.rolling(window=2).mean(),
 ...     price.rolling(window=3).mean(),
@@ -105,7 +105,7 @@ ma_window              2             3
 
 Now the same using `IndicatorFactory`:
 
-```python-repl
+```pycon
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['price'],
 ...     param_names=['window'],
@@ -134,7 +134,7 @@ of passed parameters based on a combinatorial function and returns multiple inst
 can be compared with each other. For example, this is useful to generate crossover signals
 of multiple moving averages:
 
-```python-repl
+```pycon
 >>> myind1, myind2 = MyInd.run_combs(price, [2, 3, 4])
 
 >>> myind1.ma
@@ -170,7 +170,7 @@ Its main advantage is that it doesn't need to re-compute each combination thanks
 
 To get details on what arguments are accepted by any of the class methods, use `help`:
 
-```python-repl
+```pycon
 >>> help(MyInd.run)
 Help on method run:
 
@@ -207,7 +207,7 @@ and each is having multiple values, their values will broadcast to a single shap
 To illustrate the usage of parameters in indicators, let's build a basic indicator that returns 1
 if the rolling mean is within upper and lower bounds, and -1 if it's outside:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, window, lower, upper):
 ...     output = np.full(price.shape, np.nan, dtype=np.float_)
@@ -228,7 +228,7 @@ By default, when `per_column` is set to False, each parameter is applied to the 
 
 One parameter combination:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price,
 ...     window=2,
@@ -248,7 +248,7 @@ custom_upper          5
 
 Multiple parameter combinations:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price,
 ...     window=[2, 3],
@@ -268,7 +268,7 @@ custom_upper          5         5
 
 Product of parameter combinations:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price,
 ...     window=[2, 3],
@@ -289,7 +289,7 @@ custom_upper          5         5         5         5
 
 Multiple parameter combinations, one per column:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price,
 ...     window=[2, 3],
@@ -311,7 +311,7 @@ custom_upper     5    5
 Parameter defaults can be passed directly to the `IndicatorFactory.from_custom_func` and
 `IndicatorFactory.from_apply_func`, and overriden in the run method:
 
-```python-repl
+```pycon
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['price'],
 ...     param_names=['window', 'lower', 'upper'],
@@ -339,7 +339,7 @@ the passed scalar/array to the input shape, set `bc_to_input` to True, 0 (index 
 In our example, the parameter `window` can broadcast per column, and both parameters
 `lower` and `upper` can broadcast per element:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, window, lower, upper):
 ...     output = np.full(price.shape, np.nan, dtype=np.float_)
@@ -387,7 +387,7 @@ setting `keep_raw` to True in `broadcast_kwargs` and passing `flex_2d` to the ap
 There are two configs in `vectorbt.indicators.configs` exactly for this purpose: one for column-wise
 broadcasting and one for element-wise broadcasting:
 
-```python-repl
+```pycon
 >>> from vectorbt.base.reshape_fns import flex_select_auto_nb
 >>> from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 
@@ -426,7 +426,7 @@ highest parameter flexibility at the lowest memory cost.
 For example, let's build a grid of two parameter combinations, each being one window size per column
 and both bounds per element:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price,
 ...     window=[np.array([2, 3]), np.array([3, 4])],
@@ -457,7 +457,7 @@ them as separate pandas objects rather than a single DataFrame.
 
 Let's create a parameterless indicator that measures the position of the close price within each bar:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(high, low, close):
 ...     return (close - low) / (high - low)
@@ -478,7 +478,7 @@ Let's create a parameterless indicator that measures the position of the close p
 
 To demonstrate broadcasting, let's pass high as a DataFrame, low as a Series, and close as a scalar:
 
-```python-repl
+```pycon
 >>> df = pd.DataFrame(np.random.uniform(1, 2, size=(5, 2)))
 >>> sr = pd.Series(np.random.uniform(0, 1, size=5))
 >>> MyInd.run(df, sr, 1).output
@@ -496,7 +496,7 @@ To keep it as 1-dimensional, set `to_2d` to False.
 Similar to parameters, we can also define defaults for inputs. In addition to using scalars
 and arrays as default values, we can reference other inputs:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(ts1, ts2, ts3):
 ...     return ts1 + ts2 + ts3
@@ -527,7 +527,7 @@ What if an indicator doesn't take any input arrays? In that case, we can force t
 at least provide the input shape. Let's define a generator that emulates random returns and
 generates synthetic price:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(input_shape, start, mu, sigma):
 ...     rand_returns = np.random.normal(mu, sigma, input_shape)
@@ -555,7 +555,7 @@ custom_sigma        0.01        0.01
 
 We can also supply pandas meta such as `input_index` and `input_columns` to the run method:
 
-```python-repl
+```pycon
 >>> MyInd.run(
 ...     price.shape, 100, 0, 0.01,
 ...     input_index=price.index, input_columns=price.columns
@@ -573,7 +573,7 @@ custom_sigma        0.01        0.01
 
 One can even build input-less indicator that decides on the output shape dynamically:
 
-```python-repl
+```pycon
 >>> from vectorbt.base.combine_fns import apply_and_concat_one
 
 >>> def apply_func(i, ps, input_shape):
@@ -610,7 +610,7 @@ and are passed to the calculation function as a list, one per parameter.
 
 Two regular outputs:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price):
 ...     return price - 1, price + 1
@@ -627,7 +627,7 @@ Two regular outputs:
 
 One regular output and one in-place output:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, in_out2):
 ...     in_out2[:] = price + 1
@@ -646,7 +646,7 @@ One regular output and one in-place output:
 
 Two in-place outputs:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, in_out1, in_out2):
 ...     in_out1[:] = price - 1
@@ -666,7 +666,7 @@ By default, in-place outputs are created as empty arrays with uninitialized valu
 This allows creation of optional outputs that, if not written, do not occupy much memory.
 Since not all outputs are meant to be of data type `float`, we can pass `dtype` in the `in_output_settings`.
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, in_out):
 ...     in_out[:] = price > np.mean(price)
@@ -690,7 +690,7 @@ Since not all outputs are meant to be of data type `float`, we can pass `dtype` 
 
 Another advantage of in-place outputs is that we can provide their initial state:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price, in_out1, in_out2):
 ...     in_out1[:] = in_out1 + price
@@ -734,7 +734,7 @@ we can set `keep_pd` to True to pass all inputs as pandas objects instead of raw
 
 Let's demonstrate this by wrapping a basic composed [pandas_ta](https://github.com/twopirllc/pandas-ta) strategy:
 
-```python-repl
+```pycon
 >>> import pandas_ta
 
 >>> def apply_func(open, high, low, close, volume, ema_len, linreg_len):
@@ -801,7 +801,7 @@ the whole parameter grid.
 
 Let's first take a look at a typical raw output by setting `return_raw` to True:
 
-```python-repl
+```pycon
 >>> raw = vbt.MA.run(price, 2, [False, True], return_raw=True)
 >>> raw
 ([array([[       nan,        nan,        nan,        nan],
@@ -820,7 +820,7 @@ in `output_names`. The next time we decide to run the indicator on a subset of t
 we can simply pass this tuple as the `use_raw` argument. This won't call the calculation function and
 will throw an error if some of the requested parameter combinations cannot be found in `raw`.
 
-```python-repl
+```pycon
 >>> vbt.MA.run(price, 2, True, use_raw=raw).ma
 ma_window                    2
 ma_ewm                    True
@@ -835,7 +835,7 @@ ma_ewm                    True
 Here is how the performance compares when repeatedly running the same parameter combination
 with and without `run_unique`:
 
-```python-repl
+```pycon
 >>> a = np.random.uniform(size=(1000,))
 
 >>> %timeit vbt.MA.run(a, np.full(1000, 2), run_unique=False)
@@ -861,7 +861,7 @@ rolling windows. We have already decided on the value for the first window, and 
 thousands of values for the second window. Without caching, and even with `run_unique` enabled,
 the first rolling window will be re-calculated over and over again and waste our resources:
 
-```python-repl
+```pycon
 >>> @njit
 ... def roll_mean_expensive_nb(price, w):
 ...     for i in range(100):
@@ -896,7 +896,7 @@ custom_w2                    3
 
 To avoid this, let's cache all unique rolling windows:
 
-```python-repl
+```pycon
 >>> @njit
 ... def cache_func_nb(price, ws1, ws2):
 ...     cache_dict = dict()
@@ -939,7 +939,7 @@ in other calculations or even indicators. The clear advantage of this approach i
 rely on some fixed set of parameter combinations any more, but on the values of each parameter,
 which gives us more granularity in managing performance.
 
-```python-repl
+```pycon
 >>> cache = MyInd.run(price, 2, np.arange(2, 1000), return_cache=True)
 
 >>> %timeit MyInd.run(price, np.arange(2, 1000), np.arange(2, 1000), use_cache=cache)
@@ -953,7 +953,7 @@ outputs that are processed only when explicitly called. They will become cached 
 and, in contrast to regular outputs, they can have an arbitrary shape. For example, let's
 attach a property that will calculate the distance between the moving average and the price.
 
-```python-repl
+```pycon
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['price'],
 ...     param_names=['window'],
@@ -973,7 +973,7 @@ custom_window                   2                   3
 
 Another way of defining own properties and methods is subclassing:
 
-```python-repl
+```pycon
 >>> class MyIndExtended(MyInd):
 ...     def plot(self, column=None, **kwargs):
 ...         self_col = self.select_one(column=column, group_by=False)
@@ -982,7 +982,7 @@ Another way of defining own properties and methods is subclassing:
 >>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()
 ```
 
-![](/docs/img/MyInd_plot.svg)
+![](/assets/images/MyInd_plot.svg)
 
 ## Helper properties and methods
 
@@ -990,7 +990,7 @@ For all in `input_names`, `in_output_names`, `output_names`, and `custom_output_
 `IndicatorFactory` will create a bunch of comparison and combination methods, such as for generating signals.
 What kind of methods are created can be regulated using `dtype` in the `attr_settings` dictionary.
 
-```python-repl
+```pycon
 >>> from collections import namedtuple
 
 >>> MyEnum = namedtuple('MyEnum', ['one', 'two'])(0, 1)
@@ -1045,7 +1045,7 @@ shapes can broadcast together.
 
 We can also do comparison with multiple objects at once by passing them as a tuple/list:
 
-```python-repl
+```pycon
 >>> myind.price_above([1.5, 2.5])
 custom_price_above           1.5           2.5
                         a      b      a      b
@@ -1064,7 +1064,7 @@ custom_price_above           1.5           2.5
 
 This makes possible accessing rows and columns by labels, integer positions, and parameters.
 
-```python-repl
+```pycon
 >>> ma = vbt.MA.run(price, [2, 3])
 
 >>> ma[(2, 'b')]
@@ -1100,7 +1100,7 @@ neccessary information, such as input, parameter and output names.
 
 We can attach metrics to any new indicator class:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price):
 ...     return price ** 2, price ** 3
@@ -1130,7 +1130,7 @@ Name: a, dtype: float64
 
 Similarly to stats, we can attach subplots to any new indicator class:
 
-```python-repl
+```pycon
 >>> @njit
 ... def apply_func_nb(price):
 ...     return price ** 2, price ** 3
@@ -1157,7 +1157,7 @@ Similarly to stats, we can attach subplots to any new indicator class:
 >>> myind.plots(column='a')
 ```
 
-![](/docs/img/IndicatorFactory_plots.svg)
+![](/assets/images/IndicatorFactory_plots.svg)
 """
 
 import inspect
@@ -1492,7 +1492,7 @@ def run_pipeline(
 
     * Takes one or multiple array objects in `input_list` and broadcasts them.
 
-    ```python-repl
+    ```pycon
     >>> sr = pd.Series([1, 2], index=['x', 'y'])
     >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
     >>> input_list = vbt.base.reshape_fns.broadcast(sr, df)
@@ -1509,7 +1509,7 @@ def run_pipeline(
     * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and
         broadcasts them.
 
-    ```python-repl
+    ```pycon
     >>> p1, p2, p3 = 1, [2, 3, 4], [False]
     >>> param_list = vbt.base.reshape_fns.broadcast(p1, p2, p3)
     >>> param_list[0]
@@ -1523,7 +1523,7 @@ def run_pipeline(
     * Performs calculation using `custom_func` to build output arrays (`output_list`) and
         other objects (`other_list`, optionally).
 
-    ```python-repl
+    ```pycon
     >>> def custom_func(ts1, ts2, p1, p2, p3, *args, **kwargs):
     ...     return np.hstack((
     ...         ts1 + ts2 + p1[0] * p2[0],
@@ -1539,7 +1539,7 @@ def run_pipeline(
 
     * Creates new column hierarchy based on parameters and level names.
 
-    ```python-repl
+    ```pycon
     >>> p1_columns = pd.Index(param_list[0], name='p1')
     >>> p2_columns = pd.Index(param_list[1], name='p2')
     >>> p3_columns = pd.Index(param_list[2], name='p3')
@@ -1560,7 +1560,7 @@ def run_pipeline(
         This is done to be able to compare them and generate signals, since we cannot compare NumPy
         arrays that have totally different shapes, such as (2, 2) and (2, 6).
 
-    ```python-repl
+    ```pycon
     >>> new_input_list = [
     ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
     ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
@@ -2676,66 +2676,65 @@ class IndicatorFactory:
             `Indicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
 
-        ## Example
+        Usage:
+            * The following example produces the same indicator as the `IndicatorFactory.from_apply_func` example.
 
-        The following example produces the same indicator as the `IndicatorFactory.from_apply_func` example.
+            ```pycon
+            >>> @njit
+            >>> def apply_func_nb(i, ts1, ts2, p1, p2, arg1, arg2):
+            ...     return ts1 * p1[i] + arg1, ts2 * p2[i] + arg2
 
-        ```python-repl
-        >>> @njit
-        >>> def apply_func_nb(i, ts1, ts2, p1, p2, arg1, arg2):
-        ...     return ts1 * p1[i] + arg1, ts2 * p2[i] + arg2
+            >>> @njit
+            ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
+            ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
+            ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, arg1, arg2)
 
-        >>> @njit
-        ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
-        ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
-        ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, arg1, arg2)
+            >>> MyInd = vbt.IndicatorFactory(
+            ...     input_names=['ts1', 'ts2'],
+            ...     param_names=['p1', 'p2'],
+            ...     output_names=['o1', 'o2']
+            ... ).from_custom_func(custom_func, var_args=True, arg2=200)
 
-        >>> MyInd = vbt.IndicatorFactory(
-        ...     input_names=['ts1', 'ts2'],
-        ...     param_names=['p1', 'p2'],
-        ...     output_names=['o1', 'o2']
-        ... ).from_custom_func(custom_func, var_args=True, arg2=200)
+            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
+            >>> myInd.o1
+            custom_p1              1             2
+            custom_p2              3             4
+                            a      b      a      b
+            2020-01-01  101.0  105.0  102.0  110.0
+            2020-01-02  102.0  104.0  104.0  108.0
+            2020-01-03  103.0  103.0  106.0  106.0
+            2020-01-04  104.0  102.0  108.0  104.0
+            2020-01-05  105.0  101.0  110.0  102.0
+            >>> myInd.o2
+            custom_p1              1             2
+            custom_p2              3             4
+                            a      b      a      b
+            2020-01-01  206.0  230.0  208.0  240.0
+            2020-01-02  212.0  224.0  216.0  232.0
+            2020-01-03  218.0  218.0  224.0  224.0
+            2020-01-04  224.0  212.0  232.0  216.0
+            2020-01-05  230.0  206.0  240.0  208.0
+            ```
 
-        >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
-        >>> myInd.o1
-        custom_p1              1             2
-        custom_p2              3             4
-                        a      b      a      b
-        2020-01-01  101.0  105.0  102.0  110.0
-        2020-01-02  102.0  104.0  104.0  108.0
-        2020-01-03  103.0  103.0  106.0  106.0
-        2020-01-04  104.0  102.0  108.0  104.0
-        2020-01-05  105.0  101.0  110.0  102.0
-        >>> myInd.o2
-        custom_p1              1             2
-        custom_p2              3             4
-                        a      b      a      b
-        2020-01-01  206.0  230.0  208.0  240.0
-        2020-01-02  212.0  224.0  216.0  232.0
-        2020-01-03  218.0  218.0  224.0  224.0
-        2020-01-04  224.0  212.0  232.0  216.0
-        2020-01-05  230.0  206.0  240.0  208.0
-        ```
+            The difference between `apply_func_nb` here and in `IndicatorFactory.from_apply_func` is that
+            here it takes the index of the current parameter combination that can be used for parameter selection.
+            You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
+            (which shouldn't necessarily be Numba-compiled):
 
-        The difference between `apply_func_nb` here and in `IndicatorFactory.from_apply_func` is that
-        here it takes the index of the current parameter combination that can be used for parameter selection.
-        You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
-        (which shouldn't necessarily be Numba-compiled):
-
-        ```python-repl
-        >>> @njit
-        ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
-        ...     input_shape = ts1.shape
-        ...     n_params = len(p1)
-        ...     out1 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
-        ...     out2 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
-        ...     for k in range(n_params):
-        ...         for col in range(input_shape[1]):
-        ...             for i in range(input_shape[0]):
-        ...                 out1[i, input_shape[1] * k + col] = ts1[i, col] * p1[k] + arg1
-        ...                 out2[i, input_shape[1] * k + col] = ts2[i, col] * p2[k] + arg2
-        ...     return out1, out2
-        ```
+            ```pycon
+            >>> @njit
+            ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
+            ...     input_shape = ts1.shape
+            ...     n_params = len(p1)
+            ...     out1 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
+            ...     out2 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
+            ...     for k in range(n_params):
+            ...         for col in range(input_shape[1]):
+            ...             for i in range(input_shape[0]):
+            ...                 out1[i, input_shape[1] * k + col] = ts1[i, col] * p1[k] + arg1
+            ...                 out2[i, input_shape[1] * k + col] = ts2[i, col] * p2[k] + arg2
+            ...     return out1, out2
+            ```
         """
         Indicator = self.Indicator
 
@@ -3169,43 +3168,42 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         whether to use Ray to execute `apply_func` in parallel. Only works with `numba_loop` set to False.
         See `vectorbt.base.combine_fns.ray_apply` for related keyword arguments.
 
-        ## Example
+        Usage:
+            * The following example produces the same indicator as the `IndicatorFactory.from_custom_func` example.
 
-        The following example produces the same indicator as the `IndicatorFactory.from_custom_func` example.
+            ```pycon
+            >>> @njit
+            ... def apply_func_nb(ts1, ts2, p1, p2, arg1, arg2):
+            ...     return ts1 * p1 + arg1, ts2 * p2 + arg2
 
-        ```python-repl
-        >>> @njit
-        ... def apply_func_nb(ts1, ts2, p1, p2, arg1, arg2):
-        ...     return ts1 * p1 + arg1, ts2 * p2 + arg2
+            >>> MyInd = vbt.IndicatorFactory(
+            ...     input_names=['ts1', 'ts2'],
+            ...     param_names=['p1', 'p2'],
+            ...     output_names=['o1', 'o2']
+            ... ).from_apply_func(
+            ...     apply_func_nb, var_args=True,
+            ...     kwargs_to_args=['arg2'], arg2=200)
 
-        >>> MyInd = vbt.IndicatorFactory(
-        ...     input_names=['ts1', 'ts2'],
-        ...     param_names=['p1', 'p2'],
-        ...     output_names=['o1', 'o2']
-        ... ).from_apply_func(
-        ...     apply_func_nb, var_args=True,
-        ...     kwargs_to_args=['arg2'], arg2=200)
-
-        >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
-        >>> myInd.o1
-        custom_p1              1             2
-        custom_p2              3             4
-                        a      b      a      b
-        2020-01-01  101.0  105.0  102.0  110.0
-        2020-01-02  102.0  104.0  104.0  108.0
-        2020-01-03  103.0  103.0  106.0  106.0
-        2020-01-04  104.0  102.0  108.0  104.0
-        2020-01-05  105.0  101.0  110.0  102.0
-        >>> myInd.o2
-        custom_p1              1             2
-        custom_p2              3             4
-                        a      b      a      b
-        2020-01-01  206.0  230.0  208.0  240.0
-        2020-01-02  212.0  224.0  216.0  232.0
-        2020-01-03  218.0  218.0  224.0  224.0
-        2020-01-04  224.0  212.0  232.0  216.0
-        2020-01-05  230.0  206.0  240.0  208.0
-        ```
+            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
+            >>> myInd.o1
+            custom_p1              1             2
+            custom_p2              3             4
+                            a      b      a      b
+            2020-01-01  101.0  105.0  102.0  110.0
+            2020-01-02  102.0  104.0  104.0  108.0
+            2020-01-03  103.0  103.0  106.0  106.0
+            2020-01-04  104.0  102.0  108.0  104.0
+            2020-01-05  105.0  101.0  110.0  102.0
+            >>> myInd.o2
+            custom_p1              1             2
+            custom_p2              3             4
+                            a      b      a      b
+            2020-01-01  206.0  230.0  208.0  240.0
+            2020-01-02  212.0  224.0  216.0  232.0
+            2020-01-03  218.0  218.0  224.0  224.0
+            2020-01-04  224.0  212.0  232.0  216.0
+            2020-01-05  230.0  206.0  240.0  208.0
+            ```
         """
         Indicator = self.Indicator
 
@@ -3402,40 +3400,39 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         Returns:
             Indicator
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 
-        ```python-repl
-        >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
+            >>> sma = SMA.run(price, timeperiod=[2, 3])
+            >>> sma.real
+            sma_timeperiod         2         3
+                              a    b    a    b
+            2020-01-01      NaN  NaN  NaN  NaN
+            2020-01-02      1.5  4.5  NaN  NaN
+            2020-01-03      2.5  3.5  2.0  4.0
+            2020-01-04      3.5  2.5  3.0  3.0
+            2020-01-05      4.5  1.5  4.0  2.0
+            ```
 
-        >>> sma = SMA.run(price, timeperiod=[2, 3])
-        >>> sma.real
-        sma_timeperiod         2         3
-                          a    b    a    b
-        2020-01-01      NaN  NaN  NaN  NaN
-        2020-01-02      1.5  4.5  NaN  NaN
-        2020-01-03      2.5  3.5  2.0  4.0
-        2020-01-04      3.5  2.5  3.0  3.0
-        2020-01-05      4.5  1.5  4.0  2.0
-        ```
+            * To get help on running the indicator, use the `help` command:
 
-        To get help on running the indicator, use the `help` command:
+            ```pycon
+            >>> help(SMA.run)
+            Help on method run:
 
-        ```python-repl
-        >>> help(SMA.run)
-        Help on method run:
+            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+                Run `SMA` indicator.
 
-        run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-            Run `SMA` indicator.
+                * Inputs: `close`
+                * Parameters: `timeperiod`
+                * Outputs: `real`
 
-            * Inputs: `close`
-            * Parameters: `timeperiod`
-            * Outputs: `real`
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
 
-            Pass a list of parameter names as `hide_params` to hide their column levels.
-            Set `hide_default` to False to show the column levels of the parameters with a default value.
-
-            Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
-        ```
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+            ```
         """
         import talib
         from talib import abstract
@@ -3618,72 +3615,71 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         Returns:
             Indicator
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> SMA = vbt.IndicatorFactory.from_pandas_ta('SMA')
 
-        ```python-repl
-        >>> SMA = vbt.IndicatorFactory.from_pandas_ta('SMA')
+            >>> sma = SMA.run(price, length=[2, 3])
+            >>> sma.sma
+            sma_length         2         3
+                          a    b    a    b
+            2020-01-01  NaN  NaN  NaN  NaN
+            2020-01-02  1.5  4.5  NaN  NaN
+            2020-01-03  2.5  3.5  2.0  4.0
+            2020-01-04  3.5  2.5  3.0  3.0
+            2020-01-05  4.5  1.5  4.0  2.0
+            ```
 
-        >>> sma = SMA.run(price, length=[2, 3])
-        >>> sma.sma
-        sma_length         2         3
-                      a    b    a    b
-        2020-01-01  NaN  NaN  NaN  NaN
-        2020-01-02  1.5  4.5  NaN  NaN
-        2020-01-03  2.5  3.5  2.0  4.0
-        2020-01-04  3.5  2.5  3.0  3.0
-        2020-01-05  4.5  1.5  4.0  2.0
-        ```
+            * To get help on running the indicator, use the `help` command:
 
-        To get help on running the indicator, use the `help` command:
+            ```pycon
+            >>> help(SMA.run)
+            Help on method run:
 
-        ```python-repl
-        >>> help(SMA.run)
-        Help on method run:
+            run(close, length=None, offset=None, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+                Run `SMA` indicator.
 
-        run(close, length=None, offset=None, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-            Run `SMA` indicator.
+                * Inputs: `close`
+                * Parameters: `length`, `offset`
+                * Outputs: `sma`
 
-            * Inputs: `close`
-            * Parameters: `length`, `offset`
-            * Outputs: `sma`
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
 
-            Pass a list of parameter names as `hide_params` to hide their column levels.
-            Set `hide_default` to False to show the column levels of the parameters with a default value.
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+            ```
 
-            Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
-        ```
+            * To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
-        To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
+            ```pycon
+            >>> print(SMA.__doc__)
+            Simple Moving Average (SMA)
 
-        ```python-repl
-        >>> print(SMA.__doc__)
-        Simple Moving Average (SMA)
+            The Simple Moving Average is the classic moving average that is the equally
+            weighted average over n periods.
 
-        The Simple Moving Average is the classic moving average that is the equally
-        weighted average over n periods.
+            Sources:
+                https://www.tradingtechnologies.com/help/x-study/technical-indicator-definitions/simple-moving-average-sma/
 
-        Sources:
-            https://www.tradingtechnologies.com/help/x-study/technical-indicator-definitions/simple-moving-average-sma/
+            Calculation:
+                Default Inputs:
+                    length=10
+                SMA = SUM(close, length) / length
 
-        Calculation:
-            Default Inputs:
-                length=10
-            SMA = SUM(close, length) / length
+            Args:
+                close (pd.Series): Series of 'close's
+                length (int): It's period. Default: 10
+                offset (int): How many periods to offset the result. Default: 0
 
-        Args:
-            close (pd.Series): Series of 'close's
-            length (int): It's period. Default: 10
-            offset (int): How many periods to offset the result. Default: 0
+            Kwargs:
+                adjust (bool): Default: True
+                presma (bool, optional): If True, uses SMA for initial value.
+                fillna (value, optional): pd.DataFrame.fillna(value)
+                fill_method (value, optional): Type of fill method
 
-        Kwargs:
-            adjust (bool): Default: True
-            presma (bool, optional): If True, uses SMA for initial value.
-            fillna (value, optional): pd.DataFrame.fillna(value)
-            fill_method (value, optional): Type of fill method
-
-        Returns:
-            pd.Series: New feature generated.
-        ```
+            Returns:
+                pd.Series: New feature generated.
+            ```
         """
         import pandas_ta
 
@@ -3829,52 +3825,51 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         Returns:
             Indicator
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> SMAIndicator = vbt.IndicatorFactory.from_ta('SMAIndicator')
 
-        ```python-repl
-        >>> SMAIndicator = vbt.IndicatorFactory.from_ta('SMAIndicator')
+            >>> sma = SMAIndicator.run(price, window=[2, 3])
+            >>> sma.sma_indicator
+            smaindicator_window    2         3
+                                   a    b    a    b
+            2020-01-01           NaN  NaN  NaN  NaN
+            2020-01-02           1.5  4.5  NaN  NaN
+            2020-01-03           2.5  3.5  2.0  4.0
+            2020-01-04           3.5  2.5  3.0  3.0
+            2020-01-05           4.5  1.5  4.0  2.0
+            ```
 
-        >>> sma = SMAIndicator.run(price, window=[2, 3])
-        >>> sma.sma_indicator
-        smaindicator_window    2         3
-                               a    b    a    b
-        2020-01-01           NaN  NaN  NaN  NaN
-        2020-01-02           1.5  4.5  NaN  NaN
-        2020-01-03           2.5  3.5  2.0  4.0
-        2020-01-04           3.5  2.5  3.0  3.0
-        2020-01-05           4.5  1.5  4.0  2.0
-        ```
+            * To get help on running the indicator, use the `help` command:
 
-        To get help on running the indicator, use the `help` command:
+            ```pycon
+            >>> help(SMAIndicator.run)
+            Help on method run:
 
-        ```python-repl
-        >>> help(SMAIndicator.run)
-        Help on method run:
+            run(close, window, fillna=False, short_name='smaindicator', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+                Run `SMAIndicator` indicator.
 
-        run(close, window, fillna=False, short_name='smaindicator', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-            Run `SMAIndicator` indicator.
+                * Inputs: `close`
+                * Parameters: `window`, `fillna`
+                * Outputs: `sma_indicator`
 
-            * Inputs: `close`
-            * Parameters: `window`, `fillna`
-            * Outputs: `sma_indicator`
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
 
-            Pass a list of parameter names as `hide_params` to hide their column levels.
-            Set `hide_default` to False to show the column levels of the parameters with a default value.
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+            ```
 
-            Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
-        ```
+            * To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
-        To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
+            ```pycon
+            >>> print(SMAIndicator.__doc__)
+            SMA - Simple Moving Average
 
-        ```python-repl
-        >>> print(SMAIndicator.__doc__)
-        SMA - Simple Moving Average
-
-            Args:
-                close(pandas.Series): dataset 'Close' column.
-                window(int): n period.
-                fillna(bool): if True, fill nan values.
-        ```
+                Args:
+                    close(pandas.Series): dataset 'Close' column.
+                    window(int): n period.
+                    fillna(bool): if True, fill nan values.
+            ```
         """
 
         ind_cls = cls.find_ta_indicator(cls_name)

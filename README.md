@@ -1,6 +1,6 @@
 <div align="center">
 	<br>
-	<img src="static/header.svg">
+	<img src="docs/docs/logo/header.svg">
 	<br>
 </div>
 <br>
@@ -11,8 +11,6 @@
         <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" /></a>
     <a href="https://pypi.org/project/vectorbt" alt="PyPi">
         <img src="https://img.shields.io/pypi/v/vectorbt?color=blueviolet" /></a>
-    <a href="https://app.travis-ci.com/github/polakowo/vectorbt" alt="Build Status">
-        <img src="https://app.travis-ci.com/polakowo/vectorbt.svg?branch=master" /></a>
     <a href="https://codecov.io/gh/polakowo/vectorbt" alt="codecov">
         <img src="https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3" /></a>
     <a href="https://vectorbt.dev/" alt="Website">
@@ -50,7 +48,7 @@ With vectorbt, you can
 * Analyze time series and engineer new features for **ML models**
 * Supercharge pandas and your favorite tools to run much faster
 * Visualize strategy performance using **interactive charts and dashboards** (both in Jupyter and browser)
-* Fetch and process data periodically, send Telegram notifications, and more
+* Fetch and process data periodically, send Telegram notifications, and more :fire:
 
 ## Installation
 
@@ -196,7 +194,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_ti
 fig.show()
 ```
 
-![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
+![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_rand_scatter.svg)
 
 * For fans of hyperparameter optimization: here is a snippet for testing 10,000 window combinations of a 
 dual SMA crossover strategy on BTC, USD, and LTC:
@@ -219,7 +217,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif">
+<img width="650" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_dmac_heatmap.gif">
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -265,7 +263,7 @@ The same for plotting:
 pf[(10, 20, 'ETH-USD')].plot().show()
 ```
 
-![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
+![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_dmac_portfolio.svg)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
 
@@ -299,7 +297,7 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/usage_bbands.gif">
 
 And this is just the tip of the iceberg of what's possible. Check out [Resources](#resources) to learn more.
 

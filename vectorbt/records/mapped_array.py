@@ -9,7 +9,7 @@ for example, to compute various statistics by column, such as standard deviation
 
 Consider the following example:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> from numba import njit
@@ -29,7 +29,7 @@ Using `MappedArray`, you can then reduce by column as follows:
 
 * Use already provided reducers such as `MappedArray.mean`:
 
-```python-repl
+```pycon
 >>> ma.mean()
 a    11.0
 b    14.0
@@ -39,7 +39,7 @@ dtype: float64
 
 * Use `MappedArray.to_pd` to map to pandas and then reduce manually (expensive):
 
-```python-repl
+```pycon
 >>> ma.to_pd().mean()
 a    11.0
 b    14.0
@@ -49,7 +49,7 @@ dtype: float64
 
 * Use `MappedArray.reduce` to reduce using a custom function:
 
-```python-repl
+```pycon
 >>> @njit
 ... def pow_mean_reduce_nb(col, a, pow):
 ...     return np.mean(a ** pow)
@@ -84,7 +84,7 @@ idxmax  z  z  z
 
 Use `MappedArray.apply` to apply a function on each column/group:
 
-```python-repl
+```pycon
 >>> @njit
 ... def cumsum_apply_nb(idxs, col, a):
 ...     return np.cumsum(a)
@@ -107,7 +107,7 @@ You can expand any `MappedArray` instance to pandas:
 
 * Given `idx_arr` was provided:
 
-```python-repl
+```pycon
 >>> ma.to_pd()
       a     b     c
 x  10.0  13.0  16.0
@@ -120,7 +120,7 @@ z  12.0  15.0  18.0
 
 * In case `group_by` was provided, index can be ignored, or there are position conflicts:
 
-```python-repl
+```pycon
 >>> ma.to_pd(group_by=np.array(['first', 'first', 'second']), ignore_index=True)
    first  second
 0   10.0    16.0
@@ -135,7 +135,7 @@ z  12.0  15.0  18.0
 
 Use `MappedArray.apply_mask` to filter elements per column/group:
 
-```python-repl
+```pycon
 >>> mask = [True, False, True, False, True, False, True, False, True]
 >>> filtered_ma = ma.apply_mask(mask)
 >>> filtered_ma.count()
@@ -152,19 +152,19 @@ array([0, 2, 4, 6, 8])
 
 You can build histograms and boxplots of `MappedArray` directly:
 
-```python-repl
+```pycon
 >>> ma.boxplot()
 ```
 
-![](/docs/img/mapped_boxplot.svg)
+![](/assets/images/mapped_boxplot.svg)
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
-```python-repl
+```pycon
 >>> ma.to_pd().vbt.plot()
 ```
 
-![](/docs/img/mapped_to_pd_plot.svg)
+![](/assets/images/mapped_to_pd_plot.svg)
 
 ## Grouping
 
@@ -176,7 +176,7 @@ There are multiple ways of define grouping:
 
 * When creating `MappedArray`, pass `group_by` to `vectorbt.base.array_wrapper.ArrayWrapper`:
 
-```python-repl
+```pycon
 >>> group_by = np.array(['first', 'first', 'second'])
 >>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_ma = vbt.MappedArray(grouped_wrapper, a, col_arr, idx_arr=idx_arr)
@@ -189,7 +189,7 @@ dtype: float64
 
 * Regroup an existing `MappedArray`:
 
-```python-repl
+```pycon
 >>> ma.regroup(group_by).mean()
 first     12.5
 second    17.0
@@ -198,7 +198,7 @@ dtype: float64
 
 * Pass `group_by` directly to the reducing method:
 
-```python-repl
+```pycon
 >>> ma.mean(group_by=group_by)
 first     12.5
 second    17.0
@@ -207,7 +207,7 @@ dtype: float64
 
 By the same way you can disable or modify any existing grouping:
 
-```python-repl
+```pycon
 >>> grouped_ma.mean(group_by=False)
 a    11.0
 b    14.0
@@ -223,7 +223,7 @@ dtype: float64
 `MappedArray` implements arithmetic, comparison and logical operators. You can perform basic
 operations (such as addition) on mapped arrays as if they were NumPy arrays.
 
-```python-repl
+```pycon
 >>> ma ** 2
 <vectorbt.records.mapped_array.MappedArray at 0x7f97bfc49358>
 
@@ -245,7 +245,7 @@ operations (such as addition) on mapped arrays as if they were NumPy arrays.
 Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
 on a `MappedArray` instance, which forwards indexing operation to each object with columns:
 
-```python-repl
+```pycon
 >>> ma['a'].values
 array([10., 11., 12.])
 
@@ -283,7 +283,7 @@ instance to the disk with `MappedArray.save` and load it with `MappedArray.load`
 
 Metric for mapped arrays are similar to that for `vectorbt.generic.accessors.GenericAccessor`.
 
-```python-repl
+```pycon
 >>> ma.stats(column='a')
 Start                      x
 End                        z
@@ -303,7 +303,7 @@ The main difference unfolds once the mapped array has a mapping:
 values are then considered as categorical and usual statistics are meaningless to compute.
 For this case, `MappedArray.stats` returns the value counts:
 
-```python-repl
+```pycon
 >>> mapping = {v: "test_" + str(v) for v in np.unique(ma.values)}
 >>> ma.stats(column='a', settings=dict(mapping=mapping))
 Start                                    x
@@ -323,7 +323,7 @@ Name: a, dtype: object
 
 `MappedArray.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> grouped_ma.stats(column='first')
 Start                      x
 End                        z
@@ -347,11 +347,11 @@ Name: first, dtype: object
 `MappedArray` class has a single subplot based on `MappedArray.to_pd` and
 `vectorbt.generic.accessors.GenericAccessor.plot`:
 
-```python-repl
+```pycon
 >>> ma.plots()
 ```
 
-![](/docs/img/mapped_to_pd_plot.svg)
+![](/assets/images/mapped_to_pd_plot.svg)
 """
 
 import numpy as np

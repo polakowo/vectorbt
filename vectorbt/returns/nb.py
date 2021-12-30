@@ -6,7 +6,7 @@
 Provides an arsenal of Numba-compiled functions that are used by accessors and for measuring
 portfolio performance. These only accept NumPy arrays and other Numba-compatible types.
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import vectorbt as vbt
 

@@ -18,7 +18,7 @@ Methods can be accessed as follows:
 
 There are three options to compute returns and get the accessor:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
@@ -43,7 +43,7 @@ There are three options to compute returns and get the accessor:
 
 The accessors extend `vectorbt.generic.accessors`.
 
-```python-repl
+```pycon
 >>> # inherited from GenericAccessor
 >>> ret_acc.max()
 0.09090909090909083
@@ -68,7 +68,7 @@ defaults for arguments used throughout the accessor, such as
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `ReturnsAccessor.metrics`.
 
-```python-repl
+```pycon
 >>> ret_acc.stats()
 UserWarning: Metric 'benchmark_return' requires benchmark_rets to be set
 UserWarning: Metric 'alpha' requires benchmark_rets to be set
@@ -96,7 +96,7 @@ dtype: object
 The missing `benchmark_rets` can be either passed to the contrustor of the accessor
 or as a setting to `ReturnsAccessor.stats`:
 
-```python-repl
+```pycon
 >>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
 >>> benchmark_rets = benchmark.vbt.to_returns()
 
@@ -1161,19 +1161,18 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> import numpy as np
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> import numpy as np
+            >>> np.random.seed(0)
+            >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+            >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+            >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
+            ```
 
-        >>> np.random.seed(0)
-        >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-        >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-        >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
-        ```
-
-        ![](/docs/img/plot_cumulative.svg)
+            ![](/assets/images/plot_cumulative.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

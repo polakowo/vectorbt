@@ -649,29 +649,26 @@ __pdoc__['SimulationContext.target_shape'] = """Target shape of the simulation.
 
 A tuple with exactly two elements: the number of rows and columns.
 
-## Example
-
-One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
-where the first axis are rows (minutes) and the second axis are columns (assets).
+Example:
+    One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
+    where the first axis are rows (minutes) and the second axis are columns (assets).
 """
 __pdoc__['SimulationContext.group_lens'] = """Number of columns in each group.
 
 Even if columns are not grouped, `group_lens` contains ones - one column per group.
 
-## Example
-
-In pairs trading, `group_lens` would be `np.array([2])`, while three independent
-columns would be represented by `group_lens` of `np.array([1, 1, 1])`.
+Example:
+    In pairs trading, `group_lens` would be `np.array([2])`, while three independent
+    columns would be represented by `group_lens` of `np.array([1, 1, 1])`.
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column or group with cash sharing.
 
 If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(target_shape[1],)`.
 
-## Example
-
-Consider three columns, each having $100 of starting capital. If we built one group of two columns
-with cash sharing and one (imaginary) group with the last column, the `init_cash` would be 
-`np.array([200, 100])`. Without cash sharing, the `init_cash` would be `np.array([100, 100, 100])`.
+Example:
+    Consider three columns, each having $100 of starting capital. If we built one group of two columns
+    with cash sharing and one (imaginary) group with the last column, the `init_cash` would be 
+    `np.array([200, 100])`. Without cash sharing, the `init_cash` would be `np.array([100, 100, 100])`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = "Whether cash sharing is enabled."
 __pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segment.
@@ -685,17 +682,16 @@ Has shape `SimulationContext.target_shape` and each value must exist in the rang
 
     To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
-## Example
-
-The default call sequence for three data points and two groups with three columns each:
-
-```python
-np.array([
-    [0, 1, 2, 0, 1, 2],
-    [0, 1, 2, 0, 1, 2],
-    [0, 1, 2, 0, 1, 2]
-])
-```
+Example:
+    The default call sequence for three data points and two groups with three columns each:
+    
+    ```python
+    np.array([
+        [0, 1, 2, 0, 1, 2],
+        [0, 1, 2, 0, 1, 2],
+        [0, 1, 2, 0, 1, 2]
+    ])
+    ```
 """
 __pdoc__['SimulationContext.segment_mask'] = """Mask of whether a particular segment should be executed.
 
@@ -718,16 +714,15 @@ Broadcasts to the shape `(target_shape[0], group_lens.shape[0])`.
 !!! note
     To modify the array in place, make sure to build an array of the full shape.
 
-## Example
-
-Consider two groups with two columns each and the following activity mask:
-
-```python
-np.array([[ True, False], 
-          [False,  True]])
-```
-
-The first group is only executed in the first row and the second group is only executed in the second row.
+Example:
+    Consider two groups with two columns each and the following activity mask:
+    
+    ```python
+    np.array([[ True, False], 
+              [False,  True]])
+    ```
+    
+    The first group is only executed in the first row and the second group is only executed in the second row.
 """
 __pdoc__['SimulationContext.call_pre_segment'] = """Whether to call `pre_segment_func_nb` regardless of 
 `SimulationContext.segment_mask`."""
@@ -781,19 +776,18 @@ but usually it's `target_shape[0] * target_shape[1]`, meaning there is maximal o
 
 You can use `SimulationContext.last_oidx` to get the index of the latest filled order of each column.
 
-## Example
-
-Before filling, each order record looks like this:
-
-```python
-np.array([(-8070450532247928832, -8070450532247928832, 4, 0., 0., 0., 5764616306889786413)]
-```
-
-After filling, it becomes like this:
-
-```python
-np.array([(0, 0, 1, 50., 1., 0., 1)]
-```
+Example:
+    Before filling, each order record looks like this:
+    
+    ```python
+    np.array([(-8070450532247928832, -8070450532247928832, 4, 0., 0., 0., 5764616306889786413)]
+    ```
+    
+    After filling, it becomes like this:
+    
+    ```python
+    np.array([(0, 0, 1, 50., 1., 0., 1)]
+    ```
 """
 __pdoc__['SimulationContext.log_records'] = """Log records.
 
@@ -850,14 +844,12 @@ filled order price as the latest known price.
     Overriding `last_val_price` with NaN won't apply `SimulationContext.ffill_val_price`,
     so your entire group will become NaN.
 
-## Example
-
-Consider 10 units in column 1 and 20 units in column 2. The previous close of them is
-$40 and $50 respectively, which is also the default valuation price in the current row,
-available as `last_val_price` in `pre_segment_func_nb`. If both columns are in the same group 
-with cash sharing, the group is valued at $1400 before any `order_func_nb` is called, and can 
-be later accessed via `OrderContext.value_now`.
-
+Example:
+    Consider 10 units in column 1 and 20 units in column 2. The previous close of them is
+    $40 and $50 respectively, which is also the default valuation price in the current row,
+    available as `last_val_price` in `pre_segment_func_nb`. If both columns are in the same group 
+    with cash sharing, the group is valued at $1400 before any `order_func_nb` is called, and can 
+    be later accessed via `OrderContext.value_now`.
 """
 __pdoc__['SimulationContext.last_value'] = """Latest value per column or group with cash sharing.
 
@@ -892,11 +884,10 @@ __pdoc__['SimulationContext.last_oidx'] = """Index of the latest order record of
 
 Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
 
-## Example
-
-`last_oidx` of `np.array([1, 100, -1])` means the latest filled order is `order_records[1]` for the
-first column, `order_records[100]` for the second column, and no orders have been filled yet
-for the third column.
+Example:
+    `last_oidx` of `np.array([1, 100, -1])` means the latest filled order is `order_records[1]` for the
+    first column, `order_records[100]` for the second column, and no orders have been filled yet
+    for the third column.
 """
 __pdoc__['SimulationContext.last_lidx'] = """Index of the latest log record of each column.
 
@@ -925,44 +916,43 @@ re-calculated using `SimulationContext.last_val_price` after `pre_segment_func_n
 The position record is updated after successfully filling an order (after `order_func_nb` and
 before `post_order_func_nb`).
 
-## Example
-
-Consider a simulation that orders `order_size` for `order_price` and $1 fixed fees.
-Here's order info from `order_func_nb` and the updated position info from `post_order_func_nb`:
-
-```plaintext
-    order_size  order_price  id  col  size  entry_idx  entry_price  \\
-0          NaN            1  -1    0   1.0         13    14.000000   
-1          0.5            2   0    0   0.5          1     2.000000   
-2          1.0            3   0    0   1.5          1     2.666667   
-3          NaN            4   0    0   1.5          1     2.666667   
-4         -1.0            5   0    0   1.5          1     2.666667   
-5         -0.5            6   0    0   1.5          1     2.666667   
-6          NaN            7   0    0   1.5          1     2.666667   
-7         -0.5            8   1    0   0.5          7     8.000000   
-8         -1.0            9   1    0   1.5          7     8.666667   
-9          1.0           10   1    0   1.5          7     8.666667   
-10         0.5           11   1    0   1.5          7     8.666667   
-11         1.0           12   2    0   1.0         11    12.000000   
-12        -2.0           13   3    0   1.0         12    13.000000   
-13         2.0           14   4    0   1.0         13    14.000000   
-
-    entry_fees  exit_idx  exit_price  exit_fees   pnl    return  direction  status
-0          0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
-1          1.0        -1         NaN        0.0 -1.00 -1.000000          0       0
-2          2.0        -1         NaN        0.0 -1.50 -0.375000          0       0
-3          2.0        -1         NaN        0.0 -0.75 -0.187500          0       0
-4          2.0        -1    5.000000        1.0  0.50  0.125000          0       0
-5          2.0         5    5.333333        2.0  0.00  0.000000          0       1
-6          2.0         5    5.333333        2.0  0.00  0.000000          0       1
-7          1.0        -1         NaN        0.0 -1.00 -0.250000          1       0
-8          2.0        -1         NaN        0.0 -2.50 -0.192308          1       0
-9          2.0        -1   10.000000        1.0 -5.00 -0.384615          1       0
-10         2.0        10   10.333333        2.0 -6.50 -0.500000          1       1
-11         1.0        -1         NaN        0.0 -1.00 -0.083333          0       0
-12         0.5        -1         NaN        0.0 -0.50 -0.038462          1       0
-13         0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
-```
+Example:
+    Consider a simulation that orders `order_size` for `order_price` and $1 fixed fees.
+    Here's order info from `order_func_nb` and the updated position info from `post_order_func_nb`:
+    
+    ```plaintext
+        order_size  order_price  id  col  size  entry_idx  entry_price  \\
+    0          NaN            1  -1    0   1.0         13    14.000000   
+    1          0.5            2   0    0   0.5          1     2.000000   
+    2          1.0            3   0    0   1.5          1     2.666667   
+    3          NaN            4   0    0   1.5          1     2.666667   
+    4         -1.0            5   0    0   1.5          1     2.666667   
+    5         -0.5            6   0    0   1.5          1     2.666667   
+    6          NaN            7   0    0   1.5          1     2.666667   
+    7         -0.5            8   1    0   0.5          7     8.000000   
+    8         -1.0            9   1    0   1.5          7     8.666667   
+    9          1.0           10   1    0   1.5          7     8.666667   
+    10         0.5           11   1    0   1.5          7     8.666667   
+    11         1.0           12   2    0   1.0         11    12.000000   
+    12        -2.0           13   3    0   1.0         12    13.000000   
+    13         2.0           14   4    0   1.0         13    14.000000   
+    
+        entry_fees  exit_idx  exit_price  exit_fees   pnl    return  direction  status
+    0          0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
+    1          1.0        -1         NaN        0.0 -1.00 -1.000000          0       0
+    2          2.0        -1         NaN        0.0 -1.50 -0.375000          0       0
+    3          2.0        -1         NaN        0.0 -0.75 -0.187500          0       0
+    4          2.0        -1    5.000000        1.0  0.50  0.125000          0       0
+    5          2.0         5    5.333333        2.0  0.00  0.000000          0       1
+    6          2.0         5    5.333333        2.0  0.00  0.000000          0       1
+    7          1.0        -1         NaN        0.0 -1.00 -0.250000          1       0
+    8          2.0        -1         NaN        0.0 -2.50 -0.192308          1       0
+    9          2.0        -1   10.000000        1.0 -5.00 -0.384615          1       0
+    10         2.0        10   10.333333        2.0 -6.50 -0.500000          1       1
+    11         1.0        -1         NaN        0.0 -1.00 -0.083333          0       0
+    12         0.5        -1         NaN        0.0 -0.50 -0.038462          1       0
+    13         0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
+    ```
 """
 
 
@@ -1008,15 +998,14 @@ Contains all fields from `SimulationContext` plus fields describing the current 
 
 Passed to `pre_group_func_nb` and `post_group_func_nb`.
 
-## Example
-
-Consider a group of three columns, a group of two columns, and one more column:
-
-| group | group_len | from_col | to_col |
-| ----- | --------- | -------- | ------ |
-| 0     | 3         | 0        | 3      |
-| 1     | 2         | 3        | 5      |
-| 2     | 1         | 5        | 6      |
+Example:
+    Consider a group of three columns, a group of two columns, and one more column:
+    
+    | group | group_len | from_col | to_col |
+    | ----- | --------- | -------- | ------ |
+    | 0     | 3         | 0        | 3      |
+    | 1     | 2         | 3        | 5      |
+    | 2     | 1         | 5        | 6      |
 """
 for field in GroupContext._fields:
     if field in SimulationContext._fields:
@@ -1152,9 +1141,8 @@ call next. Processing goes always from left to right.
 
 You can use `pre_segment_func_nb` to override `call_seq_now`.
     
-## Example
-
-`[2, 0, 1]` would first call column 2, then 0, and finally 1.
+Example:
+    `[2, 0, 1]` would first call column 2, then 0, and finally 1.
 """
 
 

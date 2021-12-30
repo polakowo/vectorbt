@@ -19,7 +19,7 @@ By default, vectorbt searches for columns with names 'open', 'high', 'low', 'clo
 (case doesn't matter). You can change the naming either using `ohlcv.column_names` in
 `vectorbt._settings.settings`, or by providing `column_names` directly to the accessor.
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
@@ -57,7 +57,7 @@ Name: my_open1, dtype: float64
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `OHLCVDFAccessor.metrics`.
 
-```python-repl
+```pycon
 >>> ohlcv_acc.stats()
 Start                           0
 End                             4
@@ -80,11 +80,11 @@ Name: agg_func_mean, dtype: object
 
 `OHLCVDFAccessor` class has a single subplot based on `OHLCVDFAccessor.plot` (without volume):
 
-```python-repl
+```pycon
 >>> ohlcv_acc.plots(settings=dict(plot_type='candlestick'))
 ```
 
-![](/docs/img/ohlcv_plots.svg)
+![](/assets/images/ohlcv_plots.svg)
 """
 
 import numpy as np
@@ -288,15 +288,14 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import vectorbt as vbt
+            >>> vbt.YFData.download("BTC-USD").get().vbt.ohlcv.plot()
+            ```
 
-        >>> vbt.YFData.download("BTC-USD").get().vbt.ohlcv.plot()
-        ```
-
-        ![](/docs/img/ohlcv_plot.svg)
+            ![](/assets/images/ohlcv_plot.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

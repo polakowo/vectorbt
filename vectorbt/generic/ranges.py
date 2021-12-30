@@ -14,7 +14,7 @@ are 0 and 20 (not 19!) respectively.
     Be aware that if a range hasn't ended in a column, its `end_idx` will point at the latest index.
     Make sure to account for this when computing custom metrics involving duration.
 
-```python-repl
+```pycon
 >>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
@@ -47,7 +47,7 @@ Timedelta('74 days 00:00:00')
 
 Moreover, all generic accessors have a property `ranges` and a method `get_ranges`:
 
-```python-repl
+```pycon
 >>> # vectorbt.generic.accessors.GenericAccessor.ranges.coverage
 >>> fast_below_slow.vbt.ranges.coverage()
 0.35792349726775957
@@ -58,7 +58,7 @@ Moreover, all generic accessors have a property `ranges` and a method `get_range
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Ranges.metrics`.
 
-```python-repl
+```pycon
 >>> df = pd.DataFrame({
 ...     'a': [1, 2, np.nan, np.nan, 5, 6],
 ...     'b': [np.nan, 2, np.nan, 4, np.nan, 6]
@@ -82,7 +82,7 @@ Name: a, dtype: object
 
 `Ranges.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> ranges.stats(group_by=True)
 Start                                       0
 End                                         5
@@ -105,11 +105,11 @@ Name: group, dtype: object
 
 `Ranges` class has a single subplot based on `Ranges.plot`:
 
-```python-repl
+```pycon
 >>> ranges['a'].plots()
 ```
 
-![](/docs/img/ranges_plots.svg)
+![](/assets/images/ranges_plots.svg)
 """
 
 import numpy as np
@@ -436,19 +436,18 @@ class Ranges(Records):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbt as vbt
+            >>> from datetime import datetime, timedelta
+            >>> import pandas as pd
 
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> from datetime import datetime, timedelta
-        >>> import pandas as pd
+            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> vbt.Ranges.from_ts(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
+            ```
 
-        >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> vbt.Ranges.from_ts(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
-        ```
-
-        ![](/docs/img/ranges_plot.svg)
+            ![](/assets/images/ranges_plot.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']

@@ -188,30 +188,30 @@ def deep_substitute(obj: tp.Any,
         thus loosing the reference to the original. Make sure to do a deep or hybrid copy of the object
         before proceeding for consistent behavior, or disable `make_copy` to override the original in place.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import vectorbt as vbt
-
-    >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}))
-    100
-    >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}), {'key': 200})
-    200
-    >>> vbt.deep_substitute(vbt.Sub('$key$key'), {'key': 100})
-    100100
-    >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
-    100
-    >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100})
-    [100, '100100']
-    >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
-    True
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100'), {'key': 100})
-    True
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100', safe=False))
-    NameError: name 'key' is not defined
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100', safe=True))
-    <vectorbt.utils.template.RepEval at 0x7fe3ad2ab668>
-    ```"""
+        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}))
+        100
+        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}), {'key': 200})
+        200
+        >>> vbt.deep_substitute(vbt.Sub('$key$key'), {'key': 100})
+        100100
+        >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
+        100
+        >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100})
+        [100, '100100']
+        >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
+        True
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100'), {'key': 100})
+        True
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100', safe=False))
+        NameError: name 'key' is not defined
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100', safe=True))
+        <vectorbt.utils.template.RepEval at 0x7fe3ad2ab668>
+        ```
+    """
     if mapping is None:
         mapping = {}
     if not has_templates(obj):

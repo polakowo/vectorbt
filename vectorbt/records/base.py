@@ -44,7 +44,7 @@ which is impossible to represent in a matrix form without using complex data typ
 
 Consider the following example:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> from numba import njit
@@ -79,7 +79,7 @@ There are two ways to print records:
 
 * Raw dataframe that preserves field names and data types:
 
-```python-repl
+```pycon
 >>> records.records
    id  col  idx  some_field
 0   0    0    0        10.0
@@ -95,7 +95,7 @@ There are two ways to print records:
 
 * Readable dataframe that takes into consideration `Records.field_config`:
 
-```python-repl
+```pycon
 >>> records.records_readable
    Id Column Timestamp  some_field
 0   0      a         x        10.0
@@ -120,7 +120,7 @@ without conversion to the matrix form and wasting memory resources.
 
 * Use `Records.map_field` to map a record field:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field')
 <vectorbt.records.mapped_array.MappedArray at 0x7ff49bd31a58>
 
@@ -130,7 +130,7 @@ array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 
 * Use `Records.map` to map records using a custom function.
 
-```python-repl
+```pycon
 >>> @njit
 ... def power_map_nb(record, pow):
 ...     return record.some_field ** pow
@@ -144,7 +144,7 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 
 * Use `Records.map_array` to convert an array to `vectorbt.records.mapped_array.MappedArray`.
 
-```python-repl
+```pycon
 >>> records.map_array(records_arr['some_field'] ** 2)
 <vectorbt.records.mapped_array.MappedArray object at 0x7fe9bccf2978>
 
@@ -154,7 +154,7 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 
 * Use `Records.apply` to apply a function on each column/group:
 
-```python-repl
+```pycon
 >>> @njit
 ... def cumsum_apply_nb(records):
 ...     return np.cumsum(records.some_field)
@@ -176,7 +176,7 @@ Notice how cumsum resets at each column in the first example and at each group i
 
 Use `Records.apply_mask` to filter elements per column/group:
 
-```python-repl
+```pycon
 >>> mask = [True, False, True, False, True, False, True, False, True]
 >>> filtered_records = records.apply_mask(mask)
 >>> filtered_records.count()
@@ -199,7 +199,7 @@ There are multiple ways of define grouping:
 
 * When creating `Records`, pass `group_by` to `vectorbt.base.array_wrapper.ArrayWrapper`:
 
-```python-repl
+```pycon
 >>> group_by = np.array(['first', 'first', 'second'])
 >>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_records = vbt.Records(grouped_wrapper, records_arr)
@@ -212,7 +212,7 @@ dtype: float64
 
 * Regroup an existing `Records`:
 
-```python-repl
+```pycon
 >>> records.regroup(group_by).map_field('some_field').mean()
 first     12.5
 second    17.0
@@ -221,7 +221,7 @@ dtype: float64
 
 * Pass `group_by` directly to the mapping method:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field', group_by=group_by).mean()
 first     12.5
 second    17.0
@@ -230,7 +230,7 @@ dtype: float64
 
 * Pass `group_by` directly to the reducing method:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field').mean(group_by=group_by)
 a    11.0
 b    14.0
@@ -246,7 +246,7 @@ dtype: float64
 Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
 on a `Records` instance, which forwards indexing operation to each object with columns:
 
-```python-repl
+```pycon
 >>> records['a'].records
    id  col  idx  some_field
 0   0    0    0        10.0
@@ -291,7 +291,7 @@ instance to the disk with `Records.save` and load it with `Records.load`.
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Records.metrics`.
 
-```python-repl
+```pycon
 >>> records.stats(column='a')
 Start                          x
 End                            z
@@ -302,7 +302,7 @@ Name: a, dtype: object
 
 `Records.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> grouped_records.stats(column='first')
 Start                          x
 End                            z
@@ -327,7 +327,7 @@ or other properties, we can override `field_config` using `vectorbt.records.deco
 It will look for configs of all base classes and merge our config on top of them. This preserves
 any base class property that is not explicitly listed in our config.
 
-```python-repl
+```pycon
 >>> from vectorbt.records.decorators import override_field_config
 
 >>> my_dt = np.dtype([
@@ -370,7 +370,7 @@ array([0, 1, 0, 1])
 
 Alternatively, we can override the `_field_config` class attribute.
 
-```python-repl
+```pycon
 >>> @override_field_config
 ... class MyRecords(vbt.Records):
 ...     _field_config = dict(

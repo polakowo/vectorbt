@@ -16,24 +16,24 @@ def match_tags(tags: tp.MaybeIterable[str], in_tags: tp.MaybeIterable[str]) -> b
     If any tag is not an identifier, evaluates it as a boolean expression.
     All tags in `in_tags` should be identifiers.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> from vectorbt.utils.tags import match_tags
 
-    ```python-repl
-    >>> from vectorbt.utils.tags import match_tags
-
-    >>> match_tags('hello', 'hello')
-    True
-    >>> match_tags('hello', 'world')
-    False
-    >>> match_tags(['hello', 'world'], 'world')
-    True
-    >>> match_tags('hello', ['hello', 'world'])
-    True
-    >>> match_tags('hello and world', ['hello', 'world'])
-    True
-    >>> match_tags('hello and not world', ['hello', 'world'])
-    False
-    ```"""
+        >>> match_tags('hello', 'hello')
+        True
+        >>> match_tags('hello', 'world')
+        False
+        >>> match_tags(['hello', 'world'], 'world')
+        True
+        >>> match_tags('hello', ['hello', 'world'])
+        True
+        >>> match_tags('hello and world', ['hello', 'world'])
+        True
+        >>> match_tags('hello and not world', ['hello', 'world'])
+        False
+        ```
+    """
     if isinstance(tags, str):
         tags = [tags]
     if isinstance(in_tags, str):

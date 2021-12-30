@@ -8,7 +8,7 @@ Methods can be accessed as follows:
 * `GenericSRAccessor` -> `pd.Series.vbt.*`
 * `GenericDFAccessor` -> `pd.DataFrame.vbt.*`
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
@@ -31,7 +31,7 @@ specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.return
 
 Run for the examples below:
     
-```python-repl
+```pycon
 >>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
@@ -78,7 +78,7 @@ dtype: int64
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `GenericAccessor.metrics`.
 
-```python-repl
+```pycon
 >>> df2 = pd.DataFrame({
 ...     'a': [np.nan, 2, 3],
 ...     'b': [4, np.nan, 5],
@@ -104,7 +104,7 @@ Name: a, dtype: object
 
 Mapping can be set both in `GenericAccessor` (preferred) and `GenericAccessor.stats`:
 
-```python-repl
+```pycon
 >>> mapping = {x: 'test_' + str(x) for x in pd.unique(df2.values.flatten())}
 >>> df2.vbt(freq='d', mapping=mapping).stats(column='a')
 Start                                   x
@@ -140,7 +140,7 @@ Name: a, dtype: object
 
 Selecting a column before calling `stats` will consider uniques from this column only:
 
-```python-repl
+```pycon
 >>> df2['a'].vbt(freq='d', mapping=mapping).stats()
 Start                                   x
 End                                     z
@@ -171,7 +171,7 @@ Name: a, dtype: object
 
 `GenericAccessor.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> df2.vbt(freq='d').stats(column=0, group_by=[0, 0, 1])
 Start                      x
 End                        z
@@ -194,11 +194,11 @@ Name: 0, dtype: object
 
 `GenericAccessor` class has a single subplot based on `GenericAccessor.plot`:
 
-```python-repl
+```pycon
 >>> df2.vbt.plots()
 ```
 
-![](/docs/img/generic_plots.svg)
+![](/assets/images/generic_plots.svg)
 """
 
 import warnings
@@ -444,27 +444,26 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """See `vectorbt.generic.nb.rolling_apply_nb` and
         `vectorbt.generic.nb.rolling_matrix_apply_nb` for `on_matrix=True`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+            >>> df.vbt.rolling_apply(3, mean_nb)
+                          a    b         c
+            2020-01-01  1.0  5.0  1.000000
+            2020-01-02  1.5  4.5  1.500000
+            2020-01-03  2.0  4.0  2.000000
+            2020-01-04  3.0  3.0  2.333333
+            2020-01-05  4.0  2.0  2.000000
 
-        ```python-repl
-        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-        >>> df.vbt.rolling_apply(3, mean_nb)
-                      a    b         c
-        2020-01-01  1.0  5.0  1.000000
-        2020-01-02  1.5  4.5  1.500000
-        2020-01-03  2.0  4.0  2.000000
-        2020-01-04  3.0  3.0  2.333333
-        2020-01-05  4.0  2.0  2.000000
-
-        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-        >>> df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True)
-                           a         b         c
-        2020-01-01  2.333333  2.333333  2.333333
-        2020-01-02  2.500000  2.500000  2.500000
-        2020-01-03  2.666667  2.666667  2.666667
-        2020-01-04  2.777778  2.777778  2.777778
-        2020-01-05  2.666667  2.666667  2.666667
-        ```
+            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+            >>> df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True)
+                               a         b         c
+            2020-01-01  2.333333  2.333333  2.333333
+            2020-01-02  2.500000  2.500000  2.500000
+            2020-01-03  2.666667  2.666667  2.666667
+            2020-01-04  2.777778  2.777778  2.777778
+            2020-01-05  2.666667  2.666667  2.666667
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
 
@@ -480,27 +479,26 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """See `vectorbt.generic.nb.expanding_apply_nb` and
         `vectorbt.generic.nb.expanding_matrix_apply_nb` for `on_matrix=True`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+            >>> df.vbt.expanding_apply(mean_nb)
+                          a    b    c
+            2020-01-01  1.0  5.0  1.0
+            2020-01-02  1.5  4.5  1.5
+            2020-01-03  2.0  4.0  2.0
+            2020-01-04  2.5  3.5  2.0
+            2020-01-05  3.0  3.0  1.8
 
-        ```python-repl
-        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-        >>> df.vbt.expanding_apply(mean_nb)
-                      a    b    c
-        2020-01-01  1.0  5.0  1.0
-        2020-01-02  1.5  4.5  1.5
-        2020-01-03  2.0  4.0  2.0
-        2020-01-04  2.5  3.5  2.0
-        2020-01-05  3.0  3.0  1.8
-
-        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-        >>> df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True)
-                           a         b         c
-        2020-01-01  2.333333  2.333333  2.333333
-        2020-01-02  2.500000  2.500000  2.500000
-        2020-01-03  2.666667  2.666667  2.666667
-        2020-01-04  2.666667  2.666667  2.666667
-        2020-01-05  2.600000  2.600000  2.600000
-        ```
+            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+            >>> df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True)
+                               a         b         c
+            2020-01-01  2.333333  2.333333  2.333333
+            2020-01-02  2.500000  2.500000  2.500000
+            2020-01-03  2.666667  2.666667  2.666667
+            2020-01-04  2.666667  2.666667  2.666667
+            2020-01-05  2.600000  2.600000  2.600000
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
 
@@ -519,23 +517,22 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         For `by`, see `pd.DataFrame.groupby`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
+                 a    b    c
+            1  1.5  4.5  1.5
+            2  3.5  2.5  2.5
+            3  5.0  1.0  1.0
 
-        ```python-repl
-        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-        >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
-             a    b    c
-        1  1.5  4.5  1.5
-        2  3.5  2.5  2.5
-        3  5.0  1.0  1.0
-
-        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-        >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_matrix_nb, on_matrix=True)
-                  a         b         c
-        1  2.500000  2.500000  2.500000
-        2  2.833333  2.833333  2.833333
-        3  2.333333  2.333333  2.333333
-        ```
+            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_matrix_nb, on_matrix=True)
+                      a         b         c
+            1  2.500000  2.500000  2.500000
+            2  2.833333  2.833333  2.833333
+            3  2.333333  2.333333  2.333333
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
 
@@ -559,23 +556,22 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         For `freq`, see `pd.DataFrame.resample`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+            >>> df.vbt.resample_apply('2d', mean_nb)
+                          a    b    c
+            2020-01-01  1.5  4.5  1.5
+            2020-01-03  3.5  2.5  2.5
+            2020-01-05  5.0  1.0  1.0
 
-        ```python-repl
-        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-        >>> df.vbt.resample_apply('2d', mean_nb)
-                      a    b    c
-        2020-01-01  1.5  4.5  1.5
-        2020-01-03  3.5  2.5  2.5
-        2020-01-05  5.0  1.0  1.0
-
-        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-        >>> df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True)
-                           a         b         c
-        2020-01-01  2.500000  2.500000  2.500000
-        2020-01-03  2.833333  2.833333  2.833333
-        2020-01-05  2.333333  2.333333  2.333333
-        ```
+            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+            >>> df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True)
+                               a         b         c
+            2020-01-01  2.500000  2.500000  2.500000
+            2020-01-03  2.833333  2.833333  2.833333
+            2020-01-05  2.333333  2.333333  2.333333
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
 
@@ -602,18 +598,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.applymap_nb`.
 
-        ## Example
-
-        ```python-repl
-        >>> multiply_nb = njit(lambda i, col, a: a ** 2)
-        >>> df.vbt.applymap(multiply_nb)
-                       a     b    c
-        2020-01-01   1.0  25.0  1.0
-        2020-01-02   4.0  16.0  4.0
-        2020-01-03   9.0   9.0  9.0
-        2020-01-04  16.0   4.0  4.0
-        2020-01-05  25.0   1.0  1.0
-        ```
+        Usage:
+            ```pycon
+            >>> multiply_nb = njit(lambda i, col, a: a ** 2)
+            >>> df.vbt.applymap(multiply_nb)
+                           a     b    c
+            2020-01-01   1.0  25.0  1.0
+            2020-01-02   4.0  16.0  4.0
+            2020-01-03   9.0   9.0  9.0
+            2020-01-04  16.0   4.0  4.0
+            2020-01-05  25.0   1.0  1.0
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
 
@@ -624,18 +619,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.filter_nb`.
 
-        ## Example
-
-        ```python-repl
-        >>> greater_nb = njit(lambda i, col, a: a > 2)
-        >>> df.vbt.filter(greater_nb)
-                      a    b    c
-        2020-01-01  NaN  5.0  NaN
-        2020-01-02  NaN  4.0  NaN
-        2020-01-03  3.0  3.0  3.0
-        2020-01-04  4.0  NaN  NaN
-        2020-01-05  5.0  NaN  NaN
-        ```
+        Usage:
+            ```pycon
+            >>> greater_nb = njit(lambda i, col, a: a > 2)
+            >>> df.vbt.filter(greater_nb)
+                          a    b    c
+            2020-01-01  NaN  5.0  NaN
+            2020-01-02  NaN  4.0  NaN
+            2020-01-03  3.0  3.0  3.0
+            2020-01-04  4.0  NaN  NaN
+            2020-01-05  5.0  NaN  NaN
+            ```
         """
         checks.assert_numba_func(filter_func_nb)
 
@@ -647,17 +641,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                          wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
 
-        ## Example
-
-        ```python-repl
-        >>> greater_nb = njit(lambda col, a: a[a > 2])
-        >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-        >>> df.vbt.apply_and_reduce(greater_nb, mean_nb)
-        a    4.0
-        b    4.0
-        c    3.0
-        dtype: float64
-        ```
+        Usage:
+            ```pycon
+            >>> greater_nb = njit(lambda col, a: a[a > 2])
+            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+            >>> df.vbt.apply_and_reduce(greater_nb, mean_nb)
+            a    4.0
+            b    4.0
+            c    3.0
+            dtype: float64
+            ```
         """
         checks.assert_numba_func(apply_func_nb)
         checks.assert_numba_func(reduce_func_nb)
@@ -699,49 +692,48 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         Set `returns_idx` to True if values returned by `reduce_func_nb` are indices/positions.
         Set `to_index` to False to return raw positions instead of labels.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+            >>> df.vbt.reduce(mean_nb)
+            a    3.0
+            b    3.0
+            c    1.8
+            dtype: float64
 
-        ```python-repl
-        >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-        >>> df.vbt.reduce(mean_nb)
-        a    3.0
-        b    3.0
-        c    1.8
-        dtype: float64
+            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+            >>> df.vbt.reduce(argmax_nb, returns_idx=True)
+            a   2020-01-05
+            b   2020-01-01
+            c   2020-01-03
+            dtype: datetime64[ns]
 
-        >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-        >>> df.vbt.reduce(argmax_nb, returns_idx=True)
-        a   2020-01-05
-        b   2020-01-01
-        c   2020-01-03
-        dtype: datetime64[ns]
+            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+            >>> df.vbt.reduce(argmax_nb, returns_idx=True, to_index=False)
+            a    4
+            b    0
+            c    2
+            dtype: int64
 
-        >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-        >>> df.vbt.reduce(argmax_nb, returns_idx=True, to_index=False)
-        a    4
-        b    0
-        c    2
-        dtype: int64
+            >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
+            >>> df.vbt.reduce(min_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=['min', 'max']))
+                   a    b    c
+            min  1.0  1.0  1.0
+            max  5.0  5.0  3.0
 
-        >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-        >>> df.vbt.reduce(min_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=['min', 'max']))
-               a    b    c
-        min  1.0  1.0  1.0
-        max  5.0  5.0  3.0
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> df.vbt.reduce(mean_nb, group_by=group_by)
+            group
+            first     3.0
+            second    1.8
+            dtype: float64
 
-        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-        >>> df.vbt.reduce(mean_nb, group_by=group_by)
-        group
-        first     3.0
-        second    1.8
-        dtype: float64
-
-        >>> df.vbt.reduce(min_max_nb, name_or_index=['min', 'max'],
-        ...     returns_array=True, group_by=group_by)
-        group  first  second
-        min      1.0     1.0
-        max      5.0     3.0
-        ```
+            >>> df.vbt.reduce(min_max_nb, name_or_index=['min', 'max'],
+            ...     returns_array=True, group_by=group_by)
+            group  first  second
+            min      1.0     1.0
+            max      5.0     3.0
+            ```
         """
         checks.assert_numba_func(reduce_func_nb)
 
@@ -925,20 +917,19 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         For `percentiles`, see `pd.DataFrame.describe`.
 
-        ## Example
-
-        ```python-repl
-        >>> df.vbt.describe()
-                      a         b        c
-        count  5.000000  5.000000  5.00000
-        mean   3.000000  3.000000  1.80000
-        std    1.581139  1.581139  0.83666
-        min    1.000000  1.000000  1.00000
-        25%    2.000000  2.000000  1.00000
-        50%    3.000000  3.000000  2.00000
-        75%    4.000000  4.000000  2.00000
-        max    5.000000  5.000000  3.00000
-        ```
+        Usage:
+            ```pycon
+            >>> df.vbt.describe()
+                          a         b        c
+            count  5.000000  5.000000  5.00000
+            mean   3.000000  3.000000  1.80000
+            std    1.581139  1.581139  0.83666
+            min    1.000000  1.000000  1.00000
+            25%    2.000000  2.000000  1.00000
+            50%    3.000000  3.000000  2.00000
+            75%    4.000000  4.000000  2.00000
+            max    5.000000  5.000000  3.00000
+            ```
         """
         if percentiles is not None:
             percentiles = reshape_fns.to_1d_array(percentiles)
@@ -1240,30 +1231,31 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbt.generic.nb.crossed_above_nb`.
 
-        ## Example
-        ```python-repl
-        >>> df['b'].vbt.crossed_above(df['c'])
-        2020-01-01    False
-        2020-01-02    False
-        2020-01-03    False
-        2020-01-04    False
-        2020-01-05    False
-        dtype: bool
-        >>> df['a'].vbt.crossed_above(df['b'])
-        2020-01-01    False
-        2020-01-02    False
-        2020-01-03    False
-        2020-01-04     True
-        2020-01-05    False
-        dtype: bool
-        >>> df['a'].vbt.crossed_above(df['b'], wait=1)
-        2020-01-01    False
-        2020-01-02    False
-        2020-01-03    False
-        2020-01-04    False
-        2020-01-05     True
-        dtype: bool
-        ```"""
+        Usage:
+            ```pycon
+            >>> df['b'].vbt.crossed_above(df['c'])
+            2020-01-01    False
+            2020-01-02    False
+            2020-01-03    False
+            2020-01-04    False
+            2020-01-05    False
+            dtype: bool
+            >>> df['a'].vbt.crossed_above(df['b'])
+            2020-01-01    False
+            2020-01-02    False
+            2020-01-03    False
+            2020-01-04     True
+            2020-01-05    False
+            dtype: bool
+            >>> df['a'].vbt.crossed_above(df['b'], wait=1)
+            2020-01-01    False
+            2020-01-02    False
+            2020-01-03    False
+            2020-01-04    False
+            2020-01-05     True
+            dtype: bool
+            ```
+        """
         self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         out = nb.crossed_above_nb(reshape_fns.to_2d_array(self_obj), reshape_fns.to_2d_array(other_obj), wait=wait)
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
@@ -1292,28 +1284,28 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         `**kwargs` are passed to the `transform` or `fit_transform` method.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> from sklearn.preprocessing import MinMaxScaler
 
-        ```python-repl
-        >>> from sklearn.preprocessing import MinMaxScaler
+            >>> df.vbt.transform(MinMaxScaler((-1, 1)))
+                          a    b    c
+            2020-01-01 -1.0  1.0 -1.0
+            2020-01-02 -0.5  0.5  0.0
+            2020-01-03  0.0  0.0  1.0
+            2020-01-04  0.5 -0.5  0.0
+            2020-01-05  1.0 -1.0 -1.0
 
-        >>> df.vbt.transform(MinMaxScaler((-1, 1)))
-                      a    b    c
-        2020-01-01 -1.0  1.0 -1.0
-        2020-01-02 -0.5  0.5  0.0
-        2020-01-03  0.0  0.0  1.0
-        2020-01-04  0.5 -0.5  0.0
-        2020-01-05  1.0 -1.0 -1.0
-
-        >>> fitted_scaler = MinMaxScaler((-1, 1)).fit(np.array([[2], [4]]))
-        >>> df.vbt.transform(fitted_scaler)
-                      a    b    c
-        2020-01-01 -2.0  2.0 -2.0
-        2020-01-02 -1.0  1.0 -1.0
-        2020-01-03  0.0  0.0  0.0
-        2020-01-04  1.0 -1.0 -1.0
-        2020-01-05  2.0 -2.0 -2.0
-        ```"""
+            >>> fitted_scaler = MinMaxScaler((-1, 1)).fit(np.array([[2], [4]]))
+            >>> df.vbt.transform(fitted_scaler)
+                          a    b    c
+            2020-01-01 -2.0  2.0 -2.0
+            2020-01-02 -1.0  1.0 -1.0
+            2020-01-03  0.0  0.0  0.0
+            2020-01-04  1.0 -1.0 -1.0
+            2020-01-05  2.0 -2.0 -2.0
+            ```
+        """
         is_fitted = True
         try:
             check_is_fitted(transformer)
@@ -1359,41 +1351,40 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             The datetime-like format of the index will be lost as result of this operation.
             Make sure to store the index metadata such as frequency information beforehand.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> from sklearn.model_selection import TimeSeriesSplit
 
-        ```python-repl
-        >>> from sklearn.model_selection import TimeSeriesSplit
+            >>> splitter = TimeSeriesSplit(n_splits=3)
+            >>> (train_df, train_indexes), (test_df, test_indexes) = sr.vbt.split(splitter)
 
-        >>> splitter = TimeSeriesSplit(n_splits=3)
-        >>> (train_df, train_indexes), (test_df, test_indexes) = sr.vbt.split(splitter)
+            >>> train_df
+            split_idx    0    1  2
+            0          0.0  0.0  0
+            1          1.0  1.0  1
+            2          2.0  2.0  2
+            3          3.0  3.0  3
+            4          NaN  4.0  4
+            5          NaN  5.0  5
+            6          NaN  NaN  6
+            7          NaN  NaN  7
+            >>> train_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_1'),
+             DatetimeIndex(['2020-01-01', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_2')]
+            >>> test_df
+            split_idx  0  1  2
+            0          4  6  8
+            1          5  7  9
+            >>> test_indexes
+            [DatetimeIndex(['2020-01-05', '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-07', '2020-01-08'], dtype='datetime64[ns]', name='split_1'),
+             DatetimeIndex(['2020-01-09', '2020-01-10'], dtype='datetime64[ns]', name='split_2')]
 
-        >>> train_df
-        split_idx    0    1  2
-        0          0.0  0.0  0
-        1          1.0  1.0  1
-        2          2.0  2.0  2
-        3          3.0  3.0  3
-        4          NaN  4.0  4
-        5          NaN  5.0  5
-        6          NaN  NaN  6
-        7          NaN  NaN  7
-        >>> train_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_1'),
-         DatetimeIndex(['2020-01-01', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_2')]
-        >>> test_df
-        split_idx  0  1  2
-        0          4  6  8
-        1          5  7  9
-        >>> test_indexes
-        [DatetimeIndex(['2020-01-05', '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-07', '2020-01-08'], dtype='datetime64[ns]', name='split_1'),
-         DatetimeIndex(['2020-01-09', '2020-01-10'], dtype='datetime64[ns]', name='split_2')]
+            >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
+            ```
 
-        >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
-        ```
-
-        ![](/docs/img/split_plot.svg)
+            ![](/assets/images/split_plot.svg)
         """
         total_range_sr = pd.Series(np.arange(len(self.wrapper.index)), index=self.wrapper.index)
         set_ranges = list(splitter.split(total_range_sr, **kwargs))
@@ -1463,148 +1454,145 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
     def range_split(self, **kwargs) -> SplitOutputT:
         """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.RangeSplitter`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> range_df, range_indexes = sr.vbt.range_split(n=2)
+            >>> range_df
+            split_idx  0  1
+            0          0  5
+            1          1  6
+            2          2  7
+            3          3  8
+            4          4  9
+            >>> range_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-06', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_1')]
 
-        ```python-repl
-        >>> range_df, range_indexes = sr.vbt.range_split(n=2)
-        >>> range_df
-        split_idx  0  1
-        0          0  5
-        1          1  6
-        2          2  7
-        3          3  8
-        4          4  9
-        >>> range_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-06', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_1')]
+            >>> range_df, range_indexes = sr.vbt.range_split(range_len=4)
+            >>> range_df
+            split_idx  0  1  2  3  4  5  6
+            0          0  1  2  3  4  5  6
+            1          1  2  3  4  5  6  7
+            2          2  3  4  5  6  7  8
+            3          3  4  5  6  7  8  9
+            >>> range_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1'),
+             DatetimeIndex(['2020-01-03', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_2'),
+             DatetimeIndex(['2020-01-04', ..., '2020-01-07'], dtype='datetime64[ns]', name='split_3'),
+             DatetimeIndex(['2020-01-05', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_4'),
+             DatetimeIndex(['2020-01-06', ..., '2020-01-09'], dtype='datetime64[ns]', name='split_5'),
+             DatetimeIndex(['2020-01-07', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_6')]
 
-        >>> range_df, range_indexes = sr.vbt.range_split(range_len=4)
-        >>> range_df
-        split_idx  0  1  2  3  4  5  6
-        0          0  1  2  3  4  5  6
-        1          1  2  3  4  5  6  7
-        2          2  3  4  5  6  7  8
-        3          3  4  5  6  7  8  9
-        >>> range_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1'),
-         DatetimeIndex(['2020-01-03', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_2'),
-         DatetimeIndex(['2020-01-04', ..., '2020-01-07'], dtype='datetime64[ns]', name='split_3'),
-         DatetimeIndex(['2020-01-05', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_4'),
-         DatetimeIndex(['2020-01-06', ..., '2020-01-09'], dtype='datetime64[ns]', name='split_5'),
-         DatetimeIndex(['2020-01-07', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_6')]
+            >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0, 2], end_idxs=[5, 7])
+            >>> range_df
+            split_idx  0  1
+            0          0  2
+            1          1  3
+            2          2  4
+            3          3  5
+            4          4  6
+            5          5  7
+            >>> range_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-03', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_1')]
 
-        >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0, 2], end_idxs=[5, 7])
-        >>> range_df
-        split_idx  0  1
-        0          0  2
-        1          1  3
-        2          2  4
-        3          3  5
-        4          4  6
-        5          5  7
-        >>> range_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-03', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_1')]
+            >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0], end_idxs=[2, 3, 4])
+            >>> range_df
+            split_idx    0    1  2
+            0          0.0  0.0  0
+            1          1.0  1.0  1
+            2          2.0  2.0  2
+            3          NaN  3.0  3
+            4          NaN  NaN  4
+            >>> range_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-03'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_1'),
+             DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_2')]
 
-        >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0], end_idxs=[2, 3, 4])
-        >>> range_df
-        split_idx    0    1  2
-        0          0.0  0.0  0
-        1          1.0  1.0  1
-        2          2.0  2.0  2
-        3          NaN  3.0  3
-        4          NaN  NaN  4
-        >>> range_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-03'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_1'),
-         DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_2')]
+            >>> range_df, range_indexes = sr.vbt.range_split(
+            ...     start_idxs=pd.Index(['2020-01-01', '2020-01-02']),
+            ...     end_idxs=pd.Index(['2020-01-04', '2020-01-05'])
+            ... )
+            >>> range_df
+            split_idx  0  1
+            0          0  1
+            1          1  2
+            2          2  3
+            3          3  4
+            >>> range_indexes
+            [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+             DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1')]
 
-        >>> range_df, range_indexes = sr.vbt.range_split(
-        ...     start_idxs=pd.Index(['2020-01-01', '2020-01-02']),
-        ...     end_idxs=pd.Index(['2020-01-04', '2020-01-05'])
-        ... )
-        >>> range_df
-        split_idx  0  1
-        0          0  1
-        1          1  2
-        2          2  3
-        3          3  4
-        >>> range_indexes
-        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
-         DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1')]
+             >>> sr.vbt.range_split(
+             ...    start_idxs=pd.Index(['2020-01-01', '2020-01-02', '2020-01-01']),
+             ...    end_idxs=pd.Index(['2020-01-08', '2020-01-04', '2020-01-07']),
+             ...    plot=True
+             ... )
+            ```
 
-         >>> sr.vbt.range_split(
-         ...    start_idxs=pd.Index(['2020-01-01', '2020-01-02', '2020-01-01']),
-         ...    end_idxs=pd.Index(['2020-01-08', '2020-01-04', '2020-01-07']),
-         ...    plot=True
-         ... )
-        ```
-
-        ![](/docs/img/range_split_plot.svg)
+            ![](/assets/images/range_split_plot.svg)
         """
         return self.split(RangeSplitter(), **kwargs)
 
     def rolling_split(self, **kwargs) -> SplitOutputT:
         """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.RollingSplitter`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> train_set, valid_set, test_set = sr.vbt.rolling_split(
+            ...     window_len=5, set_lens=(1, 1), left_to_right=False)
+            >>> train_set[0]
+            split_idx  0  1  2  3  4  5
+            0          0  1  2  3  4  5
+            1          1  2  3  4  5  6
+            2          2  3  4  5  6  7
+            >>> valid_set[0]
+            split_idx  0  1  2  3  4  5
+            0          3  4  5  6  7  8
+            >>> test_set[0]
+            split_idx  0  1  2  3  4  5
+            0          4  5  6  7  8  9
 
-        ```python-repl
-        >>> train_set, valid_set, test_set = sr.vbt.rolling_split(
-        ...     window_len=5, set_lens=(1, 1), left_to_right=False)
-        >>> train_set[0]
-        split_idx  0  1  2  3  4  5
-        0          0  1  2  3  4  5
-        1          1  2  3  4  5  6
-        2          2  3  4  5  6  7
-        >>> valid_set[0]
-        split_idx  0  1  2  3  4  5
-        0          3  4  5  6  7  8
-        >>> test_set[0]
-        split_idx  0  1  2  3  4  5
-        0          4  5  6  7  8  9
+            >>> sr.vbt.rolling_split(
+            ...     window_len=5, set_lens=(1, 1), left_to_right=False,
+            ...     plot=True, trace_names=['train', 'valid', 'test'])
+            ```
 
-        >>> sr.vbt.rolling_split(
-        ...     window_len=5, set_lens=(1, 1), left_to_right=False,
-        ...     plot=True, trace_names=['train', 'valid', 'test'])
-        ```
-
-        ![](/docs/img/rolling_split_plot.svg)
+            ![](/assets/images/rolling_split_plot.svg)
         """
         return self.split(RollingSplitter(), **kwargs)
 
     def expanding_split(self, **kwargs) -> SplitOutputT:
         """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.ExpandingSplitter`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> train_set, valid_set, test_set = sr.vbt.expanding_split(
+            ...     n=5, set_lens=(1, 1), min_len=3, left_to_right=False)
+            >>> train_set[0]
+            split_idx    0    1    2    3    4    5    6  7
+            0          0.0  0.0  0.0  0.0  0.0  0.0  0.0  0
+            1          NaN  1.0  1.0  1.0  1.0  1.0  1.0  1
+            2          NaN  NaN  2.0  2.0  2.0  2.0  2.0  2
+            3          NaN  NaN  NaN  3.0  3.0  3.0  3.0  3
+            4          NaN  NaN  NaN  NaN  4.0  4.0  4.0  4
+            5          NaN  NaN  NaN  NaN  NaN  5.0  5.0  5
+            6          NaN  NaN  NaN  NaN  NaN  NaN  6.0  6
+            7          NaN  NaN  NaN  NaN  NaN  NaN  NaN  7
+            >>> valid_set[0]
+            split_idx  0  1  2  3  4  5  6  7
+            0          1  2  3  4  5  6  7  8
+            >>> test_set[0]
+            split_idx  0  1  2  3  4  5  6  7
+            0          2  3  4  5  6  7  8  9
 
-        ```python-repl
-        >>> train_set, valid_set, test_set = sr.vbt.expanding_split(
-        ...     n=5, set_lens=(1, 1), min_len=3, left_to_right=False)
-        >>> train_set[0]
-        split_idx    0    1    2    3    4    5    6  7
-        0          0.0  0.0  0.0  0.0  0.0  0.0  0.0  0
-        1          NaN  1.0  1.0  1.0  1.0  1.0  1.0  1
-        2          NaN  NaN  2.0  2.0  2.0  2.0  2.0  2
-        3          NaN  NaN  NaN  3.0  3.0  3.0  3.0  3
-        4          NaN  NaN  NaN  NaN  4.0  4.0  4.0  4
-        5          NaN  NaN  NaN  NaN  NaN  5.0  5.0  5
-        6          NaN  NaN  NaN  NaN  NaN  NaN  6.0  6
-        7          NaN  NaN  NaN  NaN  NaN  NaN  NaN  7
-        >>> valid_set[0]
-        split_idx  0  1  2  3  4  5  6  7
-        0          1  2  3  4  5  6  7  8
-        >>> test_set[0]
-        split_idx  0  1  2  3  4  5  6  7
-        0          2  3  4  5  6  7  8  9
+            >>> sr.vbt.expanding_split(
+            ...     set_lens=(1, 1), min_len=3, left_to_right=False,
+            ...     plot=True, trace_names=['train', 'valid', 'test'])
+            ```
 
-        >>> sr.vbt.expanding_split(
-        ...     set_lens=(1, 1), min_len=3, left_to_right=False,
-        ...     plot=True, trace_names=['train', 'valid', 'test'])
-        ```
-
-        ![](/docs/img/expanding_split_plot.svg)
+            ![](/assets/images/expanding_split_plot.svg)
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
@@ -1617,13 +1605,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
              **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Scatter` and return the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.plot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.plot()
-        ```
-
-        ![](/docs/img/df_plot.svg)
+            ![](/assets/images/df_plot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1643,26 +1630,24 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
     def lineplot(self, **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """`GenericAccessor.plot` with 'lines' mode.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.lineplot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.lineplot()
-        ```
-
-        ![](/docs/img/df_lineplot.svg)
+            ![](/assets/images/df_lineplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
 
     def scatterplot(self, **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """`GenericAccessor.plot` with 'markers' mode.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.scatterplot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.scatterplot()
-        ```
-
-        ![](/docs/img/df_scatterplot.svg)
+            ![](/assets/images/df_scatterplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='markers')), kwargs))
 
@@ -1673,13 +1658,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 **kwargs) -> tp.Union[tp.BaseFigure, plotting.Bar]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Bar` and return the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.barplot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.barplot()
-        ```
-
-        ![](/docs/img/df_barplot.svg)
+            ![](/assets/images/df_barplot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1703,13 +1687,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                  **kwargs) -> tp.Union[tp.BaseFigure, plotting.Histogram]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Histogram` and return the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.histplot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.histplot()
-        ```
-
-        ![](/docs/img/df_histplot.svg)
+            ![](/assets/images/df_histplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
@@ -1733,13 +1716,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 **kwargs) -> tp.Union[tp.BaseFigure, plotting.Box]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Box` and return the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df.vbt.boxplot()
+            ```
 
-        ```python-repl
-        >>> df.vbt.boxplot()
-        ```
-
-        ![](/docs/img/df_boxplot.svg)
+            ![](/assets/images/df_boxplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
@@ -1847,13 +1829,12 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df['a'].vbt.plot_against(df['b'])
+            ```
 
-        ```python-repl
-        >>> df['a'].vbt.plot_against(df['b'])
-        ```
-
-        ![](/docs/img/sr_plot_against.svg)
+            ![](/assets/images/sr_plot_against.svg)
         """
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1978,13 +1959,12 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df['a'].vbt.overlay_with_heatmap(df['b'])
+            ```
 
-        ```python-repl
-        >>> df['a'].vbt.overlay_with_heatmap(df['b'])
-        ```
-
-        ![](/docs/img/sr_overlay_with_heatmap.svg)
+            ![](/assets/images/sr_overlay_with_heatmap.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
@@ -2035,51 +2015,50 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Creates `vectorbt.generic.plotting.Heatmap` and returns the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1),
+            ...     (2, 2),
+            ...     (3, 3)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1    0
+            2  2    1
+            3  3    2
+            dtype: int64
 
-        ```python-repl
-        >>> multi_index = pd.MultiIndex.from_tuples([
-        ...     (1, 1),
-        ...     (2, 2),
-        ...     (3, 3)
-        ... ])
-        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-        >>> sr
-        1  1    0
-        2  2    1
-        3  3    2
-        dtype: int64
+            >>> sr.vbt.heatmap()
+            ```
 
-        >>> sr.vbt.heatmap()
-        ```
+            ![](/assets/images/sr_heatmap.svg)
 
-        ![](/docs/img/sr_heatmap.svg)
+            * Using one level as a slider:
 
-        Using one level as a slider:
+            ```pycon
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1, 1),
+            ...     (1, 2, 2),
+            ...     (1, 3, 3),
+            ...     (2, 3, 3),
+            ...     (2, 2, 2),
+            ...     (2, 1, 1)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1  1    0
+               2  2    1
+               3  3    2
+            2  3  3    3
+               2  2    4
+               1  1    5
+            dtype: int64
 
-        ```python-repl
-        >>> multi_index = pd.MultiIndex.from_tuples([
-        ...     (1, 1, 1),
-        ...     (1, 2, 2),
-        ...     (1, 3, 3),
-        ...     (2, 3, 3),
-        ...     (2, 2, 2),
-        ...     (2, 1, 1)
-        ... ])
-        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-        >>> sr
-        1  1  1    0
-           2  2    1
-           3  3    2
-        2  3  3    3
-           2  2    4
-           1  1    5
-        dtype: int64
+            >>> sr.vbt.heatmap(slider_level=0)
+            ```
 
-        >>> sr.vbt.heatmap(slider_level=0)
-        ```
-
-        ![](/docs/img/sr_heatmap_slider.gif)
+            ![](/assets/images/sr_heatmap_slider.gif)
         """
         if not isinstance(self.wrapper.index, pd.MultiIndex):
             return self.obj.to_frame().vbt.heatmap(
@@ -2197,25 +2176,24 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Creates `vectorbt.generic.plotting.Volume` and returns the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1, 1),
+            ...     (2, 2, 2),
+            ...     (3, 3, 3)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1  1    0
+            2  2  2    1
+            3  3  3    2
+            dtype: int64
 
-        ```python-repl
-        >>> multi_index = pd.MultiIndex.from_tuples([
-        ...     (1, 1, 1),
-        ...     (2, 2, 2),
-        ...     (3, 3, 3)
-        ... ])
-        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-        >>> sr
-        1  1  1    0
-        2  2  2    1
-        3  3  3    2
-        dtype: int64
+            >>> sr.vbt.volume().show()
+            ```
 
-        >>> sr.vbt.volume().show()
-        ```
-
-        ![](/docs/img/sr_volume.svg)
+            ![](/assets/images/sr_volume.svg)
         """
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
@@ -2344,13 +2322,12 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         `**kwargs` are passed to `GenericAccessor.scatterplot`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
+            ```
 
-        ```python-repl
-        >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
-        ```
-
-        ![](/docs/img/sr_qqplot.svg)
+            ![](/assets/images/sr_qqplot.svg)
         """
         qq = stats.probplot(self.obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
@@ -2393,19 +2370,18 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         See `vectorbt.generic.nb.squeeze_grouped_nb`.
 
-        ## Example
-
-        ```python-repl
-        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-        >>> mean_squeeze_nb = njit(lambda i, group, a: np.nanmean(a))
-        >>> df.vbt.squeeze_grouped(mean_squeeze_nb, group_by=group_by)
-        group       first  second
-        2020-01-01    3.0     1.0
-        2020-01-02    3.0     2.0
-        2020-01-03    3.0     3.0
-        2020-01-04    3.0     2.0
-        2020-01-05    3.0     1.0
-        ```
+        Usage:
+            ```pycon
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> mean_squeeze_nb = njit(lambda i, group, a: np.nanmean(a))
+            >>> df.vbt.squeeze_grouped(mean_squeeze_nb, group_by=group_by)
+            group       first  second
+            2020-01-01    3.0     1.0
+            2020-01-02    3.0     2.0
+            2020-01-03    3.0     3.0
+            2020-01-04    3.0     2.0
+            2020-01-05    3.0     1.0
+            ```
         """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
@@ -2428,36 +2404,35 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             Make sure that the distribution of group lengths is close to uniform, otherwise
             groups with less columns will be filled with NaN and needlessly occupy memory.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> df.vbt.flatten_grouped(group_by=group_by, order='C')
+            group       first  second
+            2020-01-01    1.0     1.0
+            2020-01-01    5.0     NaN
+            2020-01-02    2.0     2.0
+            2020-01-02    4.0     NaN
+            2020-01-03    3.0     3.0
+            2020-01-03    3.0     NaN
+            2020-01-04    4.0     2.0
+            2020-01-04    2.0     NaN
+            2020-01-05    5.0     1.0
+            2020-01-05    1.0     NaN
 
-        ```python-repl
-        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-        >>> df.vbt.flatten_grouped(group_by=group_by, order='C')
-        group       first  second
-        2020-01-01    1.0     1.0
-        2020-01-01    5.0     NaN
-        2020-01-02    2.0     2.0
-        2020-01-02    4.0     NaN
-        2020-01-03    3.0     3.0
-        2020-01-03    3.0     NaN
-        2020-01-04    4.0     2.0
-        2020-01-04    2.0     NaN
-        2020-01-05    5.0     1.0
-        2020-01-05    1.0     NaN
-
-        >>> df.vbt.flatten_grouped(group_by=group_by, order='F')
-        group       first  second
-        2020-01-01    1.0     1.0
-        2020-01-02    2.0     2.0
-        2020-01-03    3.0     3.0
-        2020-01-04    4.0     2.0
-        2020-01-05    5.0     1.0
-        2020-01-01    5.0     NaN
-        2020-01-02    4.0     NaN
-        2020-01-03    3.0     NaN
-        2020-01-04    2.0     NaN
-        2020-01-05    1.0     NaN
-        ```
+            >>> df.vbt.flatten_grouped(group_by=group_by, order='F')
+            group       first  second
+            2020-01-01    1.0     1.0
+            2020-01-02    2.0     2.0
+            2020-01-03    3.0     3.0
+            2020-01-04    4.0     2.0
+            2020-01-05    5.0     1.0
+            2020-01-01    5.0     NaN
+            2020-01-02    4.0     NaN
+            2020-01-03    3.0     NaN
+            2020-01-04    2.0     NaN
+            2020-01-05    1.0     NaN
+            ```
         """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
@@ -2484,18 +2459,17 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                 **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Heatmap` and return the figure.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df = pd.DataFrame([
+            ...     [0, np.nan, np.nan],
+            ...     [np.nan, 1, np.nan],
+            ...     [np.nan, np.nan, 2]
+            ... ])
+            >>> df.vbt.heatmap()
+            ```
 
-        ```python-repl
-        >>> df = pd.DataFrame([
-        ...     [0, np.nan, np.nan],
-        ...     [np.nan, 1, np.nan],
-        ...     [np.nan, np.nan, 2]
-        ... ])
-        >>> df.vbt.heatmap()
-        ```
-
-        ![](/docs/img/df_heatmap.svg)
+            ![](/assets/images/df_heatmap.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.columns

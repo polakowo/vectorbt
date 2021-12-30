@@ -1,0 +1,17 @@
+.dobjtype {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 80%;
+    color: var(--md-default-fg-color--lighter) !important;
+}
+
+.githublink {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 80%;
+    color: var(--md-default-fg-color--lighter) !important;
+}
+
+.githublink:hover {
+    color: var(--md-accent-fg-color) !important;
+}

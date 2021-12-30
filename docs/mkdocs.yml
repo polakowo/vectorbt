@@ -1,0 +1,190 @@
+# Project information
+site_name: vectorbt
+site_description: Find your trading edge, using a powerful toolkit for backtesting, algorithmic trading, and research
+site_author: Oleg Polakow
+site_url: https://vectorbt.dev/
+
+# Repository
+repo_name: vectorbt
+repo_url: https://github.com/polakowo/vectorbt
+edit_uri: ""
+
+# Copyright
+copyright: Copyright &copy; 2021 Oleg Polakow. All rights reserved.
+
+# Configuration
+theme:
+  name: material
+  custom_dir: overrides
+  include_search_page: false
+  search_index_only: true
+  language: en
+  features:
+    - navigation.tracking
+    - navigation.indexes
+    - navigation.tabs
+    - navigation.instant
+    - search.suggest
+    - search.share
+  palette:
+    scheme: default
+    primary: indigo
+    accent: blue
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Roboto
+    code: Roboto Mono
+  logo: assets/logo/logo-white.svg
+  favicon: /assets/logo/favicon.png
+
+# Customization
+markdown_extensions:
+  - meta
+  - admonition
+  - def_list
+  - attr_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.progressbar
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: polakowo
+      repo: vectorbt.pro
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      extend_pygments_lang:
+        - name: pycon3
+          lang: pycon
+          options:
+            python3: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+extra:
+  analytics:
+    provider: google
+    property: G-4QLCS0J048
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/polakowo
+extra_javascript:
+  - assets/javascripts/extra.js
+extra_css:
+  - assets/stylesheets/extra.css
+
+# Page tree
+nav:
+  - Getting started:
+    - index.md
+    - Features: getting-started/features.md
+    - Installation: getting-started/installation.md
+    - Usage: getting-started/usage.md
+    - Resources: getting-started/resources.md
+    - Contributing: getting-started/contributing.md
+  - API:
+    - api/index.md
+    - _settings: api/_settings.md
+    - base:
+      - api/base/index.md
+      - accessors: api/base/accessors.md
+      - array_wrapper: api/base/array_wrapper.md
+      - column_grouper: api/base/column_grouper.md
+      - combine_fns: api/base/combine_fns.md
+      - index_fns: api/base/index_fns.md
+      - indexing: api/base/indexing.md
+      - reshape_fns: api/base/reshape_fns.md
+    - data:
+      - api/data/index.md
+      - base: api/data/base.md
+      - custom: api/data/custom.md
+      - updater: api/data/updater.md
+    - generic:
+      - api/generic/index.md
+      - accessors: api/generic/accessors.md
+      - decorators: api/generic/decorators.md
+      - drawdowns: api/generic/drawdowns.md
+      - enums: api/generic/enums.md
+      - nb: api/generic/nb.md
+      - plots_builder: api/generic/plots_builder.md
+      - plotting: api/generic/plotting.md
+      - ranges: api/generic/ranges.md
+      - splitters: api/generic/splitters.md
+      - stats_builder: api/generic/stats_builder.md
+    - indicators:
+      - api/indicators/index.md
+      - basic: api/indicators/basic.md
+      - configs: api/indicators/configs.md
+      - factory: api/indicators/factory.md
+      - nb: api/indicators/nb.md
+    - labels:
+      - api/labels/index.md
+      - enums: api/labels/enums.md
+      - generators: api/labels/generators.md
+      - nb: api/labels/nb.md
+    - messaging:
+      - api/messaging/index.md
+      - telegram: api/messaging/telegram.md
+    - ohlcv_accessors: api/ohlcv_accessors.md
+    - portfolio:
+      - api/portfolio/index.md
+      - base: api/portfolio/base.md
+      - decorators: api/portfolio/decorators.md
+      - enums: api/portfolio/enums.md
+      - logs: api/portfolio/logs.md
+      - nb: api/portfolio/nb.md
+      - orders: api/portfolio/orders.md
+      - trades: api/portfolio/trades.md
+    - px_accessors: api/px_accessors.md
+    - records:
+      - api/records/index.md
+      - base: api/records/base.md
+      - col_mapper: api/records/col_mapper.md
+      - decorators: api/records/decorators.md
+      - mapped_array: api/records/mapped_array.md
+      - nb: api/records/nb.md
+    - returns:
+      - api/returns/index.md
+      - accessors: api/returns/accessors.md
+      - metrics: api/returns/metrics.md
+      - nb: api/returns/nb.md
+      - qs_adapter: api/returns/qs_adapter.md
+    - root_accessors: api/root_accessors.md
+    - signals:
+      - api/signals/index.md
+      - accessors: api/signals/accessors.md
+      - enums: api/signals/enums.md
+      - factory: api/signals/factory.md
+      - generators: api/signals/generators.md
+      - nb: api/signals/nb.md
+    - utils:
+      - api/utils/index.md
+      - array_: api/utils/array_.md
+      - attr_: api/utils/attr_.md
+      - checks: api/utils/checks.md
+      - colors: api/utils/colors.md
+      - config: api/utils/config.md
+      - datetime_: api/utils/datetime_.md
+      - decorators: api/utils/decorators.md
+      - docs: api/utils/docs.md
+      - enum_: api/utils/enum_.md
+      - figure: api/utils/figure.md
+      - image_: api/utils/image_.md
+      - mapping: api/utils/mapping.md
+      - math_: api/utils/math_.md
+      - module_: api/utils/module_.md
+      - params: api/utils/params.md
+      - random_: api/utils/random_.md
+      - requests_: api/utils/requests_.md
+      - schedule_: api/utils/schedule_.md
+      - tags: api/utils/tags.md
+      - template: api/utils/template.md
+  - Terms:
+    - terms/index.md
+    - License: terms/license.md

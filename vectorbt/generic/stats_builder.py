@@ -241,9 +241,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             Make sure to resolve and then to re-use as many object attributes as possible to
             utilize built-in caching (even if global caching is disabled).
 
-        ## Example
-
-        See `vectorbt.portfolio.base` for examples.
+        Usage:
+            See `vectorbt.portfolio.base` for examples.
         """
         # Resolve defaults
         if silence_warnings is None:

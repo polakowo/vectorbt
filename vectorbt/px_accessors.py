@@ -72,18 +72,17 @@ class PXAccessor(BaseAccessor):
 
     Accessible through `pd.Series.vbt.px` and `pd.DataFrame.vbt.px`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> import vectorbt as vbt
+        >>> vbt.settings.set_theme('seaborn')
 
-    >>> vbt.settings.set_theme('seaborn')
+        >>> pd.Series([1, 2, 3]).vbt.px.bar()
+        ```
 
-    >>> pd.Series([1, 2, 3]).vbt.px.bar()
-    ```
-
-    ![](/docs/img/px_bar.svg)
+        ![](/assets/images/px_bar.svg)
     """
 
     def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:

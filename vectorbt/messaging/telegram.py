@@ -78,64 +78,64 @@ class TelegramBot(Configured):
     `**kwargs` are passed to `telegram.ext.updater.Updater` and override
     settings under `messaging.telegram` in `vectorbt._settings.settings`.
 
-    ## Example
+    Usage:
+        * Let's extend `TelegramBot` to track cryptocurrency prices:
 
-    Let's extend `TelegramBot` to track cryptocurrency prices:
+        ```pycon
+        >>> from telegram.ext import CommandHandler
+        >>> import ccxt
+        >>> import logging
+        >>> import vectorbt as vbt
 
-    ```python-repl
-    >>> from telegram.ext import CommandHandler
-    >>> import ccxt
-    >>> import logging
-    >>> import vectorbt as vbt
+        >>> logging.basicConfig(level=logging.INFO)  # enable logging
 
-    >>> logging.basicConfig(level=logging.INFO)  # enable logging
+        >>> class MyTelegramBot(vbt.TelegramBot):
+        ...     @property
+        ...     def custom_handlers(self):
+        ...         return (CommandHandler('get', self.get),)
+        ...
+        ...     @property
+        ...     def help_message(self):
+        ...         return "Type /get [symbol] [exchange id (optional)] to get the latest price."
+        ...
+        ...     def get(self, update, context):
+        ...         chat_id = update.effective_chat.id
+        ...
+        ...         if len(context.args) == 1:
+        ...             symbol = context.args[0]
+        ...             exchange = 'binance'
+        ...         elif len(context.args) == 2:
+        ...             symbol = context.args[0]
+        ...             exchange = context.args[1]
+        ...         else:
+        ...             self.send_message(chat_id, "This command requires symbol and optionally exchange id.")
+        ...             return
+        ...         try:
+        ...             ticker = getattr(ccxt, exchange)().fetchTicker(symbol)
+        ...         except Exception as e:
+        ...             self.send_message(chat_id, str(e))
+        ...             return
+        ...         self.send_message(chat_id, str(ticker['last']))
 
-    >>> class MyTelegramBot(vbt.TelegramBot):
-    ...     @property
-    ...     def custom_handlers(self):
-    ...         return (CommandHandler('get', self.get),)
-    ...
-    ...     @property
-    ...     def help_message(self):
-    ...         return "Type /get [symbol] [exchange id (optional)] to get the latest price."
-    ...
-    ...     def get(self, update, context):
-    ...         chat_id = update.effective_chat.id
-    ...
-    ...         if len(context.args) == 1:
-    ...             symbol = context.args[0]
-    ...             exchange = 'binance'
-    ...         elif len(context.args) == 2:
-    ...             symbol = context.args[0]
-    ...             exchange = context.args[1]
-    ...         else:
-    ...             self.send_message(chat_id, "This command requires symbol and optionally exchange id.")
-    ...             return
-    ...         try:
-    ...             ticker = getattr(ccxt, exchange)().fetchTicker(symbol)
-    ...         except Exception as e:
-    ...             self.send_message(chat_id, str(e))
-    ...             return
-    ...         self.send_message(chat_id, str(ticker['last']))
-
-    >>> bot = MyTelegramBot(token='YOUR_TOKEN')
-    >>> bot.start()
-    INFO:vectorbt.utils.messaging:Initializing bot
-    INFO:vectorbt.utils.messaging:Loaded chat ids [447924619]
-    INFO:vectorbt.utils.messaging:Running bot vectorbt_bot
-    INFO:apscheduler.scheduler:Scheduler started
-    INFO:vectorbt.utils.messaging:447924619 - Bot: "I'm back online!"
-    INFO:vectorbt.utils.messaging:447924619 - User: "/start"
-    INFO:vectorbt.utils.messaging:447924619 - Bot: "Hello!"
-    INFO:vectorbt.utils.messaging:447924619 - User: "/help"
-    INFO:vectorbt.utils.messaging:447924619 - Bot: "Type /get [symbol] [exchange id (optional)] to get the latest price."
-    INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USDT"
-    INFO:vectorbt.utils.messaging:447924619 - Bot: "55530.55"
-    INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USD bitmex"
-    INFO:vectorbt.utils.messaging:447924619 - Bot: "55509.0"
-    INFO:telegram.ext.updater:Received signal 2 (SIGINT), stopping...
-    INFO:apscheduler.scheduler:Scheduler has been shut down
-    ```"""
+        >>> bot = MyTelegramBot(token='YOUR_TOKEN')
+        >>> bot.start()
+        INFO:vectorbt.utils.messaging:Initializing bot
+        INFO:vectorbt.utils.messaging:Loaded chat ids [447924619]
+        INFO:vectorbt.utils.messaging:Running bot vectorbt_bot
+        INFO:apscheduler.scheduler:Scheduler started
+        INFO:vectorbt.utils.messaging:447924619 - Bot: "I'm back online!"
+        INFO:vectorbt.utils.messaging:447924619 - User: "/start"
+        INFO:vectorbt.utils.messaging:447924619 - Bot: "Hello!"
+        INFO:vectorbt.utils.messaging:447924619 - User: "/help"
+        INFO:vectorbt.utils.messaging:447924619 - Bot: "Type /get [symbol] [exchange id (optional)] to get the latest price."
+        INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USDT"
+        INFO:vectorbt.utils.messaging:447924619 - Bot: "55530.55"
+        INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USD bitmex"
+        INFO:vectorbt.utils.messaging:447924619 - Bot: "55509.0"
+        INFO:telegram.ext.updater:Received signal 2 (SIGINT), stopping...
+        INFO:apscheduler.scheduler:Scheduler has been shut down
+        ```
+    """
 
     def __init__(self, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         from vectorbt._settings import settings

@@ -6,7 +6,7 @@
 Order records capture information on simulation logs. Logs are populated when
 simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.logs`.
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import numpy as np
 >>> from datetime import datetime, timedelta
@@ -45,7 +45,7 @@ Name: count, dtype: int64
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Logs.metrics`.
 
-```python-repl
+```pycon
 >>> logs['a'].stats()
 Start                             2020-01-01 00:00:00
 End                               2020-04-09 00:00:00
@@ -62,7 +62,7 @@ Name: a, dtype: object
 
 `Logs.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> logs.stats(group_by=True)
 Start                             2020-01-01 00:00:00
 End                               2020-04-09 00:00:00

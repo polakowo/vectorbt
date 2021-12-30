@@ -8,7 +8,7 @@
 
 We can access the adapter from `ReturnsAccessor`:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
@@ -24,7 +24,7 @@ We can access the adapter from `ReturnsAccessor`:
 
 Which is the same as:
 
-```python-repl
+```pycon
 >>> qs.stats.r_squared(rets, benchmark_rets)
 ```
 
@@ -34,7 +34,7 @@ First, we can define all parameters such as benchmark returns once and avoid pas
 to every function. Second, vectorbt automatically translates parameters passed to `ReturnsAccessor`
 for the use in quantstats.
 
-```python-repl
+```pycon
 >>> # Defaults that vectorbt understands
 >>> ret_acc = rets.vbt.returns(
 ...     benchmark_rets=benchmark_rets,
@@ -74,7 +74,7 @@ For example, the `periods` and `periods_per_year` arguments default to the annua
 `ReturnsAccessor.ann_factor`, which itself is based on the `freq` argument. This makes the results
 produced by quantstats and vectorbt at least somewhat similar.
 
-```python-repl
+```pycon
 >>> vbt.settings.array_wrapper['freq'] = 'h'
 >>> vbt.settings.returns['year_freq'] = '365d'
 
@@ -87,7 +87,7 @@ produced by quantstats and vectorbt at least somewhat similar.
 
 We can still override any argument by overriding its default or by passing it directly to the function:
 
-```python-repl
+```pycon
 >>> rets.vbt.returns.qs(defaults=dict(periods=252)).sharpe()
 -1.5912029345745982
 

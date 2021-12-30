@@ -53,7 +53,7 @@ Also available as `vectorbt.portfolio.base.Portfolio.positions`.
 
 * Increasing position:
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import numpy as np
 >>> from datetime import datetime, timedelta
@@ -115,7 +115,7 @@ True
 
 * Decreasing position:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -172,7 +172,7 @@ True
 
 * Multiple reversing positions:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -247,7 +247,7 @@ True
 
 * Open position:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -295,7 +295,7 @@ True
 
 Get trade count, trade PnL, and winning trade PnL:
 
-```python-repl
+```pycon
 >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
 >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
 >>> trades = vbt.Portfolio.from_orders(price, size).trades
@@ -315,7 +315,7 @@ Get trade count, trade PnL, and winning trade PnL:
 
 Get count and PnL of trades with duration of more than 2 days:
 
-```python-repl
+```pycon
 >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
 >>> trades_filtered = trades.apply_mask(mask)
 >>> trades_filtered.count()
@@ -330,7 +330,7 @@ Get count and PnL of trades with duration of more than 2 days:
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Trades.metrics`.
 
-```python-repl
+```pycon
 >>> np.random.seed(42)
 >>> price = pd.DataFrame({
 ...     'a': np.random.uniform(1, 2, size=100),
@@ -373,7 +373,7 @@ Name: a, dtype: object
 
 Positions share almost identical metrics with trades:
 
-```python-repl
+```pycon
 >>> pf.positions['a'].stats()
 Start                            2020-01-01 00:00:00
 End                              2020-04-09 00:00:00
@@ -404,7 +404,7 @@ Name: a, dtype: object
 
 To also include open trades/positions when calculating metrics such as win rate, pass `incl_open=True`:
 
-```python-repl
+```pycon
 >>> pf.trades['a'].stats(settings=dict(incl_open=True))
 Start                         2020-01-01 00:00:00
 End                           2020-04-09 00:00:00
@@ -436,7 +436,7 @@ Name: a, dtype: object
 
 `Trades.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> pf.trades.stats(group_by=True)
 Start                                2020-01-01 00:00:00
 End                                  2020-04-09 00:00:00
@@ -473,11 +473,11 @@ Name: group, dtype: object
 
 `Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
 
-```python-repl
+```pycon
 >>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show_svg()
 ```
 
-![](/docs/img/trades_plots.svg)
+![](/assets/images/trades_plots.svg)
 """
 
 import numpy as np
@@ -938,21 +938,20 @@ class Trades(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> from datetime import datetime, timedelta
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbt as vbt
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.trades.plot_pnl()
+            ```
 
-        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-        >>> pf = vbt.Portfolio.from_orders(price, orders)
-        >>> pf.trades.plot_pnl()
-        ```
-
-        ![](/docs/img/trades_plot_pnl.svg)
+            ![](/assets/images/trades_plot_pnl.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
@@ -1134,21 +1133,21 @@ class Trades(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> from datetime import datetime, timedelta
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbt as vbt
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.trades.plot()
+            ```
 
-        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-        >>> pf = vbt.Portfolio.from_orders(price, orders)
-        >>> pf.trades.plot()
-        ```
-
-        ![](/docs/img/trades_plot.svg)"""
+            ![](/assets/images/trades_plot.svg)
+        """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
@@ -1464,6 +1463,9 @@ entry_trades_field_config = Config(
         settings={
             'id': dict(
                 title='Entry Trade Id'
+            ),
+            'idx': dict(
+                name='entry_idx'
             )
         }
     ),

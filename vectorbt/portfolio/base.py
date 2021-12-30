@@ -15,7 +15,7 @@ position/profit metrics and drawdown information.
 
 Run for the examples below:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> from datetime import datetime
@@ -82,7 +82,7 @@ vectorbt fills the missing data with default constants, without wasting memory.
 
 Here's an example:
 
-```python-repl
+```pycon
 >>> size = pd.Series([1, -1, 1, -1])  # per row
 >>> price = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [4, 3, 2, 1]})  # per element
 >>> direction = ['longonly', 'shortonly']  # per column
@@ -116,7 +116,7 @@ in fact, by setting `accumulate=True`, it behaves quite similarly to `Portfolio.
 
 Let's replicate the example above using signals:
 
-```python-repl
+```pycon
 >>> entries = pd.Series([True, False, True, False])
 >>> exits = pd.Series([False, True, False, True])
 
@@ -150,7 +150,7 @@ and the callback zoo, see `vectorbt.portfolio.nb.simulate_nb`.
 
 Let's replicate our example using an order function:
 
-```python-repl
+```pycon
 >>> @njit
 >>> def order_func_nb(c, size, direction, fees):
 ...     return nb.order_nb(
@@ -199,7 +199,7 @@ But there are drawbacks too:
 To showcase the features of `Portfolio`, run the following example: it checks candlestick data of 6 major
 cryptocurrencies in 2020 against every single pattern found in TA-Lib, and translates them into orders.
 
-```python-repl
+```pycon
 >>> # Fetch price history
 >>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
 >>> start = '2020-01-01 UTC'  # crypto is UTC
@@ -252,7 +252,7 @@ Date
 >>> pf.value().vbt.plot()
 ```
 
-![](/docs/img/portfolio_value.svg)
+![](/assets/images/portfolio_value.svg)
 
 ## Broadcasting
 
@@ -271,7 +271,7 @@ any direction indefinitely.
 
 For example, let's broadcast three inputs and select the last element using both approaches:
 
-```python-repl
+```pycon
 >>> # Classic way
 >>> a = np.array([1, 2, 3])
 >>> b = np.array([[4], [5], [6]])
@@ -315,7 +315,7 @@ None has a special meaning in vectorbt: it's a command to pull the default value
 - `vectorbt._settings.settings`. The branch for the `Portfolio` can be found under the key 'portfolio'.
 For example, the default size used in `Portfolio.from_signals` and `Portfolio.from_orders` is `np.inf`:
 
-```python-repl
+```pycon
 >>> vbt.settings.portfolio['size']
 inf
 ```
@@ -329,7 +329,7 @@ or to compute metrics for a combined portfolio of multiple independent columns.
 
 For example, let's divide our portfolio into two groups sharing the same cash balance:
 
-```python-repl
+```pycon
 >>> # Simulate combined portfolio
 >>> group_by = pd.Index([
 ...     'first', 'first', 'first',
@@ -350,7 +350,7 @@ Name: total_profit, dtype: float64
 
 Not only can we analyze each group, but also each column in the group:
 
-```python-repl
+```pycon
 >>> # Get total profit per column
 >>> comb_pf.total_profit(group_by=False)
 symbol
@@ -365,7 +365,7 @@ Name: total_profit, dtype: float64
 
 In the same way, we can introduce new grouping to the method itself:
 
-```python-repl
+```pycon
 >>> # Get total profit per group
 >>> pf.total_profit(group_by=group_by)
 group
@@ -382,7 +382,7 @@ Name: total_profit, dtype: float64
 Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
 on a `Portfolio` instance, which forwards indexing operation to each object with columns:
 
-```python-repl
+```pycon
 >>> pf['BTC-USD']
 <vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
 
@@ -392,7 +392,7 @@ on a `Portfolio` instance, which forwards indexing operation to each object with
 
 Combined portfolio is indexed by group:
 
-```python-repl
+```pycon
 >>> comb_pf['first']
 <vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
 
@@ -413,7 +413,7 @@ Combined portfolio is indexed by group:
 To collect more information on how a specific order was processed or to be able to track the whole
 simulation from the beginning to the end, we can turn on logging:
 
-```python-repl
+```pycon
 >>> # Simulate portfolio with logging
 >>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
@@ -452,7 +452,7 @@ simulation from the beginning to the end, we can turn on logging:
 
 Just as orders, logs are also records and thus can be easily analyzed:
 
-```python-repl
+```pycon
 >>> pf.logs.res_status.value_counts()
 symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
 Filled       184      172      177      178      177      185
@@ -479,7 +479,7 @@ Alternatively, we can precisely point at attributes and methods that should or s
 be cached. For example, we can blacklist the entire `Portfolio` class except a few most called
 methods such as `Portfolio.cash_flow` and `Portfolio.asset_flow`:
 
-```python-repl
+```pycon
 >>> vbt.settings.caching['blacklist'].append(
 ...     vbt.CacheCondition(base_cls='Portfolio')
 ... )
@@ -491,7 +491,7 @@ methods such as `Portfolio.cash_flow` and `Portfolio.asset_flow`:
 
 Define rules for one instance of `Portfolio`:
 
-```python-repl
+```pycon
 >>> vbt.settings.caching['blacklist'].append(
 ...     vbt.CacheCondition(instance=pf)
 ... )
@@ -505,7 +505,7 @@ See `vectorbt.utils.decorators.should_cache` for caching rules.
 
 To reset caching:
 
-```python-repl
+```pycon
 >>> vbt.settings.caching.reset()
 ```
 
@@ -520,7 +520,7 @@ ratio or other metrics based on returns, run and save `Portfolio.returns` in a v
 Alternatively, you can track portfolio value and returns using `Portfolio.from_order_func` and its callbacks
 (preferably in `post_segment_func_nb`):
 
-```python-repl
+```pycon
 >>> pf_baseline = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
@@ -581,7 +581,7 @@ because then, during the simulation, the portfolio value is `np.inf` and the ret
 Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `Portfolio`
 instance to the disk with `Portfolio.save` and load it with `Portfolio.load`:
 
-```python-repl
+```pycon
 >>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
@@ -620,7 +620,7 @@ Name: sharpe_ratio, dtype: float64
 
 Let's simulate a portfolio with two columns:
 
-```python-repl
+```pycon
 >>> close = vbt.YFData.download(
 ...     "BTC-USD",
 ...     start='2020-01-01 UTC',
@@ -636,7 +636,7 @@ Int64Index([10, 20], dtype='int64', name='rand_n')
 
 To return the statistics for a particular column/group, use the `column` argument:
 
-```python-repl
+```pycon
 >>> pf.stats(column=10)
 UserWarning: Metric 'sharpe_ratio' requires frequency to be set
 UserWarning: Metric 'calmar_ratio' requires frequency to be set
@@ -678,7 +678,7 @@ If vectorbt couldn't parse the frequency of `close`:
 
 We can provide the frequency as part of the settings dict:
 
-```python-repl
+```pycon
 >>> pf.stats(column=10, settings=dict(freq='d'))
 UserWarning: Changing the frequency will create a copy of this object.
 Consider setting the frequency upon object creation to re-use existing cache.
@@ -717,13 +717,13 @@ Name: 10, dtype: object
 But in this case, our portfolio will be copied to set the new frequency and we wouldn't be
 able to re-use its cached attributes. Let's define the frequency upon the simulation instead:
 
-```python-repl
+```pycon
 >>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42, freq='d')
 ```
 
 We can change the grouping of the portfolio on the fly. Let's form a single group:
 
-```python-repl
+```pycon
 >>> pf.stats(group_by=True)
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
@@ -764,7 +764,7 @@ contribute to the performance.
 If the portfolio consists of multiple columns/groups and no column/group has been selected,
 each metric is aggregated across all columns/groups based on `agg_func`, which is `np.mean` by default.
 
-```python-repl
+```pycon
 >>> pf.stats()
 UserWarning: Object has multiple columns. Aggregating using <function mean at 0x7fc77152bb70>.
 Pass column to select a single column/group.
@@ -804,7 +804,7 @@ Here, the Sharpe ratio of 0.445231 (column=10) and 1.88616 (column=20) lead to t
 
 We can also return a DataFrame with statistics per column/group by passing `agg_func=None`:
 
-```python-repl
+```pycon
 >>> pf.stats(agg_func=None)
                            Start                       End   Period  ...  Sortino Ratio
 rand_n                                                               ...
@@ -818,7 +818,7 @@ rand_n                                                               ...
 
 To select metrics, use the `metrics` argument (see `Portfolio.metrics` for supported metrics):
 
-```python-repl
+```pycon
 >>> pf.stats(metrics=['sharpe_ratio', 'sortino_ratio'], column=10)
 Sharpe Ratio     0.445231
 Sortino Ratio    0.706986
@@ -827,7 +827,7 @@ Name: 10, dtype: float64
 
 We can also select specific tags (see any metric from `Portfolio.metrics` that has the `tag` key):
 
-```python-repl
+```pycon
 >>> pf.stats(column=10, tags=['trades'])
 Total Trades                                10
 Total Open Trades                            0
@@ -847,7 +847,7 @@ Name: 10, dtype: object
 
 Or provide a boolean expression:
 
-```python-repl
+```pycon
 >>> pf.stats(column=10, tags='trades and open and not closed')
 Total Open Trades    0.0
 Open Trade PnL       0.0
@@ -863,7 +863,7 @@ have both tags attached since they are based upon both open and closed trades/po
 We can use `settings` to pass parameters used across multiple metrics.
 For example, let's pass required and risk-free return to all return metrics:
 
-```python-repl
+```pycon
 >>> pf.stats(column=10, settings=dict(required_return=0.1, risk_free=0.01))
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
@@ -907,7 +907,7 @@ In such case, we have two options:
 
 1) Set parameters globally using `settings` and set `pass_{arg}=True` individually using `metric_settings`:
 
-```python-repl
+```pycon
 >>> pf.stats(
 ...     column=10,
 ...     settings=dict(required_return=0.1, risk_free=0.01),
@@ -921,7 +921,7 @@ In such case, we have two options:
 
 2) Set parameters individually using `metric_settings`:
 
-```python-repl
+```pycon
 >>> pf.stats(
 ...     column=10,
 ...     metric_settings=dict(
@@ -937,7 +937,7 @@ In such case, we have two options:
 To calculate a custom metric, we need to provide at least two things: short name and a settings
 dict with the title and calculation function (see arguments in `vectorbt.generic.stats_builder.StatsBuilderMixin`):
 
-```python-repl
+```pycon
 >>> max_winning_streak = (
 ...     'max_winning_streak',
 ...     dict(
@@ -963,7 +963,7 @@ process is then passed as `arg` (or `trades` in our example).
 
 Here's an example without resolution of arguments:
 
-```python-repl
+```pycon
 >>> max_winning_streak = (
 ...     'max_winning_streak',
 ...     dict(
@@ -979,7 +979,7 @@ Name: 10, dtype: float64
 
 And here's an example without resolution of the calculation function:
 
-```python-repl
+```pycon
 >>> max_winning_streak = (
 ...     'max_winning_streak',
 ...     dict(
@@ -996,7 +996,7 @@ Name: 10, dtype: float64
 
 Since `max_winning_streak` method can be expressed as a path from this portfolio, we can simply write:
 
-```python-repl
+```pycon
 >>> max_winning_streak = (
 ...     'max_winning_streak',
 ...     dict(
@@ -1013,7 +1013,7 @@ Another advantage is that vectorbt can access the signature of the last method i
 To switch between entry trades, exit trades, and positions, use the `trades_type` setting.
 Additionally, you can pass `incl_open=True` to also include open trades.
 
-```python-repl
+```pycon
 >>> pf.stats(column=10, settings=dict(trades_type='positions', incl_open=True))
 Start                         2020-01-01 00:00:00+00:00
 End                           2020-09-01 00:00:00+00:00
@@ -1049,7 +1049,7 @@ Name: 10, dtype: object
 Any default metric setting or even global setting can be overridden by the user using metric-specific
 keyword arguments. Here, we override the global aggregation function for `max_dd_duration`:
 
-```python-repl
+```pycon
 >>> pf.stats(agg_func=lambda sr: sr.mean(),
 ...     metric_settings=dict(
 ...         max_dd_duration=dict(agg_func=lambda sr: sr.max())
@@ -1092,7 +1092,7 @@ Name: agg_func_<lambda>, dtype: object
 Let's create a simple metric that returns a passed value to demonstrate how vectorbt overrides settings,
 from least to most important:
 
-```python-repl
+```pycon
 >>> # vbt.settings.portfolio.stats
 >>> vbt.settings.portfolio.stats['settings']['my_arg'] = 100
 >>> my_arg_metric = ('my_arg_metric', dict(title='My Arg', calc_func=lambda my_arg: my_arg))
@@ -1120,7 +1120,7 @@ Name: 10, dtype: int64
 
 Here's an example of a parametrized metric. Let's get the number of trades with PnL over some amount:
 
-```python-repl
+```pycon
 >>> trade_min_pnl_cnt = (
 ...     'trade_min_pnl_cnt',
 ...     dict(
@@ -1146,7 +1146,7 @@ Name: stats, dtype: int64
 If the same metric name was encountered more than once, vectorbt automatically appends an
 underscore and its position, so we can pass keyword arguments to each metric separately:
 
-```python-repl
+```pycon
 >>> pf.stats(
 ...     metrics=[
 ...         trade_min_pnl_cnt,
@@ -1169,7 +1169,7 @@ To add a custom metric to the list of all metrics, we have three options.
 
 The first option is to change the `Portfolio.metrics` dict in-place (this will append to the end):
 
-```python-repl
+```pycon
 >>> pf.metrics['max_winning_streak'] = max_winning_streak[1]
 >>> pf.stats(column=10)
 Start                         2020-01-01 00:00:00+00:00
@@ -1207,20 +1207,20 @@ Name: 10, dtype: object
 Since `Portfolio.metrics` is of type `vectorbt.utils.config.Config`, we can reset it at any time
 to get default metrics:
 
-```python-repl
+```pycon
 >>> pf.metrics.reset()
 ```
 
 The second option is to copy `Portfolio.metrics`, append our metric, and pass as `metrics` argument:
 
-```python-repl
+```pycon
 >>> my_metrics = list(pf.metrics.items()) + [max_winning_streak]
 >>> pf.stats(metrics=my_metrics, column=10)
 ```
 
 The third option is to set `metrics` globally under `portfolio.stats` in `vectorbt._settings.settings`.
 
-```python-repl
+```pycon
 >>> vbt.settings.portfolio['stats']['metrics'] = my_metrics
 >>> pf.stats(column=10)
 ```
@@ -1230,7 +1230,7 @@ The third option is to set `metrics` globally under `portfolio.stats` in `vector
 We can compute the stats solely based on the portfolio's returns using `Portfolio.returns_stats`,
 which calls `vectorbt.returns.accessors.ReturnsAccessor.stats`.
 
-```python-repl
+```pycon
 >>> pf.returns_stats(column=10)
 Start                        2020-01-01 00:00:00+00:00
 End                          2020-09-01 00:00:00+00:00
@@ -1258,7 +1258,7 @@ Name: 10, dtype: object
 Most metrics defined in `vectorbt.returns.accessors.ReturnsAccessor` are also available
 as attributes of `Portfolio`:
 
-```python-repl
+```pycon
 >>> pf.sharpe_ratio()
 randnx_n
 10    0.445231
@@ -1268,7 +1268,7 @@ Name: sharpe_ratio, dtype: float64
 
 Moreover, we can access quantstats functions using `vectorbt.returns.qs_adapter.QSAdapter`:
 
-```python-repl
+```pycon
 >>> pf.qs.sharpe()
 randnx_n
 10    0.445231
@@ -1278,7 +1278,7 @@ dtype: float64
 >>> pf[10].qs.plot_snapshot()
 ```
 
-![](/docs/img/portfolio_plot_snapshot.png)
+![](/assets/images/portfolio_plot_snapshot.png)
 
 ## Plots
 
@@ -1290,16 +1290,16 @@ dtype: float64
 
 Plot portfolio of a random strategy:
 
-```python-repl
+```pycon
 >>> pf.plot(column=10)
 ```
 
-![](/docs/img/portfolio_plot.svg)
+![](/assets/images/portfolio_plot.svg)
 
 You can choose any of the subplots in `Portfolio.subplots`, in any order, and
 control their appearance using keyword arguments:
 
-```python-repl
+```pycon
 >>> pf.plot(
 ...     subplots=['drawdowns', 'underwater'],
 ...     column=10,
@@ -1315,11 +1315,11 @@ control their appearance using keyword arguments:
 ... )
 ```
 
-![](/docs/img/portfolio_plot_drawdowns.svg)
+![](/assets/images/portfolio_plot_drawdowns.svg)
 
 To create a new subplot, a preferred way is to pass a plotting function:
 
-```python-repl
+```pycon
 >>> def plot_order_size(pf, size, column=None, add_trace_kwargs=None, fig=None):
 ...     size = pf.select_one_from_obj(size, pf.wrapper.regroup(False), column=column)
 ...     size.rename('Order Size').vbt.barplot(
@@ -1346,7 +1346,7 @@ To create a new subplot, a preferred way is to pass a plotting function:
 
 Alternatively, you can create a placeholder and overwrite it manually later:
 
-```python-repl
+```pycon
 >>> fig = pf.plot(subplots=[
 ...     'orders',
 ...     ('order_size', dict(
@@ -1361,13 +1361,13 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ... )
 ```
 
-![](/docs/img/portfolio_plot_custom.svg)
+![](/assets/images/portfolio_plot_custom.svg)
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
 the path to this function (see `vectorbt.utils.attr_.deep_getattr` for the path format).
 You can additionally use templates to make some parameters to depend upon passed keyword arguments:
 
-```python-repl
+```pycon
 >>> subplots = [
 ...     ('cumulative_returns', dict(
 ...         title='Cumulative Returns',
@@ -1404,11 +1404,11 @@ You can additionally use templates to make some parameters to depend upon passed
 
 You can also replace templates across all subplots by using the global template mapping:
 
-```python-repl
+```pycon
 >>> pf.plot(subplots, column=10, template_mapping=dict(window=10))
 ```
 
-![](/docs/img/portfolio_plot_path.svg)
+![](/assets/images/portfolio_plot_path.svg)
 """
 import warnings
 
@@ -1794,75 +1794,74 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         !!! hint
             All broadcastable arguments can be set per frame, series, row, column, or element.
 
-        ## Example
+        Usage:
+            * Buy 10 units each tick:
 
-        * Buy 10 units each tick:
+            ```pycon
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> pf = vbt.Portfolio.from_orders(close, 10)
 
-        ```python-repl
-        >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> pf = vbt.Portfolio.from_orders(close, 10)
+            >>> pf.assets()
+            0    10.0
+            1    20.0
+            2    30.0
+            3    40.0
+            4    40.0
+            dtype: float64
+            >>> pf.cash()
+            0    90.0
+            1    70.0
+            2    40.0
+            3     0.0
+            4     0.0
+            dtype: float64
+            ```
 
-        >>> pf.assets()
-        0    10.0
-        1    20.0
-        2    30.0
-        3    40.0
-        4    40.0
-        dtype: float64
-        >>> pf.cash()
-        0    90.0
-        1    70.0
-        2    40.0
-        3     0.0
-        4     0.0
-        dtype: float64
-        ```
+            * Reverse each position by first closing it:
 
-        * Reverse each position by first closing it:
+            ```pycon
+            >>> size = [1, 0, -1, 0, 1]
+            >>> pf = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
 
-        ```python-repl
-        >>> size = [1, 0, -1, 0, 1]
-        >>> pf = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
+            >>> pf.assets()
+            0    100.000000
+            1      0.000000
+            2    -66.666667
+            3      0.000000
+            4     26.666667
+            dtype: float64
+            >>> pf.cash()
+            0      0.000000
+            1    200.000000
+            2    400.000000
+            3    133.333333
+            4      0.000000
+            dtype: float64
+            ```
 
-        >>> pf.assets()
-        0    100.000000
-        1      0.000000
-        2    -66.666667
-        3      0.000000
-        4     26.666667
-        dtype: float64
-        >>> pf.cash()
-        0      0.000000
-        1    200.000000
-        2    400.000000
-        3    133.333333
-        4      0.000000
-        dtype: float64
-        ```
+            * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example
+            (it's more compact but has less control over execution):
 
-        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example
-        (it's more compact but has less control over execution):
+            ```pycon
+            >>> np.random.seed(42)
+            >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
+            >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
+            >>> size[1::2] = np.nan  # skip every second tick
 
-        ```python-repl
-        >>> np.random.seed(42)
-        >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
-        >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
-        >>> size[1::2] = np.nan  # skip every second tick
+            >>> pf = vbt.Portfolio.from_orders(
+            ...     close,  # acts both as reference and order price here
+            ...     size,
+            ...     size_type='targetpercent',
+            ...     call_seq='auto',  # first sell then buy
+            ...     group_by=True,  # one group
+            ...     cash_sharing=True,  # assets share the same cash
+            ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
+            ... )
 
-        >>> pf = vbt.Portfolio.from_orders(
-        ...     close,  # acts both as reference and order price here
-        ...     size,
-        ...     size_type='targetpercent',
-        ...     call_seq='auto',  # first sell then buy
-        ...     group_by=True,  # one group
-        ...     cash_sharing=True,  # assets share the same cash
-        ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
-        ... )
+            >>> pf.asset_value(group_by=False).vbt.plot()
+            ```
 
-        >>> pf.asset_value(group_by=False).vbt.plot()
-        ```
-
-        ![](/docs/img/simulate_nb.svg)
+            ![](/assets/images/simulate_nb.svg)
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -2280,412 +2279,411 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         Also see notes and hints for `Portfolio.from_orders`.
 
-        ## Example
-
-        * By default, if all signal arrays are None, `entries` becomes True,
+        Usage:
+            * By default, if all signal arrays are None, `entries` becomes True,
             which opens a position at the very first tick and does nothing else:
 
-        ```python-repl
-        >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> pf = vbt.Portfolio.from_signals(close, size=1)
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3    0.0
-        4    0.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> pf = vbt.Portfolio.from_signals(close, size=1)
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3    0.0
+            4    0.0
+            dtype: float64
+            ```
 
-        * Entry opens long, exit closes long:
+            * Entry opens long, exit closes long:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1,
-        ...     direction='longonly'
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3   -1.0
-        4    0.0
-        dtype: float64
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1,
+            ...     direction='longonly'
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -1.0
+            4    0.0
+            dtype: float64
 
-        >>> # Using direction-aware arrays instead of `direction`
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
-        ...     exits=pd.Series([False, False, True, True, True]),  # long_exits
-        ...     short_entries=False,
-        ...     short_exits=False,
-        ...     size=1
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3   -1.0
-        4    0.0
-        dtype: float64
-        ```
+            >>> # Using direction-aware arrays instead of `direction`
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
+            ...     exits=pd.Series([False, False, True, True, True]),  # long_exits
+            ...     short_entries=False,
+            ...     short_exits=False,
+            ...     size=1
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -1.0
+            4    0.0
+            dtype: float64
+            ```
 
-        Notice how both `short_entries` and `short_exits` are provided as constants - as any other
-        broadcastable argument, they are treated as arrays where each element is False.
+            Notice how both `short_entries` and `short_exits` are provided as constants - as any other
+            broadcastable argument, they are treated as arrays where each element is False.
 
-        * Entry opens short, exit closes short:
+            * Entry opens short, exit closes short:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1,
-        ...     direction='shortonly'
-        ... )
-        >>> pf.asset_flow()
-        0   -1.0
-        1    0.0
-        2    0.0
-        3    1.0
-        4    0.0
-        dtype: float64
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1,
+            ...     direction='shortonly'
+            ... )
+            >>> pf.asset_flow()
+            0   -1.0
+            1    0.0
+            2    0.0
+            3    1.0
+            4    0.0
+            dtype: float64
 
-        >>> # Using direction-aware arrays instead of `direction`
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=False,  # long_entries
-        ...     exits=False,  # long_exits
-        ...     short_entries=pd.Series([True, True, True, False, False]),
-        ...     short_exits=pd.Series([False, False, True, True, True]),
-        ...     size=1
-        ... )
-        >>> pf.asset_flow()
-        0   -1.0
-        1    0.0
-        2    0.0
-        3    1.0
-        4    0.0
-        dtype: float64
-        ```
+            >>> # Using direction-aware arrays instead of `direction`
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=False,  # long_entries
+            ...     exits=False,  # long_exits
+            ...     short_entries=pd.Series([True, True, True, False, False]),
+            ...     short_exits=pd.Series([False, False, True, True, True]),
+            ...     size=1
+            ... )
+            >>> pf.asset_flow()
+            0   -1.0
+            1    0.0
+            2    0.0
+            3    1.0
+            4    0.0
+            dtype: float64
+            ```
 
-        * Entry opens long and closes short, exit closes long and opens short:
+            * Entry opens long and closes short, exit closes long and opens short:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1,
-        ...     direction='both'
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3   -2.0
-        4    0.0
-        dtype: float64
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1,
+            ...     direction='both'
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -2.0
+            4    0.0
+            dtype: float64
 
-        >>> # Using direction-aware arrays instead of `direction`
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
-        ...     exits=False,  # long_exits
-        ...     short_entries=pd.Series([False, False, True, True, True]),
-        ...     short_exits=False,
-        ...     size=1
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3   -2.0
-        4    0.0
-        dtype: float64
-        ```
+            >>> # Using direction-aware arrays instead of `direction`
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),  # long_entries
+            ...     exits=False,  # long_exits
+            ...     short_entries=pd.Series([False, False, True, True, True]),
+            ...     short_exits=False,
+            ...     size=1
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -2.0
+            4    0.0
+            dtype: float64
+            ```
 
-        * More complex signal combinations are best expressed using direction-aware arrays.
+            * More complex signal combinations are best expressed using direction-aware arrays.
             For example, ignore opposite signals as long as the current position is open:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries      =pd.Series([True, False, False, False, False]),  # long_entries
-        ...     exits        =pd.Series([False, False, True, False, False]),  # long_exits
-        ...     short_entries=pd.Series([False, True, False, True, False]),
-        ...     short_exits  =pd.Series([False, False, False, False, True]),
-        ...     size=1,
-        ...     upon_opposite_entry='ignore'
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2   -1.0
-        3   -1.0
-        4    1.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries      =pd.Series([True, False, False, False, False]),  # long_entries
+            ...     exits        =pd.Series([False, False, True, False, False]),  # long_exits
+            ...     short_entries=pd.Series([False, True, False, True, False]),
+            ...     short_exits  =pd.Series([False, False, False, False, True]),
+            ...     size=1,
+            ...     upon_opposite_entry='ignore'
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2   -1.0
+            3   -1.0
+            4    1.0
+            dtype: float64
+            ```
 
-        * First opposite signal closes the position, second one opens a new position:
+            * First opposite signal closes the position, second one opens a new position:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1,
-        ...     direction='both',
-        ...     upon_opposite_entry='close'
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2    0.0
-        3   -1.0
-        4   -1.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1,
+            ...     direction='both',
+            ...     upon_opposite_entry='close'
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -1.0
+            4   -1.0
+            dtype: float64
+            ```
 
-        * If both long entry and exit signals are True (a signal conflict), choose exit:
+            * If both long entry and exit signals are True (a signal conflict), choose exit:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1.,
-        ...     direction='longonly',
-        ...     upon_long_conflict='exit')
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2   -1.0
-        3    0.0
-        4    0.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1.,
+            ...     direction='longonly',
+            ...     upon_long_conflict='exit')
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2   -1.0
+            3    0.0
+            4    0.0
+            dtype: float64
+            ```
 
-        * If both long entry and short entry signal are True (a direction conflict), choose short:
+            * If both long entry and short entry signal are True (a direction conflict), choose short:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1.,
-        ...     direction='both',
-        ...     upon_dir_conflict='short')
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2   -2.0
-        3    0.0
-        4    0.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1.,
+            ...     direction='both',
+            ...     upon_dir_conflict='short')
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2   -2.0
+            3    0.0
+            4    0.0
+            dtype: float64
+            ```
 
-        !!! note
-            Remember that when direction is set to 'both', entries become `long_entries` and exits become
-            `short_entries`, so this becomes a conflict of directions rather than signals.
+            !!! note
+                Remember that when direction is set to 'both', entries become `long_entries` and exits become
+                `short_entries`, so this becomes a conflict of directions rather than signals.
 
-        * If there are both signal and direction conflicts:
+            * If there are both signal and direction conflicts:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=True,  # long_entries
-        ...     exits=True,  # long_exits
-        ...     short_entries=True,
-        ...     short_exits=True,
-        ...     size=1,
-        ...     upon_long_conflict='entry',
-        ...     upon_short_conflict='entry',
-        ...     upon_dir_conflict='short'
-        ... )
-        >>> pf.asset_flow()
-        0   -1.0
-        1    0.0
-        2    0.0
-        3    0.0
-        4    0.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=True,  # long_entries
+            ...     exits=True,  # long_exits
+            ...     short_entries=True,
+            ...     short_exits=True,
+            ...     size=1,
+            ...     upon_long_conflict='entry',
+            ...     upon_short_conflict='entry',
+            ...     upon_dir_conflict='short'
+            ... )
+            >>> pf.asset_flow()
+            0   -1.0
+            1    0.0
+            2    0.0
+            3    0.0
+            4    0.0
+            dtype: float64
+            ```
 
-        * Turn on accumulation of signals. Entry means long order, exit means short order
+            * Turn on accumulation of signals. Entry means long order, exit means short order
             (acts similar to `from_orders`):
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1.,
-        ...     direction='both',
-        ...     accumulate=True)
-        >>> pf.asset_flow()
-        0    1.0
-        1    1.0
-        2    0.0
-        3   -1.0
-        4   -1.0
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1.,
+            ...     direction='both',
+            ...     accumulate=True)
+            >>> pf.asset_flow()
+            0    1.0
+            1    1.0
+            2    0.0
+            3   -1.0
+            4   -1.0
+            dtype: float64
+            ```
 
-        * Allow increasing a position (of any direction), deny decreasing a position:
+            * Allow increasing a position (of any direction), deny decreasing a position:
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     size=1.,
-        ...     direction='both',
-        ...     accumulate='addonly')
-        >>> pf.asset_flow()
-        0    1.0  << open a long position
-        1    1.0  << add to the position
-        2    0.0
-        3   -3.0  << close and open a short position
-        4   -1.0  << add to the position
-        dtype: float64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     size=1.,
+            ...     direction='both',
+            ...     accumulate='addonly')
+            >>> pf.asset_flow()
+            0    1.0  << open a long position
+            1    1.0  << add to the position
+            2    0.0
+            3   -3.0  << close and open a short position
+            4   -1.0  << add to the position
+            dtype: float64
+            ```
 
-        * Testing multiple parameters (via broadcasting):
+            * Testing multiple parameters (via broadcasting):
 
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close,
-        ...     entries=pd.Series([True, True, True, False, False]),
-        ...     exits=pd.Series([False, False, True, True, True]),
-        ...     direction=[list(Direction)],
-        ...     broadcast_kwargs=dict(columns_from=Direction._fields))
-        >>> pf.asset_flow()
-            Long  Short    All
-        0  100.0 -100.0  100.0
-        1    0.0    0.0    0.0
-        2    0.0    0.0    0.0
-        3 -100.0   50.0 -200.0
-        4    0.0    0.0    0.0
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close,
+            ...     entries=pd.Series([True, True, True, False, False]),
+            ...     exits=pd.Series([False, False, True, True, True]),
+            ...     direction=[list(Direction)],
+            ...     broadcast_kwargs=dict(columns_from=Direction._fields))
+            >>> pf.asset_flow()
+                Long  Short    All
+            0  100.0 -100.0  100.0
+            1    0.0    0.0    0.0
+            2    0.0    0.0    0.0
+            3 -100.0   50.0 -200.0
+            4    0.0    0.0    0.0
+            ```
 
-        * Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
+            * Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
 
-        ```python-repl
-        >>> close = pd.Series([10, 11, 12, 11, 10, 9])
-        >>> entries = pd.Series([True, False, False, False, False, False])
-        >>> exits = pd.Series([False, False, False, False, False, True])
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits,
-        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.2)  # take profit hit
-        >>> pf.asset_flow()
-        0    10.0
-        1     0.0
-        2   -10.0
-        3     0.0
-        4     0.0
-        5     0.0
-        dtype: float64
+            ```pycon
+            >>> close = pd.Series([10, 11, 12, 11, 10, 9])
+            >>> entries = pd.Series([True, False, False, False, False, False])
+            >>> exits = pd.Series([False, False, False, False, False, True])
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close, entries, exits,
+            ...     sl_stop=0.1, sl_trail=True, tp_stop=0.2)  # take profit hit
+            >>> pf.asset_flow()
+            0    10.0
+            1     0.0
+            2   -10.0
+            3     0.0
+            4     0.0
+            5     0.0
+            dtype: float64
 
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits,
-        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.3)  # stop loss hit
-        >>> pf.asset_flow()
-        0    10.0
-        1     0.0
-        2     0.0
-        3     0.0
-        4   -10.0
-        5     0.0
-        dtype: float64
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close, entries, exits,
+            ...     sl_stop=0.1, sl_trail=True, tp_stop=0.3)  # stop loss hit
+            >>> pf.asset_flow()
+            0    10.0
+            1     0.0
+            2     0.0
+            3     0.0
+            4   -10.0
+            5     0.0
+            dtype: float64
 
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close, entries, exits,
-        ...     sl_stop=np.inf, sl_trail=True, tp_stop=np.inf)  # nothing hit, exit as usual
-        >>> pf.asset_flow()
-        0    10.0
-        1     0.0
-        2     0.0
-        3     0.0
-        4     0.0
-        5   -10.0
-        dtype: float64
-        ```
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     close, entries, exits,
+            ...     sl_stop=np.inf, sl_trail=True, tp_stop=np.inf)  # nothing hit, exit as usual
+            >>> pf.asset_flow()
+            0    10.0
+            1     0.0
+            2     0.0
+            3     0.0
+            4     0.0
+            5   -10.0
+            dtype: float64
+            ```
 
-        !!! note
-            When the stop price is hit, the stop signal invalidates any other signal defined for this bar.
-            Thus, make sure that your signaling logic happens at the very end of the bar
-            (for example, by using the closing price), otherwise you may expose yourself to a look-ahead bias.
+            !!! note
+                When the stop price is hit, the stop signal invalidates any other signal defined for this bar.
+                Thus, make sure that your signaling logic happens at the very end of the bar
+                (for example, by using the closing price), otherwise you may expose yourself to a look-ahead bias.
 
-            See `vectorbt.portfolio.enums.StopExitPrice` for more details.
+                See `vectorbt.portfolio.enums.StopExitPrice` for more details.
 
-        * We can implement our own stop loss or take profit, or adjust the existing one at each time step.
-        Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
+            * We can implement our own stop loss or take profit, or adjust the existing one at each time step.
+            Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
 
-        ```python-repl
-        >>> @njit
-        ... def adjust_sl_func_nb(c):
-        ...     current_profit = (c.val_price_now - c.init_price) / c.init_price
-        ...     if current_profit >= 0.40:
-        ...         return 0.25, True
-        ...     elif current_profit >= 0.25:
-        ...         return 0.15, True
-        ...     elif current_profit >= 0.20:
-        ...         return 0.07, True
-        ...     return c.curr_stop, c.curr_trail
+            ```pycon
+            >>> @njit
+            ... def adjust_sl_func_nb(c):
+            ...     current_profit = (c.val_price_now - c.init_price) / c.init_price
+            ...     if current_profit >= 0.40:
+            ...         return 0.25, True
+            ...     elif current_profit >= 0.25:
+            ...         return 0.15, True
+            ...     elif current_profit >= 0.20:
+            ...         return 0.07, True
+            ...     return c.curr_stop, c.curr_trail
 
-        >>> close = pd.Series([10, 11, 12, 11, 10])
-        >>> pf = vbt.Portfolio.from_signals(close, adjust_sl_func_nb=adjust_sl_func_nb)
-        >>> pf.asset_flow()
-        0    10.0
-        1     0.0
-        2     0.0
-        3   -10.0  # 7% from 12 hit
-        4    11.0
-        dtype: float64
-        ```
+            >>> close = pd.Series([10, 11, 12, 11, 10])
+            >>> pf = vbt.Portfolio.from_signals(close, adjust_sl_func_nb=adjust_sl_func_nb)
+            >>> pf.asset_flow()
+            0    10.0
+            1     0.0
+            2     0.0
+            3   -10.0  # 7% from 12 hit
+            4    11.0
+            dtype: float64
+            ```
 
-        * Sometimes there is a need to provide or transform signals dynamically. For this, we can implement
-        a custom signal function `signal_func_nb`. For example, let's implement a signal function that
-        takes two numerical arrays - long and short one - and transforms them into 4 direction-aware boolean
-        arrays that vectorbt understands:
+            * Sometimes there is a need to provide or transform signals dynamically. For this, we can implement
+            a custom signal function `signal_func_nb`. For example, let's implement a signal function that
+            takes two numerical arrays - long and short one - and transforms them into 4 direction-aware boolean
+            arrays that vectorbt understands:
 
-        ```python-repl
-        >>> @njit
-        ... def signal_func_nb(c, long_num_arr, short_num_arr):
-        ...     long_num = nb.get_elem_nb(c, long_num_arr)
-        ...     short_num = nb.get_elem_nb(c, short_num_arr)
-        ...     is_long_entry = long_num > 0
-        ...     is_long_exit = long_num < 0
-        ...     is_short_entry = short_num > 0
-        ...     is_short_exit = short_num < 0
-        ...     return is_long_entry, is_long_exit, is_short_entry, is_short_exit
+            ```pycon
+            >>> @njit
+            ... def signal_func_nb(c, long_num_arr, short_num_arr):
+            ...     long_num = nb.get_elem_nb(c, long_num_arr)
+            ...     short_num = nb.get_elem_nb(c, short_num_arr)
+            ...     is_long_entry = long_num > 0
+            ...     is_long_exit = long_num < 0
+            ...     is_short_entry = short_num > 0
+            ...     is_short_exit = short_num < 0
+            ...     return is_long_entry, is_long_exit, is_short_entry, is_short_exit
 
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     signal_func_nb=signal_func_nb,
-        ...     signal_args=(vbt.Rep('long_num_arr'), vbt.Rep('short_num_arr')),
-        ...     broadcast_named_args=dict(
-        ...         long_num_arr=pd.Series([1, 0, -1, 0, 0]),
-        ...         short_num_arr=pd.Series([0, 1, 0, 1, -1])
-        ...     ),
-        ...     size=1,
-        ...     upon_opposite_entry='ignore'
-        ... )
-        >>> pf.asset_flow()
-        0    1.0
-        1    0.0
-        2   -1.0
-        3   -1.0
-        4    1.0
-        dtype: float64
-        ```
+            >>> pf = vbt.Portfolio.from_signals(
+            ...     pd.Series([1, 2, 3, 4, 5]),
+            ...     signal_func_nb=signal_func_nb,
+            ...     signal_args=(vbt.Rep('long_num_arr'), vbt.Rep('short_num_arr')),
+            ...     broadcast_named_args=dict(
+            ...         long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+            ...         short_num_arr=pd.Series([0, 1, 0, 1, -1])
+            ...     ),
+            ...     size=1,
+            ...     upon_opposite_entry='ignore'
+            ... )
+            >>> pf.asset_flow()
+            0    1.0
+            1    0.0
+            2   -1.0
+            3   -1.0
+            4    1.0
+            dtype: float64
+            ```
 
-        Passing both arrays as `broadcast_named_args` broadcasts them internally as any other array,
-        so we don't have to worry about their dimensions every time we change our data.
+            Passing both arrays as `broadcast_named_args` broadcasts them internally as any other array,
+            so we don't have to worry about their dimensions every time we change our data.
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -3027,7 +3025,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         Based on `Portfolio.from_signals`.
 
-        ```python-repl
+        ```pycon
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> pf = vbt.Portfolio.from_holding(close)
         >>> pf.final_value()
@@ -3060,43 +3058,42 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             To generate random signals, the shape of `close` is used. Broadcasting with other
             arrays happens after the generation.
 
-        ## Example
+        Usage:
+            * Test multiple combinations of random entries and exits:
 
-        * Test multiple combinations of random entries and exits:
+            ```pycon
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> pf = vbt.Portfolio.from_random_signals(close, n=[2, 1, 0], seed=42)
+            >>> pf.orders.count()
+            randnx_n
+            2    4
+            1    2
+            0    0
+            Name: count, dtype: int64
+            ```
 
-        ```python-repl
-        >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> pf = vbt.Portfolio.from_random_signals(close, n=[2, 1, 0], seed=42)
-        >>> pf.orders.count()
-        randnx_n
-        2    4
-        1    2
-        0    0
-        Name: count, dtype: int64
-        ```
+            * Test the Cartesian product of entry and exit encounter probabilities:
 
-        * Test the Cartesian product of entry and exit encounter probabilities:
-
-        ```python-repl
-        >>> pf = vbt.Portfolio.from_random_signals(
-        ...     close,
-        ...     entry_prob=[0, 0.5, 1],
-        ...     exit_prob=[0, 0.5, 1],
-        ...     param_product=True,
-        ...     seed=42)
-        >>> pf.orders.count()
-        rprobnx_entry_prob  rprobnx_exit_prob
-        0.0                 0.0                  0
-                            0.5                  0
-                            1.0                  0
-        0.5                 0.0                  1
-                            0.5                  4
-                            1.0                  3
-        1.0                 0.0                  1
-                            0.5                  4
-                            1.0                  5
-        Name: count, dtype: int64
-        ```
+            ```pycon
+            >>> pf = vbt.Portfolio.from_random_signals(
+            ...     close,
+            ...     entry_prob=[0, 0.5, 1],
+            ...     exit_prob=[0, 0.5, 1],
+            ...     param_product=True,
+            ...     seed=42)
+            >>> pf.orders.count()
+            rprobnx_entry_prob  rprobnx_exit_prob
+            0.0                 0.0                  0
+                                0.5                  0
+                                1.0                  0
+            0.5                 0.0                  1
+                                0.5                  4
+                                1.0                  3
+            1.0                 0.0                  1
+                                0.5                  4
+                                1.0                  5
+            Name: count, dtype: int64
+            ```
         """
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
@@ -3322,320 +3319,319 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             since the price of an order is unknown before the call (which is more realistic by the way).
             You can still override the valuation price in `pre_segment_func_nb`.
 
-        ## Example
+        Usage:
+            * Buy 10 units each tick using closing price:
 
-        * Buy 10 units each tick using closing price:
+            ```pycon
+            >>> @njit
+            ... def order_func_nb(c, size):
+            ...     return nb.order_nb(size=size)
 
-        ```python-repl
-        >>> @njit
-        ... def order_func_nb(c, size):
-        ...     return nb.order_nb(size=size)
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> pf = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
 
-        >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> pf = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
+            >>> pf.assets()
+            0    10.0
+            1    20.0
+            2    30.0
+            3    40.0
+            4    40.0
+            dtype: float64
+            >>> pf.cash()
+            0    90.0
+            1    70.0
+            2    40.0
+            3     0.0
+            4     0.0
+            dtype: float64
+            ```
 
-        >>> pf.assets()
-        0    10.0
-        1    20.0
-        2    30.0
-        3    40.0
-        4    40.0
-        dtype: float64
-        >>> pf.cash()
-        0    90.0
-        1    70.0
-        2    40.0
-        3     0.0
-        4     0.0
-        dtype: float64
-        ```
+            * Reverse each position by first closing it. Keep state of last position to determine
+            which position to open next (just as an example, there are easier ways to do this):
 
-        * Reverse each position by first closing it. Keep state of last position to determine
-        which position to open next (just as an example, there are easier ways to do this):
+            ```pycon
+            >>> @njit
+            ... def pre_group_func_nb(c):
+            ...     last_pos_state = np.array([-1])
+            ...     return (last_pos_state,)
 
-        ```python-repl
-        >>> @njit
-        ... def pre_group_func_nb(c):
-        ...     last_pos_state = np.array([-1])
-        ...     return (last_pos_state,)
+            >>> @njit
+            ... def order_func_nb(c, last_pos_state):
+            ...     if c.position_now != 0:
+            ...         return nb.close_position_nb()
+            ...
+            ...     if last_pos_state[0] == 1:
+            ...         size = -np.inf  # open short
+            ...         last_pos_state[0] = -1
+            ...     else:
+            ...         size = np.inf  # open long
+            ...         last_pos_state[0] = 1
+            ...     return nb.order_nb(size=size)
 
-        >>> @njit
-        ... def order_func_nb(c, last_pos_state):
-        ...     if c.position_now != 0:
-        ...         return nb.close_position_nb()
-        ...
-        ...     if last_pos_state[0] == 1:
-        ...         size = -np.inf  # open short
-        ...         last_pos_state[0] = -1
-        ...     else:
-        ...         size = np.inf  # open long
-        ...         last_pos_state[0] = 1
-        ...     return nb.order_nb(size=size)
+            >>> pf = vbt.Portfolio.from_order_func(
+            ...     close,
+            ...     order_func_nb,
+            ...     pre_group_func_nb=pre_group_func_nb
+            ... )
 
-        >>> pf = vbt.Portfolio.from_order_func(
-        ...     close,
-        ...     order_func_nb,
-        ...     pre_group_func_nb=pre_group_func_nb
-        ... )
+            >>> pf.assets()
+            0    100.000000
+            1      0.000000
+            2    -66.666667
+            3      0.000000
+            4     26.666667
+            dtype: float64
+            >>> pf.cash()
+            0      0.000000
+            1    200.000000
+            2    400.000000
+            3    133.333333
+            4      0.000000
+            dtype: float64
+            ```
 
-        >>> pf.assets()
-        0    100.000000
-        1      0.000000
-        2    -66.666667
-        3      0.000000
-        4     26.666667
-        dtype: float64
-        >>> pf.cash()
-        0      0.000000
-        1    200.000000
-        2    400.000000
-        3    133.333333
-        4      0.000000
-        dtype: float64
-        ```
+            * Equal-weighted portfolio as in the example under `vectorbt.portfolio.nb.simulate_nb`:
 
-        * Equal-weighted portfolio as in the example under `vectorbt.portfolio.nb.simulate_nb`:
+            ```pycon
+            >>> @njit
+            ... def pre_group_func_nb(c):
+            ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
+            ...     return (order_value_out,)
 
-        ```python-repl
-        >>> @njit
-        ... def pre_group_func_nb(c):
-        ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
-        ...     return (order_value_out,)
+            >>> @njit
+            ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
+            ...     for col in range(c.from_col, c.to_col):
+            ...         c.last_val_price[col] = nb.get_col_elem_nb(c, col, price)
+            ...     nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
+            ...     return ()
 
-        >>> @njit
-        ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
-        ...     for col in range(c.from_col, c.to_col):
-        ...         c.last_val_price[col] = nb.get_col_elem_nb(c, col, price)
-        ...     nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
-        ...     return ()
+            >>> @njit
+            ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
+            ...     return nb.order_nb(
+            ...         size=nb.get_elem_nb(c, size),
+            ...         price=nb.get_elem_nb(c, price),
+            ...         size_type=nb.get_elem_nb(c, size_type),
+            ...         direction=nb.get_elem_nb(c, direction),
+            ...         fees=nb.get_elem_nb(c, fees),
+            ...         fixed_fees=nb.get_elem_nb(c, fixed_fees),
+            ...         slippage=nb.get_elem_nb(c, slippage)
+            ...     )
 
-        >>> @njit
-        ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
-        ...     return nb.order_nb(
-        ...         size=nb.get_elem_nb(c, size),
-        ...         price=nb.get_elem_nb(c, price),
-        ...         size_type=nb.get_elem_nb(c, size_type),
-        ...         direction=nb.get_elem_nb(c, direction),
-        ...         fees=nb.get_elem_nb(c, fees),
-        ...         fixed_fees=nb.get_elem_nb(c, fixed_fees),
-        ...         slippage=nb.get_elem_nb(c, slippage)
-        ...     )
+            >>> np.random.seed(42)
+            >>> close = np.random.uniform(1, 10, size=(5, 3))
+            >>> size_template = vbt.RepEval('np.asarray(1 / group_lens[0])')
 
-        >>> np.random.seed(42)
-        >>> close = np.random.uniform(1, 10, size=(5, 3))
-        >>> size_template = vbt.RepEval('np.asarray(1 / group_lens[0])')
+            >>> pf = vbt.Portfolio.from_order_func(
+            ...     close,
+            ...     order_func_nb,
+            ...     size_template,  # order_args as *args
+            ...     vbt.Rep('price'),
+            ...     vbt.Rep('size_type'),
+            ...     vbt.Rep('direction'),
+            ...     vbt.Rep('fees'),
+            ...     vbt.Rep('fixed_fees'),
+            ...     vbt.Rep('slippage'),
+            ...     segment_mask=2,  # rebalance every second tick
+            ...     pre_group_func_nb=pre_group_func_nb,
+            ...     pre_segment_func_nb=pre_segment_func_nb,
+            ...     pre_segment_args=(
+            ...         size_template,
+            ...         vbt.Rep('price'),
+            ...         vbt.Rep('size_type'),
+            ...         vbt.Rep('direction')
+            ...     ),
+            ...     broadcast_named_args=dict(  # broadcast against each other
+            ...         price=close,
+            ...         size_type=SizeType.TargetPercent,
+            ...         direction=Direction.LongOnly,
+            ...         fees=0.001,
+            ...         fixed_fees=1.,
+            ...         slippage=0.001
+            ...     ),
+            ...     template_mapping=dict(np=np),  # required by size_template
+            ...     cash_sharing=True, group_by=True,  # one group with cash sharing
+            ... )
 
-        >>> pf = vbt.Portfolio.from_order_func(
-        ...     close,
-        ...     order_func_nb,
-        ...     size_template,  # order_args as *args
-        ...     vbt.Rep('price'),
-        ...     vbt.Rep('size_type'),
-        ...     vbt.Rep('direction'),
-        ...     vbt.Rep('fees'),
-        ...     vbt.Rep('fixed_fees'),
-        ...     vbt.Rep('slippage'),
-        ...     segment_mask=2,  # rebalance every second tick
-        ...     pre_group_func_nb=pre_group_func_nb,
-        ...     pre_segment_func_nb=pre_segment_func_nb,
-        ...     pre_segment_args=(
-        ...         size_template,
-        ...         vbt.Rep('price'),
-        ...         vbt.Rep('size_type'),
-        ...         vbt.Rep('direction')
-        ...     ),
-        ...     broadcast_named_args=dict(  # broadcast against each other
-        ...         price=close,
-        ...         size_type=SizeType.TargetPercent,
-        ...         direction=Direction.LongOnly,
-        ...         fees=0.001,
-        ...         fixed_fees=1.,
-        ...         slippage=0.001
-        ...     ),
-        ...     template_mapping=dict(np=np),  # required by size_template
-        ...     cash_sharing=True, group_by=True,  # one group with cash sharing
-        ... )
+            >>> pf.asset_value(group_by=False).vbt.plot()
+            ```
 
-        >>> pf.asset_value(group_by=False).vbt.plot()
-        ```
+            ![](/assets/images/simulate_nb.svg)
 
-        ![](/docs/img/simulate_nb.svg)
+            Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
+            before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
+            to broadcast some arguments against each other and templates to pass those objects to callbacks.
+            Additionally, we used an evaluation template to compute the size based on the number of assets in each group.
 
-        Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
-        before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
-        to broadcast some arguments against each other and templates to pass those objects to callbacks.
-        Additionally, we used an evaluation template to compute the size based on the number of assets in each group.
+            You may ask: why should we bother using broadcasting and templates if we could just pass `size=1/3`?
+            Because of flexibility those features provide: we can now pass whatever parameter combinations we want
+            and it will work flawlessly. For example, to create two groups of equally-allocated positions,
+            we need to change only two parameters:
 
-        You may ask: why should we bother using broadcasting and templates if we could just pass `size=1/3`?
-        Because of flexibility those features provide: we can now pass whatever parameter combinations we want
-        and it will work flawlessly. For example, to create two groups of equally-allocated positions,
-        we need to change only two parameters:
+            ```pycon
+            >>> close = np.random.uniform(1, 10, size=(5, 6))  # 6 columns instead of 3
+            >>> group_by = ['g1', 'g1', 'g1', 'g2', 'g2', 'g2']  # 2 groups instead of 1
 
-        ```python-repl
-        >>> close = np.random.uniform(1, 10, size=(5, 6))  # 6 columns instead of 3
-        >>> group_by = ['g1', 'g1', 'g1', 'g2', 'g2', 'g2']  # 2 groups instead of 1
+            >>> pf['g1'].asset_value(group_by=False).vbt.plot()
+            >>> pf['g2'].asset_value(group_by=False).vbt.plot()
+            ```
 
-        >>> pf['g1'].asset_value(group_by=False).vbt.plot()
-        >>> pf['g2'].asset_value(group_by=False).vbt.plot()
-        ```
+            ![](/assets/images/from_order_func_g1.svg)
 
-        ![](/docs/img/from_order_func_g1.svg)
+            ![](/assets/images/from_order_func_g2.svg)
 
-        ![](/docs/img/from_order_func_g2.svg)
+            * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
-        * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
+            ```pycon
+            >>> @njit
+            ... def pre_sim_func_nb(c):
+            ...     # We need to define stop price per column once
+            ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
+            ...     return (stop_price,)
 
-        ```python-repl
-        >>> @njit
-        ... def pre_sim_func_nb(c):
-        ...     # We need to define stop price per column once
-        ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
-        ...     return (stop_price,)
+            >>> @njit
+            ... def order_func_nb(c, stop_price, entries, exits, size):
+            ...     # Select info related to this order
+            ...     entry_now = nb.get_elem_nb(c, entries)
+            ...     exit_now = nb.get_elem_nb(c, exits)
+            ...     size_now = nb.get_elem_nb(c, size)
+            ...     price_now = nb.get_elem_nb(c, c.close)
+            ...     stop_price_now = stop_price[c.col]
+            ...
+            ...     # Our logic
+            ...     if entry_now:
+            ...         if c.position_now == 0:
+            ...             return nb.order_nb(
+            ...                 size=size_now,
+            ...                 price=price_now,
+            ...                 direction=Direction.LongOnly)
+            ...     elif exit_now or price_now >= stop_price_now:
+            ...         if c.position_now > 0:
+            ...             return nb.order_nb(
+            ...                 size=-size_now,
+            ...                 price=price_now,
+            ...                 direction=Direction.LongOnly)
+            ...     return NoOrder
 
-        >>> @njit
-        ... def order_func_nb(c, stop_price, entries, exits, size):
-        ...     # Select info related to this order
-        ...     entry_now = nb.get_elem_nb(c, entries)
-        ...     exit_now = nb.get_elem_nb(c, exits)
-        ...     size_now = nb.get_elem_nb(c, size)
-        ...     price_now = nb.get_elem_nb(c, c.close)
-        ...     stop_price_now = stop_price[c.col]
-        ...
-        ...     # Our logic
-        ...     if entry_now:
-        ...         if c.position_now == 0:
-        ...             return nb.order_nb(
-        ...                 size=size_now,
-        ...                 price=price_now,
-        ...                 direction=Direction.LongOnly)
-        ...     elif exit_now or price_now >= stop_price_now:
-        ...         if c.position_now > 0:
-        ...             return nb.order_nb(
-        ...                 size=-size_now,
-        ...                 price=price_now,
-        ...                 direction=Direction.LongOnly)
-        ...     return NoOrder
+            >>> @njit
+            ... def post_order_func_nb(c, stop_price, stop):
+            ...     # Same broadcasting as for size
+            ...     stop_now = nb.get_elem_nb(c, stop)
+            ...
+            ...     if c.order_result.status == OrderStatus.Filled:
+            ...         if c.order_result.side == OrderSide.Buy:
+            ...             # Position entered: Set stop condition
+            ...             stop_price[c.col] = (1 + stop_now) * c.order_result.price
+            ...         else:
+            ...             # Position exited: Remove stop condition
+            ...             stop_price[c.col] = np.nan
 
-        >>> @njit
-        ... def post_order_func_nb(c, stop_price, stop):
-        ...     # Same broadcasting as for size
-        ...     stop_now = nb.get_elem_nb(c, stop)
-        ...
-        ...     if c.order_result.status == OrderStatus.Filled:
-        ...         if c.order_result.side == OrderSide.Buy:
-        ...             # Position entered: Set stop condition
-        ...             stop_price[c.col] = (1 + stop_now) * c.order_result.price
-        ...         else:
-        ...             # Position exited: Remove stop condition
-        ...             stop_price[c.col] = np.nan
+            >>> def simulate(close, entries, exits, size, threshold):
+            ...     return vbt.Portfolio.from_order_func(
+            ...         close,
+            ...         order_func_nb,
+            ...         vbt.Rep('entries'), vbt.Rep('exits'), vbt.Rep('size'),  # order_args
+            ...         pre_sim_func_nb=pre_sim_func_nb,
+            ...         post_order_func_nb=post_order_func_nb,
+            ...         post_order_args=(vbt.Rep('threshold'),),
+            ...         broadcast_named_args=dict(  # broadcast against each other
+            ...             entries=entries,
+            ...             exits=exits,
+            ...             size=size,
+            ...             threshold=threshold
+            ...         )
+            ...     )
 
-        >>> def simulate(close, entries, exits, size, threshold):
-        ...     return vbt.Portfolio.from_order_func(
-        ...         close,
-        ...         order_func_nb,
-        ...         vbt.Rep('entries'), vbt.Rep('exits'), vbt.Rep('size'),  # order_args
-        ...         pre_sim_func_nb=pre_sim_func_nb,
-        ...         post_order_func_nb=post_order_func_nb,
-        ...         post_order_args=(vbt.Rep('threshold'),),
-        ...         broadcast_named_args=dict(  # broadcast against each other
-        ...             entries=entries,
-        ...             exits=exits,
-        ...             size=size,
-        ...             threshold=threshold
-        ...         )
-        ...     )
+            >>> close = pd.Series([10, 11, 12, 13, 14])
+            >>> entries = pd.Series([True, True, False, False, False])
+            >>> exits = pd.Series([False, False, False, True, True])
+            >>> simulate(close, entries, exits, np.inf, 0.1).asset_flow()
+            0    10.0
+            1     0.0
+            2   -10.0
+            3     0.0
+            4     0.0
+            dtype: float64
 
-        >>> close = pd.Series([10, 11, 12, 13, 14])
-        >>> entries = pd.Series([True, True, False, False, False])
-        >>> exits = pd.Series([False, False, False, True, True])
-        >>> simulate(close, entries, exits, np.inf, 0.1).asset_flow()
-        0    10.0
-        1     0.0
-        2   -10.0
-        3     0.0
-        4     0.0
-        dtype: float64
+            >>> simulate(close, entries, exits, np.inf, 0.2).asset_flow()
+            0    10.0
+            1     0.0
+            2   -10.0
+            3     0.0
+            4     0.0
+            dtype: float64
 
-        >>> simulate(close, entries, exits, np.inf, 0.2).asset_flow()
-        0    10.0
-        1     0.0
-        2   -10.0
-        3     0.0
-        4     0.0
-        dtype: float64
+            >>> simulate(close, entries, exits, np.nan).asset_flow()
+            0    10.0
+            1     0.0
+            2     0.0
+            3   -10.0
+            4     0.0
+            dtype: float64
+            ```
 
-        >>> simulate(close, entries, exits, np.nan).asset_flow()
-        0    10.0
-        1     0.0
-        2     0.0
-        3   -10.0
-        4     0.0
-        dtype: float64
-        ```
+            The reason why stop of 10% does not result in an order at the second time step is because
+            it comes at the same time as entry, so it must wait until no entry is present.
+            This can be changed by replacing the statement "elif" with "if", which would execute
+            an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
+            `Portfolio.from_signals`).
 
-        The reason why stop of 10% does not result in an order at the second time step is because
-        it comes at the same time as entry, so it must wait until no entry is present.
-        This can be changed by replacing the statement "elif" with "if", which would execute
-        an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
-        `Portfolio.from_signals`).
+            We can also test the parameter combinations above all at once (thanks to broadcasting):
 
-        We can also test the parameter combinations above all at once (thanks to broadcasting):
+            ```pycon
+            >>> size = pd.DataFrame(
+            ...     [[0.1, 0.2, np.nan]],
+            ...     columns=pd.Index(['0.1', '0.2', 'nan'], name='size')
+            ... )
+            >>> simulate(close, entries, exits, np.inf, size).asset_flow()
+            size   0.1   0.2   nan
+            0     10.0  10.0  10.0
+            1      0.0   0.0   0.0
+            2    -10.0 -10.0   0.0
+            3      0.0   0.0 -10.0
+            4      0.0   0.0   0.0
+            ```
 
-        ```python-repl
-        >>> size = pd.DataFrame(
-        ...     [[0.1, 0.2, np.nan]],
-        ...     columns=pd.Index(['0.1', '0.2', 'nan'], name='size')
-        ... )
-        >>> simulate(close, entries, exits, np.inf, size).asset_flow()
-        size   0.1   0.2   nan
-        0     10.0  10.0  10.0
-        1      0.0   0.0   0.0
-        2    -10.0 -10.0   0.0
-        3      0.0   0.0 -10.0
-        4      0.0   0.0   0.0
-        ```
+            * Let's illustrate how to generate multiple orders per symbol and bar.
+            For each bar, buy at open and sell at close:
 
-        * Let's illustrate how to generate multiple orders per symbol and bar.
-        For each bar, buy at open and sell at close:
+            ```pycon
+            >>> @njit
+            ... def flex_order_func_nb(c, open, size):
+            ...     if c.call_idx == 0:
+            ...         return c.from_col, nb.order_nb(size=size, price=open[c.i, c.from_col])
+            ...     if c.call_idx == 1:
+            ...         return c.from_col, nb.close_position_nb(price=c.close[c.i, c.from_col])
+            ...     return -1, NoOrder
 
-        ```python-repl
-        >>> @njit
-        ... def flex_order_func_nb(c, open, size):
-        ...     if c.call_idx == 0:
-        ...         return c.from_col, nb.order_nb(size=size, price=open[c.i, c.from_col])
-        ...     if c.call_idx == 1:
-        ...         return c.from_col, nb.close_position_nb(price=c.close[c.i, c.from_col])
-        ...     return -1, NoOrder
+            >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
+            >>> close = pd.DataFrame({'a': [2, 3, 4], 'b': [3, 4, 5]})
+            >>> size = 1
+            >>> pf = vbt.Portfolio.from_order_func(
+            ...     close,
+            ...     flex_order_func_nb,
+            ...     to_2d_array(open), size,
+            ...     flexible=True, max_orders=close.shape[0] * close.shape[1] * 2)
 
-        >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
-        >>> close = pd.DataFrame({'a': [2, 3, 4], 'b': [3, 4, 5]})
-        >>> size = 1
-        >>> pf = vbt.Portfolio.from_order_func(
-        ...     close,
-        ...     flex_order_func_nb,
-        ...     to_2d_array(open), size,
-        ...     flexible=True, max_orders=close.shape[0] * close.shape[1] * 2)
+            >>> pf.orders.records_readable
+                Order Id  Timestamp Column  Size  Price  Fees  Side
+            0          0          0      a   1.0    1.0   0.0   Buy
+            1          1          0      a   1.0    2.0   0.0  Sell
+            2          2          1      a   1.0    2.0   0.0   Buy
+            3          3          1      a   1.0    3.0   0.0  Sell
+            4          4          2      a   1.0    3.0   0.0   Buy
+            5          5          2      a   1.0    4.0   0.0  Sell
+            6          6          0      b   1.0    4.0   0.0   Buy
+            7          7          0      b   1.0    3.0   0.0  Sell
+            8          8          1      b   1.0    5.0   0.0   Buy
+            9          9          1      b   1.0    4.0   0.0  Sell
+            10        10          2      b   1.0    6.0   0.0   Buy
+            11        11          2      b   1.0    5.0   0.0  Sell
+            ```
 
-        >>> pf.orders.records_readable
-            Order Id  Timestamp Column  Size  Price  Fees  Side
-        0          0          0      a   1.0    1.0   0.0   Buy
-        1          1          0      a   1.0    2.0   0.0  Sell
-        2          2          1      a   1.0    2.0   0.0   Buy
-        3          3          1      a   1.0    3.0   0.0  Sell
-        4          4          2      a   1.0    3.0   0.0   Buy
-        5          5          2      a   1.0    4.0   0.0  Sell
-        6          6          0      b   1.0    4.0   0.0   Buy
-        7          7          0      b   1.0    3.0   0.0  Sell
-        8          8          1      b   1.0    5.0   0.0   Buy
-        9          9          1      b   1.0    4.0   0.0  Sell
-        10        10          2      b   1.0    6.0   0.0   Buy
-        11        11          2      b   1.0    5.0   0.0  Sell
-        ```
-
-        !!! warning
-            Each bar is effectively a black box - we don't know how the price moves inside.
-            Since trades must come in an order that replicates that of the real world, the only reliable
-            pieces of information are the opening and the closing price.
+            !!! warning
+                Each bar is effectively a black box - we don't know how the price moves inside.
+                Since trades must come in an order that replicates that of the real world, the only reliable
+                pieces of information are the opening and the closing price.
         """
         # Get defaults
         from vectorbt._settings import settings

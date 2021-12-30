@@ -76,41 +76,40 @@ PandasIndexerT = tp.TypeVar("PandasIndexerT", bound="PandasIndexer")
 class PandasIndexer(IndexingBase):
     """Implements indexing using `iloc`, `loc`, `xs` and `__getitem__`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> from vectorbt.base.indexing import PandasIndexer
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> from vectorbt.base.indexing import PandasIndexer
+        >>> class C(PandasIndexer):
+        ...     def __init__(self, df1, df2):
+        ...         self.df1 = df1
+        ...         self.df2 = df2
+        ...         super().__init__()
+        ...
+        ...     def indexing_func(self, pd_indexing_func):
+        ...         return self.__class__(
+        ...             pd_indexing_func(self.df1),
+        ...             pd_indexing_func(self.df2)
+        ...         )
 
-    >>> class C(PandasIndexer):
-    ...     def __init__(self, df1, df2):
-    ...         self.df1 = df1
-    ...         self.df2 = df2
-    ...         super().__init__()
-    ...
-    ...     def indexing_func(self, pd_indexing_func):
-    ...         return self.__class__(
-    ...             pd_indexing_func(self.df1),
-    ...             pd_indexing_func(self.df2)
-    ...         )
+        >>> df1 = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
+        >>> df2 = pd.DataFrame({'a': [5, 6], 'b': [7, 8]})
+        >>> c = C(df1, df2)
 
-    >>> df1 = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
-    >>> df2 = pd.DataFrame({'a': [5, 6], 'b': [7, 8]})
-    >>> c = C(df1, df2)
+        >>> c.iloc[:, 0]
+        <__main__.C object at 0x1a1cacbbe0>
 
-    >>> c.iloc[:, 0]
-    <__main__.C object at 0x1a1cacbbe0>
+        >>> c.iloc[:, 0].df1
+        0    1
+        1    2
+        Name: a, dtype: int64
 
-    >>> c.iloc[:, 0].df1
-    0    1
-    1    2
-    Name: a, dtype: int64
-
-    >>> c.iloc[:, 0].df2
-    0    5
-    1    6
-    Name: a, dtype: int64
-    ```
+        >>> c.iloc[:, 0].df2
+        0    5
+        1    6
+        Name: a, dtype: int64
+        ```
     """
 
     def __init__(self, **kwargs) -> None:
@@ -242,44 +241,43 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
         class_name (str): Name of the generated class.
         module_name (str): Name of the module to which the class should be bound.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> from vectorbt.base.indexing import build_param_indexer, indexing_on_mapper
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> from vectorbt.base.indexing import build_param_indexer, indexing_on_mapper
+        >>> MyParamIndexer = build_param_indexer(['my_param'])
+        >>> class C(MyParamIndexer):
+        ...     def __init__(self, df, param_mapper):
+        ...         self.df = df
+        ...         self._my_param_mapper = param_mapper
+        ...         super().__init__([param_mapper])
+        ...
+        ...     def indexing_func(self, pd_indexing_func):
+        ...         return self.__class__(
+        ...             pd_indexing_func(self.df),
+        ...             indexing_on_mapper(self._my_param_mapper, self.df, pd_indexing_func)
+        ...         )
 
-    >>> MyParamIndexer = build_param_indexer(['my_param'])
-    >>> class C(MyParamIndexer):
-    ...     def __init__(self, df, param_mapper):
-    ...         self.df = df
-    ...         self._my_param_mapper = param_mapper
-    ...         super().__init__([param_mapper])
-    ...
-    ...     def indexing_func(self, pd_indexing_func):
-    ...         return self.__class__(
-    ...             pd_indexing_func(self.df),
-    ...             indexing_on_mapper(self._my_param_mapper, self.df, pd_indexing_func)
-    ...         )
+        >>> df = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
+        >>> param_mapper = pd.Series(['First', 'Second'], index=['a', 'b'])
+        >>> c = C(df, param_mapper)
 
-    >>> df = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
-    >>> param_mapper = pd.Series(['First', 'Second'], index=['a', 'b'])
-    >>> c = C(df, param_mapper)
+        >>> c.my_param_loc['First'].df
+        0    1
+        1    2
+        Name: a, dtype: int64
 
-    >>> c.my_param_loc['First'].df
-    0    1
-    1    2
-    Name: a, dtype: int64
+        >>> c.my_param_loc['Second'].df
+        0    3
+        1    4
+        Name: b, dtype: int64
 
-    >>> c.my_param_loc['Second'].df
-    0    3
-    1    4
-    Name: b, dtype: int64
-
-    >>> c.my_param_loc[['First', 'First', 'Second', 'Second']].df
-          a     b
-    0  1  1  3  3
-    1  2  2  4  4
-    ```
+        >>> c.my_param_loc[['First', 'First', 'Second', 'Second']].df
+              a     b
+        0  1  1  3  3
+        1  2  2  4  4
+        ```
     """
 
     class ParamIndexer(IndexingBase):

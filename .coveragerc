@@ -12,9 +12,9 @@ omit =
     */px_accessors.py
     */utils/colors.py
     */utils/figure.py
-    */utils/image.py
-    */utils/module.py
-    */utils/requests.py
+    */utils/image_.py
+    */utils/module_.py
+    */utils/requests_.py
     */generic/plotting.py
     */generic/plots_builder.py
     */data/custom.py

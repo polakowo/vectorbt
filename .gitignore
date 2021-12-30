@@ -4,5 +4,5 @@ __pycache__
 .idea
 .mypy_cache
 .pytest_cache
-pipeline.yaml
-Untitled.ipynb
+docs/docs/api
+docs/site

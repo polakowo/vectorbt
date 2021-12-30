@@ -16,84 +16,85 @@ logger = logging.getLogger(__name__)
 class DataUpdater(Configured):
     """Class for scheduling data updates.
 
-    ## Example
+    Usage:
+        * Update in the foreground:
 
-    ```python-repl
-    >>> import vectorbt as vbt
+        ```pycon
+        >>> import vectorbt as vbt
 
-    >>> class MyDataUpdater(vbt.DataUpdater):
-    ...     def __init__(self, *args, **kwargs):
-    ...         super().__init__(*args, **kwargs)
-    ...         self.update_count = 0
-    ...
-    ...     def update(self, count_limit=None):
-    ...         prev_index_len = len(self.data.wrapper.index)
-    ...         super().update()
-    ...         new_index_len = len(self.data.wrapper.index)
-    ...         print(f"Data updated with {new_index_len - prev_index_len} data points")
-    ...         self.update_count += 1
-    ...         if count_limit is not None and self.update_count >= count_limit:
-    ...             raise vbt.CancelledError
+        >>> class MyDataUpdater(vbt.DataUpdater):
+        ...     def __init__(self, *args, **kwargs):
+        ...         super().__init__(*args, **kwargs)
+        ...         self.update_count = 0
+        ...
+        ...     def update(self, count_limit=None):
+        ...         prev_index_len = len(self.data.wrapper.index)
+        ...         super().update()
+        ...         new_index_len = len(self.data.wrapper.index)
+        ...         print(f"Data updated with {new_index_len - prev_index_len} data points")
+        ...         self.update_count += 1
+        ...         if count_limit is not None and self.update_count >= count_limit:
+        ...             raise vbt.CancelledError
 
-    >>> data = vbt.GBMData.download('SYMBOL', start='1 minute ago', freq='1s')
-    >>> my_updater = MyDataUpdater(data)
-    >>> my_updater.update_every(count_limit=10)
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
+        >>> data = vbt.GBMData.download('SYMBOL', start='1 minute ago', freq='1s')
+        >>> my_updater = MyDataUpdater(data)
+        >>> my_updater.update_every(count_limit=10)
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
 
-    >>> my_updater.data.get()
-    2021-05-02 16:53:51.755347+00:00    96.830482
-    2021-05-02 16:53:52.755347+00:00    94.481883
-    2021-05-02 16:53:53.755347+00:00    94.327835
-    2021-05-02 16:53:54.755347+00:00    90.178038
-    2021-05-02 16:53:55.755347+00:00    88.260168
-                                          ...
-    2021-05-02 16:54:57.755347+00:00    99.342590
-    2021-05-02 16:54:58.755347+00:00    94.872893
-    2021-05-02 16:54:59.755347+00:00    93.212823
-    2021-05-02 16:55:00.755347+00:00    95.199882
-    2021-05-02 16:55:01.755347+00:00    93.070532
-    Freq: S, Length: 71, dtype: float64
-    ```
+        >>> my_updater.data.get()
+        2021-05-02 16:53:51.755347+00:00    96.830482
+        2021-05-02 16:53:52.755347+00:00    94.481883
+        2021-05-02 16:53:53.755347+00:00    94.327835
+        2021-05-02 16:53:54.755347+00:00    90.178038
+        2021-05-02 16:53:55.755347+00:00    88.260168
+                                              ...
+        2021-05-02 16:54:57.755347+00:00    99.342590
+        2021-05-02 16:54:58.755347+00:00    94.872893
+        2021-05-02 16:54:59.755347+00:00    93.212823
+        2021-05-02 16:55:00.755347+00:00    95.199882
+        2021-05-02 16:55:01.755347+00:00    93.070532
+        Freq: S, Length: 71, dtype: float64
+        ```
 
-    Update in the background:
+        * Update in the background:
 
-    ```python-repl
-    >>> my_updater = MyDataUpdater(my_updater.data)
-    >>> my_updater.update_every(in_background=True, count_limit=10)
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
-    Data updated with 1 data points
+        ```pycon
+        >>> my_updater = MyDataUpdater(my_updater.data)
+        >>> my_updater.update_every(in_background=True, count_limit=10)
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
+        Data updated with 1 data points
 
-    >>> my_updater.data.get()
-    2021-05-02 16:53:51.755347+00:00    96.830482
-    2021-05-02 16:53:52.755347+00:00    94.481883
-    2021-05-02 16:53:53.755347+00:00    94.327835
-    2021-05-02 16:53:54.755347+00:00    90.178038
-    2021-05-02 16:53:55.755347+00:00    88.260168
-                                          ...
-    2021-05-02 16:55:07.755347+00:00    94.502885
-    2021-05-02 16:55:08.755347+00:00    94.823707
-    2021-05-02 16:55:09.755347+00:00    92.570025
-    2021-05-02 16:55:10.755347+00:00    84.239018
-    2021-05-02 16:55:11.755347+00:00    81.294486
-    Freq: S, Length: 81, dtype: float64
-    ```
+        >>> my_updater.data.get()
+        2021-05-02 16:53:51.755347+00:00    96.830482
+        2021-05-02 16:53:52.755347+00:00    94.481883
+        2021-05-02 16:53:53.755347+00:00    94.327835
+        2021-05-02 16:53:54.755347+00:00    90.178038
+        2021-05-02 16:53:55.755347+00:00    88.260168
+                                              ...
+        2021-05-02 16:55:07.755347+00:00    94.502885
+        2021-05-02 16:55:08.755347+00:00    94.823707
+        2021-05-02 16:55:09.755347+00:00    92.570025
+        2021-05-02 16:55:10.755347+00:00    84.239018
+        2021-05-02 16:55:11.755347+00:00    81.294486
+        Freq: S, Length: 81, dtype: float64
+        ```
     """
 
     def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:

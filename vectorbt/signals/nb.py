@@ -7,7 +7,7 @@ Provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import vectorbt as vbt
 
@@ -54,24 +54,23 @@ def generate_nb(shape: tp.Shape,
             It should return an array of indices from `[from_i, to_i)` (can be empty).
         *args: Arguments passed to `choice_func_nb`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> from numba import njit
+        >>> import numpy as np
+        >>> from vectorbt.signals.nb import generate_nb
 
-    ```python-repl
-    >>> from numba import njit
-    >>> import numpy as np
-    >>> from vectorbt.signals.nb import generate_nb
+        >>> @njit
+        ... def choice_func_nb(from_i, to_i, col):
+        ...     return np.array([from_i + col])
 
-    >>> @njit
-    ... def choice_func_nb(from_i, to_i, col):
-    ...     return np.array([from_i + col])
-
-    >>> generate_nb((5, 3), choice_func_nb)
-    [[ True False False]
-     [False  True False]
-     [False False  True]
-     [False False False]
-     [False False False]]
-    ```
+        >>> generate_nb((5, 3), choice_func_nb)
+        [[ True False False]
+         [False  True False]
+         [False False  True]
+         [False False False]
+         [False False False]]
+        ```
     """
     out = np.full(shape, False, dtype=np.bool_)
 
@@ -649,30 +648,30 @@ def generate_stop_ex_nb(entries: tp.Array2d,
                         flex_2d: bool) -> tp.Array2d:
     """Generate using `generate_ex_nb` and `stop_choice_nb`.
 
-    ## Example
+    Usage:
+        * Generate trailing stop loss and take profit signals for 10%.
 
-    Generate trailing stop loss and take profit signals for 10%.
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbt.signals.nb import generate_stop_ex_nb
+        ```pycon
+        >>> import numpy as np
+        >>> from vectorbt.signals.nb import generate_stop_ex_nb
 
-    >>> entries = np.asarray([False, True, False, False, False])[:, None]
-    >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
+        >>> entries = np.asarray([False, True, False, False, False])[:, None]
+        >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
 
-    >>> generate_stop_ex_nb(entries, ts, -0.1, True, 1, True, True)
-    array([[False],
-           [False],
-           [False],
-           [ True],
-           [False]])
+        >>> generate_stop_ex_nb(entries, ts, -0.1, True, 1, True, True)
+        array([[False],
+               [False],
+               [False],
+               [ True],
+               [False]])
 
-    >>> generate_stop_ex_nb(entries, ts, 0.1, False, 1, True, True)
-    array([[False],
-           [False],
-           [ True],
-           [False],
-           [False]])
-    ```
+        >>> generate_stop_ex_nb(entries, ts, 0.1, False, 1, True, True)
+        array([[False],
+               [False],
+               [ True],
+               [False],
+               [False]])
+        ```
     """
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(
@@ -892,65 +891,65 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
                              flex_2d: bool) -> tp.Array2d:
     """Generate using `generate_ex_nb` and `ohlc_stop_choice_nb`.
 
-    ## Example
+    Usage:
+        * Generate trailing stop loss and take profit signals for 10%.
+        Illustrates how exit signal can be generated within the same bar as entry.
 
-    Generate trailing stop loss and take profit signals for 10%.
-    Illustrates how exit signal can be generated within the same bar as entry.
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbt.signals.nb import generate_ohlc_stop_ex_nb
+        ```pycon
+        >>> import numpy as np
+        >>> from vectorbt.signals.nb import generate_ohlc_stop_ex_nb
 
-    >>> entries = np.asarray([True, False, True, False, False])[:, None]
-    >>> entry_price = np.asarray([10, 11, 12, 11, 10])[:, None]
-    >>> high_price = entry_price + 1
-    >>> low_price = entry_price - 1
-    >>> close_price = entry_price
-    >>> stop_price_out = np.full_like(entries, np.nan, dtype=np.float_)
-    >>> stop_type_out = np.full_like(entries, -1, dtype=np.int_)
+        >>> entries = np.asarray([True, False, True, False, False])[:, None]
+        >>> entry_price = np.asarray([10, 11, 12, 11, 10])[:, None]
+        >>> high_price = entry_price + 1
+        >>> low_price = entry_price - 1
+        >>> close_price = entry_price
+        >>> stop_price_out = np.full_like(entries, np.nan, dtype=np.float_)
+        >>> stop_type_out = np.full_like(entries, -1, dtype=np.int_)
 
-    >>> generate_ohlc_stop_ex_nb(
-    ...     entries=entries,
-    ...     open=entry_price,
-    ...     high=high_price,
-    ...     low=low_price,
-    ...     close=close_price,
-    ...     stop_price_out=stop_price_out,
-    ...     stop_type_out=stop_type_out,
-    ...     sl_stop=0.1,
-    ...     sl_trail=True,
-    ...     tp_stop=0.1,
-    ...     reverse=False,
-    ...     is_open_safe=True,
-    ...     wait=1,
-    ...     until_next=True,
-    ...     skip_until_exit=False,
-    ...     pick_first=True,
-    ...     flex_2d=True
-    ... )
-    array([[ True],
-           [False],
-           [False],
-           [ True],
-           [False]])
+        >>> generate_ohlc_stop_ex_nb(
+        ...     entries=entries,
+        ...     open=entry_price,
+        ...     high=high_price,
+        ...     low=low_price,
+        ...     close=close_price,
+        ...     stop_price_out=stop_price_out,
+        ...     stop_type_out=stop_type_out,
+        ...     sl_stop=0.1,
+        ...     sl_trail=True,
+        ...     tp_stop=0.1,
+        ...     reverse=False,
+        ...     is_open_safe=True,
+        ...     wait=1,
+        ...     until_next=True,
+        ...     skip_until_exit=False,
+        ...     pick_first=True,
+        ...     flex_2d=True
+        ... )
+        array([[ True],
+               [False],
+               [False],
+               [ True],
+               [False]])
 
-    >>> stop_price_out
-    array([[ 9. ],  << trailing SL from 10 (entry_price)
-           [ nan],
-           [ nan],
-           [11.7],  << trailing SL from 13 (high_price)
-           [ nan]])
+        >>> stop_price_out
+        array([[ 9. ],  << trailing SL from 10 (entry_price)
+               [ nan],
+               [ nan],
+               [11.7],  << trailing SL from 13 (high_price)
+               [ nan]])
 
-    >>> stop_type_out
-    array([[ 1],
-           [-1],
-           [-1],
-           [ 1],
-           [-1]])
-    ```
+        >>> stop_type_out
+        array([[ 1],
+               [-1],
+               [-1],
+               [ 1],
+               [-1]])
+        ```
 
-    Note that if `is_open_safe` was False, the first exit would be executed at the second bar.
-    This is because we don't know whether the entry price comes before the high and low price
-    at the first bar, and so the trailing stop isn't triggered for the low price of 9.0.
+        Note that if `is_open_safe` was False, the first exit would be executed at the second bar.
+        This is because we don't know whether the entry price comes before the high and low price
+        at the first bar, and so the trailing stop isn't triggered for the low price of 9.0.
     """
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(

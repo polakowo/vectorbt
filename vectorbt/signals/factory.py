@@ -284,181 +284,180 @@ class SignalFactory(IndicatorFactory):
 
         For more arguments, see `vectorbt.indicators.factory.run_pipeline`.
 
-        ## Example
+        Usage:
+            * The simplest signal indicator that places True at the very first index:
 
-        The simplest signal indicator that places True at the very first index:
+            ```pycon
+            >>> from numba import njit
+            >>> import vectorbt as vbt
+            >>> import numpy as np
 
-        ```python-repl
-        >>> from numba import njit
-        >>> import vectorbt as vbt
-        >>> import numpy as np
+            >>> @njit
+            ... def entry_choice_func(from_i, to_i, col):
+            ...     return np.array([from_i])
 
-        >>> @njit
-        ... def entry_choice_func(from_i, to_i, col):
-        ...     return np.array([from_i])
+            >>> @njit
+            ... def exit_choice_func(from_i, to_i, col):
+            ...     return np.array([from_i])
 
-        >>> @njit
-        ... def exit_choice_func(from_i, to_i, col):
-        ...     return np.array([from_i])
+            >>> MySignals = vbt.SignalFactory().from_choice_func(
+            ...     entry_choice_func=entry_choice_func,
+            ...     exit_choice_func=exit_choice_func,
+            ...     entry_kwargs=dict(wait=1),
+            ...     exit_kwargs=dict(wait=1)
+            ... )
 
-        >>> MySignals = vbt.SignalFactory().from_choice_func(
-        ...     entry_choice_func=entry_choice_func,
-        ...     exit_choice_func=exit_choice_func,
-        ...     entry_kwargs=dict(wait=1),
-        ...     exit_kwargs=dict(wait=1)
-        ... )
+            >>> my_sig = MySignals.run(input_shape=(3, 3))
+            >>> my_sig.entries
+                   0      1      2
+            0   True   True   True
+            1  False  False  False
+            2   True   True   True
+            >>> my_sig.exits
+                   0      1      2
+            0  False  False  False
+            1   True   True   True
+            2  False  False  False
+            ```
 
-        >>> my_sig = MySignals.run(input_shape=(3, 3))
-        >>> my_sig.entries
-               0      1      2
-        0   True   True   True
-        1  False  False  False
-        2   True   True   True
-        >>> my_sig.exits
-               0      1      2
-        0  False  False  False
-        1   True   True   True
-        2  False  False  False
-        ```
+            * Take the first entry and place an exit after waiting `n` ticks. Find the next entry and repeat.
+            Test three different `n` values.
 
-        Take the first entry and place an exit after waiting `n` ticks. Find the next entry and repeat.
-        Test three different `n` values.
+            ```pycon
+            >>> from numba import njit
+            >>> from vectorbt.signals.factory import SignalFactory
 
-        ```python-repl
-        >>> from numba import njit
-        >>> from vectorbt.signals.factory import SignalFactory
+            >>> @njit
+            ... def wait_choice_nb(from_i, to_i, col, n, temp_idx_arr):
+            ...     temp_idx_arr[0] = from_i + n  # index of next exit
+            ...     if temp_idx_arr[0] < to_i:
+            ...         return temp_idx_arr[:1]
+            ...     return temp_idx_arr[:0]  # must return array anyway
 
-        >>> @njit
-        ... def wait_choice_nb(from_i, to_i, col, n, temp_idx_arr):
-        ...     temp_idx_arr[0] = from_i + n  # index of next exit
-        ...     if temp_idx_arr[0] < to_i:
-        ...         return temp_idx_arr[:1]
-        ...     return temp_idx_arr[:0]  # must return array anyway
+            >>> # Build signal generator
+            >>> MySignals = SignalFactory(
+            ...     mode='chain',
+            ...     param_names=['n']
+            ... ).from_choice_func(
+            ...     exit_choice_func=wait_choice_nb,
+            ...     exit_settings=dict(
+            ...         pass_params=['n'],
+            ...         pass_kwargs=['temp_idx_arr']  # built-in kwarg
+            ...     )
+            ... )
 
-        >>> # Build signal generator
-        >>> MySignals = SignalFactory(
-        ...     mode='chain',
-        ...     param_names=['n']
-        ... ).from_choice_func(
-        ...     exit_choice_func=wait_choice_nb,
-        ...     exit_settings=dict(
-        ...         pass_params=['n'],
-        ...         pass_kwargs=['temp_idx_arr']  # built-in kwarg
-        ...     )
-        ... )
+            >>> # Run signal generator
+            >>> entries = [True, True, True, True, True]
+            >>> my_sig = MySignals.run(entries, [0, 1, 2])
 
-        >>> # Run signal generator
-        >>> entries = [True, True, True, True, True]
-        >>> my_sig = MySignals.run(entries, [0, 1, 2])
+            >>> my_sig.entries  # input entries
+            custom_n     0     1     2
+            0         True  True  True
+            1         True  True  True
+            2         True  True  True
+            3         True  True  True
+            4         True  True  True
 
-        >>> my_sig.entries  # input entries
-        custom_n     0     1     2
-        0         True  True  True
-        1         True  True  True
-        2         True  True  True
-        3         True  True  True
-        4         True  True  True
+            >>> my_sig.new_entries  # output entries
+            custom_n      0      1      2
+            0          True   True   True
+            1         False  False  False
+            2          True  False  False
+            3         False   True  False
+            4          True  False   True
 
-        >>> my_sig.new_entries  # output entries
-        custom_n      0      1      2
-        0          True   True   True
-        1         False  False  False
-        2          True  False  False
-        3         False   True  False
-        4          True  False   True
+            >>> my_sig.exits  # output exits
+            custom_n      0      1      2
+            0         False  False  False
+            1          True  False  False
+            2         False   True  False
+            3          True  False   True
+            4         False  False  False
+            ```
 
-        >>> my_sig.exits  # output exits
-        custom_n      0      1      2
-        0         False  False  False
-        1          True  False  False
-        2         False   True  False
-        3          True  False   True
-        4         False  False  False
-        ```
+            * To combine multiple iterative signals, you would need to create a custom choice function.
+            Here is an example of combining two random generators using "OR" rule (the first signal wins):
 
-        To combine multiple iterative signals, you would need to create a custom choice function.
-        Here is an example of combining two random generators using "OR" rule (the first signal wins):
+            ```pycon
+            >>> from numba import njit
+            >>> from collections import namedtuple
+            >>> from vectorbt.indicators.configs import flex_elem_param_config
+            >>> from vectorbt.signals.factory import SignalFactory
+            >>> from vectorbt.signals.nb import rand_by_prob_choice_nb
 
-        ```python-repl
-        >>> from numba import njit
-        >>> from collections import namedtuple
-        >>> from vectorbt.indicators.configs import flex_elem_param_config
-        >>> from vectorbt.signals.factory import SignalFactory
-        >>> from vectorbt.signals.nb import rand_by_prob_choice_nb
+            >>> # Enum to distinguish random generators
+            >>> RandType = namedtuple('RandType', ['R1', 'R2'])(0, 1)
 
-        >>> # Enum to distinguish random generators
-        >>> RandType = namedtuple('RandType', ['R1', 'R2'])(0, 1)
+            >>> # Define exit choice function
+            >>> @njit
+            ... def rand_exit_choice_nb(from_i, to_i, col, rand_type, prob1,
+            ...                         prob2, temp_idx_arr1, temp_idx_arr2, flex_2d):
+            ...     idxs1 = rand_by_prob_choice_nb(from_i, to_i, col, prob1, True, temp_idx_arr1, flex_2d)
+            ...     if len(idxs1) > 0:
+            ...         to_i = idxs1[0]  # no need to go beyond first the first found signal
+            ...     idxs2 = rand_by_prob_choice_nb(from_i, to_i, col, prob2, True, temp_idx_arr2, flex_2d)
+            ...     if len(idxs2) > 0:
+            ...         rand_type[idxs2[0], col] = RandType.R2
+            ...         return idxs2
+            ...     if len(idxs1) > 0:
+            ...         rand_type[idxs1[0], col] = RandType.R1
+            ...         return idxs1
+            ...     return temp_idx_arr1[:0]
 
-        >>> # Define exit choice function
-        >>> @njit
-        ... def rand_exit_choice_nb(from_i, to_i, col, rand_type, prob1,
-        ...                         prob2, temp_idx_arr1, temp_idx_arr2, flex_2d):
-        ...     idxs1 = rand_by_prob_choice_nb(from_i, to_i, col, prob1, True, temp_idx_arr1, flex_2d)
-        ...     if len(idxs1) > 0:
-        ...         to_i = idxs1[0]  # no need to go beyond first the first found signal
-        ...     idxs2 = rand_by_prob_choice_nb(from_i, to_i, col, prob2, True, temp_idx_arr2, flex_2d)
-        ...     if len(idxs2) > 0:
-        ...         rand_type[idxs2[0], col] = RandType.R2
-        ...         return idxs2
-        ...     if len(idxs1) > 0:
-        ...         rand_type[idxs1[0], col] = RandType.R1
-        ...         return idxs1
-        ...     return temp_idx_arr1[:0]
+            >>> # Build signal generator
+            >>> MySignals = SignalFactory(
+            ...     mode='chain',
+            ...     in_output_names=['rand_type'],
+            ...     param_names=['prob1', 'prob2'],
+            ...     attr_settings=dict(
+            ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
+            ...     )
+            ... ).from_choice_func(
+            ...     exit_choice_func=rand_exit_choice_nb,
+            ...     exit_settings=dict(
+            ...         pass_in_outputs=['rand_type'],
+            ...         pass_params=['prob1', 'prob2'],
+            ...         pass_kwargs=['temp_idx_arr1', 'temp_idx_arr2', 'flex_2d']
+            ...     ),
+            ...     param_settings=dict(
+            ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
+            ...         prob2=flex_elem_param_config
+            ...     ),
+            ...     pass_flex_2d=True,
+            ...     rand_type=-1  # fill with this value
+            ... )
 
-        >>> # Build signal generator
-        >>> MySignals = SignalFactory(
-        ...     mode='chain',
-        ...     in_output_names=['rand_type'],
-        ...     param_names=['prob1', 'prob2'],
-        ...     attr_settings=dict(
-        ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
-        ...     )
-        ... ).from_choice_func(
-        ...     exit_choice_func=rand_exit_choice_nb,
-        ...     exit_settings=dict(
-        ...         pass_in_outputs=['rand_type'],
-        ...         pass_params=['prob1', 'prob2'],
-        ...         pass_kwargs=['temp_idx_arr1', 'temp_idx_arr2', 'flex_2d']
-        ...     ),
-        ...     param_settings=dict(
-        ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
-        ...         prob2=flex_elem_param_config
-        ...     ),
-        ...     pass_flex_2d=True,
-        ...     rand_type=-1  # fill with this value
-        ... )
+            >>> # Run signal generator
+            >>> entries = [True, True, True, True, True]
+            >>> my_sig = MySignals.run(entries, [0., 1.], [0., 1.], param_product=True)
 
-        >>> # Run signal generator
-        >>> entries = [True, True, True, True, True]
-        >>> my_sig = MySignals.run(entries, [0., 1.], [0., 1.], param_product=True)
+            >>> my_sig.new_entries
+            custom_prob1           0.0           1.0
+            custom_prob2    0.0    1.0    0.0    1.0
+            0              True   True   True   True
+            1             False  False  False  False
+            2             False   True   True   True
+            3             False  False  False  False
+            4             False   True   True   True
 
-        >>> my_sig.new_entries
-        custom_prob1           0.0           1.0
-        custom_prob2    0.0    1.0    0.0    1.0
-        0              True   True   True   True
-        1             False  False  False  False
-        2             False   True   True   True
-        3             False  False  False  False
-        4             False   True   True   True
+            >>> my_sig.exits
+            custom_prob1           0.0           1.0
+            custom_prob2    0.0    1.0    0.0    1.0
+            0             False  False  False  False
+            1             False   True   True   True
+            2             False  False  False  False
+            3             False   True   True   True
+            4             False  False  False  False
 
-        >>> my_sig.exits
-        custom_prob1           0.0           1.0
-        custom_prob2    0.0    1.0    0.0    1.0
-        0             False  False  False  False
-        1             False   True   True   True
-        2             False  False  False  False
-        3             False   True   True   True
-        4             False  False  False  False
-
-        >>> my_sig.rand_type_readable
-        custom_prob1     0.0     1.0
-        custom_prob2 0.0 1.0 0.0 1.0
-        0
-        1                 R2  R1  R1
-        2
-        3                 R2  R1  R1
-        4
-        ```
+            >>> my_sig.rand_type_readable
+            custom_prob1     0.0     1.0
+            custom_prob2 0.0 1.0 0.0 1.0
+            0
+            1                 R2  R1  R1
+            2
+            3                 R2  R1  R1
+            4
+            ```
         """
 
         mode = self.mode

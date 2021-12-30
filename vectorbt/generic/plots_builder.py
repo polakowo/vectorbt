@@ -169,9 +169,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             See further notes under `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 
-        ## Example
-
-        See `vectorbt.portfolio.base` for examples.
+        Usage:
+            See `vectorbt.portfolio.base` for examples.
         """
         from vectorbt._settings import settings as _settings
         plotting_cfg = _settings['plotting']

@@ -6,7 +6,7 @@
 Order records capture information on filled orders. Orders are mainly populated when simulating
 a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.orders`.
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import numpy as np
 >>> from datetime import datetime, timedelta
@@ -40,7 +40,7 @@ Name: count, dtype: int64
 !!! hint
     See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats` and `Orders.metrics`.
 
-```python-repl
+```pycon
 >>> orders['a'].stats()
 Start                2020-01-01 00:00:00
 End                  2020-04-09 00:00:00
@@ -66,7 +66,7 @@ Name: a, dtype: object
 
 `Orders.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> orders.stats(group_by=True)
 Start                2020-01-01 00:00:00
 End                  2020-04-09 00:00:00
@@ -97,11 +97,11 @@ Name: group, dtype: object
 
 `Orders` class has a single subplot based on `Orders.plot`:
 
-```python-repl
+```pycon
 >>> orders['a'].plots()
 ```
 
-![](/docs/img/orders_plots.svg)
+![](/assets/images/orders_plots.svg)
 """
 
 import numpy as np
@@ -363,22 +363,22 @@ class Orders(Records):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> from datetime import datetime, timedelta
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbt as vbt
+            >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> size = pd.Series([1., 1., 1., 1., -1.])
+            >>> orders = vbt.Portfolio.from_orders(price, size).orders
 
-        >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> size = pd.Series([1., 1., 1., 1., -1.])
-        >>> orders = vbt.Portfolio.from_orders(price, size).orders
+            >>> orders.plot()
+            ```
 
-        >>> orders.plot()
-        ```
-
-        ![](/docs/img/orders_plot.svg)"""
+            ![](/assets/images/orders_plot.svg)
+        """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 

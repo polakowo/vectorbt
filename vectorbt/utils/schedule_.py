@@ -119,55 +119,54 @@ class ScheduleManager:
 
         See the package `schedule` for more details.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import datetime
+            >>> import pytz
+            >>> import vectorbt as vbt
 
-        ```python-repl
-        >>> import datetime
-        >>> import pytz
-        >>> import vectorbt as vbt
+            >>> def job_func(message="I'm working..."):
+            ...     print(message)
 
-        >>> def job_func(message="I'm working..."):
-        ...     print(message)
+            >>> my_manager = vbt.ScheduleManager()
 
-        >>> my_manager = vbt.ScheduleManager()
+            >>> # add jobs
+            >>> my_manager.every().do(job_func, message="Hello")
+            Every 1 second do job_func(message='Hello') (last run: [never], next run: 2021-03-18 19:06:47)
 
-        >>> # add jobs
-        >>> my_manager.every().do(job_func, message="Hello")
-        Every 1 second do job_func(message='Hello') (last run: [never], next run: 2021-03-18 19:06:47)
+            >>> my_manager.every(10, 'minutes').do(job_func)
+            Every 10 minutes do job_func() (last run: [never], next run: 2021-03-18 19:16:46)
 
-        >>> my_manager.every(10, 'minutes').do(job_func)
-        Every 10 minutes do job_func() (last run: [never], next run: 2021-03-18 19:16:46)
+            >>> my_manager.every('hour').do(job_func)
+            Every 1 hour do job_func() (last run: [never], next run: 2021-03-18 20:06:46)
 
-        >>> my_manager.every('hour').do(job_func)
-        Every 1 hour do job_func() (last run: [never], next run: 2021-03-18 20:06:46)
+            >>> my_manager.every('10:30').do(job_func)
+            Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
-        >>> my_manager.every('10:30').do(job_func)
-        Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
+            >>> my_manager.every('day', '10:30').do(job_func)
+            Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
-        >>> my_manager.every('day', '10:30').do(job_func)
-        Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
+            >>> my_manager.every('day', datetime.time(9, 30, tzinfo=pytz.utc)).do(job_func)
+            Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
-        >>> my_manager.every('day', datetime.time(9, 30, tzinfo=pytz.utc)).do(job_func)
-        Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
+            >>> my_manager.every('monday').do(job_func)
+            Every 1 week do job_func() (last run: [never], next run: 2021-03-22 19:06:46)
 
-        >>> my_manager.every('monday').do(job_func)
-        Every 1 week do job_func() (last run: [never], next run: 2021-03-22 19:06:46)
+            >>> my_manager.every('wednesday', '13:15').do(job_func)
+            Every 1 week at 13:15:00 do job_func() (last run: [never], next run: 2021-03-24 13:15:00)
 
-        >>> my_manager.every('wednesday', '13:15').do(job_func)
-        Every 1 week at 13:15:00 do job_func() (last run: [never], next run: 2021-03-24 13:15:00)
+            >>> my_manager.every('minute', ':17').do(job_func)
+            Every 1 minute at 00:00:17 do job_func() (last run: [never], next run: 2021-03-18 19:07:17)
 
-        >>> my_manager.every('minute', ':17').do(job_func)
-        Every 1 minute at 00:00:17 do job_func() (last run: [never], next run: 2021-03-18 19:07:17)
+            >>> my_manager.start()
+            ```
 
-        >>> my_manager.start()
-        ```
+            You can still use the chained approach as done by `schedule`:
 
-        You can still use the chained approach as done by `schedule`:
-
-        ```python-repl
-        >>> my_manager.every().minute.at(':17').do(job_func)
-        Every 1 minute at 00:00:17 do job_func() (last run: [never], next run: 2021-03-18 19:07:17)
-        ```
+            ```pycon
+            >>> my_manager.every().minute.at(':17').do(job_func)
+            Every 1 minute at 00:00:17 do job_func() (last run: [never], next run: 2021-03-18 19:07:17)
+            ```
         """
         # Parse arguments
         interval = 1

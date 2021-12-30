@@ -17,7 +17,7 @@ Here are the main properties of the `settings` config:
 
 For example, you can change default width and height of each plot:
 
-```python-repl
+```pycon
 >>> import vectorbt as vbt
 
 >>> vbt.settings['plotting']['layout']['width'] = 800
@@ -59,7 +59,7 @@ Since this is only visible when looking at the source code, the advice is to alw
 Like any other class subclassing `vectorbt.utils.config.Config`, we can save settings to the disk,
 load it back, and update in-place:
 
-```python-repl
+```pycon
 >>> vbt.settings.save('my_settings')
 >>> vbt.settings['caching']['enabled'] = False
 >>> vbt.settings['caching']['enabled']
@@ -580,230 +580,201 @@ settings.register_templates()
 
 __pdoc__['settings'] = f"""Global settings config.
 
-## settings.numba
-
-Settings applied to Numba.
-
-```json
-{settings['numba'].to_doc()}
-```
-
-## settings.config
-
-Settings applied to `vectorbt.utils.config.Config`.
-
-```json
-{settings['config'].to_doc()}
-```
-
-## settings.configured
-
-Settings applied to `vectorbt.utils.config.Configured`.
-
-```json
-{settings['configured'].to_doc()}
-```
-
-## settings.caching
-
-Settings applied across `vectorbt.utils.decorators`.
-
-See `vectorbt.utils.decorators.should_cache`.
-
-```json
-{settings['caching'].to_doc()}
-```
-
-## settings.broadcasting
-
-Settings applied across `vectorbt.base.reshape_fns`.
-
-```json
-{settings['broadcasting'].to_doc()}
-```
-
-## settings.array_wrapper
-
-Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
-
-```json
-{settings['array_wrapper'].to_doc()}
-```
-
-## settings.datetime
-
-Settings applied across `vectorbt.utils.datetime_`.
-
-```json
-{settings['datetime'].to_doc()}
-```
-
-## settings.data
-
-Settings applied across `vectorbt.data`.
-
-```json
-{settings['data'].to_doc()}
-```
-
-### settings.data.binance
-
-See `binance.client.Client`.
-
-### settings.data.ccxt
-
-See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys).
-Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.
-
-## settings.plotting
-
-Settings applied to plotting Plotly figures.
-
-```json
-{settings['plotting'].to_doc(replace={
-    'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
-    'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
-    'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
-}, path='settings.plotting')}
-```
-
-## settings.stats_builder
-
-Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
-
-```json
-{settings['stats_builder'].to_doc()}
-```
-
-## settings.plots_builder
-
-Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
-
-```json
-{settings['plots_builder'].to_doc()}
-```
-
-## settings.generic
-
-Settings applied across `vectorbt.generic`.
-
-```json
-{settings['generic'].to_doc()}
-```
-
-## settings.generic.ranges
-
-Settings applied across `vectorbt.generic.ranges`.
-
-```json
-{settings['ranges'].to_doc()}
-```
-
-## settings.generic.drawdowns
-
-Settings applied across `vectorbt.generic.drawdowns`.
-
-```json
-{settings['drawdowns'].to_doc()}
-```
-
-## settings.ohlcv
-
-Settings applied across `vectorbt.ohlcv_accessors`.
-
-```json
-{settings['ohlcv'].to_doc()}
-```
-
-## settings.signals
-
-Settings applied across `vectorbt.signals`.
-
-```json
-{settings['signals'].to_doc()}
-```
-
-## settings.returns
-
-Settings applied across `vectorbt.returns`.
-
-```json
-{settings['returns'].to_doc()}
-```
-
-## settings.qs_adapter
-
-Settings applied across `vectorbt.returns.qs_adapter`.
-
-```json
-{settings['qs_adapter'].to_doc()}
-```
-
-## settings.records
-
-Settings applied across `vectorbt.records.base`.
-
-```json
-{settings['records'].to_doc()}
-```
-
-## settings.mapped_array
-
-Settings applied across `vectorbt.records.mapped_array`.
-
-```json
-{settings['mapped_array'].to_doc()}
-```
-
-## settings.portfolio.orders
-
-Settings applied across `vectorbt.portfolio.orders`.
-
-```json
-{settings['orders'].to_doc()}
-```
-
-## settings.portfolio.trades
-
-Settings applied across `vectorbt.portfolio.trades`.
-
-```json
-{settings['trades'].to_doc()}
-```
-
-## settings.portfolio.logs
-
-Settings applied across `vectorbt.portfolio.logs`.
-
-```json
-{settings['logs'].to_doc()}
-```
-
-## settings.portfolio
-
-Settings applied to `vectorbt.portfolio.base.Portfolio`.
-
-```json
-{settings['portfolio'].to_doc()}
-```
-
-## settings.messaging
-
-Settings applied across `vectorbt.messaging`.
-
-```json
-{settings['messaging'].to_doc()}
-```
-
-### settings.messaging.telegram
-
-Settings applied to [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
-
-Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
-For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
-`telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
-
-### settings.messaging.giphy
-
-Settings applied to [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
+settings.numba:
+    Settings applied to Numba.
+    
+    ```json
+    {settings['numba'].to_doc()}
+    ```
+
+settings.config:
+    Settings applied to `vectorbt.utils.config.Config`.
+    
+    ```json
+    {settings['config'].to_doc()}
+    ```
+
+settings.configured:
+    Settings applied to `vectorbt.utils.config.Configured`.
+    
+    ```json
+    {settings['configured'].to_doc()}
+    ```
+
+settings.caching:
+    Settings applied across `vectorbt.utils.decorators`.
+    
+    See `vectorbt.utils.decorators.should_cache`.
+    
+    ```json
+    {settings['caching'].to_doc()}
+    ```
+
+settings.broadcasting:
+    Settings applied across `vectorbt.base.reshape_fns`.
+    
+    ```json
+    {settings['broadcasting'].to_doc()}
+    ```
+
+settings.array_wrapper:
+    Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
+    
+    ```json
+    {settings['array_wrapper'].to_doc()}
+    ```
+
+settings.datetime:
+    Settings applied across `vectorbt.utils.datetime_`.
+    
+    ```json
+    {settings['datetime'].to_doc()}
+    ```
+
+settings.data:
+    Settings applied across `vectorbt.data`.
+    
+    ```json
+    {settings['data'].to_doc()}
+    ```
+    
+settings.data.binance:
+    See `binance.client.Client`.
+    
+settings.data.ccxt:
+    See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys). 
+    Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.
+
+settings.plotting:
+    Settings applied to plotting Plotly figures.
+    
+    ```json
+    {settings['plotting'].to_doc(replace={
+        'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
+        'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
+        'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
+    }, path='settings.plotting')}
+    ```
+
+settings.stats_builder:
+    Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
+    
+    ```json
+    {settings['stats_builder'].to_doc()}
+    ```
+
+settings.plots_builder:
+    Settings applied to `vectorbt.generic.plots_builder.PlotsBuilderMixin`.
+    
+    ```json
+    {settings['plots_builder'].to_doc()}
+    ```
+
+settings.generic:
+    Settings applied across `vectorbt.generic`.
+    
+    ```json
+    {settings['generic'].to_doc()}
+    ```
+
+settings.generic.ranges:
+    Settings applied across `vectorbt.generic.ranges`.
+    
+    ```json
+    {settings['ranges'].to_doc()}
+    ```
+
+settings.generic.drawdowns:
+    Settings applied across `vectorbt.generic.drawdowns`.
+    
+    ```json
+    {settings['drawdowns'].to_doc()}
+    ```
+
+settings.ohlcv:
+    Settings applied across `vectorbt.ohlcv_accessors`.
+    
+    ```json
+    {settings['ohlcv'].to_doc()}
+    ```
+
+settings.signals:
+    Settings applied across `vectorbt.signals`.
+    
+    ```json
+    {settings['signals'].to_doc()}
+    ```
+
+settings.returns:
+    Settings applied across `vectorbt.returns`.
+    
+    ```json
+    {settings['returns'].to_doc()}
+    ```
+
+settings.qs_adapter:
+    Settings applied across `vectorbt.returns.qs_adapter`.
+    
+    ```json
+    {settings['qs_adapter'].to_doc()}
+    ```
+
+settings.records:
+    Settings applied across `vectorbt.records.base`.
+    
+    ```json
+    {settings['records'].to_doc()}
+    ```
+
+settings.mapped_array:
+    Settings applied across `vectorbt.records.mapped_array`.
+    
+    ```json
+    {settings['mapped_array'].to_doc()}
+    ```
+
+settings.orders:
+    Settings applied across `vectorbt.portfolio.orders`.
+    
+    ```json
+    {settings['orders'].to_doc()}
+    ```
+
+settings.trades:
+    Settings applied across `vectorbt.portfolio.trades`.
+    
+    ```json
+    {settings['trades'].to_doc()}
+    ```
+
+settings.logs:
+    Settings applied across `vectorbt.portfolio.logs`.
+    
+    ```json
+    {settings['logs'].to_doc()}
+    ```
+
+settings.portfolio:
+    Settings applied to `vectorbt.portfolio.base.Portfolio`.
+    
+    ```json
+    {settings['portfolio'].to_doc()}
+    ```
+
+settings.messaging:
+    Settings applied across `vectorbt.messaging`.
+    
+    ```json
+    {settings['messaging'].to_doc()}
+    ```
+
+settings.messaging.telegram:
+    Settings applied to [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
+    
+    Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
+    For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
+    `telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
+
+settings.messaging.giphy:
+    Settings applied to [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
 """
