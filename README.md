@@ -1,7 +1,7 @@
 <div align="center">
-	<br>
-	<img src="docs/docs/assets/logo/header.svg">
-	<br>
+	<a href="https://vectorbt.dev/" alt="https://vectorbt.dev/">
+        <img src="docs/docs/assets/logo/header.svg" />
+    </a>
 </div>
 <br>
 <p align="center">

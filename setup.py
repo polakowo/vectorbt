@@ -57,9 +57,6 @@ setup(
             'pytest',
             'pytest-cov',
             'codecov'
-        ],
-        'docs': [
-            'pdoc3'  # AGPL-3.0
         ]
     },
     python_requires='>=3.6, <3.10',
