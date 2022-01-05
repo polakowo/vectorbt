@@ -8,7 +8,7 @@ title: Features
 
 - [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of pandas to easily switch between pandas and vectorbt functionality.
 
-```pycon title="Compute a rolling z-score"
+```pycon title="Compute the rolling z-score"
 >>> import vectorbt as vbt
 >>> import pandas as pd
 >>> import numpy as np
@@ -230,7 +230,7 @@ array([3, 2])
 
 - [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support.
 
-```pycon title="Test multiple entry and exit probabilities"
+```pycon title="Generate entries and exits using different probabilities"
 >>> rprobnx = vbt.RPROBNX.run(
 ...     input_shape=(5,),
 ...     entry_prob=[0.5, 1.],
@@ -292,7 +292,7 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 
 - [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across vectorbt into a single behemoth class.
 
-```pycon title="Test the Golden Cross"
+```pycon title="Backtest the Golden Cross"
 >>> price = vbt.YFData.download('BTC-USD', start='2018-01-01').get('Close')
 >>> fast_ma = vbt.MA.run(price, 50, short_name='fast_ma')
 >>> slow_ma = vbt.MA.run(price, 200, short_name='slow_ma')
