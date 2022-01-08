@@ -1725,6 +1725,7 @@ def signals_to_size_nb(position_now: float,
                         order_size -= size / val_price_now
                     else:
                         order_size -= size
+                size_type = SizeType.Amount
         elif is_long_exit:
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
@@ -1755,6 +1756,7 @@ def signals_to_size_nb(position_now: float,
                         order_size += size / val_price_now
                     else:
                         order_size += size
+                size_type = SizeType.Amount
         elif is_short_exit:
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:

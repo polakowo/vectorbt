@@ -1878,9 +1878,8 @@ class TestFromSignals:
         record_arrays_close(
             from_signals_both(size=[[0, 1, np.inf]], size_type='value').order_records,
             np.array([
-                (0, 1, 0, 1.0, 1.0, 0.0, 0), (1, 1, 3, 0.3125, 4.0, 0.0, 1),
-                (2, 1, 4, 0.1775, 5.0, 0.0, 1), (3, 2, 0, 100.0, 1.0, 0.0, 0),
-                (4, 2, 3, 200.0, 4.0, 0.0, 1)
+                (0, 1, 0, 1.0, 1.0, 0.0, 0), (1, 1, 3, 1.25, 4.0, 0.0, 1),
+                (2, 2, 0, 100.0, 1.0, 0.0, 0), (3, 2, 3, 200.0, 4.0, 0.0, 1)
             ], dtype=order_dt)
         )
         record_arrays_close(

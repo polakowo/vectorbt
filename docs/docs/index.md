@@ -22,14 +22,14 @@ without significant delays.
 
 With vectorbt, you can
 
-- [x] Backtest strategies in **a couple of lines** of Python code
-- [x] Enjoy the best of both worlds: the ecosystem of Python and **the speed of C**
-- [x] Retain **full control** over execution and your data (as opposed to web-based services such as TradingView)
-- [x] Optimize your trading strategy against many parameters, assets, and periods **in one go**
-- [x] Uncover **hidden patterns** in financial markets
-- [x] Analyze time series and engineer new features for **ML models**
+- [x] Backtest strategies in a couple of lines of Python code
+- [x] Enjoy the best of both worlds: the ecosystem of Python and the speed of C
+- [x] Retain full control over execution and your data (as opposed to web-based services such as TradingView)
+- [x] Optimize your trading strategy against many parameters, assets, and periods in one go
+- [x] Uncover hidden patterns in financial markets
+- [x] Analyze time series and engineer new features for ML models
 - [x] Supercharge pandas and your favorite tools to run much faster
-- [x] Visualize strategy performance using **interactive charts and dashboards** (both in Jupyter and browser)
+- [x] Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
 - [x] Fetch and process data periodically, send Telegram notifications, and more :fire:
 
 ## Why vectorbt?

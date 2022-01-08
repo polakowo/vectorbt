@@ -40,14 +40,14 @@ data even without GPU and parallelization and enables the user to interact with 
 without significant delays.
 
 With vectorbt, you can
-* Backtest strategies in **a couple of lines** of Python code
-* Enjoy the best of both worlds: the ecosystem of Python and **the speed of C**
-* Retain **full control** over execution (as opposed to web-based services such as TradingView)
-* Optimize your trading strategy against many parameters, assets, and periods **in one go**
-* Uncover **hidden patterns** in financial markets
-* Analyze time series and engineer new features for **ML models**
+* Backtest strategies in a couple of lines of Python code
+* Enjoy the best of both worlds: the ecosystem of Python and the speed of C
+* Retain full control over execution (as opposed to web-based services such as TradingView)
+* Optimize your trading strategy against many parameters, assets, and periods in one go
+* Uncover hidden patterns in financial markets
+* Analyze time series and engineer new features for ML models
 * Supercharge pandas and your favorite tools to run much faster
-* Visualize strategy performance using **interactive charts and dashboards** (both in Jupyter and browser)
+* Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
 * Fetch and process data periodically, send Telegram notifications, and more :fire:
 
 ## Installation
