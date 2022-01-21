@@ -1,3 +1,9 @@
+/* Normal colors */
+:root {
+  --md-heart: #{$clr-red-a200};
+  --md-heart-big: #{$clr-red-a400};
+}
+
 .dobjtype {
     display: inline-block;
     margin-left: 0.5rem;
@@ -14,4 +20,38 @@
 
 .githublink:hover {
     color: var(--md-accent-fg-color) !important;
+}
+
+.twemoji.heart-throb svg, .twemoji.heart-throb-hover svg {
+    position: relative;
+    color: var(--md-heart);
+    animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  40% { color: var(--md-heart-big); transform: scale(1.3); }
+  50% { transform: scale(1.2); }
+  60% { color: var(--md-heart-big); transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.sponsorship {
+    text-align: center;
+}
+
+footer.sponsorship hr {
+    display: inline-block;
+    width: 32px;
+    margin: 0 14px;
+    vertical-align: middle;
+    border-bottom: 2px solid var(--md-default-fg-color--lighter);
+}
+
+footer.sponsorship:hover hr {
+    border-color: var(--md-accent-fg-color);
+}
+
+footer.sponsorship:not(:hover) .twemoji.heart-throb-hover svg {
+    color: var(--md-default-fg-color--lighter) !important;
 }

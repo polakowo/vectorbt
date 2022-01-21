@@ -24,7 +24,7 @@ Run for the examples below:
 
 >>> import vectorbt as vbt
 >>> from vectorbt.utils.colors import adjust_opacity
->>> from vectorbt.utils.enum import map_enum_fields
+>>> from vectorbt.utils.enum_ import map_enum_fields
 >>> from vectorbt.base.reshape_fns import broadcast, flex_select_auto_nb, to_2d_array
 >>> from vectorbt.portfolio.enums import SizeType, Direction, NoOrder, OrderStatus, OrderSide
 >>> from vectorbt.portfolio import nb

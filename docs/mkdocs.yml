@@ -37,6 +37,7 @@ theme:
     code: Roboto Mono
   logo: assets/logo/logo-white.svg
   favicon: /assets/logo/favicon.png
+  sponsor: "https://github.com/sponsors/polakowo"
 
 # Customization
 markdown_extensions:
