@@ -544,4 +544,4 @@ dtype: float64
 
 ## Want more?
 
-Discover the features offered by [vectorbt PRO](https://vectorbt.pro/)!
+Discover the features of [vectorbt PRO](https://vectorbt.pro/) :rocket:
