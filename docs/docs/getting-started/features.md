@@ -542,3 +542,6 @@ dtype: float64
 5.96813681074424
 ```
 
+## Want more?
+
+Discover the features offered by [vectorbt PRO](https://vectorbt.pro/)!
