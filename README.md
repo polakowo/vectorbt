@@ -195,7 +195,8 @@ pip install -U "vectorbt[full]"
 
 ## Important note
 
-All the active development has moved to **[vectorbt PRO](https://vectorbt.pro/)**.
+All the active development has moved to [vectorbt PRO](https://vectorbt.pro/).
+
 This project is being maintained only. PRs are welcome.
 
 ## License
