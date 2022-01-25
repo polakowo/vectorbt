@@ -6,6 +6,10 @@ title: Getting started
 
 ![](/assets/logo/header.svg)
 
+!!! important
+    All the active development has moved to **[vectorbt PRO](https://vectorbt.pro/)**.
+    This project is being maintained only. PRs are welcome.
+
 ## What is vectorbt?
 
 vectorbt is a Python package for quantitative analysis that takes a novel approach to backtesting: 

@@ -85,6 +85,9 @@ plugins:
   - search
   - minify:
       minify_html: true
+  - redirects:
+      redirect_maps:
+        vectorbt-pro.md: https://vectorbt.pro/
 
 # Page tree
 nav:

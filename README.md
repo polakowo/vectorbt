@@ -193,12 +193,10 @@ To also install optional dependencies:
 pip install -U "vectorbt[full]"
 ```
 
-## vectorbt 2.0
+## Important note
 
-We've recently launched the beta version of **[vectorbt PRO](https://vectorbt.pro/)**, which is actively developed, 
-properly documented, and there is a Discord server for discussions and announcements. 
-If you want to be part of the new growing community and get access to cutting-edge software, 
-complete a sponsorship on [GitHub Sponsors](https://github.com/sponsors/polakowo).
+All the active development has moved to **[vectorbt PRO](https://vectorbt.pro/)**.
+This project is being maintained only. PRs are welcome.
 
 ## License
 
