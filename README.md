@@ -193,6 +193,14 @@ To also install optional dependencies:
 pip install -U "vectorbt[full]"
 ```
 
+## vectorbt 2.0
+
+> We've recently launched the beta version of [vectorbt PRO], which is actively developed, 
+> properly documented, and there is a Discord server for discussions and announcements. 
+> If you want to be part of the new growing community and get access to cutting-edge software, 
+> complete a sponsorship on [GitHub Sponsors](https://github.com/sponsors/polakowo). 
+> As always, happy coding :heart:
+
 ## License
 
 This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license. 
