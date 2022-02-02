@@ -95,6 +95,7 @@ nav:
     - Usage: getting-started/usage.md
     - Resources: getting-started/resources.md
     - Contributing: getting-started/contributing.md
+  - Documentation: documentation.md
   - API:
     - api/index.md
     - _settings: api/_settings.md
