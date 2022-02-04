@@ -221,7 +221,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                 if checks.is_pandas(arg):
                     index = index_fns.get_index(arg, axis)
                     if last_index is not None:
-                        if not pd.Index.equals(index, last_index):
+                        if not checks.is_index_equal(index, last_index):
                             index_conflict = True
                     last_index = index
                     continue
@@ -241,18 +241,17 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                         if new_index is None:
                             new_index = index
                         else:
+                            if checks.is_index_equal(index, new_index):
+                                continue
                             if index_from.lower() == 'strict':
                                 # If pandas objects have different index/columns, raise an exception
-                                if not pd.Index.equals(index, new_index):
-                                    raise ValueError(
-                                        f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
+                                raise ValueError(
+                                    f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
                             # 1. rule: if indexes are of the same length, they are simply stacked
                             # 2. rule: if index has one element, it gets repeated and then stacked
 
-                            if pd.Index.equals(index, new_index):
-                                continue
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
                                     raise ValueError("Indexes could not be broadcast together")

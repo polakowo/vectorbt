@@ -1575,6 +1575,28 @@ class TestReshapeFns:
                 )
             )
 
+        broadcasted = reshape_fns.broadcast(
+            pd.DataFrame([[1, 2, 3]], columns=pd.Index(['a', 'b', 'c'], name='i1')),
+            pd.DataFrame([[4, 5, 6]], columns=pd.Index(['a', 'b', 'c'], name='i2')),
+            index_from='stack',
+            columns_from='stack',
+            drop_duplicates=True,
+            drop_redundant=True,
+            ignore_sr_names=True
+        )
+        pd.testing.assert_frame_equal(
+            broadcasted[0],
+            pd.DataFrame([[1, 2, 3]], columns=pd.MultiIndex.from_tuples([
+                ('a', 'a'), ('b', 'b'), ('c', 'c')
+            ], names=['i1', 'i2']))
+        )
+        pd.testing.assert_frame_equal(
+            broadcasted[1],
+            pd.DataFrame([[4, 5, 6]], columns=pd.MultiIndex.from_tuples([
+                ('a', 'a'), ('b', 'b'), ('c', 'c')
+            ], names=['i1', 'i2']))
+        )
+
     def test_broadcast_keep(self):
         # 1d
         to_broadcast = 0, a1, a2, sr_none, sr1, sr2
