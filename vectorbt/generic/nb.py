@@ -1751,19 +1751,22 @@ def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp
     crossed_ago = -1
 
     for i in range(arr1.shape[0]):
-        if was_below:
-            if arr1[i] > arr2[i]:
+        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
+            crossed_ago = -1
+            was_below = False
+            out[i] = False
+        elif arr1[i] > arr2[i]:
+            if was_below:
                 crossed_ago += 1
                 out[i] = crossed_ago == wait
-            elif crossed_ago != -1 or (np.isnan(arr1[i]) or np.isnan(arr2[i])):
-                crossed_ago = -1
-                was_below = False
-                out[i] = False
             else:
                 out[i] = False
+        elif arr1[i] == arr2[i]:
+            crossed_ago = -1
+            out[i] = False
         else:
-            if arr1[i] < arr2[i]:
-                was_below = True
+            crossed_ago = -1
+            was_below = True
             out[i] = False
     return out
 
