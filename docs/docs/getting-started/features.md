@@ -374,7 +374,7 @@ dtype: object
 
 ```pycon title="Parse 5 highest slippage values from logs"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
->>> slippage = np.random.uniform(0, 0.005, size=close.shape[0])
+>>> slippage = np.random.uniform(0, 0.005, size=price.shape[0])
 >>> logs = vbt.Portfolio.from_random_signals(price, n=5, slippage=slippage, log=True).logs
 
 >>> req_price_ma = logs.map_field('req_price')
