@@ -26,8 +26,8 @@ Note: you must run the notebook to play with the widgets.
 
 ### Articles
 
-- [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 - [SuperFast SuperTrend](https://polakowo.medium.com/superfast-supertrend-6269a3af0c2a?source=friends_link&sk=2e7e3846b72a9e2283ade8b210664d1c)
+- [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
 ### Getting Help
 

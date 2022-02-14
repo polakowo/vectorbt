@@ -4,11 +4,6 @@ title: Installation
 
 # Installation
 
-!!! important
-    All the active development has moved to **[vectorbt PRO](https://vectorbt.pro/)**.
-    
-    This project is being maintained only. PRs are welcome.
-
 You can install vectorbt with pip, the Python package manager, or with Docker.
 
 ## With pip
