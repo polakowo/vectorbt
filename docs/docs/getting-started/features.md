@@ -4,6 +4,10 @@ title: Features
 
 # Features :zap:
 
+!!! info
+    This project is maintained but no new features are developed; they are now coming exclusively to
+    [__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
+
 ## Pandas
 
 - [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of pandas to easily switch between pandas and vectorbt functionality.
@@ -541,7 +545,3 @@ dtype: float64
 >>> pf.total_return()
 5.96813681074424
 ```
-
-## Want more?
-
-Discover the features of [vectorbt PRO](https://vectorbt.pro/) :rocket:

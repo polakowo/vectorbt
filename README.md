@@ -23,6 +23,9 @@
         <img src="https://badges.gitter.im/vectorbt.svg" /></a>
 </p>
 
+_Note_: This project is maintained but no new features are developed; they are now coming exclusively to
+[__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
+
 ## :sparkles: Usage
 
 vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
