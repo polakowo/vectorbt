@@ -32,6 +32,10 @@ With vectorbt, you can
 - [x] Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
 - [x] Fetch and process data periodically, send Telegram notifications, and more :fire:
 
+!!! info
+    This project is maintained but no new features are developed; they are now coming exclusively to
+    [__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
+
 ## Why vectorbt?
 
 While there are many great backtesting packages for Python, vectorbt combines an extremely fast 
