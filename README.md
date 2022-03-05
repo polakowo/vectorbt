@@ -23,9 +23,6 @@
         <img src="https://badges.gitter.im/vectorbt.svg" /></a>
 </p>
 
-_Note_: This project is maintained but no new features are developed; they are now coming exclusively to
-[__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
-
 ## :sparkles: Usage
 
 vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
@@ -185,6 +182,9 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 And this is just the tip of the iceberg of what's possible. Check out the [website](https://vectorbt.dev/) to learn more.
 
 ## Installation
+
+_Note_: This project is maintained but no new features are developed; they are now coming exclusively to
+[__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
 
 ```sh
 pip install -U vectorbt
