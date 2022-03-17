@@ -31,9 +31,18 @@ Note: you must run the notebook to play with the widgets.
 
 ### Getting Help
 
-- If you need supervision or any help with your implementation, [join a private chat](https://www.patreon.com/vectorbt)
 - For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
 - If you have general questions, start a new [GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
   - Alternatively, you can ask on [Gitter](https://gitter.im/vectorbt/community)
 - If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
 - For other inquiries, please [contact the author](mailto:olegpolakow@gmail.com)
+
+!!! hint
+    Active development and support has moved to [__vectorbt.pro__](https://vectorbt.pro/), which means
+    that I will less likely provide an assistance in GitHub Discussions and Issues. 
+
+    Sponsor me on [GitHub Sponsors](https://github.com/sponsors/polakowo) and get access to our private 
+    Discord server where you can get an instant support from our vibrant community. In addition, 
+    vectorbt PRO is (much) easier to use and provides a range of exclusive examples and articles to 
+    help beginners and professionals alike!
+    
