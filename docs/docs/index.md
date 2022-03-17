@@ -34,7 +34,7 @@ With vectorbt, you can
 
 !!! info
     This project is maintained but no new features are developed; they are now coming exclusively to
-    [__vectorbt.pro__](https://vectorbt.pro/) - commercial successor of vectorbt. Pull requests are welcome.
+    [__vectorbt.pro__](https://vectorbt.pro/) - commercial successor to vectorbt. Pull requests are welcome.
 
 ## Why vectorbt?
 
