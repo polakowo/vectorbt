@@ -183,9 +183,6 @@ And this is just the tip of the iceberg of what's possible. Check out the [websi
 
 ## Installation
 
-_Note_: This project is maintained but no new features are developed; they are now coming exclusively to
-[__vectorbt.pro__](https://vectorbt.pro/) - commercial successor to vectorbt. Pull requests are welcome.
-
 ```sh
 pip install -U vectorbt
 ```
