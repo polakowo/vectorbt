@@ -27,8 +27,8 @@ setup(
         'matplotlib',
         'plotly>=4.12.0',
         'ipywidgets>=7.0.0',
-        'numba==0.53.1; python_version == "3.7"',
-        'numba>=0.53.1; python_version != "3.7"',
+        "numba>=0.53.1; python_version < '3.10'",
+        "numba>=0.56.0; python_version >= '3.10'",
         'dill',
         'tqdm',
         'dateparser',
@@ -59,7 +59,7 @@ setup(
             'codecov'
         ]
     },
-    python_requires='>=3.6, <3.10',
+    python_requires='>=3.6, <3.11',
     license='Apache 2.0 with Commons Clause',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -70,6 +70,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Operating System :: OS Independent',
         'Intended Audience :: Science/Research',
         'Topic :: Software Development',
