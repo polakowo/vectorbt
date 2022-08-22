@@ -22,19 +22,70 @@ without significant delays.
 
 With vectorbt, you can
 
-- [x] Backtest strategies in a couple of lines of Python code
-- [x] Enjoy the best of both worlds: the ecosystem of Python and the speed of C
-- [x] Retain full control over execution and your data (as opposed to web-based services such as TradingView)
-- [x] Optimize your trading strategy against many parameters, assets, and periods in one go
-- [x] Uncover hidden patterns in financial markets
-- [x] Analyze time series and engineer new features for ML models
-- [x] Supercharge pandas and your favorite tools to run much faster
-- [x] Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
-- [x] Fetch and process data periodically, send Telegram notifications, and more :fire:
+<div class="grid cards" markdown>
 
-!!! info
-    This project is maintained but no new features are developed; they are now coming exclusively to
-    [__vectorbt.pro__](https://vectorbt.pro/) - commercial successor to vectorbt. Pull requests are welcome.
+- :fontawesome-solid-wind:{ .lg .middle } 
+
+    ---
+
+    Backtest strategies in a couple of lines of Python code
+
+- :fontawesome-solid-gauge-simple-high:{ .lg .middle } 
+
+    ---
+
+    Enjoy the best of both worlds: the ecosystem of Python and the speed of C
+
+- :fontawesome-regular-eye:{ .lg .middle } 
+
+    ---
+
+    Retain full control over execution and your data (as opposed to web-based services such as TradingView)
+
+- :fontawesome-solid-flask:{ .lg .middle } 
+
+    ---
+
+    Optimize your trading strategy against many parameters, assets, and periods in one go
+
+- :fontawesome-solid-magnifying-glass-dollar:{ .lg .middle } 
+
+    ---
+
+    Uncover hidden patterns in financial markets
+
+- :fontawesome-solid-robot:{ .lg .middle } 
+
+    ---
+
+    Analyze time series and engineer new features for ML models
+
+- :fontawesome-solid-meteor:{ .lg .middle } 
+
+    ---
+
+    Supercharge pandas and your favorite tools to run much faster
+
+- :fontawesome-solid-chart-pie:{ .lg .middle } 
+
+    ---
+
+    Visualize strategy performance using interactive charts and dashboards (both in Jupyter and browser)
+
+- :fontawesome-regular-gem:{ .lg .middle } 
+
+    ---
+
+    Fetch and process data periodically, send Telegram notifications, and more
+
+- :heart_on_fire:{ .lg .middle }
+
+    ---
+
+    [__Support us__](https://vectorbt.pro/) to get access to parallelization, portfolio optimization, 
+    pattern recognition, event projections, limit order support, and 100+ other hot features
+
+</div>
 
 ## Why vectorbt?
 

@@ -44,6 +44,7 @@ markdown_extensions:
   - meta
   - admonition
   - def_list
+  - md_in_html
   - attr_list
   - tables
   - footnotes

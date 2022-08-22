@@ -55,3 +55,8 @@ footer.sponsorship:hover hr {
 footer.sponsorship:not(:hover) .twemoji.heart-throb-hover svg {
     color: var(--md-default-fg-color--lighter) !important;
 }
+
+.grid.cards li:last-of-type {
+    border-color: transparent !important;
+    box-shadow: var(--md-shadow-z3) !important;
+}
