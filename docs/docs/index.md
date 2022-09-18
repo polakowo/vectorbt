@@ -83,7 +83,7 @@ With vectorbt, you can
     ---
 
     [__Support us__](https://vectorbt.pro/) to get access to parallelization, portfolio optimization, 
-    pattern recognition, event projections, limit order support, and 100+ other hot features
+    pattern recognition, event projections, limit order support, and 100+ other hot features!
 
 </div>
 

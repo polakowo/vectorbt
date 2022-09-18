@@ -4801,7 +4801,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trade PnL."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
 
     def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
@@ -4811,7 +4810,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of position PnL."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
         return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
 
     def plot_asset_flow(self,
