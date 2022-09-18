@@ -203,6 +203,10 @@ If you have any questions about this or want to apply for a license exception, p
 
 Installing optional dependencies may be subject to a more restrictive license.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=polakowo/vectorbt&type=Timeline)](https://star-history.com/#polakowo/vectorbt&Timeline)
+
 ## Disclaimer
 
 This software is for educational purposes only. Do not risk money which you are afraid to lose. 
