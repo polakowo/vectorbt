@@ -3438,7 +3438,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         func_name = func_name.upper()
         talib_func = getattr(talib, func_name)
-        info = abstract.Function(func_name)._Function__info
+        info = abstract.Function(func_name).info
         input_names = []
         for in_names in info['input_names'].values():
             if isinstance(in_names, (list, tuple)):
