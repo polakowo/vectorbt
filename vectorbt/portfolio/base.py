@@ -2972,6 +2972,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             slippage=broadcasted_args['slippage'],
             min_size=broadcasted_args['min_size'],
             max_size=broadcasted_args['max_size'],
+            size_granularity=broadcasted_args['size_granularity'],
             reject_prob=broadcasted_args['reject_prob'],
             lock_cash=broadcasted_args['lock_cash'],
             allow_partial=broadcasted_args['allow_partial'],
