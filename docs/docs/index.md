@@ -4,7 +4,16 @@ title: Getting started
 
 # Getting started
 
-![](/assets/logo/header.svg)
+<div align="center">
+	<a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
+        <img src="/assets/logo/header-pro.svg" />
+    </a>
+</div>
+<div align="center">
+	<a href="https://vectorbt.dev/" alt="https://vectorbt.dev/">
+        <img src="/assets/logo/header.svg" />
+    </a>
+</div>
 
 ## What is vectorbt?
 
@@ -78,7 +87,7 @@ With vectorbt, you can
 
     Fetch and process data periodically, send Telegram notifications, and more
 
-- :heart_on_fire:{ .lg .middle }
+- :gem:{ .lg .middle }
 
     ---
 

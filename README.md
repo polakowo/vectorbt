@@ -1,11 +1,11 @@
 <div align="center">
-	<a href="https://vectorbt.dev/" alt="https://vectorbt.dev/">
-        <img src="docs/docs/assets/logo/header.svg" />
+	<a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
+        <img src="docs/docs/assets/logo/header-pro.svg" />
     </a>
 </div>
 <div align="center">
-	<a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
-        <img src="docs/docs/assets/logo/header-pro.svg" />
+	<a href="https://vectorbt.dev/" alt="https://vectorbt.dev/">
+        <img src="docs/docs/assets/logo/header.svg" />
     </a>
 </div>
 <br>
