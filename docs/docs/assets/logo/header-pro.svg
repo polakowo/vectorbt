@@ -17,7 +17,7 @@
 					margin: 0;
 					width: 100%;
 					height: 80px;
-					background: linear-gradient(-45deg, #448AFF, #353352);
+					background: linear-gradient(-45deg, #00b0ff, #2e3d52);
 					background-size: 300% 300%;
 					border-radius: 10px;
 					color: white;
