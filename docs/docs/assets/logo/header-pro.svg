@@ -17,8 +17,8 @@
 					margin: 0;
 					width: 100%;
 					height: 80px;
-					background: linear-gradient(-45deg, #242732, #2F303E);
-					background-size: 600% 400%;
+					background: linear-gradient(-45deg, #448AFF, #353352);
+					background-size: 300% 300%;
 					border-radius: 10px;
 					color: white;
 					text-align: center;
@@ -35,7 +35,7 @@
 					font-size: 36px;
 					font-style: italic;
 					color: white;
-					text-shadow: 0 12px 5px rgba(255, 255, 255, 0.3);
+					text-shadow: 0 12px 5px rgba(255, 255, 255, 0.2);
 				}
 				.icon {
 					position: absolute;
