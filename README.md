@@ -3,6 +3,11 @@
         <img src="docs/docs/assets/logo/header.svg" />
     </a>
 </div>
+<div align="center">
+	<a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
+        <img src="docs/docs/assets/logo/header-pro.svg" />
+    </a>
+</div>
 <br>
 <p align="center">
     <a href="https://pypi.org/project/vectorbt" alt="Python Versions">
