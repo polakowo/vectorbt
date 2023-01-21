@@ -239,16 +239,16 @@ settings = SettingsConfig(
                 seaborn=dict(
                     color_schema=Config(  # flex
                         dict(
-                            blue="rgb(76,114,176)",
-                            orange="rgb(221,132,82)",
-                            green="rgb(129,114,179)",
-                            red="rgb(85,168,104)",
-                            purple="rgb(218,139,195)",
-                            brown="rgb(204,185,116)",
-                            pink="rgb(140,140,140)",
-                            gray="rgb(100,181,205)",
-                            yellow="rgb(147,120,96)",
-                            cyan="rgb(196,78,82)"
+                            blue="#1f77b4",
+                            orange="#ff7f0e",
+                            green="#2ca02c",
+                            red="#dc3912",
+                            purple="#9467bd",
+                            brown="#8c564b",
+                            pink="#e377c2",
+                            gray="#7f7f7f",
+                            yellow="#bcbd22",
+                            cyan="#17becf"
                         )
                     ),
                     template=Config(json.loads(pkgutil.get_data(__name__, "templates/seaborn.json"))),  # flex
