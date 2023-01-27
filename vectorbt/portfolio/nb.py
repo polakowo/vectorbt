@@ -1169,8 +1169,10 @@ def init_records_nb(target_shape: tp.Shape,
                     max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Initialize order and log records."""
     if max_orders is None:
-        max_orders = target_shape[0] * target_shape[1]
-    order_records = np.empty(max_orders, dtype=order_dt)
+        _max_orders = target_shape[0] * target_shape[1]
+    else:
+        _max_orders = max_orders
+    order_records = np.empty(_max_orders, dtype=order_dt)
     if max_logs == 0:
         max_logs = 1
     log_records = np.empty(max_logs, dtype=log_dt)
