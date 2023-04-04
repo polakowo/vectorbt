@@ -24,6 +24,9 @@ def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:
     """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_talib`."""
     return IndicatorFactory.from_talib(*args, **kwargs)
 
+def mtalib(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_talib`."""
+    return IndicatorFactory.from_mtalib(*args, **kwargs)
 
 def pandas_ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
     """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_pandas_ta`."""
@@ -38,6 +41,7 @@ def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
 __all__ = [
     'IndicatorFactory',
     'talib',
+    'mtalib',
     'pandas_ta',
     'ta',
     'MA',
@@ -50,6 +54,7 @@ __all__ = [
     'OBV'
 ]
 __whitelist__ = [
+    'mtalib',
     'talib',
     'pandas_ta',
     'ta'
