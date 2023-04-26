@@ -159,7 +159,7 @@ def apply_mapping(obj: tp.Any,
         if obj.size == 0:
             return obj
         series = []
-        for sr_name, sr in obj.iteritems():
+        for sr_name, sr in obj.items():
             if ignore_type is None or not _compatible_types(sr.dtype, sr.iloc[0]):
                 series.append(sr.map(_converter))
             else:

@@ -980,7 +980,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             elif mapping.lower() == 'columns':
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
+        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         value_counts = nb.value_counts_nb(codes, len(uniques), group_lens)

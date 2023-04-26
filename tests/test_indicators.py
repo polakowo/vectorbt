@@ -156,7 +156,7 @@ class TestFactory:
                 [110., 115.]
             ]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
+            columns=pd.Index([0, 1], dtype='int64', name='custom_p')
         )
         pd.testing.assert_frame_equal(
             F.from_custom_func(custom_func, var_args=True).run(ts['a'], [0, 1], 10, b=100).out,
@@ -275,7 +275,7 @@ class TestFactory:
                 [110., 115.]
             ]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
+            columns=pd.Index([0, 1], dtype='int64', name='custom_p')
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func, var_args=True).run(ts['a'], [0, 1], 10, b=100).out,
@@ -410,7 +410,7 @@ class TestFactory:
                 [0, 1]
             ]),
             index=pd.RangeIndex(start=0, stop=5, step=1),
-            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
+            columns=pd.Index([0, 1], dtype='int64', name='custom_p')
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func, require_input_shape=True).run(5, [0, 1]).out,
@@ -1943,7 +1943,7 @@ class TestFactory:
             obj.out_above([2, 3]),
             target
         )
-        columns = target.columns.rename('my_above', 0)
+        columns = target.columns.set_names('my_above', level=0)
         pd.testing.assert_frame_equal(
             obj.out_above([2, 3], level_name='my_above'),
             pd.DataFrame(
@@ -2014,7 +2014,7 @@ class TestFactory:
             obj.out_and([False, True]),
             target
         )
-        columns = target.columns.rename('my_and', 0)
+        columns = target.columns.set_names('my_and', level=0)
         pd.testing.assert_frame_equal(
             obj.out_and([False, True], level_name='my_and'),
             pd.DataFrame(
@@ -2350,7 +2350,7 @@ class TestFactory:
                         ts['a'].rolling(4).mean().values
                     )),
                     index=ts.index,
-                    columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
+                    columns=pd.Index([2, 3, 4], dtype='int64', name='sma_length')
                 )
             )
 
@@ -2378,7 +2378,7 @@ class TestFactory:
                         ts['a'].rolling(4).mean().values
                     )),
                     index=ts.index,
-                    columns=pd.Int64Index([2, 3, 4], dtype='int64', name='smaindicator_window')
+                    columns=pd.Index([2, 3, 4], dtype='int64', name='smaindicator_window')
                 )
             )
             target = pd.DataFrame(

@@ -607,7 +607,7 @@ class TestFromOrders:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.columns,
-            pd.Int64Index([0], dtype='int64')
+            pd.Index([0], dtype='int64')
         )
         assert pf.wrapper.ndim == 1
         assert pf.wrapper.freq == day_dt
@@ -1281,11 +1281,11 @@ class TestFromOrders:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([200., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not pf.cash_sharing
 
@@ -1301,11 +1301,11 @@ class TestFromOrders:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([100., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert pf.cash_sharing
         with pytest.raises(Exception):
@@ -1764,7 +1764,7 @@ class TestFromSignals:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.columns,
-            pd.Int64Index([0], dtype='int64')
+            pd.Index([0], dtype='int64')
         )
         assert pf.wrapper.ndim == 1
         assert pf.wrapper.freq == day_dt
@@ -2528,11 +2528,11 @@ class TestFromSignals:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([200., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not pf.cash_sharing
 
@@ -2547,11 +2547,11 @@ class TestFromSignals:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([100., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert pf.cash_sharing
         with pytest.raises(Exception):
@@ -3452,7 +3452,7 @@ class TestFromRandomSignals:
         )
         pd.testing.assert_index_equal(
             result.wrapper.columns,
-            pd.Int64Index([1, 2], dtype='int64', name='randnx_n')
+            pd.Index([1, 2], dtype='int64', name='randnx_n')
         )
 
     def test_from_random_prob(self):
@@ -3557,7 +3557,7 @@ class TestFromOrderFunc:
         )
         pd.testing.assert_index_equal(
             pf.wrapper.columns,
-            pd.Int64Index([0], dtype='int64')
+            pd.Index([0], dtype='int64')
         )
         assert pf.wrapper.ndim == 1
         assert pf.wrapper.freq == day_dt
@@ -3642,11 +3642,11 @@ class TestFromOrderFunc:
             )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([200., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not pf.cash_sharing
 
@@ -3681,11 +3681,11 @@ class TestFromOrderFunc:
             )
         pd.testing.assert_index_equal(
             pf.wrapper.grouper.group_by,
-            pd.Int64Index([0, 0, 1], dtype='int64')
+            pd.Index([0, 0, 1], dtype='int64')
         )
         pd.testing.assert_series_equal(
             pf.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
+            pd.Series([100., 100.], index=pd.Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert pf.cash_sharing
 

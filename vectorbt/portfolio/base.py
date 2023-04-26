@@ -629,7 +629,7 @@ Let's simulate a portfolio with two columns:
 
 >>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
 >>> pf.wrapper.columns
-Int64Index([10, 20], dtype='int64', name='rand_n')
+Index([10, 20], dtype='int64', name='rand_n')
 ```
 
 ### Column, group, and tag selection

@@ -442,7 +442,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         new_data = {}
         for k, v in data.items():
             if isinstance(v, pd.Series):
-                v = v.to_frame(name=v.name)
+                v = v.to_frame()
             v = v.reindex(columns=columns)
             if not multiple_columns:
                 v = v[columns[0]]

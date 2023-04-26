@@ -996,7 +996,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             elif mapping.lower() == 'columns':
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
+        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
         if incl_all_keys and mapping is not None:
