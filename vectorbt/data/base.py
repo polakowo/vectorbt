@@ -692,7 +692,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                     new_data[c].loc[:, s] = col_data
                 else:
                     new_data[c].loc[:] = col_data
-
+        for c in columns:
+            new_data[c] = new_data[c].infer_objects(copy=False)
         return new_data
 
     def get(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
