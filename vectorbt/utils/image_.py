@@ -56,6 +56,8 @@ def save_animation(fname: str,
         delta (int): Window size of each iteration.
         step (int): Step of each iteration.
         fps (int): Frames per second.
+
+            Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
         tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
@@ -64,6 +66,8 @@ def save_animation(fname: str,
     """
     if writer_kwargs is None:
         writer_kwargs = {}
+    if "duration" not in writer_kwargs:
+        writer_kwargs["duration"] = 1000 / fps
     if tqdm_kwargs is None:
         tqdm_kwargs = {}
     if to_image_kwargs is None:
@@ -71,7 +75,7 @@ def save_animation(fname: str,
     if delta is None:
         delta = len(index) // 2
 
-    with imageio.get_writer(fname, fps=fps, **writer_kwargs) as writer:
+    with imageio.get_writer(fname, **writer_kwargs) as writer:
         for i in tqdm(range(0, len(index) - delta, step), disable=not show_progress, **tqdm_kwargs):
             fig = plot_func(index[i:i + delta], *args, **kwargs)
             if isinstance(fig, (go.Figure, go.FigureWidget)):
