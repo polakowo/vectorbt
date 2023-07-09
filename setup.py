@@ -42,15 +42,15 @@ setup(
     ],
     extras_require={
         'full': [
-            'yfinance>=0.1.63',
+            'yfinance>=0.2.22',
             'python-binance',
-            'ccxt',
+            'ccxt>=4.0.14',
             'alpaca-trade-api==1.4.3',
             'ray>=1.4.1',
             'ta',
             'pandas_ta',
             'TA-Lib',
-            'python-telegram-bot>=13.4',  # LGPLv3
+            'python-telegram-bot>=13.4,<20.0',  # LGPLv3
             'quantstats>=0.0.37'
         ],
         'cov': [
