@@ -7,7 +7,7 @@ import logging
 from functools import wraps
 
 from telegram import Update
-from telegram.error import Unauthorized, ChatMigrated
+from telegram.error import Forbidden, ChatMigrated
 from telegram.ext import (
     Handler,
     CallbackContext,
