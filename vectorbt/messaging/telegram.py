@@ -268,7 +268,7 @@ class TelegramBot(Configured):
             self.chat_ids.append(new_id)
             # Resend to new chat id
             self.send(kind, new_id, *args, log_msg=log_msg, **kwargs)
-        except Unauthorized as e:
+        except Forbidden as e:
             logger.info(f"{chat_id} - Unauthorized to send the %s", kind)
 
     def send_to_all(self, kind: str, *args, **kwargs) -> None:
