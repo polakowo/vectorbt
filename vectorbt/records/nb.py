@@ -16,7 +16,8 @@ These only accept NumPy arrays and other Numba-compatible types.
     Records should retain the order they were created in."""
 
 import numpy as np
-from numba import njit, generated_jit
+from numba import njit
+from numba.extending import overload
 from numba.np.numpy_support import as_dtype
 
 from vectorbt import _typing as tp
@@ -299,10 +300,13 @@ def is_mapped_expandable_nb(col_arr: tp.Array1d, idx_arr: tp.Array1d, target_sha
     return True
 
 
-@generated_jit(nopython=True, cache=True)
-def expand_mapped_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.Array1d,
-                     target_shape: tp.Shape, fill_value: float) -> tp.Array2d:
-    """Set each element to a value by boolean mask."""
+def _expand_mapped_nb(
+    mapped_arr,
+    col_arr,
+    idx_arr,
+    target_shape,
+    fill_value,
+):
     nb_enabled = not isinstance(mapped_arr, np.ndarray)
     if nb_enabled:
         mapped_arr_dtype = as_dtype(mapped_arr.dtype)
@@ -312,7 +316,7 @@ def expand_mapped_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.Ar
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
 
-    def _expand_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value):
+    def impl(mapped_arr, col_arr, idx_arr, target_shape, fill_value):
         out = np.full(target_shape, fill_value, dtype=dtype)
 
         for r in range(mapped_arr.shape[0]):
@@ -320,14 +324,27 @@ def expand_mapped_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.Ar
         return out
 
     if not nb_enabled:
-        return _expand_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
+        return impl(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
 
-    return _expand_mapped_nb
+    return impl
 
 
-@generated_jit(nopython=True, cache=True)
-def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float) -> tp.Array2d:
-    """Expand mapped array by stacking without using index data."""
+ol_expand_mapped_nb = overload(_expand_mapped_nb)(_expand_mapped_nb)
+
+
+@njit(cache=True)
+def expand_mapped_nb(
+    mapped_arr: tp.Array1d,
+    col_arr: tp.Array1d,
+    idx_arr: tp.Array1d,
+    target_shape: tp.Shape,
+    fill_value: float,
+) -> tp.Array2d:
+    """Set each element to a value by boolean mask."""
+    return _expand_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
+
+
+def _stack_expand_mapped_nb(mapped_arr, col_map, fill_value):
     nb_enabled = not isinstance(mapped_arr, np.ndarray)
     if nb_enabled:
         mapped_arr_dtype = as_dtype(mapped_arr.dtype)
@@ -337,7 +354,7 @@ def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_valu
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
 
-    def _stack_expand_mapped_nb(mapped_arr, col_map, fill_value):
+    def impl(mapped_arr, col_map, fill_value):
         col_idxs, col_lens = col_map
         col_start_idxs = np.cumsum(col_lens) - col_lens
         out = np.full((np.max(col_lens), col_lens.shape[0]), fill_value, dtype=dtype)
@@ -347,15 +364,24 @@ def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_valu
             if col_len == 0:
                 continue
             col_start_idx = col_start_idxs[col]
-            ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
-            out[:col_len, col] = mapped_arr[ridxs]
+            idxs = col_idxs[col_start_idx : col_start_idx + col_len]
+            out[:col_len, col] = mapped_arr[idxs]
 
         return out
 
     if not nb_enabled:
-        return _stack_expand_mapped_nb(mapped_arr, col_map, fill_value)
+        return impl(mapped_arr, col_map, fill_value)
 
-    return _stack_expand_mapped_nb
+    return impl
+
+
+ol_stack_expand_mapped_nb = overload(_stack_expand_mapped_nb)(_stack_expand_mapped_nb)
+
+
+@njit(cache=True)
+def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float) -> tp.Array2d:
+    """Expand mapped array by stacking without using index data."""
+    return _stack_expand_mapped_nb(mapped_arr, col_map, fill_value)
 
 
 # ############# Reducing ############# #

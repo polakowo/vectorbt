@@ -8,3 +8,4 @@ docs/docs/api
 docs/site
 dist
 vectorbt.egg-info
+venvs
