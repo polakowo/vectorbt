@@ -59,8 +59,8 @@ markdown_extensions:
       user: polakowo
       repo: vectorbt
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       extend_pygments_lang:
         - name: pycon3
@@ -86,6 +86,10 @@ plugins:
   - search
   - minify:
       minify_html: true
+
+# Validation
+validation:
+  absolute_links: ignore
 
 # Page tree
 nav:
