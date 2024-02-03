@@ -10,11 +10,11 @@
 </div>
 <br>
 <p align="center">
-    <a href="https://pypi.org/project/vectorbt" alt="PyPi">
-        <img src="https://img.shields.io/pypi/v/vectorbt?color=blueviolet" />
-    </a>
     <a href="https://pepy.tech/project/vectorbt" alt="Downloads">
         <img src="https://pepy.tech/badge/vectorbt" />
+    </a>
+    <a href="https://pypi.org/project/vectorbt" alt="PyPi">
+        <img src="https://img.shields.io/pypi/v/vectorbt?color=blueviolet" />
     </a>
     <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" alt="License">
 	<img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
