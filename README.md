@@ -208,6 +208,10 @@ To also install optional dependencies:
 pip install -U "vectorbt[full]"
 ```
 
+## Colab Notebook
+
+[Google Colaboratory](https://colab.research.google.com/drive/1ibqyrf6LPFlzRb6mkPpl3hxqL6ryNBXI?usp=sharing)
+
 ## License
 
 This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license. 
