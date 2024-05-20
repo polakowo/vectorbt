@@ -3287,7 +3287,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
                 !!! note
                     Disabling it does not disable Numba for other functions.
-                    If neccessary, you should ensure that every other function does not uses Numba as well.
+                    If necessary, you should ensure that every other function does not uses Numba as well.
                     You can do this by using the `py_func` attribute of that function.
                     Or, you could disable Numba globally by doing `os.environ['NUMBA_DISABLE_JIT'] = '1'`.
             max_orders (int): Size of the order records array.

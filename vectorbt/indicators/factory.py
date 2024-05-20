@@ -118,7 +118,7 @@ Now the same using `IndicatorFactory`:
 ```
 
 The `IndicatorFactory` class is used to construct indicator classes from UDFs. First, we provide
-all the necessary information (indicator conig) to build the facade of the indicator, such as the names
+all the necessary information (indicator config) to build the facade of the indicator, such as the names
 of inputs, parameters, and outputs, and the actual calculation function. The factory then generates a
 self-contained indicator class capable of running arbitrary configurations of inputs and parameters.
 To run any configuration, we can either use the `run` method (as we did above) or the `run_combs` method.
@@ -309,7 +309,7 @@ custom_upper     5    5
 ```
 
 Parameter defaults can be passed directly to the `IndicatorFactory.from_custom_func` and
-`IndicatorFactory.from_apply_func`, and overriden in the run method:
+`IndicatorFactory.from_apply_func`, and overridden in the run method:
 
 ```pycon
 >>> MyInd = vbt.IndicatorFactory(
@@ -1091,7 +1091,7 @@ Name: (2, b), dtype: float64
 
 Indicator factory also provides a class method `IndicatorFactory.from_talib`
 that can be used to wrap any function from TA-Lib. It automatically fills all the
-neccessary information, such as input, parameter and output names.
+necessary information, such as input, parameter and output names.
 
 ## Stats
 
@@ -2625,7 +2625,7 @@ class IndicatorFactory:
                          **pipeline_kwargs) -> tp.Type[IndicatorBase]:
         """Build indicator class around a custom calculation function.
 
-        In contrast to `IndicatorFactory.from_apply_func`, this method offers full flexbility.
+        In contrast to `IndicatorFactory.from_apply_func`, this method offers full flexibility.
         It's up to we to handle caching and concatenate columns for each parameter (for example,
         by using `vectorbt.base.combine_fns.apply_and_concat_one`). Also, you should ensure that
         each output array has an appropriate number of columns, which is the number of columns in
@@ -2660,7 +2660,7 @@ class IndicatorFactory:
                 Can be overwritten by any run method.
             var_args (bool): Whether run methods should accept variable arguments (`*args`).
 
-                Set to True if `custom_func` accepts positional agruments that are not listed in the config.
+                Set to True if `custom_func` accepts positional arguments that are not listed in the config.
             keyword_only_args (bool): Whether run methods should accept keyword-only arguments (`*`).
 
                 Set to True to force the user to use keyword arguments (e.g., to avoid misplacing arguments).
