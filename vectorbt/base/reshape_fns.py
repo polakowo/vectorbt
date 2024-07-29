@@ -12,7 +12,14 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 from numba import njit
-from numpy.lib.stride_tricks import _broadcast_shape
+try:
+    from numpy import broadcast_shapes
+
+    broadcast_shape = None
+except ImportError:
+    from numpy.lib.stride_tricks import _broadcast_shape as broadcast_shape
+
+    broadcast_shapes = None
 
 from vectorbt import _typing as tp
 from vectorbt.base import index_fns, array_wrapper
@@ -564,7 +571,10 @@ def broadcast(*args: tp.ArrayLike,
 
     # Get final shape
     if to_shape is None:
-        to_shape = _broadcast_shape(*map(np.asarray, arr_args_2d))
+        if broadcast_shapes is not None:
+            to_shape = broadcast_shapes(*map(lambda x: np.asarray(x).shape, arr_args_2d))
+        else:
+            to_shape = broadcast_shape(*map(np.asarray, arr_args_2d))
 
     # Perform broadcasting
     new_args = []
