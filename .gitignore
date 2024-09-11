@@ -9,3 +9,4 @@ docs/site
 dist
 vectorbt.egg-info
 venvs
+.DS_Store

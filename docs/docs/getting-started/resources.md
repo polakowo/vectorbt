@@ -31,6 +31,18 @@ Note: you must run the notebook to play with the widgets.
 - [The PyQuant Newsletter](https://pyquantnews.com/the-pyquant-newsletter/) :newspaper2:
     - [1,000,000 backtest simulations in 20 seconds](https://pyquantnews.com/1000000-backtest-simulations-20-seconds-vectorbt/)
 
+### Books
+
+- [Python for Algorithmic Trading Cookbook: Recipes for designing, building, and deploying algorithmic trading strategies with Python](https://www.amazon.com/Python-Algorithmic-Trading-Cookbook-algorithmic/dp/1835084702/)
+
+=== "Cover"
+
+    ![](/assets/misc/AlgoTradingCookbook.jpg)
+
+=== "Back Cover"
+
+    ![](/assets/misc/AlgoTradingCookbookBack.jpg)
+
 ### Getting Help
 
 - For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
