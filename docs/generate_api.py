@@ -1,6 +1,6 @@
 from functools import partial
 
-from pdoc_to_md import generate_api, format_github_link
+from api_markdown import generate_api, format_github_link
 
 
 format_github_link = partial(format_github_link, user='polakowo', repo='vectorbt')

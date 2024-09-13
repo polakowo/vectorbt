@@ -1,5 +1,5 @@
 import yaml
-from pdoc_to_md import generate_nav_from_api
+from api_markdown import generate_nav_from_api
 
 if __name__ == "__main__":
     nav = []
