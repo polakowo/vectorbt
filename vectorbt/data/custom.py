@@ -196,7 +196,7 @@ class YFData(Data):
         ...     end='2021-04-12 09:35:00 -0400',
         ...     interval='1m'
         ... )
-        >>> yf_data.get())
+        >>> yf_data.get()
                                          Open        High         Low       Close  \\
         Datetime
         2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
