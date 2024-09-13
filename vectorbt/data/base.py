@@ -92,7 +92,7 @@ Updating can be implemented by overriding the `Data.update_symbol` instance meth
 the same arguments as `Data.download_symbol`. In contrast to the download method, the update
 method is an instance method and can access the data downloaded earlier. It can also access the
 keyword arguments initially passed to the download method, accessible under `Data.download_kwargs`.
-Those arguments can be used as default arguments and overriden by arguments passed directly
+Those arguments can be used as default arguments and overridden by arguments passed directly
 to the update method, using `vectorbt.utils.config.merge_dicts`.
 
 Let's define an update method that updates the latest data point and adds two news data points.
