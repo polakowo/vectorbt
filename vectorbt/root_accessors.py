@@ -17,7 +17,7 @@ vbt.ohlcv.accessors.OHLCVDFAccessor            -> pd.DataFrame.vbt.ohlc.* and pd
 vbt.px_accessors.PXAccessor                    -> pd.DataFrame.vbt.px.*
 ```
 
-Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
+Additionally, some accessors subclass other accessors building the following inheritance hierarchy:
 
 ```plaintext
 vbt.base.accessors.BaseSR/DFAccessor
