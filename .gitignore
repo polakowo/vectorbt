@@ -11,3 +11,4 @@ vectorbt.egg-info
 venvs
 .DS_Store
 docs/api-markdown
+build

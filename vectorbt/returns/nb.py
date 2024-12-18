@@ -48,7 +48,7 @@ def get_return_nb(input_value: float, output_value: float) -> float:
 @njit(cache=True)
 def returns_1d_nb(value: tp.Array1d, init_value: float) -> tp.Array1d:
     """Calculate returns from value."""
-    out = np.empty(value.shape, dtype=np.float_)
+    out = np.empty(value.shape, dtype=np.float64)
     input_value = init_value
     for i in range(out.shape[0]):
         output_value = value[i]
@@ -60,7 +60,7 @@ def returns_1d_nb(value: tp.Array1d, init_value: float) -> tp.Array1d:
 @njit(cache=True)
 def returns_nb(value: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
-    out = np.empty(value.shape, dtype=np.float_)
+    out = np.empty(value.shape, dtype=np.float64)
     for col in range(out.shape[1]):
         out[:, col] = returns_1d_nb(value[:, col], init_value[col])
     return out
@@ -75,7 +75,7 @@ def total_return_apply_nb(idxs: tp.Array1d, col: int, returns: tp.Array1d) -> fl
 @njit(cache=True)
 def cum_returns_1d_nb(returns: tp.Array1d, start_value: float) -> tp.Array1d:
     """Cumulative returns."""
-    out = np.empty_like(returns, dtype=np.float_)
+    out = np.empty_like(returns, dtype=np.float64)
     cumprod = 1
     for i in range(returns.shape[0]):
         if not np.isnan(returns[i]):
@@ -89,7 +89,7 @@ def cum_returns_1d_nb(returns: tp.Array1d, start_value: float) -> tp.Array1d:
 @njit(cache=True)
 def cum_returns_nb(returns: tp.Array2d, start_value: float) -> tp.Array2d:
     """2-dim version of `cum_returns_1d_nb`."""
-    out = np.empty_like(returns, dtype=np.float_)
+    out = np.empty_like(returns, dtype=np.float64)
     for col in range(returns.shape[1]):
         out[:, col] = cum_returns_1d_nb(returns[:, col], start_value)
     return out
@@ -107,7 +107,7 @@ def cum_returns_final_1d_nb(returns: tp.Array1d, start_value: float = 0.) -> flo
 @njit(cache=True)
 def cum_returns_final_nb(returns: tp.Array2d, start_value: float = 0.) -> tp.Array1d:
     """2-dim version of `cum_returns_final_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = cum_returns_final_1d_nb(returns[:, col], start_value)
     return out
@@ -139,7 +139,7 @@ def annualized_return_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
 @njit(cache=True)
 def annualized_return_nb(returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `annualized_return_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = annualized_return_1d_nb(returns[:, col], ann_factor)
     return out
@@ -177,7 +177,7 @@ def annualized_volatility_nb(returns: tp.Array2d,
                              levy_alpha: float = 2.0,
                              ddof: int = 1) -> tp.Array1d:
     """2-dim version of `annualized_volatility_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = annualized_volatility_1d_nb(returns[:, col], ann_factor, levy_alpha, ddof)
     return out
@@ -210,7 +210,7 @@ def drawdown_1d_nb(returns: tp.Array1d) -> tp.Array1d:
 @njit(cache=True)
 def drawdown_nb(returns: tp.Array2d) -> tp.Array2d:
     """2-dim version of `drawdown_1d_nb`."""
-    out = np.empty_like(returns, dtype=np.float_)
+    out = np.empty_like(returns, dtype=np.float64)
     for col in range(returns.shape[1]):
         out[:, col] = drawdown_1d_nb(returns[:, col])
     return out
@@ -225,7 +225,7 @@ def max_drawdown_1d_nb(returns: tp.Array1d) -> float:
 @njit(cache=True)
 def max_drawdown_nb(returns: tp.Array2d) -> tp.Array1d:
     """2-dim version of `max_drawdown_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = max_drawdown_1d_nb(returns[:, col])
     return out
@@ -257,7 +257,7 @@ def calmar_ratio_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
 @njit(cache=True)
 def calmar_ratio_nb(returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `calmar_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = calmar_ratio_1d_nb(returns[:, col], ann_factor)
     return out
@@ -303,7 +303,7 @@ def omega_ratio_nb(returns: tp.Array2d,
                    risk_free: float = 0.,
                    required_return: float = 0.) -> tp.Array1d:
     """2-dim version of `omega_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = omega_ratio_1d_nb(
             returns[:, col], ann_factor, risk_free, required_return)
@@ -349,7 +349,7 @@ def sharpe_ratio_nb(returns: tp.Array2d,
                     risk_free: float = 0.,
                     ddof: int = 1) -> tp.Array1d:
     """2-dim version of `sharpe_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = sharpe_ratio_1d_nb(returns[:, col], ann_factor, risk_free, ddof)
     return out
@@ -382,7 +382,7 @@ def downside_risk_1d_nb(returns: tp.Array1d, ann_factor: float, required_return:
 @njit(cache=True)
 def downside_risk_nb(returns: tp.Array2d, ann_factor: float, required_return: float = 0.) -> tp.Array1d:
     """2-dim version of `downside_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = downside_risk_1d_nb(returns[:, col], ann_factor, required_return)
     return out
@@ -420,7 +420,7 @@ def sortino_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, required_return:
 @njit(cache=True)
 def sortino_ratio_nb(returns: tp.Array2d, ann_factor: float, required_return: float = 0.) -> tp.Array1d:
     """2-dim version of `sortino_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = sortino_ratio_1d_nb(returns[:, col], ann_factor, required_return)
     return out
@@ -458,7 +458,7 @@ def information_ratio_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ddo
 @njit(cache=True)
 def information_ratio_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ddof: int = 1) -> tp.Array1d:
     """2-dim version of `information_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = information_ratio_1d_nb(returns[:, col], benchmark_rets[:, col], ddof)
     return out
@@ -504,7 +504,7 @@ def beta_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d) -> float:
 @njit(cache=True)
 def beta_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `beta_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = beta_1d_nb(returns[:, col], benchmark_rets[:, col])
     return out
@@ -546,7 +546,7 @@ def alpha_nb(returns: tp.Array2d,
              ann_factor: float,
              risk_free: float = 0.) -> tp.Array1d:
     """2-dim version of `alpha_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = alpha_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor, risk_free)
     return out
@@ -584,7 +584,7 @@ def tail_ratio_1d_nb(returns: tp.Array1d) -> float:
 @njit(cache=True)
 def tail_ratio_nb(returns: tp.Array2d) -> tp.Array1d:
     """2-dim version of `tail_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = tail_ratio_1d_nb(returns[:, col])
     return out
@@ -613,7 +613,7 @@ def value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
 @njit(cache=True)
 def value_at_risk_nb(returns: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `value_at_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = value_at_risk_1d_nb(returns[:, col], cutoff)
     return out
@@ -643,7 +643,7 @@ def cond_value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float
 @njit(cache=True)
 def cond_value_at_risk_nb(returns: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `cond_value_at_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = cond_value_at_risk_1d_nb(returns[:, col], cutoff)
     return out
@@ -676,7 +676,7 @@ def capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: f
 @njit(cache=True)
 def capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out
@@ -714,7 +714,7 @@ def up_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor
 @njit(cache=True)
 def up_capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `up_capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = up_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out
@@ -752,7 +752,7 @@ def down_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_fact
 @njit(cache=True)
 def down_capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `down_capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
+    out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
         out[col] = down_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out

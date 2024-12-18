@@ -64,7 +64,7 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
     """Generate random floats summing to one.
 
     See # https://stackoverflow.com/a/2640067/8141780"""
-    rand_floats = np.empty(n + 1, dtype=np.float_)
+    rand_floats = np.empty(n + 1, dtype=np.float64)
     rand_floats[0] = 0.
     rand_floats[1] = 1.
     rand_floats[2:] = np.random.uniform(0, 1, n - 1)

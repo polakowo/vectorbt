@@ -547,7 +547,7 @@ Name: sharpe_ratio, dtype: float64
 ... def post_segment_func_nb(c, returns_out):
 ...     returns_out[c.i, c.group] = c.last_return[c.group]
 
->>> returns_out = np.empty_like(ohlcv['Close'], dtype=np.float_)
+>>> returns_out = np.empty_like(ohlcv['Close'], dtype=np.float64)
 >>> pf = vbt.Portfolio.from_order_func(
 ...     ohlcv['Close'],
 ...     order_func_nb,
@@ -1978,7 +1978,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float64)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_any_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -2904,7 +2904,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float64)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_any_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -3396,7 +3396,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             ```pycon
             >>> @njit
             ... def pre_group_func_nb(c):
-            ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
+            ...     order_value_out = np.empty(c.group_len, dtype=np.float64)
             ...     return (order_value_out,)
 
             >>> @njit
@@ -3486,7 +3486,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             >>> @njit
             ... def pre_sim_func_nb(c):
             ...     # We need to define stop price per column once
-            ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
+            ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float64)
             ...     return (stop_price,)
 
             >>> @njit
@@ -3720,7 +3720,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float64)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if isinstance(segment_mask, int):
             _segment_mask = np.full((target_shape_2d[0], len(group_lens)), False)

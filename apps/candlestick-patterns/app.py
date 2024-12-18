@@ -1233,7 +1233,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     all_patterns = list(set(entry_patterns + exit_patterns))
     entry_i = [all_patterns.index(p) for p in entry_patterns]
     exit_i = [all_patterns.index(p) for p in exit_patterns]
-    signals = np.full((len(df.index), len(all_patterns)), 0., dtype=np.float_)
+    signals = np.full((len(df.index), len(all_patterns)), 0., dtype=np.float64)
     for i, pattern in enumerate(all_patterns):
         if pattern != 'CUSTOM':
             signals[:, i] = abstract.Function(pattern)(talib_inputs)
@@ -1260,7 +1260,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         return np.where(entry_signals > 0, entry_signals, 0).sum(axis=1) + \
                np.where(exit_signals < 0, exit_signals, 0).sum(axis=1)
 
-    main_size = np.empty((len(df.index),), dtype=np.float_)
+    main_size = np.empty((len(df.index),), dtype=np.float64)
     main_size[0] = 0  # avoid looking into future
     main_size[1:] = _generate_size(signals)[:-1]
 
@@ -1273,7 +1273,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         idx = np.random.rand(*a.shape).argsort(axis=axis)
         return np.take_along_axis(a, idx, axis=axis)
 
-    rand_size = np.empty((len(df.index), n_random_strat), dtype=np.float_)
+    rand_size = np.empty((len(df.index), n_random_strat), dtype=np.float64)
     rand_size[0] = 0  # avoid looking into future
     if 'mimic_strategy' in prob_options:
         for i in range(n_random_strat):

@@ -666,14 +666,14 @@ class Trades(Ranges):
         """Winning streak at each trade in the current column.
 
         See `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
-        return self.apply(nb.trade_winning_streak_nb, dtype=np.int_)
+        return self.apply(nb.trade_winning_streak_nb, dtype=np.int64)
 
     @cached_property
     def losing_streak(self) -> MappedArray:
         """Losing streak at each trade in the current column.
 
         See `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
-        return self.apply(nb.trade_losing_streak_nb, dtype=np.int_)
+        return self.apply(nb.trade_losing_streak_nb, dtype=np.int64)
 
     @cached_method
     def win_rate(self, group_by: tp.GroupByLike = None,

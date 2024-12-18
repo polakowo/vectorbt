@@ -334,7 +334,7 @@ class SignalsAccessor(GenericAccessor):
             ...         return temp_idx_arr[:1]  # array with one signal
             ...     return temp_idx_arr[:0]  # empty array
 
-            >>> temp_idx_arr = np.empty((1,), dtype=np.int_)  # reuse memory
+            >>> temp_idx_arr = np.empty((1,), dtype=np.int64)  # reuse memory
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3),
             ...     entry_choice_func_nb, (temp_idx_arr,),
@@ -976,12 +976,12 @@ class SignalsAccessor(GenericAccessor):
             entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args,
             **broadcast_kwargs, keep_raw=keep_raw)
         if stop_price_out is None:
-            stop_price_out = np.empty_like(entries, dtype=np.float_)
+            stop_price_out = np.empty_like(entries, dtype=np.float64)
         else:
             stop_price_out = out_args[0]
             out_args = out_args[1:]
         if stop_type_out is None:
-            stop_type_out = np.empty_like(entries, dtype=np.int_)
+            stop_type_out = np.empty_like(entries, dtype=np.int64)
         else:
             stop_type_out = out_args[0]
         stop_price_out = reshape_fns.to_2d_array(stop_price_out)
@@ -1228,7 +1228,7 @@ class SignalsAccessor(GenericAccessor):
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
             return rank_wrapped.vbt.to_mapped(
                 dropna=True,
-                dtype=np.int_,
+                dtype=np.int64,
                 **kwargs
             )
         return rank_wrapped
@@ -1275,7 +1275,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
+        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
         return self.rank(
             nb.sig_pos_rank_nb,
             allow_gaps,
@@ -1317,7 +1317,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
+        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
         return self.rank(
             nb.part_pos_rank_nb,
             prepare_func=prepare_func,
@@ -1391,7 +1391,7 @@ class SignalsAccessor(GenericAccessor):
             minus_one_mask = nth_index == -1
             nth_index = nth_index.astype(object)
             nth_index[minus_one_mask] = np.nan
-            nth_index[~minus_one_mask] = self.wrapper.index[nth_index[~minus_one_mask].astype(np.int_)]
+            nth_index[~minus_one_mask] = self.wrapper.index[nth_index[~minus_one_mask].astype(np.int64)]
         wrap_kwargs = merge_dicts(dict(name_or_index='nth_index'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nth_index, group_by=group_by, **wrap_kwargs)
 
@@ -1443,13 +1443,13 @@ class SignalsAccessor(GenericAccessor):
         See `vectorbt.generic.accessors.GenericAccessor.to_mapped`.
 
         Only True values will be considered."""
-        indices = np.arange(len(self.wrapper.index), dtype=np.float_)[:, None]
+        indices = np.arange(len(self.wrapper.index), dtype=np.float64)[:, None]
         indices = np.tile(indices, (1, len(self.wrapper.columns)))
         indices = reshape_fns.soft_to_ndim(indices, self.wrapper.ndim)
         indices[~self.obj.values] = np.nan
         return self.wrapper.wrap(indices).vbt.to_mapped(
             dropna=True,
-            dtype=np.int_,
+            dtype=np.int64,
             group_by=group_by,
             **kwargs
         )

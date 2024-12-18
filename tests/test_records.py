@@ -2345,7 +2345,7 @@ close = pd.Series([1, 2, 3, 4, 5, 6, 7, 8], index=[
     datetime(2020, 1, 8)
 ]).vbt.tile(4, keys=['a', 'b', 'c', 'd'])
 
-size = np.full(close.shape, np.nan, dtype=np.float_)
+size = np.full(close.shape, np.nan, dtype=np.float64)
 size[:, 0] = [1, 0.1, -1, -0.1, np.nan, 1, -1, 2]
 size[:, 1] = [-1, -0.1, 1, 0.1, np.nan, -1, 1, -2]
 size[:, 2] = [1, 0.1, -1, -0.1, np.nan, 1, -2, 2]

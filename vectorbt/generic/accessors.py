@@ -773,7 +773,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             name_or_index='reduce' if not returns_array else None,
             to_index=returns_idx and to_index,
             fillna=-1 if returns_idx else None,
-            dtype=np.int_ if returns_idx else None
+            dtype=np.int64 if returns_idx else None
         ), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
@@ -865,7 +865,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return count of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='count', dtype=np.int_), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='count', dtype=np.int64), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.count_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
 

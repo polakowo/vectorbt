@@ -210,7 +210,7 @@ if the rolling mean is within upper and lower bounds, and -1 if it's outside:
 ```pycon
 >>> @njit
 ... def apply_func_nb(price, window, lower, upper):
-...     output = np.full(price.shape, np.nan, dtype=np.float_)
+...     output = np.full(price.shape, np.nan, dtype=np.float64)
 ...     for col in range(price.shape[1]):
 ...         for i in range(window, price.shape[0]):
 ...             mean = np.mean(price[i - window:i, col])
@@ -342,7 +342,7 @@ In our example, the parameter `window` can broadcast per column, and both parame
 ```pycon
 >>> @njit
 ... def apply_func_nb(price, window, lower, upper):
-...     output = np.full(price.shape, np.nan, dtype=np.float_)
+...     output = np.full(price.shape, np.nan, dtype=np.float64)
 ...     for col in range(price.shape[1]):
 ...         for i in range(window[col], price.shape[0]):
 ...             mean = np.mean(price[i - window[col]:i, col])
@@ -393,7 +393,7 @@ broadcasting and one for element-wise broadcasting:
 
 >>> @njit
 ... def apply_func_nb(price, window, lower, upper, flex_2d):
-...     output = np.full(price.shape, np.nan, dtype=np.float_)
+...     output = np.full(price.shape, np.nan, dtype=np.float64)
 ...     for col in range(price.shape[1]):
 ...         _window = flex_select_auto_nb(window, 0, col, flex_2d)
 ...         for i in range(_window, price.shape[0]):
@@ -996,16 +996,16 @@ What kind of methods are created can be regulated using `dtype` in the `attr_set
 >>> MyEnum = namedtuple('MyEnum', ['one', 'two'])(0, 1)
 
 >>> def apply_func_nb(price):
-...     out_float = np.empty(price.shape, dtype=np.float_)
+...     out_float = np.empty(price.shape, dtype=np.float64)
 ...     out_bool = np.empty(price.shape, dtype=np.bool_)
-...     out_enum = np.empty(price.shape, dtype=np.int_)
+...     out_enum = np.empty(price.shape, dtype=np.int64)
 ...     return out_float, out_bool, out_enum
 
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['price'],
 ...     output_names=['out_float', 'out_bool', 'out_enum'],
 ...     attr_settings=dict(
-...         out_float=dict(dtype=np.float_),
+...         out_float=dict(dtype=np.float64),
 ...         out_bool=dict(dtype=np.bool_),
 ...         out_enum=dict(dtype=MyEnum)
 ... )).from_apply_func(apply_func_nb)
@@ -2259,7 +2259,7 @@ class IndicatorFactory:
                 Following keys are accepted:
 
                 * `dtype`: Data type used to determine which methods to generate around this attribute.
-                    Set to None to disable. Default is `np.float_`. Can be set to instance of
+                    Set to None to disable. Default is `np.float64`. Can be set to instance of
                     `collections.namedtuple` acting as enumerated type, or any other mapping;
                     It will then create a property with suffix `readable` that contains data in a string format.
             metrics (dict): Metrics supported by `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
@@ -2498,7 +2498,7 @@ class IndicatorFactory:
         for attr_name in all_attr_names:
             _attr_settings = attr_settings.get(attr_name, {})
             checks.assert_dict_valid(_attr_settings, ['dtype'])
-            dtype = _attr_settings.get('dtype', np.float_)
+            dtype = _attr_settings.get('dtype', np.float64)
 
             if checks.is_mapping_like(dtype):
                 def attr_readable(self,
@@ -2725,8 +2725,8 @@ class IndicatorFactory:
             ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
             ...     input_shape = ts1.shape
             ...     n_params = len(p1)
-            ...     out1 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
-            ...     out2 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float_)
+            ...     out1 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float64)
+            ...     out2 = np.empty((input_shape[0], input_shape[1] * n_params), dtype=np.float64)
             ...     for k in range(n_params):
             ...         for col in range(input_shape[1]):
             ...             for i in range(input_shape[0]):

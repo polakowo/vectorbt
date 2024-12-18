@@ -3816,7 +3816,7 @@ class TestFromOrderFunc:
             order_size = np.copy(target_hold_value[c.i, c.from_col:c.to_col])
             order_size_type = np.full(c.group_len, SizeType.TargetValue)
             direction = np.full(c.group_len, Direction.Both)
-            order_value_out = np.empty(c.group_len, dtype=np.float_)
+            order_value_out = np.empty(c.group_len, dtype=np.float64)
             c.last_val_price[c.from_col:c.to_col] = c.close[c.i, c.from_col:c.to_col]
             nb.sort_call_seq_nb(c, order_size, order_size_type, direction, order_value_out)
             return order_size, order_size_type, direction
@@ -4064,12 +4064,12 @@ class TestFromOrderFunc:
             [-1, -1, -1],
             [1, 1, 1]
         ])
-        value_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
-        value_arr2 = np.empty(size.shape, dtype=np.float_)
-        value_arr3 = np.empty(size.shape, dtype=np.float_)
-        return_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
-        return_arr2 = np.empty(size.shape, dtype=np.float_)
-        return_arr3 = np.empty(size.shape, dtype=np.float_)
+        value_arr1 = np.empty((size.shape[0], 2), dtype=np.float64)
+        value_arr2 = np.empty(size.shape, dtype=np.float64)
+        value_arr3 = np.empty(size.shape, dtype=np.float64)
+        return_arr1 = np.empty((size.shape[0], 2), dtype=np.float64)
+        return_arr2 = np.empty(size.shape, dtype=np.float64)
+        return_arr3 = np.empty(size.shape, dtype=np.float64)
         pos_record_arr1 = np.empty(size.shape, dtype=trade_dt)
         pos_record_arr2 = np.empty(size.shape, dtype=trade_dt)
         pos_record_arr3 = np.empty(size.shape, dtype=trade_dt)
@@ -4233,14 +4233,14 @@ class TestFromOrderFunc:
             ], dtype=trade_dt)
         )
 
-        cash_arr = np.empty((size.shape[0], 2), dtype=np.float_)
-        position_arr = np.empty(size.shape, dtype=np.float_)
-        val_price_arr = np.empty(size.shape, dtype=np.float_)
-        value_arr = np.empty((size.shape[0], 2), dtype=np.float_)
-        return_arr = np.empty((size.shape[0], 2), dtype=np.float_)
-        sim_order_cash_arr = np.empty(size.shape, dtype=np.float_)
-        sim_order_value_arr = np.empty(size.shape, dtype=np.float_)
-        sim_order_return_arr = np.empty(size.shape, dtype=np.float_)
+        cash_arr = np.empty((size.shape[0], 2), dtype=np.float64)
+        position_arr = np.empty(size.shape, dtype=np.float64)
+        val_price_arr = np.empty(size.shape, dtype=np.float64)
+        value_arr = np.empty((size.shape[0], 2), dtype=np.float64)
+        return_arr = np.empty((size.shape[0], 2), dtype=np.float64)
+        sim_order_cash_arr = np.empty(size.shape, dtype=np.float64)
+        sim_order_value_arr = np.empty(size.shape, dtype=np.float64)
+        sim_order_return_arr = np.empty(size.shape, dtype=np.float64)
 
         def post_order_func_nb(c):
             sim_order_cash_arr[c.i, c.col] = c.cash_now
@@ -4644,8 +4644,8 @@ class TestFromOrderFunc:
             [-5, 5, -10],
             [-5, 5, 10]
         ])
-        debt = np.empty(price_wide.shape, dtype=np.float_)
-        free_cash = np.empty(price_wide.shape, dtype=np.float_)
+        debt = np.empty(price_wide.shape, dtype=np.float64)
+        free_cash = np.empty(price_wide.shape, dtype=np.float64)
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func, size,
@@ -4680,8 +4680,8 @@ class TestFromOrderFunc:
             pf.cash(free=True).values
         )
 
-        debt = np.empty(price_wide.shape, dtype=np.float_)
-        free_cash = np.empty(price_wide.shape, dtype=np.float_)
+        debt = np.empty(price_wide.shape, dtype=np.float64)
+        free_cash = np.empty(price_wide.shape, dtype=np.float64)
         pf = vbt.Portfolio.from_order_func(
             price_wide.vbt.wrapper.wrap(price_wide.values[::-1]),
             order_func, size,
@@ -4716,8 +4716,8 @@ class TestFromOrderFunc:
             pf.cash(free=True).values
         )
 
-        debt = np.empty(price_wide.shape, dtype=np.float_)
-        free_cash = np.empty((price_wide.shape[0], 2), dtype=np.float_)
+        debt = np.empty(price_wide.shape, dtype=np.float64)
+        free_cash = np.empty((price_wide.shape[0], 2), dtype=np.float64)
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func, size,

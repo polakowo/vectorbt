@@ -175,7 +175,7 @@ class TestAccessors:
             temp_int[0] = from_i
             return temp_int[:1]
 
-        temp_int = np.empty((mask.shape[0],), dtype=np.int_)
+        temp_int = np.empty((mask.shape[0],), dtype=np.int64)
 
         en, ex = pd.Series.vbt.signals.generate_both(
             5, entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
@@ -321,7 +321,7 @@ class TestAccessors:
             temp_int[0] = from_i
             return temp_int[:1]
 
-        temp_int = np.empty((mask.shape[0],), dtype=np.int_)
+        temp_int = np.empty((mask.shape[0],), dtype=np.int64)
 
         pd.testing.assert_series_equal(
             mask['a'].vbt.signals.generate_exits(choice_func_nb, temp_int),
@@ -768,7 +768,7 @@ class TestAccessors:
         a = np.full(n * 2, 0.)
         for i in range(10000):
             en, ex = pd.Series.vbt.signals.generate_random_both(1000, n, entry_wait=2, exit_wait=2)
-            _a = np.empty((n * 2,), dtype=np.int_)
+            _a = np.empty((n * 2,), dtype=np.int64)
             _a[0::2] = np.flatnonzero(en)
             _a[1::2] = np.flatnonzero(ex)
             a += _a
@@ -2130,7 +2130,7 @@ class TestFactory:
             ),
             in_output_settings=dict(
                 in_out2=dict(
-                    dtype=np.float_
+                    dtype=np.float64
                 )
             ),
             in_out2=np.nan,
@@ -2183,7 +2183,7 @@ class TestFactory:
             ),
             in_output_settings=dict(
                 in_out2=dict(
-                    dtype=np.float_
+                    dtype=np.float64
                 )
             ),
             in_out2=np.nan,
@@ -2286,7 +2286,7 @@ class TestFactory:
             ),
             in_output_settings=dict(
                 in_out2=dict(
-                    dtype=np.float_
+                    dtype=np.float64
                 )
             ),
             in_out2=np.nan,
@@ -2430,10 +2430,10 @@ class TestFactory:
             ),
             in_output_settings=dict(
                 in_out1=dict(
-                    dtype=np.float_
+                    dtype=np.float64
                 ),
                 in_out2=dict(
-                    dtype=np.float_
+                    dtype=np.float64
                 )
             ),
             in_out1=np.nan,

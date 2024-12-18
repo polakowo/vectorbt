@@ -1020,9 +1020,9 @@ class TestFactory:
                 (1, 'c')
             ], names=['custom_p', None])
         )
-        assert F.from_apply_func(apply_func).run(ts, [0, 1])._in_out.dtype == np.float_
-        assert F.from_apply_func(apply_func, in_output_settings={'in_out': {'dtype': np.int_}}) \
-                   .run(ts, [0, 1])._in_out.dtype == np.int_
+        assert F.from_apply_func(apply_func).run(ts, [0, 1])._in_out.dtype == np.float64
+        assert F.from_apply_func(apply_func, in_output_settings={'in_out': {'dtype': np.int64}}) \
+                   .run(ts, [0, 1])._in_out.dtype == np.int64
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func, in_out=-1).run(ts, [0, 1]).in_out,
             target
@@ -1113,12 +1113,12 @@ class TestFactory:
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, in_output_settings=dict(in_out=dict(dtype=np.int_)))
+            F.from_apply_func(apply_func, in_output_settings=dict(in_out=dict(dtype=np.int64)))
                 .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, in_output_settings=dict(in_out=dict(dtype=np.int_)))
+            F.from_apply_func(apply_func_nb, numba_loop=True, in_output_settings=dict(in_out=dict(dtype=np.int64)))
                 .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).in_out,
             target
         )
@@ -2104,7 +2104,7 @@ class TestFactory:
             input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['in_out'], param_names=['p1', 'p2'],
             attr_settings={
                 'ts': {'dtype': None},
-                'o1': {'dtype': np.float_},
+                'o1': {'dtype': np.float64},
                 'o2': {'dtype': np.bool_},
                 'in_out': {'dtype': TestEnum}
             }

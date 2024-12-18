@@ -356,7 +356,7 @@ def generate_rand_by_prob_nb(shape: tp.Shape,
     See `rand_by_prob_choice_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    temp_idx_arr = np.empty((shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((shape[0],), dtype=np.int64)
     return generate_nb(
         shape,
         pick_first,
@@ -401,7 +401,7 @@ def generate_rand_ex_by_prob_nb(entries: tp.Array2d,
     Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_ex_nb(
         entries,
         wait,
@@ -492,7 +492,7 @@ def generate_rand_enex_nb(shape: tp.Shape,
                 chosen_ranges = rescale_float_to_int_nb(rand_floats, (min_range, max_range), total_range)
 
                 # Translate them into entries
-                entry_idxs = np.empty(_n, dtype=np.int_)
+                entry_idxs = np.empty(_n, dtype=np.int64)
                 entry_idxs[0] = first_idx
                 entry_idxs[1:] = chosen_ranges
                 entry_idxs = np.cumsum(entry_idxs)
@@ -536,7 +536,7 @@ def generate_rand_enex_by_prob_nb(shape: tp.Shape,
     Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    temp_idx_arr = np.empty((shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((shape[0],), dtype=np.int64)
     return generate_enex_nb(
         shape,
         entry_wait,
@@ -554,7 +554,7 @@ def generate_rand_enex_by_prob_nb(shape: tp.Shape,
 @njit(cache=True)
 def first_choice_nb(from_i: int, to_i: int, col: int, a: tp.Array2d) -> tp.Array1d:
     """`choice_func_nb` that returns the index of the first signal in `a`."""
-    out = np.empty((1,), dtype=np.int_)
+    out = np.empty((1,), dtype=np.int64)
     for i in range(from_i, to_i):
         if a[i, col]:
             out[0] = i
@@ -673,7 +673,7 @@ def generate_stop_ex_nb(entries: tp.Array2d,
                [False]])
         ```
     """
-    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_ex_nb(
         entries,
         wait,
@@ -707,7 +707,7 @@ def generate_stop_enex_nb(entries: tp.Array2d,
     !!! note
         Has the same logic as calling `generate_stop_ex_nb` with `skip_until_exit=True`, but
         removes all entries that come before the next exit."""
-    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_enex_nb(
         entries.shape,
         entry_wait,
@@ -904,8 +904,8 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         >>> high_price = entry_price + 1
         >>> low_price = entry_price - 1
         >>> close_price = entry_price
-        >>> stop_price_out = np.full_like(entries, np.nan, dtype=np.float_)
-        >>> stop_type_out = np.full_like(entries, -1, dtype=np.int_)
+        >>> stop_price_out = np.full_like(entries, np.nan, dtype=np.float64)
+        >>> stop_type_out = np.full_like(entries, -1, dtype=np.int64)
 
         >>> generate_ohlc_stop_ex_nb(
         ...     entries=entries,
@@ -951,7 +951,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         This is because we don't know whether the entry price comes before the high and low price
         at the first bar, and so the trailing stop isn't triggered for the low price of 9.0.
     """
-    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_ex_nb(
         entries,
         wait,
@@ -1001,7 +1001,7 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
     !!! note
         Has the same logic as calling `generate_ohlc_stop_ex_nb` with `skip_until_exit=True`, but
         removes all entries that come before the next exit."""
-    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_enex_nb(
         entries.shape,
         entry_wait,
@@ -1171,7 +1171,7 @@ def rank_nb(a: tp.Array2d,
 
     Setting `after_false` to True will disregard the first partition of True values
     if there is no False value before them."""
-    out = np.full(a.shape, -1, dtype=np.int_)
+    out = np.full(a.shape, -1, dtype=np.int64)
 
     for col in range(a.shape[1]):
         reset_i = 0
@@ -1248,7 +1248,7 @@ def nth_index_1d_nb(a: tp.Array1d, n: int) -> int:
 @njit(cache=True)
 def nth_index_nb(a: tp.Array2d, n: int) -> tp.Array1d:
     """2-dim version of `nth_index_1d_nb`."""
-    out = np.empty(a.shape[1], dtype=np.int_)
+    out = np.empty(a.shape[1], dtype=np.int64)
     for col in range(a.shape[1]):
         out[col] = nth_index_1d_nb(a[:, col], n)
     return out
@@ -1264,7 +1264,7 @@ def norm_avg_index_1d_nb(a: tp.Array1d) -> float:
 @njit(cache=True)
 def norm_avg_index_nb(a: tp.Array2d) -> tp.Array1d:
     """2-dim version of `norm_avg_index_1d_nb`."""
-    out = np.empty(a.shape[1], dtype=np.float_)
+    out = np.empty(a.shape[1], dtype=np.float64)
     for col in range(a.shape[1]):
         out[col] = norm_avg_index_1d_nb(a[:, col])
     return out

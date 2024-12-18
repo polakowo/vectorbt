@@ -608,7 +608,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if to_index:
             if dtype is None:
-                dtype = np.int_
+                dtype = np.int64
             if fillna is None:
                 fillna = -1
 

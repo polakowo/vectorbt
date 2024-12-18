@@ -795,7 +795,7 @@ class SignalFactory(IndicatorFactory):
                         key, value = key
                     else:
                         if key.startswith('temp_idx_arr'):
-                            value = np.empty((input_shape[0],), dtype=np.int_)
+                            value = np.empty((input_shape[0],), dtype=np.int64)
                     value = func_kwargs.get(key, value)
                     more_args += (value,)
                 return more_args

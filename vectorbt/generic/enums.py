@@ -56,11 +56,11 @@ __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 # ############# Records ############# #
 
 range_dt = np.dtype([
-    ('id', np.int_),
-    ('col', np.int_),
-    ('start_idx', np.int_),
-    ('end_idx', np.int_),
-    ('status', np.int_)
+    ('id', np.int64),
+    ('col', np.int64),
+    ('start_idx', np.int64),
+    ('end_idx', np.int64),
+    ('status', np.int64)
 ], align=True)
 """_"""
 
@@ -72,16 +72,16 @@ __pdoc__['range_dt'] = f"""`np.dtype` of range records.
 """
 
 drawdown_dt = np.dtype([
-    ('id', np.int_),
-    ('col', np.int_),
-    ('peak_idx', np.int_),
-    ('start_idx', np.int_),
-    ('valley_idx', np.int_),
-    ('end_idx', np.int_),
-    ('peak_val', np.float_),
-    ('valley_val', np.float_),
-    ('end_val', np.float_),
-    ('status', np.int_),
+    ('id', np.int64),
+    ('col', np.int64),
+    ('peak_idx', np.int64),
+    ('start_idx', np.int64),
+    ('valley_idx', np.int64),
+    ('end_idx', np.int64),
+    ('peak_val', np.float64),
+    ('valley_val', np.float64),
+    ('end_val', np.float64),
+    ('status', np.int64),
 ], align=True)
 """_"""
 

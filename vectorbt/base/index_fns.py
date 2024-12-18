@@ -244,7 +244,7 @@ def drop_duplicate_levels(index: tp.Index, keep: tp.Optional[str] = None) -> tp.
 @njit(cache=True)
 def _align_index_to_nb(a: tp.Array1d, b: tp.Array1d) -> tp.Array1d:
     """Return indices required to align `a` to `b`."""
-    idxs = np.empty(b.shape[0], dtype=np.int_)
+    idxs = np.empty(b.shape[0], dtype=np.int64)
     g = 0
     for i in range(b.shape[0]):
         for j in range(a.shape[0]):

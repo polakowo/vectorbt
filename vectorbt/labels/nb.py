@@ -117,7 +117,7 @@ def local_extrema_apply_nb(close: tp.Array2d,
     Inspired by https://www.mdpi.com/1099-4300/22/10/1162/pdf"""
     pos_th = np.asarray(pos_th)
     neg_th = np.asarray(neg_th)
-    out = np.full(close.shape, 0, dtype=np.int_)
+    out = np.full(close.shape, 0, dtype=np.int64)
 
     for col in range(close.shape[1]):
         prev_i = 0
@@ -168,7 +168,7 @@ def local_extrema_apply_nb(close: tp.Array2d,
 @njit(cache=True)
 def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Return 0 for H-L and 1 for L-H."""
-    out = np.full_like(close, np.nan, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float64)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
@@ -190,7 +190,7 @@ def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array
 @njit(cache=True)
 def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Normalize each range between two extrema between 0 (will go up) and 1 (will go down)."""
-    out = np.full_like(close, np.nan, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float64)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
@@ -219,7 +219,7 @@ def bn_cont_sat_trend_labels_nb(close: tp.Array2d,
     """
     pos_th = np.asarray(pos_th)
     neg_th = np.asarray(neg_th)
-    out = np.full_like(close, np.nan, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float64)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
@@ -261,7 +261,7 @@ def bn_cont_sat_trend_labels_nb(close: tp.Array2d,
 @njit(cache=True)
 def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize: bool) -> tp.Array2d:
     """Compute the percentage change of the current value to the next extremum."""
-    out = np.full_like(close, np.nan, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float64)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
@@ -315,7 +315,7 @@ def breakout_labels_nb(close: tp.Array2d,
     First hit wins."""
     pos_th = np.asarray(pos_th)
     neg_th = np.asarray(neg_th)
-    out = np.full_like(close, 0, dtype=np.float_)
+    out = np.full_like(close, 0, dtype=np.float64)
 
     for col in range(close.shape[1]):
         for i in range(close.shape[0]):

@@ -71,7 +71,7 @@ def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[
 @njit(cache=True)
 def get_group_lens_nb(groups: tp.Array1d) -> tp.Array1d:
     """Return count per group."""
-    result = np.empty(groups.shape[0], dtype=np.int_)
+    result = np.empty(groups.shape[0], dtype=np.int64)
     j = 0
     last_group = -1
     group_len = 0

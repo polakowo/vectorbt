@@ -893,15 +893,15 @@ def build_call_seq_nb(target_shape: tp.Shape,
                       call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
     """Build a new call sequence array."""
     if call_seq_type == CallSeqType.Reversed:
-        out = np.full(target_shape[1], 1, dtype=np.int_)
+        out = np.full(target_shape[1], 1, dtype=np.int64)
         out[np.cumsum(group_lens)[1:] - group_lens[1:] - 1] -= group_lens[1:]
         out = np.cumsum(out[::-1])[::-1] - 1
-        out = out * np.ones((target_shape[0], 1), dtype=np.int_)
+        out = out * np.ones((target_shape[0], 1), dtype=np.int64)
         return out
-    out = np.full(target_shape[1], 1, dtype=np.int_)
+    out = np.full(target_shape[1], 1, dtype=np.int64)
     out[np.cumsum(group_lens)[:-1]] -= group_lens[:-1]
     out = np.cumsum(out) - 1
-    out = out * np.ones((target_shape[0], 1), dtype=np.int_)
+    out = out * np.ones((target_shape[0], 1), dtype=np.int64)
     if call_seq_type == CallSeqType.Random:
         shuffle_call_seq_nb(out, group_lens)
     return out
@@ -909,14 +909,14 @@ def build_call_seq_nb(target_shape: tp.Shape,
 
 def require_call_seq(call_seq: tp.Array2d) -> tp.Array2d:
     """Force the call sequence array to pass our requirements."""
-    return np.require(call_seq, dtype=np.int_, requirements=['A', 'O', 'W', 'F'])
+    return np.require(call_seq, dtype=np.int64, requirements=['A', 'O', 'W', 'F'])
 
 
 def build_call_seq(target_shape: tp.Shape,
                    group_lens: tp.Array1d,
                    call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
     """Not compiled but faster version of `build_call_seq_nb`."""
-    call_seq = np.full(target_shape[1], 1, dtype=np.int_)
+    call_seq = np.full(target_shape[1], 1, dtype=np.int64)
     if call_seq_type == CallSeqType.Reversed:
         call_seq[np.cumsum(group_lens)[1:] - group_lens[1:] - 1] -= group_lens[1:]
         call_seq = np.cumsum(call_seq[::-1])[::-1] - 1
@@ -1373,12 +1373,12 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-    order_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    init_cash = init_cash.astype(np.float64)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
+    order_price = np.full(target_shape[1], np.nan, dtype=np.float64)
+    temp_order_value = np.empty(target_shape[1], dtype=np.float64)
     oidx = 0
     lidx = 0
 
@@ -1949,36 +1949,36 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    init_cash = init_cash.astype(np.float64)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     if use_stops:
-        sl_init_i = np.full(target_shape[1], -1, dtype=np.int_)
-        sl_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
-        sl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        sl_init_i = np.full(target_shape[1], -1, dtype=np.int64)
+        sl_init_price = np.full(target_shape[1], np.nan, dtype=np.float64)
+        sl_curr_i = np.full(target_shape[1], -1, dtype=np.int64)
+        sl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float64)
+        sl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float64)
         sl_curr_trail = np.full(target_shape[1], False, dtype=np.bool_)
-        tp_init_i = np.full(target_shape[1], -1, dtype=np.int_)
-        tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        tp_init_i = np.full(target_shape[1], -1, dtype=np.int64)
+        tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float64)
+        tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float64)
     else:
-        sl_init_i = np.empty(0, dtype=np.int_)
-        sl_init_price = np.empty(0, dtype=np.float_)
-        sl_curr_i = np.empty(0, dtype=np.int_)
-        sl_curr_price = np.empty(0, dtype=np.float_)
-        sl_curr_stop = np.empty(0, dtype=np.float_)
+        sl_init_i = np.empty(0, dtype=np.int64)
+        sl_init_price = np.empty(0, dtype=np.float64)
+        sl_curr_i = np.empty(0, dtype=np.int64)
+        sl_curr_price = np.empty(0, dtype=np.float64)
+        sl_curr_stop = np.empty(0, dtype=np.float64)
         sl_curr_trail = np.empty(0, dtype=np.bool_)
-        tp_init_i = np.empty(0, dtype=np.int_)
-        tp_init_price = np.empty(0, dtype=np.float_)
-        tp_curr_stop = np.empty(0, dtype=np.float_)
-    price_arr = np.full(target_shape[1], np.nan, dtype=np.float_)
-    size_arr = np.empty(target_shape[1], dtype=np.float_)
-    size_type_arr = np.empty(target_shape[1], dtype=np.float_)
-    slippage_arr = np.empty(target_shape[1], dtype=np.float_)
-    direction_arr = np.empty(target_shape[1], dtype=np.int_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+        tp_init_i = np.empty(0, dtype=np.int64)
+        tp_init_price = np.empty(0, dtype=np.float64)
+        tp_curr_stop = np.empty(0, dtype=np.float64)
+    price_arr = np.full(target_shape[1], np.nan, dtype=np.float64)
+    size_arr = np.empty(target_shape[1], dtype=np.float64)
+    size_type_arr = np.empty(target_shape[1], dtype=np.float64)
+    slippage_arr = np.empty(target_shape[1], dtype=np.float64)
+    direction_arr = np.empty(target_shape[1], dtype=np.int64)
+    temp_order_value = np.empty(target_shape[1], dtype=np.float64)
     oidx = 0
     lidx = 0
 
@@ -2633,7 +2633,7 @@ def simulate_nb(target_shape: tp.Shape,
         ... def pre_sim_func_nb(c):
         ...     print('before simulation')
         ...     # Create a temporary array and pass it down the stack
-        ...     order_value_out = np.empty(c.target_shape[1], dtype=np.float_)
+        ...     order_value_out = np.empty(c.target_shape[1], dtype=np.float64)
         ...     return (order_value_out,)
 
         >>> @njit
@@ -2789,20 +2789,20 @@ def simulate_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
+    init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
     last_free_cash = init_cash.copy()
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
     lidx = 0
 
@@ -3421,20 +3421,20 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
+    init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
     last_free_cash = init_cash.copy()
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
     lidx = 0
 
@@ -3997,8 +3997,8 @@ def flex_simulate_nb(target_shape: tp.Shape,
         ... def pre_group_func_nb(c):
         ...     print('\\tbefore group', c.group)
         ...     # Create temporary arrays and pass them down the stack
-        ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
-        ...     call_seq_out = np.empty(c.group_len, dtype=np.int_)
+        ...     order_value_out = np.empty(c.group_len, dtype=np.float64)
+        ...     call_seq_out = np.empty(c.group_len, dtype=np.int64)
         ...     # Forward down the stack
         ...     return (order_value_out, call_seq_out)
 
@@ -4127,20 +4127,20 @@ def flex_simulate_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
+    init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
     last_free_cash = init_cash.copy()
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
     lidx = 0
 
@@ -4660,20 +4660,20 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    init_cash = init_cash.astype(np.float_)
+    init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float_)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_position = np.full(target_shape[1], 0., dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
     last_free_cash = init_cash.copy()
-    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+    last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record['id'][:] = -1
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
+    last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
     lidx = 0
 
@@ -5767,7 +5767,7 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
 @njit(cache=True)
 def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     """Return the current winning streak of each trade."""
-    out = np.full(len(records), 0, dtype=np.int_)
+    out = np.full(len(records), 0, dtype=np.int64)
     curr_rank = 0
     for i in range(len(records)):
         if records[i]['pnl'] > 0:
@@ -5781,7 +5781,7 @@ def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
 @njit(cache=True)
 def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     """Return the current losing streak of each trade."""
-    out = np.full(len(records), 0, dtype=np.int_)
+    out = np.full(len(records), 0, dtype=np.int64)
     curr_rank = 0
     for i in range(len(records)):
         if records[i]['pnl'] < 0:
@@ -5970,7 +5970,7 @@ def asset_flow_nb(target_shape: tp.Shape,
     Returns the total transacted amount of assets at each time step."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full(target_shape, 0., dtype=np.float_)
+    out = np.full(target_shape, 0., dtype=np.float64)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -6095,7 +6095,7 @@ def cash_flow_nb(target_shape: tp.Shape,
     """Get (free) cash flow series per column."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full(target_shape, 0., dtype=np.float_)
+    out = np.full(target_shape, 0., dtype=np.float64)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -6142,7 +6142,7 @@ def sum_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
     """Squeeze each group of columns into a single column using sum operation."""
     check_group_lens_nb(group_lens, a.shape[1])
 
-    out = np.empty((a.shape[0], len(group_lens)), dtype=np.float_)
+    out = np.empty((a.shape[0], len(group_lens)), dtype=np.float64)
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
@@ -6162,7 +6162,7 @@ def init_cash_grouped_nb(init_cash: tp.Array1d, group_lens: tp.Array1d, cash_sha
     """Get initial cash per group."""
     if cash_sharing:
         return init_cash
-    out = np.empty(group_lens.shape, dtype=np.float_)
+    out = np.empty(group_lens.shape, dtype=np.float64)
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
@@ -6180,7 +6180,7 @@ def init_cash_nb(init_cash: tp.Array1d, group_lens: tp.Array1d, cash_sharing: bo
     if not cash_sharing:
         return init_cash
     group_lens_cs = np.cumsum(group_lens)
-    out = np.full(group_lens_cs[-1], np.nan, dtype=np.float_)
+    out = np.full(group_lens_cs[-1], np.nan, dtype=np.float64)
     out[group_lens_cs - group_lens] = init_cash
     out = generic_nb.ffill_1d_nb(out)
     return out
@@ -6311,8 +6311,8 @@ def total_profit_nb(target_shape: tp.Shape,
     A much faster version than the one based on `value_nb`."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    assets = np.full(target_shape[1], 0., dtype=np.float_)
-    cash = np.full(target_shape[1], 0., dtype=np.float_)
+    assets = np.full(target_shape[1], 0., dtype=np.float64)
+    cash = np.full(target_shape[1], 0., dtype=np.float64)
     zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
 
     for col in range(col_lens.shape[0]):
@@ -6356,7 +6356,7 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
     """Get total profit per group."""
     check_group_lens_nb(group_lens, total_profit.shape[0])
 
-    out = np.empty(len(group_lens), dtype=np.float_)
+    out = np.empty(len(group_lens), dtype=np.float64)
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
@@ -6424,7 +6424,7 @@ def benchmark_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_c
     """Get market value per group."""
     check_group_lens_nb(group_lens, close.shape[1])
 
-    out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
+    out = np.empty((close.shape[0], len(group_lens)), dtype=np.float64)
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
@@ -6439,7 +6439,7 @@ def benchmark_value_grouped_nb(close: tp.Array2d, group_lens: tp.Array1d, init_c
 @njit(cache=True)
 def total_benchmark_return_nb(benchmark_value: tp.Array2d) -> tp.Array1d:
     """Get total market return per column/group."""
-    out = np.empty(benchmark_value.shape[1], dtype=np.float_)
+    out = np.empty(benchmark_value.shape[1], dtype=np.float64)
     for col in range(benchmark_value.shape[1]):
         out[col] = returns_nb.get_return_nb(benchmark_value[0, col], benchmark_value[-1, col])
     return out
@@ -6448,7 +6448,7 @@ def total_benchmark_return_nb(benchmark_value: tp.Array2d) -> tp.Array1d:
 @njit(cache=True)
 def gross_exposure_nb(asset_value: tp.Array2d, cash: tp.Array2d) -> tp.Array2d:
     """Get gross exposure per column/group."""
-    out = np.empty(asset_value.shape, dtype=np.float_)
+    out = np.empty(asset_value.shape, dtype=np.float64)
     for col in range(out.shape[1]):
         for i in range(out.shape[0]):
             denom = add_nb(asset_value[i, col], cash[i, col])

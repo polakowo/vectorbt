@@ -547,10 +547,10 @@ ohlcstx_func_config = Config(
         pass_flex_2d=True,
         in_output_settings=dict(
             stop_price=dict(
-                dtype=np.float_
+                dtype=np.float64
             ),
             stop_type=dict(
-                dtype=np.int_
+                dtype=np.int64
             )
         ),
         param_settings=dict(

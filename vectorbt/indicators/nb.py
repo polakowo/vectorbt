@@ -188,7 +188,7 @@ def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Ar
     tr1 = high - low
     tr2 = np.abs(high - prev_close)
     tr3 = np.abs(low - prev_close)
-    tr = np.empty(prev_close.shape, dtype=np.float_)
+    tr = np.empty(prev_close.shape, dtype=np.float64)
     for col in range(tr.shape[1]):
         for i in range(tr.shape[0]):
             tr[i, col] = max(tr1[i, col], tr2[i, col], tr3[i, col])
