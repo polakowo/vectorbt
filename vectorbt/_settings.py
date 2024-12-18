@@ -165,7 +165,7 @@ settings = SettingsConfig(
             missing_columns='raise',
             alpaca=Config(
                 dict(
-                    key_id=None,
+                    api_key=None,
                     secret_key=None
                 )
             ),

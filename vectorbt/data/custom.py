@@ -759,7 +759,7 @@ class CCXTData(Data):
 
 
 class AlpacaData(Data):
-    """`Data` for data coming from `alpaca-trade-api`.
+    """`Data` for data coming from `alpaca-py`.
 
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
     
@@ -815,7 +815,7 @@ class AlpacaData(Data):
                         end: tp.DatetimeLike = 'now UTC',
                         adjustment: tp.Optional[str] = 'all',
                         limit: int = 500,
-                        exchange: tp.Optional[str] = 'CBSE',
+                        feed: tp.Optional[str] = None,
                         **kwargs) -> tp.Frame:
         """Download the symbol.
 
@@ -839,16 +839,24 @@ class AlpacaData(Data):
 
                 Allowed are `raw`, `split`, `dividend` or `all`.
             limit (int): The maximum number of returned items.
-            exchange (str): For crypto symbols. Which exchange you wish to retrieve data from.
+            feed (str): The feed to pull market data from.
 
-                Allowed are `FTX`, `ERSX`, `CBSE`
+                This is either "iex", "otc", or "sip". Feeds "sip" and "otc" are only available to
+                those with a subscription. Default is "iex" for free plans and "sip" for paid.
 
         For defaults, see `data.alpaca` in `vectorbt._settings.settings`.
         """
         from vectorbt._settings import settings
-        from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame, REST
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+        from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
+        from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
         alpaca_cfg = settings['data']['alpaca']
+
+        if "/" in symbol:
+            REST = CryptoHistoricalDataClient
+        else:
+            REST = StockHistoricalDataClient
 
         client_kwargs = dict()
         for k in get_func_kwargs(REST):
@@ -878,27 +886,24 @@ class AlpacaData(Data):
         start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
         end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
 
-        def _is_crypto_symbol(symbol):
-            return len(symbol) == 6 and "USD" in symbol
-
-        if _is_crypto_symbol(symbol):
-            df = client.get_crypto_bars(
-                symbol=symbol,
+        if "/" in symbol:
+            df = client.get_crypto_bars(CryptoBarsRequest(
+                symbol_or_symbols=symbol,
                 timeframe=_timeframe,
                 start=start_ts,
                 end=end_ts,
                 limit=limit,
-                exchanges=exchange
-            ).df
+            )).df
         else:
-            df = client.get_bars(
-                symbol=symbol,
+            df = client.get_stock_bars(StockBarsRequest(
+                symbol_or_symbols=symbol,
                 timeframe=_timeframe,
                 start=start_ts,
                 end=end_ts,
                 adjustment=adjustment,
-                limit=limit
-            ).df
+                limit=limit,
+                feed=feed,
+            )).df
 
         # filter for OHLCV
         # remove extra columns
@@ -911,7 +916,6 @@ class AlpacaData(Data):
             'low': 'Low',
             'close': 'Close',
             'volume': 'Volume',
-            'exchange': 'Exchange'
         }, inplace=True)
 
         df['Open'] = df['Open'].astype(float)
