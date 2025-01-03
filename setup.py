@@ -54,6 +54,17 @@ setup(
             'python-telegram-bot>=13.4,<20.0',  # LGPLv3
             'quantstats>=0.0.37'
         ],
+        'full-no-talib': [
+            'yfinance>=0.2.22',
+            'python-binance',
+            'ccxt>=4.0.14',
+            'alpaca-py',
+            'ray>=1.4.1',
+            'ta',
+            'pandas_ta',
+            'python-telegram-bot>=13.4,<20.0',  # LGPLv3
+            'quantstats>=0.0.37'
+        ],
         'cov': [
             'pytest',
             'pytest-cov',
