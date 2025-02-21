@@ -6,6 +6,7 @@
 # Run this app with `python app.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
 
+import time
 import dash
 import dash_table
 import dash_core_components as dcc
@@ -16,6 +17,8 @@ from flask_caching import Cache
 import plotly.graph_objects as go
 
 import os
+import getpass
+import glob
 import numpy as np
 import pandas as pd
 import json
@@ -33,6 +36,8 @@ from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.portfolio.enums import Direction, DirectionConflictMode
 from vectorbt.portfolio.base import Portfolio
+
+from dal_stock_sql.dal import Dal
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -96,7 +101,7 @@ active_color = "#88ccee"
 # Defaults
 data_path = 'data/data.h5'
 default_metric = 'Total Return [%]'
-default_symbol = 'BTC-USD'
+default_symbol = 'MSFT:ISLAND:USD'
 default_period = '1y'
 default_interval = '1d'
 default_date_range = [0, 1]
@@ -463,6 +468,10 @@ app.layout = html.Div(
                                     "Reset",
                                     id="reset_button"
                                 ),
+                                html.Button(
+                                    "CleanCache",
+                                    id="clean_button"
+                                ),
                                 html.Details(
                                     open=True,
                                     children=[
@@ -509,7 +518,20 @@ app.layout = html.Div(
                                                             value=default_interval,
                                                         ),
                                                     ]
-                                                )
+                                                ),
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Source:"),
+                                                        dcc.Dropdown(
+                                                            id="datasource",
+                                                            options=[{"value": 'yahoo', "label": 'yahoo'},
+                                                                     {"value": 'csv', "label": 'csv'},
+                                                                     {"value": 'csv_all', "label": 'csv_all'},
+                                                                     {"value": 'sql', "label": 'sql'}],
+                                                            value='csv',
+                                                        ),
+                                                    ]
+                                                ),
                                             ],
                                         ),
                                         html.Label("Filter period:"),
@@ -938,8 +960,26 @@ app.clientside_callback(
 )
 
 
+data_mode = 'sql'
+df_all_symbol = None
+sql_dal = None
+
+
 @cache.memoize()
 def fetch_data(symbol, period, interval, auto_adjust, back_adjust):
+    """Fetch OHLCV data from backend."""
+    global data_mode
+    if data_mode == 'csv_all':
+        return fetch_data_csv_all(symbol, period, interval, auto_adjust, back_adjust)
+    elif data_mode == 'csv':
+        return fetch_data_csv(symbol, period, interval, auto_adjust, back_adjust)
+    elif data_mode == 'sql':
+        return fetch_data_sql(symbol, period, interval, auto_adjust, back_adjust)
+    return fetch_data_yf(symbol, period, interval, auto_adjust, back_adjust)
+
+
+@cache.memoize()
+def fetch_data_yf(symbol, period, interval, auto_adjust, back_adjust):
     """Fetch OHLCV data from Yahoo! Finance."""
     return yf.Ticker(symbol).history(
         period=period,
@@ -948,6 +988,73 @@ def fetch_data(symbol, period, interval, auto_adjust, back_adjust):
         auto_adjust=auto_adjust,
         back_adjust=back_adjust
     )
+
+
+@cache.memoize()
+def fetch_data_csv(symbol, period, interval, auto_adjust, back_adjust, csvdir='~/trade/data/kaggle_allUS_daily_with_volume_yahoo/stocks'):
+    """Fetch OHLCV data from csv containing one symbols."""
+    csvfile = csvdir + '/' + symbol + '.csv'
+    _start = time.perf_counter()
+    df = pd.read_csv(csvfile, parse_dates=['Date'], index_col='Date')
+    _duration = time.perf_counter() - _start
+    return df
+
+
+@cache.memoize()
+def fetch_data_csv_all(symbol, period, interval, auto_adjust, back_adjust, csvfile='~/trade/data/test.csv'):
+    """Fetch OHLCV data from csv containing multiple symbols."""
+    global df_all_symbol
+    csvfile = '~/trade/data/test.csv'
+    if df_all_symbol is None:
+        _start = time.perf_counter()
+        df_all_symbol = pd.read_csv(csvfile, parse_dates=['date'])
+        df_all_symbol = df_all_symbol.rename(
+            columns={"date": "Date", "open": "Open", "high": "High", "low": "Low", "close": "Close",
+                     "volume": "Volume"})
+        df_all_symbol['Date'] = df_all_symbol['Date'].map(
+            lambda t: pd.to_datetime(t.replace(tzinfo=None)).to_pydatetime())
+        df_all_symbol = df_all_symbol.set_index(pd.DatetimeIndex(df_all_symbol['Date']))
+        _duration = time.perf_counter() - _start
+    res = df_all_symbol[df_all_symbol['symbol'] == symbol]
+    res = res.drop(['symbol'], axis=1)
+    return res
+
+
+@cache.memoize()
+def fetch_data_sql(symbol, period, interval, auto_adjust, back_adjust):
+    """Fetch OHLCV data from SQL."""
+    global sql_dal
+    if interval == '60m':
+        dbtableRead = 'stock_market.ohlcv_hour1'
+    elif interval == '15m':
+        dbtableRead = 'stock_market.ohlcv_minute15'
+    elif interval == '1d':
+        dbtableRead = 'stock_market.ohlcv_day1'
+    else:
+        raise(ValueError(f"error unknown interval {interval}"))
+    if sql_dal is None:
+        user = getpass.getuser()
+        password = os.getenv('pg_password')
+        sql_dal = Dal.Instance()
+        sql_dal.init(user=user, password=password)
+    res = sql_dal.get_one_symbol(dbtableRead, symbol)
+    res = res.rename(
+        columns={"date": "Date", "open": "Open", "high": "High", "low": "Low", "close": "Close",
+                 "volume": "Volume"})
+    return res
+
+
+@app.callback(
+    [Output('clean_button', 'children')],
+    [Input('clean_button', 'n_clicks')],
+    prevent_initial_call=True
+)
+def clean_cache(_):
+    """Clean all data in cache."""
+    files = glob.glob('data/*')
+    for f in files:
+        os.remove(f)
+    return
 
 
 @app.callback(
@@ -962,8 +1069,11 @@ def update_data(symbol, period, interval, yf_options):
     """Store data into a hidden DIV to avoid repeatedly calling Yahoo's API."""
     auto_adjust = 'auto_adjust' in yf_options
     back_adjust = 'back_adjust' in yf_options
+    _start = time.perf_counter()
     df = fetch_data(symbol, period, interval, auto_adjust, back_adjust)
-    return df.to_json(date_format='iso', orient='split'), df.index.tolist()
+    _duration = time.perf_counter() - _start
+    res = df.to_json(date_format='iso', orient='split'), df.index.tolist()
+    return res
 
 
 @app.callback(
