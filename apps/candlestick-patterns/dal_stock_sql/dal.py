@@ -76,8 +76,6 @@ class Dal:
         # remove TZ otherwise pandas DateTimeIndex lookup in pandas do not work
         #df['date'] = df['date'].map(lambda t: pd.to_datetime(t.replace(tzinfo=None)).to_pydatetime())
         df = df.set_index(pd.DatetimeIndex(df['date']))
-        # drop bar if no volume
-        df = df[df.volume != -1]
         return df
 
     def get_one_symbol(self, dbtable: str, symbol: str, date_start: dt = None, date_end: dt = None):
