@@ -249,6 +249,7 @@ class YFData(Data):
                         period: str = 'max',
                         start: tp.Optional[tp.DatetimeLike] = None,
                         end: tp.Optional[tp.DatetimeLike] = None,
+                        ticker_kwargs: tp.KwargsLike = None,
                         **kwargs) -> tp.Frame:
         """Download the symbol.
 
@@ -261,6 +262,7 @@ class YFData(Data):
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            ticker_kwargs (dict): Keyword arguments passed to `yfinance.ticker.Ticker`.
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
         """
         import yfinance as yf
@@ -271,7 +273,9 @@ class YFData(Data):
         if end is not None:
             end = to_tzaware_datetime(end, tz=get_local_tz())
 
-        return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
+        if ticker_kwargs is None:
+            ticker_kwargs = {}
+        return yf.Ticker(symbol, **ticker_kwargs).history(period=period, start=start, end=end, **kwargs)
 
     def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.Frame:
         """Update the symbol.
