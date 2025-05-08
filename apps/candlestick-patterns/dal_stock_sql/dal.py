@@ -3,14 +3,17 @@ import psycopg2
 from psycopg2 import pool
 import pandas as pd
 import logging
-import sys
-from dal_stock_sql.util import Singleton, timedelta_to_postgres_interval
+
 
 logger = logging.getLogger(__name__)
 
 
-@Singleton
-class Dal:
+class MarketDataRepository:
+    def __init__(self):
+        """Initialize basic structure but don't connect yet"""
+        self.connection_pool = None
+        self.ver_twsapi = None
+    
     def init(self, database='postgres', user='admin', password='admin', host='127.0.0.1', port='5432',
              ver_twsapi=10, maxconn=2):
         self.ver_twsapi = ver_twsapi
@@ -120,6 +123,4 @@ class Dal:
         # remove TZ otherwise pandas DateTimeIndex lookup in pandas do not work
         #df['date'] = df['date'].map(lambda t: pd.to_datetime(t.replace(tzinfo=None)).to_pydatetime())
         df = df.set_index(pd.DatetimeIndex(df['date']))
-        # drop bar if no volume
-        df = df[df.volume != -1]
         return df

@@ -37,7 +37,7 @@ from vectorbt.utils.colors import adjust_opacity
 from vectorbt.portfolio.enums import Direction, DirectionConflictMode
 from vectorbt.portfolio.base import Portfolio
 
-from dal_stock_sql.dal import Dal
+from dal_stock_sql.dal import MarketDataRepository
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -101,7 +101,7 @@ active_color = "#88ccee"
 # Defaults
 data_path = 'data/data.h5'
 default_metric = 'Total Return [%]'
-default_symbol = 'MSFT:ISLAND:USD'
+default_symbol = 'BTC-USD'
 default_period = '1y'
 default_interval = '1d'
 default_date_range = [0, 1]
@@ -1025,17 +1025,17 @@ def fetch_data_sql(symbol, period, interval, auto_adjust, back_adjust):
     """Fetch OHLCV data from SQL."""
     global sql_dal
     if interval == '60m':
-        dbtableRead = 'stock_market.ohlcv_hour1'
+        dbtableRead = 'stock_market.ohlcv_1_hour'
     elif interval == '15m':
-        dbtableRead = 'stock_market.ohlcv_minute15'
+        dbtableRead = 'stock_market.ohlcv_15_minute'
     elif interval == '1d':
-        dbtableRead = 'stock_market.ohlcv_day1'
+        dbtableRead = 'stock_market.ohlcv_1_day'
     else:
         raise(ValueError(f"error unknown interval {interval}"))
     if sql_dal is None:
         user = getpass.getuser()
         password = os.getenv('pg_password')
-        sql_dal = Dal.Instance()
+        sql_dal = MarketDataRepository.Instance()
         sql_dal.init(user=user, password=password)
     res = sql_dal.get_one_symbol(dbtableRead, symbol)
     res = res.rename(
