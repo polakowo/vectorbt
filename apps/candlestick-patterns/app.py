@@ -1035,7 +1035,7 @@ def fetch_data_sql(symbol, period, interval, auto_adjust, back_adjust):
     if sql_dal is None:
         user = getpass.getuser()
         password = os.getenv('pg_password')
-        sql_dal = MarketDataRepository.Instance()
+        sql_dal = MarketDataRepository()
         sql_dal.init(user=user, password=password)
     res = sql_dal.get_one_symbol(dbtableRead, symbol)
     res = res.rename(
