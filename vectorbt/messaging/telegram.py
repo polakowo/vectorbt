@@ -6,6 +6,16 @@
 import logging
 from functools import wraps
 
+from telegram import __version__ as TG_VER
+
+try:
+    from telegram import __version_info__
+except ImportError:
+    __version_info__ = (0, 0)
+
+if __version_info__ >= (20, 0):
+    raise RuntimeError(f"This implementation is not compatible with telegram version {TG_VER}")
+
 from telegram import Update
 from telegram.error import Unauthorized, ChatMigrated
 from telegram.ext import (
