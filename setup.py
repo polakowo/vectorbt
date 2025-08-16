@@ -25,7 +25,7 @@ setup(
         'pandas',
         'scipy',
         'matplotlib',
-        'plotly>=4.12.0, <6.0.0',
+        'plotly>=4.12.0',
         'ipywidgets>=7.0.0',
         "numba>=0.53.1, <0.57.0; python_version<'3.10'",
         "numba>=0.56.0, <0.57.0; python_version>='3.10' and python_version<'3.11'",
