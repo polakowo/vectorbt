@@ -735,7 +735,7 @@ we can set `keep_pd` to True to pass all inputs as pandas objects instead of raw
 Let's demonstrate this by wrapping a basic composed [pandas_ta](https://github.com/twopirllc/pandas-ta) strategy:
 
 ```pycon
->>> import pandas_ta
+>>> import pandas_ta  # or import pandas_ta_classic as pandas_ta
 
 >>> def apply_func(open, high, low, close, volume, ema_len, linreg_len):
 ...     df = pd.DataFrame(dict(open=open, high=high, low=low, close=close, volume=volume))
@@ -3586,7 +3586,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         !!! note
             Returns only the indicators that have been successfully parsed."""
-        import pandas_ta
+        try:
+            import pandas_ta
+        except:
+            import pandas_ta_classic as pandas_ta
 
         indicators = set()
         for func_name in [_k for k, v in pandas_ta.Category.items() for _k in v]:
@@ -3680,7 +3683,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 pd.Series: New feature generated.
             ```
         """
-        import pandas_ta
+        try:
+            import pandas_ta
+        except:
+            import pandas_ta_classic as pandas_ta
 
         func_name = func_name.lower()
         pandas_ta_func = getattr(pandas_ta, func_name)

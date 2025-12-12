@@ -49,7 +49,7 @@ setup(
             'alpaca-py',
             'ray>=1.4.1',
             'ta',
-            'pandas_ta',
+            'pandas-ta-classic',
             'TA-Lib',
             'python-telegram-bot>=13.4,<20.0',  # LGPLv3
             'quantstats>=0.0.37'
@@ -61,7 +61,7 @@ setup(
             'alpaca-py',
             'ray>=1.4.1',
             'ta',
-            'pandas_ta',
+            'pandas-ta-classic',
             'python-telegram-bot>=13.4,<20.0',  # LGPLv3
             'quantstats>=0.0.37'
         ],

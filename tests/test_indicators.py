@@ -25,7 +25,10 @@ pandas_ta_available = True
 try:
     import pandas_ta
 except:
-    pandas_ta_available = False
+    try:
+        import pandas_ta_classic as pandas_ta
+    except:
+        pandas_ta_available = False
 
 talib_available = True
 try:
