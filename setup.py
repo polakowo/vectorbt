@@ -27,6 +27,7 @@ setup(
         'matplotlib',
         'plotly>=4.12.0',
         'ipywidgets>=7.0.0',
+        'anywidget',
         "numba>=0.53.1, <0.57.0; python_version<'3.10'",
         "numba>=0.56.0, <0.57.0; python_version>='3.10' and python_version<'3.11'",
         "numba>=0.57.0; python_version>='3.11'",
