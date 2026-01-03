@@ -116,7 +116,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-<img src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
 
 Inspect any strategy configuration by indexing with pandas:
 
@@ -197,7 +197,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
 
 This is just the tip of the iceberg. Visit the [website](https://vectorbt.dev/) to learn more.
 
