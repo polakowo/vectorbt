@@ -12,7 +12,7 @@ setup(
     version=version['__version__'],
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
-    author_email='olegpolakow@gmail.com',
+    author_email='olegpolakow@vectorbt.pro',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/polakowo/vectorbt',

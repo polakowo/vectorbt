@@ -10,6 +10,6 @@ The source code is open and everyone (individuals and organizations) can use it 
 However, it is not allowed to sell products and services that are mostly just this software.
 
 If you have any questions about this or want to apply for a license exception, 
-please [contact the author](mailto:olegpolakow@gmail.com).
+please [contact the author](mailto:olegpolakow@vectorbt.pro).
 
 Installing optional dependencies may be subject to a more restrictive license.
