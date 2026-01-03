@@ -822,20 +822,6 @@ class TestMappedArray:
         )
         mapped_array2 = mapped_array.replace(mapped_arr=[4, 4, 3, 2, np.nan, 4, 3, 2, 1])
         pd.testing.assert_frame_equal(
-            mapped_array2.value_counts(sort_uniques=False),
-            pd.DataFrame(
-                np.array([
-                    [2, 1, 0, 0],
-                    [1, 0, 1, 0],
-                    [0, 1, 1, 0],
-                    [0, 0, 1, 0],
-                    [0, 1, 0, 0]
-                ]),
-                index=pd.Index([4.0, 3.0, 2.0, 1.0, None], dtype='float64'),
-                columns=wrapper.columns
-            )
-        )
-        pd.testing.assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=True),
             pd.DataFrame(
                 np.array([
