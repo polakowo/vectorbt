@@ -2123,11 +2123,15 @@ class TestFactory:
             '__dir__',
             '__doc__',
             '__eq__',
+        ]
+        if sys.version_info >= (3, 13):
+            expected_attrs.append('__firstlineno__')
+        expected_attrs.extend([
             '__format__',
             '__ge__',
             '__getattribute__',
             '__getitem__',
-        ]
+        ])
         if sys.version_info >= (3, 11):
             expected_attrs.append('__getstate__')
         expected_attrs.extend([
@@ -2145,6 +2149,10 @@ class TestFactory:
             '__repr__',
             '__setattr__',
             '__sizeof__',
+        ])
+        if sys.version_info >= (3, 13):
+            expected_attrs.append('__static_attributes__')
+        expected_attrs.extend([
             '__str__',
             '__subclasshook__',
             '__weakref__',
