@@ -73,6 +73,7 @@ full-no-talib = [
 cov = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "codecov",
 ]
 
