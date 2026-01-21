@@ -582,7 +582,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
-            ind = np.argsort(self.col_arr)
+            ind = np.argsort(self.col_arr, kind='stable')
         return self.replace(
             mapped_arr=self.values[ind],
             col_arr=self.col_arr[ind],
@@ -1022,9 +1022,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             value_counts = value_counts / value_counts_sum.sum()
         if sort:
             if ascending:
-                new_indices = value_counts_sum.argsort()
+                new_indices = value_counts_sum.argsort(kind='stable')
             else:
-                new_indices = (-value_counts_sum).argsort()
+                new_indices = (-value_counts_sum).argsort(kind='stable')
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(

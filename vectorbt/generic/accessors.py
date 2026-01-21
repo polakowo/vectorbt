@@ -1006,9 +1006,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts / value_counts_sum.sum()
         if sort:
             if ascending:
-                new_indices = value_counts_sum.argsort()
+                new_indices = value_counts_sum.argsort(kind='stable')
             else:
-                new_indices = (-value_counts_sum).argsort()
+                new_indices = (-value_counts_sum).argsort(kind='stable')
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(
