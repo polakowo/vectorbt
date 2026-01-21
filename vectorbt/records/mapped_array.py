@@ -1014,7 +1014,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             value_counts = value_counts[~nan_mask]
             mapped_uniques = mapped_uniques[~nan_mask]
         if sort_uniques:
-            new_indices = mapped_uniques.argsort()
+            new_indices = mapped_uniques.argsort(kind='stable')
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)

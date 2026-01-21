@@ -575,7 +575,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """
         checks.assert_numba_func(apply_func_nb)
 
-        resampled = self.obj.resample(freq, axis=0, **kwargs)
+        resampled = self.obj.resample(freq, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
@@ -998,7 +998,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts[~nan_mask]
             uniques = uniques[~nan_mask]
         if sort_uniques:
-            new_indices = uniques.argsort()
+            new_indices = uniques.argsort(kind='stable')
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)

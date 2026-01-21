@@ -27,14 +27,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "numpy>=1.16.5",
-    "pandas",
+    "numpy>=1.23",
+    "pandas>=2.0,<3.0",
     "scipy",
     "matplotlib",
     "plotly>=4.12.0",
     "ipywidgets>=7.0.0",
     "anywidget",
-    "numba>=0.57.0",
+    "numba>=0.60",
     "dill",
     "tqdm",
     "dateparser",
