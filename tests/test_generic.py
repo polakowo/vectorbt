@@ -12,6 +12,13 @@ from vectorbt.generic import nb
 
 seed = 42
 
+
+def pandas_applymap(df: pd.DataFrame, func):
+    """Pandas' native element-wise map, compatible with pandas 2.0+."""
+    if hasattr(pd.DataFrame, 'map'):
+        return df.map(func)
+    return df.applymap(func)
+
 day_dt = np.timedelta64(86400000000000)
 
 df = pd.DataFrame({
@@ -588,7 +595,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df.vbt.applymap(mult_nb),
-            df.applymap(lambda x: x * 2)
+            pandas_applymap(df, lambda x: x * 2)
         )
 
     def test_filter(self):
@@ -602,7 +609,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df.vbt.filter(greater_nb),
-            df.applymap(lambda x: x if x > 2 else np.nan)
+            pandas_applymap(df, lambda x: x if x > 2 else np.nan)
         )
 
     def test_apply_and_reduce(self):
