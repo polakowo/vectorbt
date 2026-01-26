@@ -1,3 +1,4 @@
+import sys
 from collections import namedtuple
 from datetime import datetime
 from itertools import product
@@ -2114,7 +2115,7 @@ class TestFactory:
         )
         ind = F.from_apply_func(lambda ts, in_out, p1, p2: (ts + in_out, ts + in_out)).run(ts, 100, 200)
         test_attr_list = dir(ind)
-        assert test_attr_list == [
+        expected_attrs = [
             '__annotations__',
             '__class__',
             '__delattr__',
@@ -2122,10 +2123,18 @@ class TestFactory:
             '__dir__',
             '__doc__',
             '__eq__',
+        ]
+        if sys.version_info >= (3, 13):
+            expected_attrs.append('__firstlineno__')
+        expected_attrs.extend([
             '__format__',
             '__ge__',
             '__getattribute__',
             '__getitem__',
+        ])
+        if sys.version_info >= (3, 11):
+            expected_attrs.append('__getstate__')
+        expected_attrs.extend([
             '__gt__',
             '__hash__',
             '__init__',
@@ -2140,6 +2149,10 @@ class TestFactory:
             '__repr__',
             '__setattr__',
             '__sizeof__',
+        ])
+        if sys.version_info >= (3, 13):
+            expected_attrs.append('__static_attributes__')
+        expected_attrs.extend([
             '__str__',
             '__subclasshook__',
             '__weakref__',
@@ -2245,7 +2258,8 @@ class TestFactory:
             'wrapper',
             'writeable_attrs',
             'xs'
-        ]
+        ])
+        assert test_attr_list == expected_attrs
 
     def test_get_talib_indicators(self):
         if talib_available:

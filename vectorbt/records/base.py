@@ -693,7 +693,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
-            ind = np.argsort(self.col_arr)
+            ind = np.argsort(self.col_arr, kind='stable')
         return self.replace(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
     def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:

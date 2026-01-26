@@ -175,6 +175,72 @@ def is_equal(arg1: tp.Any, arg2: tp.Any,
     return False
 
 
+def _functions_equal(f1: tp.Any, f2: tp.Any) -> bool:
+    """Compare functions by their semantic behavior, ignoring position metadata.
+
+    Compares code object attributes that define what a function does,
+    not where it was defined (file, line, column).
+    """
+    # Same object - trivially equal
+    if f1 is f2:
+        return True
+
+    # Both must be callable
+    if not (callable(f1) and callable(f2)):
+        return False
+
+    # Must both have __code__ (excludes built-ins, C extensions)
+    if not (hasattr(f1, '__code__') and hasattr(f2, '__code__')):
+        # Fall back to identity check for built-ins
+        return f1 is f2
+
+    c1, c2 = f1.__code__, f2.__code__
+
+    # Compare all semantically meaningful code object attributes
+    if c1.co_code != c2.co_code:  # Bytecode instructions
+        return False
+    if c1.co_consts != c2.co_consts:  # Constants used
+        return False
+    if c1.co_names != c2.co_names:  # Global names referenced
+        return False
+    if c1.co_varnames != c2.co_varnames:  # Local variable names
+        return False
+    if c1.co_freevars != c2.co_freevars:  # Free variable names (closures)
+        return False
+    if c1.co_cellvars != c2.co_cellvars:  # Cell variable names
+        return False
+    if c1.co_argcount != c2.co_argcount:  # Number of positional args
+        return False
+    if c1.co_kwonlyargcount != c2.co_kwonlyargcount:  # Number of keyword-only args
+        return False
+    if c1.co_posonlyargcount != c2.co_posonlyargcount:  # Number of positional-only args
+        return False
+    if c1.co_flags != c2.co_flags:  # Flags (generator, async, etc.)
+        return False
+
+    # Compare default argument values
+    if getattr(f1, '__defaults__', None) != getattr(f2, '__defaults__', None):
+        return False
+    if getattr(f1, '__kwdefaults__', None) != getattr(f2, '__kwdefaults__', None):
+        return False
+
+    # Compare closure values (actual captured values, not just names)
+    closure1 = getattr(f1, '__closure__', None)
+    closure2 = getattr(f2, '__closure__', None)
+    if closure1 is None and closure2 is None:
+        pass  # Both have no closure - OK
+    elif closure1 is None or closure2 is None:
+        return False  # One has closure, other doesn't
+    elif len(closure1) != len(closure2):
+        return False
+    else:
+        for cell1, cell2 in zip(closure1, closure2):
+            if cell1.cell_contents != cell2.cell_contents:
+                return False
+
+    return True
+
+
 def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwargs) -> bool:
     """Check whether two objects are equal (deep check)."""
 
@@ -226,6 +292,11 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
                         return True
                 except:
                     pass
+                # For callables, compare by semantic behavior (not position metadata)
+                if callable(arg1) and callable(arg2):
+                    if _functions_equal(arg1, arg2):
+                        return True
+                    return False
                 try:
                     _kwargs = _select_kwargs(dill.dumps, kwargs)
                     if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):

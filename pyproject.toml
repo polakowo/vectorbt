@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vectorbt"
+dynamic = ["version"]
+description = "Python library for backtesting and analyzing trading strategies at scale"
+readme = "README.md"
+license-files = ["LICENSE.md"]
+authors = [
+    {name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro"}
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=2.0,<3.0",
+    "scipy",
+    "matplotlib",
+    "plotly>=4.12.0",
+    "ipywidgets>=7.0.0",
+    "anywidget",
+    "numba>=0.60",
+    "dill",
+    "tqdm",
+    "dateparser",
+    "imageio",
+    "scikit-learn",
+    "schedule",
+    "requests",
+    "pytz",
+    "mypy_extensions",
+]
+
+[project.optional-dependencies]
+full = [
+    "yfinance>=0.2.22",
+    "python-binance",
+    "ccxt>=4.0.14",
+    "alpaca-py",
+    "ray>=1.4.1",
+    "ta",
+    "pandas-ta-classic",
+    "TA-Lib",
+    "python-telegram-bot>=13.4,<20.0",
+    "quantstats>=0.0.37",
+]
+full-no-talib = [
+    "yfinance>=0.2.22",
+    "python-binance",
+    "ccxt>=4.0.14",
+    "alpaca-py",
+    "ray>=1.4.1",
+    "ta",
+    "pandas-ta-classic",
+    "python-telegram-bot>=13.4,<20.0",
+    "quantstats>=0.0.37",
+]
+cov = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "codecov",
+]
+
+[project.urls]
+Homepage = "https://github.com/polakowo/vectorbt"
+
+[tool.setuptools.dynamic]
+version = {attr = "vectorbt._version.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["vectorbt*"]
+
+[tool.setuptools.package-data]
+vectorbt = ["templates/*.json"]
