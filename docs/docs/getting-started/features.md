@@ -6,7 +6,7 @@ title: Features
 
 ## Pandas
 
-- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of pandas to easily switch between pandas and vectorbt functionality.
+- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
 
 ```pycon title="Compute the rolling z-score"
 >>> import vectorbt as vbt
@@ -148,7 +148,7 @@ Data updated with 5 data points
 
 ## Indicators
 
-- [x] **Technical indicators**: Most popular technical indicators with full Numba support, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the vectorbt's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
+- [x] **Technical indicators**: Most popular technical indicators with full Numba support, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
 
 ```pycon title="Compute 2 moving averages at once"
 >>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
@@ -190,7 +190,7 @@ sma_timeperiod    2    3
 4               4.5  4.0
 ```
 
-- [x] **Indicator factory**: Sophisticated factory for building custom technical indicators of any complexity. Takes a function and does all the magic for you: generates an indicator skeleton that takes inputs and parameters of any shape and type, and runs the vectorbt's indicator engine. The easiest and most flexible way to create indicators you will find in open source.
+- [x] **Indicator factory**: Sophisticated factory for building custom technical indicators of any complexity. Takes a function and does all the magic for you: generates an indicator skeleton that takes inputs and parameters of any shape and type, and runs the VectorBT's indicator engine. The easiest and most flexible way to create indicators you will find in open source.
 
 ```pycon title="Construct a random indicator"
 >>> @njit
@@ -290,7 +290,7 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 
 ## Modeling
 
-- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across vectorbt into a single behemoth class.
+- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
 
 ```pycon title="Backtest the Golden Cross"
 >>> price = vbt.YFData.download('BTC-USD', start='2018-01-01').get('Close')
@@ -419,7 +419,7 @@ dtype: float64
 
 ## Plotting
 
-- [x] **Data visualization**: Numerous flexible data plotting functions distributed across vectorbt.
+- [x] **Data visualization**: Numerous flexible data plotting functions distributed across VectorBT.
 
 ```pycon title="Plot time series against each other"
 >>> sr1 = pd.Series(np.cumprod(np.random.normal(0, 0.01, 100) + 1))

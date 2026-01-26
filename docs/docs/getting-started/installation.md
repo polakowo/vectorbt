@@ -4,7 +4,7 @@ title: Installation
 
 # Installation
 
-You can install vectorbt with pip, the Python package manager, or with Docker.
+You can install VectorBT with pip, the Python package manager, or with Docker.
 
 ## With pip
 
