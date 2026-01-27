@@ -23,22 +23,34 @@ pip install -U "vectorbt[full]"
 You can pull the most recent Docker image if you [have Docker installed](https://docs.docker.com/install/).
 
 ```sh
-docker run --rm -p 8888:8888 -v "$PWD":/home/jovyan/work polakowo/vectorbt
+docker run --rm -p 8888:8888 -v "$PWD":/home/jovyan/work polakowo/vectorbt:latest-full
 ```
 
-This command pulls the latest `polakowo/vectorbt` image from Docker Hub. It then starts a container running 
-a Jupyter Notebook server and exposes the server on host port 8888. Visiting `http://127.0.0.1:8888/?token=<token>` 
-in a browser loads JupyterLab, where token is the secret token printed in the console. Docker destroys 
-the container after notebook server exit, but any files written to the working directory in the container 
-remain intact in the working directory on the host. See [Jupyter Docker Stacks - Quick Start](https://github.com/jupyter/docker-stacks#quick-start).
+This command pulls the latest `polakowo/vectorbt:latest-full` image from Docker Hub.
+It then starts a container running a Jupyter server and exposes it on host port 8888.
+Visiting `http://127.0.0.1:8888/?token=<token>` in a browser opens JupyterLab, where
+`<token>` is the secret token printed in the console.
 
-There are two types of images: 
+Docker removes the container when the notebook server exits, but any files written to the
+working directory inside the container remain available in the working directory on the host
+(because the current directory is mounted into the container). See [Jupyter Docker Stacks -
+Quick Start](https://github.com/jupyter/docker-stacks#quick-start).
 
-* **[polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt)**: vanilla version (default)
-* **[polakowo/vectorbt-full](https://hub.docker.com/r/polakowo/vectorbt-full)**: full version (with optional dependencies)
+There are two types of images in [polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt):
+the vanilla version and the full version (with optional dependencies). To use the vanilla version,
+use `polakowo/vectorbt:latest` instead of `polakowo/vectorbt:latest-full`.
 
-Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook) 
-and comes with Jupyter environment, vectorbt, and other scientific packages installed.
+Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook)
+and comes with a Jupyter environment, vectorbt, and other scientific packages installed.
+
+!!! note
+    If you already have a Jupyter server running locally on port 8888, use another port, such as 10000:
+
+    ```sh
+    docker run --rm -p 10000:8888 -v "$PWD":/home/jovyan/work polakowo/vectorbt:latest-full
+    ```
+
+    Then open `http://127.0.0.1:10000/?token=<token>` in your browser (note the port change from `8888` to `10000`).
 
 ## With git
 

@@ -76,6 +76,11 @@ cov = [
     "pytest-xdist",
     "codecov",
 ]
+docs = [
+    "mkdocs-material",
+    "ruamel.yaml",
+    "mako"
+]
 
 [project.urls]
 Homepage = "https://github.com/polakowo/vectorbt"

@@ -1,4 +1,4 @@
-name: Build & Push Docker Image
+name: Docker
 
 on:
   release:
@@ -18,13 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Base image: no extras
           - variant: base
             vbt_extras: ""
             tag_suffix: ""
             latest_tag: latest
 
-          # Full image: extras=full
           - variant: full
             vbt_extras: "full"
             tag_suffix: "-full"
@@ -34,8 +32,10 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
-          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || github.ref }}
+          fetch-depth: 1
+          fetch-tags: true
+          filter: blob:none
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

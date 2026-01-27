@@ -223,7 +223,8 @@ This is just the tip of the iceberg. Visit the [website](https://vectorbt.dev/) 
 ## :link: Links
 
 * [Website](https://vectorbt.dev/)
-* [Colab Notebook](https://colab.research.google.com/drive/1ibqyrf6LPFlzRb6mkPpl3hxqL6ryNBXI?usp=sharing)
+* [Docker images](https://hub.docker.com/r/polakowo/vectorbt)
+* [Colab notebook](https://colab.research.google.com/drive/1ibqyrf6LPFlzRb6mkPpl3hxqL6ryNBXI?usp=sharing)
 
 ## :balance_scale: License
 
