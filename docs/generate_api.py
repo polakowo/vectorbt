@@ -1038,15 +1038,20 @@ class ToMarkdown:
             body = textwrap.dedent(body)
             if section in ("Args", "Attributes"):
                 body = re.compile(
-                    r"^([\w*]+)(?: $begin:math:text$\(\[\\w\.\,\=\\\[\\\] \-\]\+\)$end:math:text$)?: "
-                    r"((?:.*)(?:\n(?: {2,}.*|$))*)",
+                    r"^([\w*]+)(?:\s*\(([^)]*)\))?\s*:\s*([^\n]*(?:\n(?: {2,}.*|$))*)",
                     re.MULTILINE,
-                ).sub(lambda m: ToMarkdown.deflist(*ToMarkdown.fix_indent(*m.groups())), inspect.cleandoc(f"\n{body}"))
+                ).sub(
+                    lambda m: ToMarkdown.deflist(*ToMarkdown.fix_indent(*m.groups())),
+                    inspect.cleandoc(f"\n{body}"),
+                )
             elif section in ("Returns", "Yields", "Raises", "Warns"):
                 body = re.compile(
-                    r"^()([\w.,$begin:math:display$$end:math:display$ ]+): " r"((?:.*)(?:\n(?: {2,}.*|$))*)",
+                    r"^()([A-Za-z0-9_.,\s\[\](){}\-+=|*/\\]+?)\s*:\s*([^\n]*(?:\n(?: {2,}.*|$))*)",
                     re.MULTILINE,
-                ).sub(lambda m: ToMarkdown.deflist(*ToMarkdown.fix_indent(*m.groups())), inspect.cleandoc(f"\n{body}"))
+                ).sub(
+                    lambda m: ToMarkdown.deflist(*ToMarkdown.fix_indent(*m.groups())),
+                    inspect.cleandoc(f"\n{body}"),
+                )
             return f"__{section}__\n\n{body}"
 
         return re.compile(
