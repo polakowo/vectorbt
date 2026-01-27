@@ -38,14 +38,17 @@ jobs:
           pip install -e ".[full,docs]"
 
       - name: Generate API markdown
+        working-directory: docs
         run: |
-          python docs/generate_api.py
+          python generate_api.py
 
       - name: Update mkdocs navigation for API
+        working-directory: docs
         run: |
-          python docs/update_api_nav.py
+          python update_api_nav.py
 
       - name: Build MkDocs site
+        working-directory: docs
         run: |
           mkdocs build --strict
 
@@ -55,7 +58,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: docs/site
 
   deploy:
     needs: build
