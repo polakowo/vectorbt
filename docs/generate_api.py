@@ -1252,7 +1252,7 @@ def generate_api(
 
 if __name__ == "__main__":
     generate_api(
-        "../vectorbt",
+        "vectorbt",
         root_dir="docs",
         get_icon=lambda module: None,
         get_tags=lambda module: set(),
