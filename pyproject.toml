@@ -78,6 +78,7 @@ cov = [
 ]
 docs = [
     "mkdocs-material",
+    "mkdocs-minify-plugin",
     "ruamel.yaml",
     "mako"
 ]
