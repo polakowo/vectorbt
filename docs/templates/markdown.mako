@@ -1,5 +1,5 @@
 <%
-    from docs.generate_api import ToMarkdown, Module, Function
+    from __main__ import ToMarkdown, Module, Function
 
     def to_markdown(text):
         return ToMarkdown.convert(text, module=module)
