@@ -1,202 +1,453 @@
+/* =========================
+   Modern UI theme (Dash + DBC)
+   ========================= */
+
 :root {
-    --bgcolor: #272a32;
-    --dark_bgcolor: #1d2026;
-    --fontcolor: #9fa6b7;
-    --dark_fontcolor: #7b7d8d;
-    --gridcolor: #323b56;
-    --loadcolor: #387c9e;
-    --active_color: #88ccee;
+  --bg: #ffffff;
+  --bg-muted: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #fbfbfd;
+
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  /* Active */
+  --primary: #2563EB;
+  --primary-700: #1D4ED8;
+
+  /* RGB triples (for rgba usage) */
+  --ink-rgb: 15, 23, 42;
+  --primary-rgb: 37, 99, 235;
+
+  /* Surfaces */
+  --primary-tint: #EFF6FF;
+  --primary-tint-2: #DBEAFE;
+
+  --shadow-sm: 0 1px 2px rgba(var(--ink-rgb), 0.06);
+  --shadow-md: 0 10px 25px rgba(var(--ink-rgb), 0.08);
+
+  /* Radius (reduced + standardized) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+
+  /* Optional: use for tight focus rounding */
+  --radius-focus: 10px;
+
+  --focus: 0 0 0 3px rgba(var(--primary-rgb), 0.20);
+
+  /* Common alpha accents */
+  --primary-a35: rgba(var(--primary-rgb), 0.35);
+  --primary-a55: rgba(var(--primary-rgb), 0.55);
+  --primary-a85: rgba(var(--primary-rgb), 0.85);
 }
 
-.container.scalable {
-    width: 100%;
-    max-width: none;
-}
-
-/* Remove Undo
-–––––––––––––––––––––––––––––––––––––––––––––––––– */
-._dash-undo-redo {
-    display: none;
-}
+* { box-sizing: border-box; }
 
 body {
-    background-color: var(--dark_bgcolor);
-    color: var(--fontcolor);
-    overflow-x: hidden;
-    padding: 15px 30px;
-    margin: 0px;
+  margin: 0;
+  padding: 16px 20px;
+  background: var(--bg-muted);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.35;
+  overflow-x: hidden;
 }
 
-button, .button {
-    background-color: var(--dark_bgcolor) !important;
-    color: var(--dark_fontcolor) !important;
-    border: 1px solid dimgrey !important;
+@media (max-width: 576px) {
+  body { padding: 12px 12px; }
 }
 
-button:hover, .button:hover {
-    color: var(--active_color) !important;
-    border: 1px solid var(--active_color) !important;
+._dash-undo-redo { display: none; }
+
+.container.scalable,
+.container-fluid.scalable {
+  width: 100%;
+  max-width: none;
 }
 
-.banner {
-    height: 5rem;
-    margin-bottom: 1rem;
-    display: flex;
-    flex-direction: row nowrap;
-    align-items: center;
-    justify-content: space-between;
+/* App shell spacing */
+.app-shell {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.banner h6 {
-    font-family: 'Open Sans', sans-serif;
-    font-size: 2rem;
-    font-weight: 600;
-    line-height: 1;
-    text-transform: uppercase;
+/* =========================
+   Top app header
+   ========================= */
+
+.app-shell .app-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 14px 16px;
+  margin: 6px 0 14px;
+
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
-.control-row {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    margin-bottom: 10px;
+.app-shell .app-banner h6 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
 }
 
-.half-width {
-    width: 45%;
+/* GitHub link styled like pill button */
+.app-shell .btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 9px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
-.full-width {
-    width: 100%;
+.app-shell .btn-link:hover {
+  color: var(--primary);
+  border-color: var(--primary-a35);
+  background: var(--primary-tint);
+  transform: translateY(-1px);
 }
 
-*.Select-control,
-Select--single,
-.Select-multi-value-wrapper,
-.Select-value,
-.Select-value-label,
-.Select-placeholder,
-.Select-multi-value-wrapper,
-.Select-input input,
-.input-control {
-    background-color: var(--dark_bgcolor) !important;
-    color: var(--dark_fontcolor) !important;
+.app-shell .btn-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
-.Select-control,
-.input-control {
-    border: 1px solid dimgrey !important;
+/* =========================
+   Cards / containers
+   ========================= */
+
+.app-shell .pretty-container {
+  margin: 14px 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
-.Select.is-focused .Select-input input {
-    color: var(--active_color) !important;
+.app-shell .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: -2px 0 10px;
+  padding: 8px 0;
+
+  border-bottom: 1px solid var(--border);
 }
 
-.Select.is-focused .Select-value .Select-value-label {
-    color: var(--active_color) !important;
+.app-shell .card-header h6 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
 }
 
-.Select-menu-outer,
-.Select.is-focused .Select-control,
-.input-control:focus {
-    color: var(--active_color) !important;
-    border: 1px solid var(--active_color) !important;
+/* Labels + small text */
+.app-shell label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: inline-block;
 }
 
-.input-control {
-    width: 100%;
-    height: 36px;
+.app-shell small {
+  color: var(--text-subtle);
 }
 
-span.Select-clear-zone {
-    display: none !important;
+/* =========================
+   Buttons (opt-in via .btn-neutral)
+   ========================= */
+
+.app-shell .btn-neutral {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease, transform 120ms ease;
 }
 
-.Select-menu-outer,
-.Select-menu-outer div,
-.Select--multi {
-    background-color: var(--dark_bgcolor) !important;
-    color: var(--dark_fontcolor) !important;
+.app-shell .btn-neutral:hover {
+  color: var(--primary);
+  border-color: var(--primary-a35);
+  background: var(--primary-tint);
+  transform: translateY(-1px);
 }
 
-.Select-menu-outer div:hover {
-    color: var(--active_color) !important;
-    cursor: pointer;
+.app-shell .btn-neutral:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
-label, small {
-    color: var(--dark_fontcolor);
+.app-shell .button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
-.control-outer {
-    display: inline-block;
+.app-shell .field-label {
+  display: block;
+  margin-top: 10px;
 }
 
-.section-title {
-    font-size: 16px;
-    font-weight: bold;
-    display: block;
-    margin-top: 20px;
-    margin-bottom: 5px;
-    cursor: pointer;
-}
-.section-title:focus {
-    outline: none;
+/* =========================
+   Inputs / Dropdowns
+   ========================= */
+
+.app-shell .input-control,
+.app-shell input[type="text"],
+.app-shell input[type="number"] {
+  width: 100%;
+  height: 38px;
+  padding: 6px 10px;
+
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  font-size: 14px;
 }
 
-.app__left__section {
-    min-height: 100vh;
-    max-height: 100vh;
+.app-shell .input-control:focus-visible,
+.app-shell input[type="text"]:focus-visible,
+.app-shell input[type="number"]:focus-visible {
+  outline: none;
+  border-color: var(--primary-a55);
+  box-shadow: var(--focus);
 }
 
-.app__right__section {
-    min-height: 100vh;
-    max-height: 100vh;
+/* Dash Dropdown legacy react-select v1 */
+.app-shell .Select-control {
+  min-height: 38px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
 }
 
-.pretty-container {
-    margin: 15px 0px;
-    padding: 25px;
-    background-color: var(--bgcolor);
-    border-radius: 5px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+.app-shell .Select.is-focused .Select-control {
+  border-color: var(--primary-a55);
+  box-shadow: var(--focus);
 }
 
-#yfinance_checklist {
-    color: var(--dark_fontcolor);
+.app-shell .Select-placeholder,
+.app-shell .Select-value-label {
+  color: var(--text-subtle);
+  font-size: 14px;
 }
 
-.rc-slider {
-    margin-top: 10px;
+/* Dash Dropdown newer react-select hooks (future/variant-safe) */
+.app-shell .Select__control {
+  min-height: 38px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
 }
 
-.rc-slider-rail {
-    background-color: var(--dark_bgcolor) !important
+.app-shell .Select__control--is-focused {
+  border-color: var(--primary-a55);
+  box-shadow: var(--focus);
 }
 
-.rc-slider-track {
-    background-color: var(--loadcolor) !important
+.app-shell .Select__placeholder,
+.app-shell .Select__single-value,
+.app-shell .Select__input-container {
+  color: var(--text-subtle);
+  font-size: 14px;
 }
 
-.rc-slider-dot-active, .rc-slider-handle {
-    border-color: var(--active_color) !important;
-    background-color: var(--active_color);
+/* Menu */
+.app-shell .Select-menu-outer,
+.app-shell .Select__menu {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
 }
 
-.rc-slider-handle {
-    border: none !important;
+.app-shell .Select-option,
+.app-shell .Select__option {
+  font-size: 14px;
 }
 
-.column-1 {
-    padding-right: 15px !important;
+.app-shell .Select-option:hover,
+.app-shell .Select__option--is-focused {
+  background: var(--primary-tint);
+  color: var(--primary);
+  cursor: pointer;
 }
 
-.dash-cell.column-2 .input-active,
-.dash-cell.column-3 .input-active {
-    color: var(--active_color) !important;
+/* Hide clear X (legacy) */
+.app-shell span.Select-clear-zone { display: none; }
+
+/* =========================
+   Details/Summary styling (lighter, less “box in a box”)
+   ========================= */
+
+.app-shell details {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-top: 10px;
 }
 
-.dash-spreadsheet-inner .row {
-    margin: 0px;
+.app-shell details + details {
+  margin-top: 12px;
 }
 
+.app-shell summary.section-title {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.04em;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 6px 2px;
+}
+
+.app-shell summary.section-title::-webkit-details-marker { display: none; }
+
+.app-shell summary.section-title:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--radius-focus);
+}
+
+/* =========================
+   RangeSlider
+   ========================= */
+
+.app-shell .rc-slider { margin-top: 10px; }
+
+.app-shell .rc-slider-rail { background: var(--primary-tint-2); }
+
+.app-shell .rc-slider-track { background: var(--primary-a85); }
+
+.app-shell .rc-slider-handle,
+.app-shell .rc-slider-dot-active {
+  border-color: var(--primary-a85);
+  background: var(--primary-a85);
+}
+
+.app-shell .rc-slider-handle {
+  border-width: 1px;
+  box-shadow: 0 2px 10px rgba(var(--ink-rgb), 0.12);
+}
+
+/* =========================
+   Checklist styling (opt-in via .checklist class or specific IDs)
+   ========================= */
+
+.app-shell .checklist label,
+.app-shell #yf_checklist label,
+.app-shell #exit_checklist label,
+.app-shell #sim_checklist label,
+.app-shell #prob_checklist label,
+.app-shell #stats_checklist label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.app-shell .checklist input,
+.app-shell #yf_checklist input,
+.app-shell #exit_checklist input,
+.app-shell #sim_checklist input,
+.app-shell #prob_checklist input,
+.app-shell #stats_checklist input {
+  margin-right: 8px;
+}
+
+.app-shell input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+/* =========================
+   DataTable (Dash)
+   ========================= */
+
+.app-shell .dash-table-container .dash-spreadsheet-container {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.app-shell .dash-spreadsheet-inner {
+  background: var(--surface);
+}
+
+.app-shell .dash-spreadsheet-inner th {
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-weight: 800;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-shell .dash-spreadsheet-inner td {
+  border-bottom: 1px solid rgba(229, 231, 235, 0.7);
+  color: var(--text);
+}
+
+.app-shell .dash-table-container .dash-cell.focused,
+.app-shell .dash-table-container .dash-cell.cell--selected {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--primary-a35);
+}
+
+.app-shell .dash-spreadsheet-inner .row { margin: 0; }
