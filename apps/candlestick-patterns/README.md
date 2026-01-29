@@ -7,7 +7,7 @@ A [Dash](https://github.com/plotly/dash) app to visualize and backtest candlesti
 - Fetches market data via [yfinance](https://github.com/ranaroussi/yfinance)
 - Detects candlestick patterns via [TA-Lib](https://github.com/TA-Lib/ta-lib-python)
 - Choose entry/exit patterns, override candle settings, or specify signals manually
-- Backtests signals using [vectorbt](https://github.com/polakowo/vectorbt)
+- Backtests signals using [VectorBT](https://github.com/polakowo/vectorbt)
 - Visualizes OHLCV, signals, orders, trades, and portfolio value with [Plotly](https://github.com/plotly/plotly.py)
 - Displays key performance metrics (e.g., Sharpe ratio)
 - Compares strategy vs buy & hold and random trading
@@ -19,7 +19,7 @@ A [Dash](https://github.com/plotly/dash) app to visualize and backtest candlesti
 
 ### 1) Clone the repo
 
-If you're running this from the `vectorbt` mono-repo:
+If you're running this from the VectorBT repository:
 
 ```bash
 git clone https://github.com/polakowo/vectorbt.git
@@ -69,4 +69,4 @@ Open: http://127.0.0.1:8050/
 
 ## 🖼️ Screenshot
 
-![screenshot.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/screenshot.png)
+![screenshot.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/screenshot.png)

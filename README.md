@@ -225,9 +225,9 @@ This is just the tip of the iceberg. Visit the [website](https://vectorbt.dev/) 
 
 ### Candlestick Patterns ([here](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/))
 
-Explore candlestick-pattern signals interactively and backtest them with vectorbt.
+Explore candlestick-pattern signals interactively and backtest them with VectorBT.
 
-[![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
+[![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
 
 ## 🔗 Links
 
