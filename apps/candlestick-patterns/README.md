@@ -19,8 +19,6 @@ A [Dash](https://github.com/plotly/dash) app to visualize and backtest candlesti
 
 ### 1) Clone the repo
 
-If you're running this from the VectorBT repository:
-
 ```bash
 git clone https://github.com/polakowo/vectorbt.git
 cd vectorbt/apps/candlestick-patterns
@@ -28,14 +26,10 @@ cd vectorbt/apps/candlestick-patterns
 
 ### 2) Create an environment + install deps
 
-If you already have a `requirements.txt` in this directory:
-
 ```bash
 uv venv
 uv pip install -r requirements.txt
 ```
-
-If you have (or migrate to) a `pyproject.toml`, `uv` can install from it as well.
 
 ### 3) Run the app
 
