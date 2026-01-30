@@ -263,3 +263,47 @@ class ExpandingSplitter(BaseSplitter):
             end_idxs = end_idxs[idxs]
 
         return split_ranges_into_sets(start_idxs, end_idxs, **kwargs)
+
+
+class ShrinkingSplitter(BaseSplitter):
+    """Shrinking walk-forward splitter."""
+
+    def split(self,
+            X: tp.ArrayLike,
+            n: tp.Optional[int] = None,
+            min_len: int = 1,
+            **kwargs) -> RangesT:
+        """Similar to `RollingSplitter.split`, but shrinking.
+
+        `**kwargs` are passed to `split_ranges_into_sets`."""
+        X = to_any_array(X)
+        if isinstance(X, (pd.Series, pd.DataFrame)):
+            index = X.index
+        else:
+            index = pd.Index(np.arange(X.shape[0]))
+
+        # Resolve start_idxs and end_idxs
+        start_idxs = np.arange(len(index))
+        end_idxs = np.full(len(index), len(index)-1)
+
+        # Filter out short ranges
+        window_lens = end_idxs - start_idxs + 1
+        min_len_mask = window_lens >= min_len
+        if not np.any(min_len_mask):
+            raise ValueError(f"There are no ranges that meet window_len>={min_len}")
+        start_idxs = start_idxs[min_len_mask]
+        end_idxs = end_idxs[min_len_mask]
+
+        # Evenly select n ranges
+        if n is not None:
+            if n > len(start_idxs):
+                raise ValueError(f"n cannot be bigger than the maximum number of windows {len(start_idxs)}")
+            idxs = np.round(np.linspace(0, len(start_idxs) - 1, n)).astype(int)
+            start_idxs = start_idxs[idxs]
+            end_idxs = end_idxs[idxs]
+            
+        if 'left_to_right' not in kwargs:
+            kwargs['left_to_right'] = False
+
+        return split_ranges_into_sets(start_idxs, end_idxs, **kwargs)
+
