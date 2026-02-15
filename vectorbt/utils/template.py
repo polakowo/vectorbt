@@ -5,6 +5,7 @@
 
 from copy import copy
 from string import Template
+import ast
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
@@ -105,7 +106,106 @@ class RepEval(SafeToStr):
 
         Merges `mapping` and `RepEval.mapping`."""
         mapping = merge_dicts(self.mapping, mapping)
-        return eval(self.expression, {}, mapping)
+        # Use a restricted AST evaluator to avoid arbitrary code execution
+        def _eval_node(node):
+            if isinstance(node, ast.Constant):
+                return node.value
+            if isinstance(node, ast.Name):
+                if node.id in mapping:
+                    return mapping[node.id]
+                raise NameError(f"name '{node.id}' is not defined")
+            if isinstance(node, ast.BinOp):
+                left = _eval_node(node.left)
+                right = _eval_node(node.right)
+                if isinstance(node.op, ast.Add):
+                    return left + right
+                if isinstance(node.op, ast.Sub):
+                    return left - right
+                if isinstance(node.op, ast.Mult):
+                    return left * right
+                if isinstance(node.op, ast.Div):
+                    return left / right
+                if isinstance(node.op, ast.FloorDiv):
+                    return left // right
+                if isinstance(node.op, ast.Mod):
+                    return left % right
+                if isinstance(node.op, ast.Pow):
+                    return left ** right
+                raise ValueError(f"unsupported binary operator: {node.op}")
+            if isinstance(node, ast.UnaryOp):
+                operand = _eval_node(node.operand)
+                if isinstance(node.op, ast.USub):
+                    return -operand
+                if isinstance(node.op, ast.UAdd):
+                    return +operand
+                if isinstance(node.op, ast.Not):
+                    return not operand
+                raise ValueError(f"unsupported unary operator: {node.op}")
+            if isinstance(node, ast.BoolOp):
+                values = [_eval_node(v) for v in node.values]
+                if isinstance(node.op, ast.And):
+                    return all(values)
+                if isinstance(node.op, ast.Or):
+                    return any(values)
+                raise ValueError(f"unsupported boolean operator: {node.op}")
+            if isinstance(node, ast.Compare):
+                left = _eval_node(node.left)
+                for op, comparator in zip(node.ops, node.comparators):
+                    right = _eval_node(comparator)
+                    if isinstance(op, ast.Eq):
+                        if not (left == right):
+                            return False
+                    elif isinstance(op, ast.NotEq):
+                        if not (left != right):
+                            return False
+                    elif isinstance(op, ast.Lt):
+                        if not (left < right):
+                            return False
+                    elif isinstance(op, ast.LtE):
+                        if not (left <= right):
+                            return False
+                    elif isinstance(op, ast.Gt):
+                        if not (left > right):
+                            return False
+                    elif isinstance(op, ast.GtE):
+                        if not (left >= right):
+                            return False
+                    else:
+                        raise ValueError(f"unsupported comparison operator: {op}")
+                    left = right
+                return True
+            if isinstance(node, ast.Attribute):
+                val = _eval_node(node.value)
+                return getattr(val, node.attr)
+            if isinstance(node, ast.Call):
+                # Allow calls only when calling an attribute of a mapped name, e.g. np.prod(...)
+                func_node = node.func
+                if isinstance(func_node, ast.Attribute) and isinstance(func_node.value, ast.Name):
+                    base_name = func_node.value.id
+                    if base_name not in mapping:
+                        raise NameError(f"name '{base_name}' is not defined")
+                    base_obj = mapping[base_name]
+                    func = getattr(base_obj, func_node.attr)
+                    if not callable(func):
+                        raise ValueError(f"object '{func_node.attr}' of '{base_name}' is not callable")
+                    args = [_eval_node(a) for a in node.args]
+                    kwargs = {kw.arg: _eval_node(kw.value) for kw in node.keywords}
+                    return func(*args, **kwargs)
+                raise ValueError("only calls to mapped attributes are allowed")
+            if isinstance(node, ast.Subscript):
+                val = _eval_node(node.value)
+                idx = _eval_node(node.slice) if not isinstance(node.slice, ast.Slice) else None
+                return val[idx]
+            if isinstance(node, ast.List):
+                return [_eval_node(elt) for elt in node.elts]
+            if isinstance(node, ast.Tuple):
+                return tuple(_eval_node(elt) for elt in node.elts)
+            if isinstance(node, ast.Dict):
+                return {_eval_node(k): _eval_node(v) for k, v in zip(node.keys, node.values)}
+            raise ValueError(f"unsupported expression: {type(node).__name__}")
+
+        parsed = ast.parse(self.expression, mode="eval")
+        return _eval_node(parsed.body)
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(" \
