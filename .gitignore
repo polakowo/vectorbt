@@ -13,3 +13,4 @@ venvs
 .DS_Store
 build
 uv.lock
+.venv*
