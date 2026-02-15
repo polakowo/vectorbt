@@ -162,40 +162,25 @@ class RepEval(SafeToStr):
 
         def _handle_compare(node):
             left = _eval_node(node.left)
+            ops_map = {
+                ast.Eq: lambda a, b: a == b,
+                ast.NotEq: lambda a, b: a != b,
+                ast.Is: lambda a, b: a is b,
+                ast.IsNot: lambda a, b: a is not b,
+                ast.In: lambda a, b: a in b,
+                ast.NotIn: lambda a, b: a not in b,
+                ast.Lt: lambda a, b: a < b,
+                ast.LtE: lambda a, b: a <= b,
+                ast.Gt: lambda a, b: a > b,
+                ast.GtE: lambda a, b: a >= b,
+            }
             for op, comparator in zip(node.ops, node.comparators):
                 right = _eval_node(comparator)
-                if isinstance(op, ast.Eq):
-                    if not (left == right):
-                        return False
-                elif isinstance(op, ast.NotEq):
-                    if not (left != right):
-                        return False
-                elif isinstance(op, ast.Is):
-                    if not (left is right):
-                        return False
-                elif isinstance(op, ast.IsNot):
-                    if not (left is not right):
-                        return False
-                elif isinstance(op, ast.In):
-                    if not (left in right):
-                        return False
-                elif isinstance(op, ast.NotIn):
-                    if not (left not in right):
-                        return False
-                elif isinstance(op, ast.Lt):
-                    if not (left < right):
-                        return False
-                elif isinstance(op, ast.LtE):
-                    if not (left <= right):
-                        return False
-                elif isinstance(op, ast.Gt):
-                    if not (left > right):
-                        return False
-                elif isinstance(op, ast.GtE):
-                    if not (left >= right):
-                        return False
-                else:
+                func = ops_map.get(type(op))
+                if func is None:
                     raise ValueError(f"unsupported comparison operator: {op}")
+                if not func(left, right):
+                    return False
                 left = right
             return True
 
