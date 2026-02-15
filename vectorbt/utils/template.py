@@ -12,6 +12,13 @@ from vectorbt.utils import checks
 from vectorbt.utils.config import set_dict_item, get_func_arg_names, merge_dicts
 from vectorbt.utils.docs import SafeToStr, prepare_for_doc
 
+# Allowlist of attributes on mapped names that may be accessed/called from templates.
+# Keys are names as they appear in the `mapping` (e.g. 'np'), values are sets of attribute names.
+# Keep this intentionally small and conservative; expand only when necessary.
+TEMPLATE_ALLOWED_ATTRS = {
+    'np': {'prod'},
+}
+
 
 class Sub(SafeToStr):
     """Template to substitute parts of the string with the respective values from `mapping`.
@@ -175,8 +182,17 @@ class RepEval(SafeToStr):
                     left = right
                 return True
             if isinstance(node, ast.Attribute):
-                val = _eval_node(node.value)
-                return getattr(val, node.attr)
+                # Only allow attribute access on top-level names from mapping and only allowed attrs
+                if isinstance(node.value, ast.Name):
+                    base_name = node.value.id
+                    if base_name not in mapping:
+                        raise NameError(f"name '{base_name}' is not defined")
+                    allowed = TEMPLATE_ALLOWED_ATTRS.get(base_name, set())
+                    if node.attr not in allowed:
+                        raise ValueError(f"access to attribute '{node.attr}' of '{base_name}' is not allowed")
+                    base_obj = mapping[base_name]
+                    return getattr(base_obj, node.attr)
+                raise ValueError("attribute access is only allowed on top-level mapped names")
             if isinstance(node, ast.Call):
                 # Allow calls only when calling an attribute of a mapped name, e.g. np.prod(...)
                 func_node = node.func
@@ -184,6 +200,9 @@ class RepEval(SafeToStr):
                     base_name = func_node.value.id
                     if base_name not in mapping:
                         raise NameError(f"name '{base_name}' is not defined")
+                    allowed = TEMPLATE_ALLOWED_ATTRS.get(base_name, set())
+                    if func_node.attr not in allowed:
+                        raise ValueError(f"call to '{func_node.attr}' of '{base_name}' is not allowed")
                     base_obj = mapping[base_name]
                     func = getattr(base_obj, func_node.attr)
                     if not callable(func):
@@ -194,7 +213,19 @@ class RepEval(SafeToStr):
                 raise ValueError("only calls to mapped attributes are allowed")
             if isinstance(node, ast.Subscript):
                 val = _eval_node(node.value)
-                idx = _eval_node(node.slice) if not isinstance(node.slice, ast.Slice) else None
+                # Handle slice objects properly
+                s = node.slice
+                if isinstance(s, ast.Slice):
+                    lower = _eval_node(s.lower) if s.lower is not None else None
+                    upper = _eval_node(s.upper) if s.upper is not None else None
+                    step = _eval_node(s.step) if s.step is not None else None
+                    return val[slice(lower, upper, step)]
+                # Tuple of indices (multi-dimensional)
+                if isinstance(s, ast.Tuple):
+                    idx = tuple(_eval_node(elt) for elt in s.elts)
+                    return val[idx]
+                # Other single index types
+                idx = _eval_node(s)
                 return val[idx]
             if isinstance(node, ast.List):
                 return [_eval_node(elt) for elt in node.elts]
