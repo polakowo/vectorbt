@@ -1744,8 +1744,27 @@ class TestChecks:
         assert checks.is_deep_equal(0, 0)
         assert not checks.is_deep_equal(0, False)
         assert not checks.is_deep_equal(0, 1)
-        assert checks.is_deep_equal(lambda x: x, lambda x: x)
+        # Function comparison - same instance
+        f = lambda x: x
+        assert checks.is_deep_equal(f, f)
+        # Function comparison - separately defined but semantically identical
+        f1 = lambda x: x
+        f2 = lambda x: x
+        assert checks.is_deep_equal(f1, f2)
+        # Function comparison - different behavior
         assert not checks.is_deep_equal(lambda x: x, lambda x: 2 * x)
+        # Function in nested structure - shared reference
+        shared_func = lambda x: x
+        assert checks.is_deep_equal({'f': shared_func}, {'f': shared_func})
+        # Function with closure - same captured value
+        y = 10
+        f3 = lambda x: x + y
+        f4 = lambda x: x + y
+        assert checks.is_deep_equal(f3, f4)
+        # Function with different default values
+        f5 = lambda x, d=1: x + d
+        f6 = lambda x, d=2: x + d
+        assert not checks.is_deep_equal(f5, f6)
 
     def test_is_instance_of(self):
         class _A:

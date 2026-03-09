@@ -4,7 +4,7 @@ title: Usage
 
 # Usage :sparkles:
 
-vectorbt allows you to easily backtest strategies with a couple of lines of Python code.
+VectorBT allows you to easily backtest strategies with a couple of lines of Python code.
 
 * Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
 
@@ -124,7 +124,7 @@ pf[(10, 20, 'ETH-USD')].plot().show()
 
 ![](/assets/images/usage_dmac_portfolio.svg)
 
-It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
+It's not all about backtesting - VectorBT can be used to facilitate financial data analysis and visualization.
 
 * Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
 

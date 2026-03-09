@@ -153,8 +153,7 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike,
 
 def datetime_to_ms(dt: datetime) -> int:
     """Convert a datetime to milliseconds."""
-    epoch = datetime.fromtimestamp(0, dt.tzinfo)
-    return int((dt - epoch).total_seconds() * 1000.0)
+    return int(dt.timestamp() * 1000.0)
 
 
 def interval_to_ms(interval: str) -> tp.Optional[int]:

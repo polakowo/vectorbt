@@ -582,7 +582,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
-            ind = np.argsort(self.col_arr)
+            ind = np.argsort(self.col_arr, kind='stable')
         return self.replace(
             mapped_arr=self.values[ind],
             col_arr=self.col_arr[ind],
@@ -989,8 +989,6 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
         !!! note
             Does not take into account missing values."""
-        from pkg_resources import parse_version
-
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):
@@ -999,10 +997,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             elif mapping.lower() == 'columns':
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        if parse_version(pd.__version__) < parse_version("1.5.0"):
-            mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
-        else:
-            mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
+        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
         if incl_all_keys and mapping is not None:
@@ -1019,7 +1014,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             value_counts = value_counts[~nan_mask]
             mapped_uniques = mapped_uniques[~nan_mask]
         if sort_uniques:
-            new_indices = mapped_uniques.argsort()
+            new_indices = mapped_uniques.argsort(kind='stable')
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)
@@ -1027,9 +1022,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             value_counts = value_counts / value_counts_sum.sum()
         if sort:
             if ascending:
-                new_indices = value_counts_sum.argsort()
+                new_indices = value_counts_sum.argsort(kind='stable')
             else:
-                new_indices = (-value_counts_sum).argsort()
+                new_indices = (-value_counts_sum).argsort(kind='stable')
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(

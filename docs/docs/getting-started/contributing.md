@@ -6,7 +6,7 @@ title: Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
-First, you need to install vectorbt from the repository:
+First, you need to install VectorBT from the repository:
 
 ```bash
 pip uninstall vectorbt

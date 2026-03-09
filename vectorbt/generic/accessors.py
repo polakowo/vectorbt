@@ -575,7 +575,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """
         checks.assert_numba_func(apply_func_nb)
 
-        resampled = self.obj.resample(freq, axis=0, **kwargs)
+        resampled = self.obj.resample(freq, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
@@ -972,8 +972,6 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         * Enable `incl_all_keys` to include all mapping keys, no only those that are present in the array.
 
         Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
-        from pkg_resources import parse_version
-
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):
@@ -982,10 +980,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             elif mapping.lower() == 'columns':
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        if parse_version(pd.__version__) < parse_version("1.5.0"):
-            codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
-        else:
-            codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
+        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         value_counts = nb.value_counts_nb(codes, len(uniques), group_lens)
@@ -1003,7 +998,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts[~nan_mask]
             uniques = uniques[~nan_mask]
         if sort_uniques:
-            new_indices = uniques.argsort()
+            new_indices = uniques.argsort(kind='stable')
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)
@@ -1011,9 +1006,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts / value_counts_sum.sum()
         if sort:
             if ascending:
-                new_indices = value_counts_sum.argsort()
+                new_indices = value_counts_sum.argsort(kind='stable')
             else:
-                new_indices = (-value_counts_sum).argsort()
+                new_indices = (-value_counts_sum).argsort(kind='stable')
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(
