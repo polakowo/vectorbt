@@ -41,9 +41,9 @@
     </a>
 </p>
 
-Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. VectorBT is the community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
+Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. VectorBT is the open-source, community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
 
-## 🧩 Features
+## Features
 
 - Fast, vectorized backtesting and strategy research on pandas/NumPy, accelerated with Numba
 - Pandas-native API with custom accessors and high-performance operations
@@ -57,7 +57,7 @@ Test thousands of trading ideas in seconds, analyze portfolios across markets an
 - Automation support for scheduled updates and Telegram notifications
 - Composable Python API suitable for rapid experimentation and AI agent-driven workflows
 
-## 📦 Installation
+## Installation
 
 ```sh
 pip install -U vectorbt
@@ -69,7 +69,7 @@ To install optional dependencies as well:
 pip install -U "vectorbt[full]"
 ```
 
-## ✨ Usage
+## Usage
 
 VectorBT lets you backtest strategies in just a few lines of Python.
 
@@ -229,7 +229,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 
 This is just the tip of the iceberg. Visit the [website](https://vectorbt.dev/) to learn more.
 
-## 🕹️ Apps
+## Apps
 
 ### Candlestick Patterns ([here](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/))
 
@@ -237,13 +237,13 @@ Explore candlestick-pattern signals interactively and backtest them with VectorB
 
 [![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
 
-## 🔗 Links
+## Links
 
 * [Website](https://vectorbt.dev/)
 * [Docker images](https://hub.docker.com/r/polakowo/vectorbt)
 * [Colab notebook](https://colab.research.google.com/drive/1ibqyrf6LPFlzRb6mkPpl3hxqL6ryNBXI?usp=sharing)
 
-## ⚖️ License
+## License
 
 This work is [fair-code](http://faircode.io/) distributed under the [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license.
 
@@ -253,11 +253,11 @@ If you have questions or want to request a license exception, please [contact th
 
 Installing optional dependencies may be subject to a more restrictive license.
 
-## ⭐ Star History
+## Star history
 
 [![Star History Chart](https://api.star-history.com/svg?repos=polakowo/vectorbt&type=Timeline)](https://star-history.com/#polakowo/vectorbt&Timeline)
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This software is for educational purposes only. Do not risk money you cannot afford to lose.
 
