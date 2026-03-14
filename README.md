@@ -41,13 +41,21 @@
     </a>
 </p>
 
-> [!TIP]
-> *New in 0.28*:
->
-> * Plotly 6 support
-> * `ticker_kwargs` in `YFData`
-> * Fixed Pandas TA dependency (→ [pandas-ta-classic](https://github.com/xgboosted/pandas-ta-classic)).
-> * Updated apps and Docker images
+Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. VectorBT is the community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
+
+## 🧩 Features
+
+- Fast, vectorized backtesting and strategy research on pandas/NumPy, accelerated with Numba
+- Pandas-native API with custom accessors and high-performance operations
+- Flexible broadcasting for multi-asset analysis and large parameter sweeps
+- Rich indicator ecosystem with support for custom indicators and popular TA libraries (TA-Lib, Pandas TA, etc.)
+- Portfolio backtesting with trades, positions, drawdowns, and performance analysis (incl. QuantStats)
+- Signal-based tooling for generation, ranking, mapping, and distribution analysis
+- Built-in data access (Yahoo Finance, CCXT, Alpaca, etc.), preprocessing, and random data generation
+- Robustness testing, walk-forward optimization, and label generation for ML workflows
+- Interactive visualization with Plotly, Jupyter widgets, and browser-friendly dashboards
+- Automation support for scheduled updates and Telegram notifications
+- Composable Python API suitable for rapid experimentation and AI agent-driven workflows
 
 ## 📦 Installation
 
