@@ -17,6 +17,7 @@ Here's a collection of resources to get started.
 - [Running Telegram signal bot](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TelegramSignals.ipynb)
 - [Porting RSI strategy from backtrader](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/PortingBTStrategy.ipynb)
 - [Pairs trading (vs backtrader)](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/PairsTrading.ipynb)
+- [Researching external stock sentiment with Adanos](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/AdanosSentimentResearch.ipynb)
 
 Note: you must run the notebook to play with the widgets.
 
@@ -48,4 +49,3 @@ Note: you must run the notebook to play with the widgets.
 - For questions on Numba and other parts, the best place to go to is [StackOverflow](https://stackoverflow.com/)
 - If you have general questions, start a new [GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
 - If you found what appears to be a bug, please [create a new issue](https://github.com/polakowo/vectorbt/issues)
-    
