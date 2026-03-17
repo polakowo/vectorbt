@@ -41,7 +41,9 @@
     </a>
 </p>
 
-Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. VectorBT is the open-source, community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
+Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. Built for both human researchers and AI agents, VectorBT combines rapid experimentation with a mature, battle-tested backtesting stack shaped by years of community use.
+
+VectorBT is the open-source, community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
 
 ## Features
 
