@@ -15,6 +15,15 @@
     <a href="https://pepy.tech/project/vectorbt" title="Downloads">
         <img src="https://pepy.tech/badge/vectorbt" />
     </a>
+    <a href="https://github.com/polakowo/vectorbt/stargazers" title="Stars">
+        <img src="https://img.shields.io/github/stars/polakowo/vectorbt?style=flat" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/network/members" title="Forks">
+        <img src="https://img.shields.io/github/forks/polakowo/vectorbt?style=flat" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/graphs/contributors" title="Contributors">
+        <img src="https://img.shields.io/github/contributors/polakowo/vectorbt?style=flat" />
+    </a>
     <a href="https://pypi.org/project/vectorbt" title="PyPI">
         <img src="https://img.shields.io/pypi/v/vectorbt?color=blueviolet" />
     </a>
@@ -33,9 +42,6 @@
     <a href="https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge" title="Join the chat">
         <img src="https://badges.gitter.im/vectorbt.svg" />
     </a>
-</p>
-
-<p align="center">
     <a href="https://pypi.org/project/vectorbt" title="Supported Python versions">
         <img src="https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white" />
     </a>
