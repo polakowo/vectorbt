@@ -12,4 +12,5 @@ vectorbt.egg-info
 venvs
 .DS_Store
 build
+.mcp.json
 uv.lock
