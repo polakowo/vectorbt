@@ -4296,10 +4296,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     @cached_method
     def gross_exposure(self, direction: str = 'both', group_by: tp.GroupByLike = None,
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get gross exposure."""
-        asset_value = to_2d_array(self.asset_value(group_by=group_by, direction=direction))
+        """Get gross exposure.
+
+        Gross exposure is the sum of absolute position values divided by portfolio value.
+        For grouped portfolios with mixed long/short positions, per-column absolute values
+        are summed before dividing by group portfolio value."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            # For grouped portfolios, we need sum(abs(per_column)) per group,
+            # not abs(sum(per_column)). The latter gives net exposure, not gross.
+            asset_value_ungrouped = to_2d_array(self.asset_value(group_by=False, direction=direction))
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            abs_asset_value = nb.asset_value_grouped_nb(np.abs(asset_value_ungrouped), group_lens)
+        else:
+            abs_asset_value = np.abs(to_2d_array(self.asset_value(group_by=group_by, direction=direction)))
         cash = to_2d_array(self.cash(group_by=group_by, free=True))
-        gross_exposure = nb.gross_exposure_nb(asset_value, cash)
+        gross_exposure = nb.gross_exposure_nb(abs_asset_value, cash)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
