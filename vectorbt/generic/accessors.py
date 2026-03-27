@@ -229,7 +229,7 @@ from vectorbt.generic.decorators import attach_nb_methods, attach_transform_meth
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.ranges import Ranges
-from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
+from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter, ShrinkingSplitter
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.utils import checks
@@ -1595,6 +1595,41 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             ![](/assets/images/expanding_split_plot.svg)
         """
         return self.split(ExpandingSplitter(), **kwargs)
+    
+    
+    def shrinking_split(self, **kwargs) -> SplitOutputT:
+        """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.ShrinkingSplitter`.
+
+        Usage:
+            ```pycon
+            >>> train_set, valid_set, test_set = sr.vbt.shrinking_split(
+            ...     n=5, set_lens=(1, 1), min_len=3, left_to_right=False)
+            >>> train_set[0]
+            split_idx    0    1    2    3    4    5    6  7
+            0          0.0  0.0  0.0  0.0  0.0  0.0  0.0  0
+            1          NaN  1.0  1.0  1.0  1.0  1.0  1.0  1
+            2          NaN  NaN  2.0  2.0  2.0  2.0  2.0  2
+            3          NaN  NaN  NaN  3.0  3.0  3.0  3.0  3
+            4          NaN  NaN  NaN  NaN  4.0  4.0  4.0  4
+            5          NaN  NaN  NaN  NaN  NaN  5.0  5.0  5
+            6          NaN  NaN  NaN  NaN  NaN  NaN  6.0  6
+            7          NaN  NaN  NaN  NaN  NaN  NaN  NaN  7
+            >>> valid_set[0]
+            split_idx  0  1  2  3  4  5  6  7
+            0          1  2  3  4  5  6  7  8
+            >>> test_set[0]
+            split_idx  0  1  2  3  4  5  6  7
+            0          2  3  4  5  6  7  8  9
+
+            >>> sr.vbt.shrinking_split(
+            ...     set_lens=(1, 1), min_len=3, left_to_right=False,
+            ...     plot=True, trace_names=['train', 'valid', 'test'])
+            ```
+
+            ![](/assets/images/shrinking_split_plot.svg)
+        """
+        return self.split(ShrinkingSplitter(), **kwargs)
+    
 
     # ############# Plotting ############# #
 
