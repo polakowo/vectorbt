@@ -3029,3 +3029,22 @@ class TestBasic:
                 name=close_ts.name
             )
         )
+
+
+def test_dmac_btc_synthetic_strategy():
+    price = pd.Series(
+        [10, 11, 12, 13, 14, 13, 12, 13, 14, 15, 16, 15, 14, 15, 16],
+        index=pd.date_range('2021-01-01', periods=15, freq='D'))
+
+    fast_ma = vbt.MA.run(price, window=2).ma
+    slow_ma = vbt.MA.run(price, window=4).ma
+
+    entries = fast_ma.ma_crossed_above(slow_ma)
+    exits = fast_ma.ma_crossed_below(slow_ma)
+
+    pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=1000, fees=0.0)
+
+    assert pf.total_return() > 0
+    assert pf.trades.count() > 0
+    assert pf.final_value() >= pf.init_cash
+
