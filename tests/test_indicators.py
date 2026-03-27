@@ -3048,3 +3048,27 @@ def test_dmac_btc_synthetic_strategy():
     assert pf.trades.count() > 0
     assert pf.final_value() >= pf.init_cash
 
+
+def test_dmac_btc_live_price_arg():
+    from examples.dmac_live import run_dmac_live
+
+    price = pd.Series(
+        [10, 11, 12, 13, 14, 13, 12, 13, 14, 15, 16, 15, 14, 15, 16],
+        index=pd.date_range('2021-01-01', periods=15, freq='1h'))
+
+    result = run_dmac_live(
+        price=price,
+        fast_window=2,
+        slow_window=4,
+        init_cash=1000,
+        fees=0.0,
+        freq='1h'
+    )
+
+    assert 'portfolio' in result
+    assert 'entries' in result
+    assert 'exits' in result
+    assert result['portfolio'].final_value() >= result['portfolio'].init_cash
+    assert result['entries'].sum() > 0
+    assert result['exits'].sum() > 0
+

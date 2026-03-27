@@ -10,10 +10,19 @@ import vectorbt as vbt
 import pandas as pd
 
 
-def run_dmac_live(symbol='BTC-USD', fast_window=50, slow_window=200, init_cash=10000, fees=0.001, freq='1h', n_rows=500):
-    price = vbt.YFData.download(symbol).get('Close')
-    if len(price) > n_rows:
-        price = price.iloc[-n_rows:]
+def run_dmac_live(symbol='BTC-USD', fast_window=50, slow_window=200, init_cash=10000, fees=0.001, freq='1h', n_rows=500, price=None):
+    """Run DMAC strategy on BTC price data.
+
+    - If `price` is provided, use it directly (for testing/local data).
+    - Otherwise, download from Yahoo Finance.
+    """
+    if price is None:
+        price = vbt.YFData.download(symbol).get('Close')
+        if len(price) > n_rows:
+            price = price.iloc[-n_rows:]
+
+    if len(price) == 0:
+        raise ValueError('Price data cannot be empty')
 
     fast_ma = vbt.MA.run(price, window=fast_window).ma
     slow_ma = vbt.MA.run(price, window=slow_window).ma
