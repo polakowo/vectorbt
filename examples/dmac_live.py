@@ -24,8 +24,8 @@ def run_dmac_live(symbol='BTC-USD', fast_window=50, slow_window=200, init_cash=1
     if len(price) == 0:
         raise ValueError('Price data cannot be empty')
 
-    fast_ma = vbt.MA.run(price, window=fast_window).ma
-    slow_ma = vbt.MA.run(price, window=slow_window).ma
+    fast_ma = vbt.MA.run(price, window=fast_window)
+    slow_ma = vbt.MA.run(price, window=slow_window)
 
     entries = fast_ma.ma_crossed_above(slow_ma)
     exits = fast_ma.ma_crossed_below(slow_ma)

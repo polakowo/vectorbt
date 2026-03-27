@@ -3036,8 +3036,8 @@ def test_dmac_btc_synthetic_strategy():
         [10, 11, 12, 13, 14, 13, 12, 13, 14, 15, 16, 15, 14, 15, 16],
         index=pd.date_range('2021-01-01', periods=15, freq='D'))
 
-    fast_ma = vbt.MA.run(price, window=2).ma
-    slow_ma = vbt.MA.run(price, window=4).ma
+    fast_ma = vbt.MA.run(price, window=2)
+    slow_ma = vbt.MA.run(price, window=4)
 
     entries = fast_ma.ma_crossed_above(slow_ma)
     exits = fast_ma.ma_crossed_below(slow_ma)
