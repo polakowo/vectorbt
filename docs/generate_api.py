@@ -813,10 +813,14 @@ class Function(Doc):
             if value is inspect.Parameter.empty:
                 return p
 
-            replacement = next(
-                (i for i in ("os.environ", "sys.stdin", "sys.stdout", "sys.stderr") if value is eval(i)),
-                None,
-            )
+            # Resolve a small whitelist of global objects without using eval
+            _safe_globals = {
+                "os.environ": os.environ,
+                "sys.stdin": sys.stdin,
+                "sys.stdout": sys.stdout,
+                "sys.stderr": sys.stderr,
+            }
+            replacement = next((name for name, obj in _safe_globals.items() if value is obj), None)
             if not replacement:
                 if isinstance(value, CPUDispatcher):
                     replacement = value.py_func.__name__

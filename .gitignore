@@ -14,3 +14,4 @@ venvs
 build
 .mcp.json
 uv.lock
+.venv*
