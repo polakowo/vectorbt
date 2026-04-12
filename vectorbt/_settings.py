@@ -185,6 +185,10 @@ settings = SettingsConfig(
         ),
         plotting=dict(
             use_widgets=True,
+            # Default backend used by `vbt.create_figure(...)`. Existing
+            # `make_figure` / `make_subplots`-based plot methods are
+            # unaffected -- they will be migrated in follow-up issues.
+            default_backend='plotly',
             show_kwargs=Config(),  # flex
             color_schema=Config(  # flex
                 dict(
