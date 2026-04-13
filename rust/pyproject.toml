@@ -6,8 +6,7 @@ build-backend = "maturin"
 name = "vectorbt-rust"
 version = "1.0.0"
 description = "Rust-accelerated kernels for vectorbt"
-readme = "README.md"
-license-files = ["../LICENSE.md"]
+license = "Apache-2.0 WITH Commons-Clause-1.0"
 authors = [
     {name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro"}
 ]
