@@ -192,6 +192,12 @@ class PlotlyFigureProtocolMixin:
                 customdata = [hover_text] * n_points if n_points is not None else [hover_text]
             else:
                 customdata = list(hover_text)
+                n_points = len(x) if hasattr(x, '__len__') else None
+                if n_points is not None and len(customdata) != n_points:
+                    raise ValueError(
+                        f"hover_text sequence length ({len(customdata)}) must match "
+                        f"the number of data points ({n_points})"
+                    )
             trace_kwargs['customdata'] = customdata
             trace_kwargs['hovertemplate'] = '%{customdata}<extra></extra>'
         self.add_trace(go.Scatter(**trace_kwargs), **_add_trace_kwargs(row, col))
