@@ -200,6 +200,35 @@ class TestCreateFigureRouting:
         fig = create_figure(specs=[[{'secondary_y': True}]])
         assert 'yaxis2' in fig.layout
 
+    def test_create_figure_rows_only_fills_cols_to_1(self):
+        """rows=2 without cols must route to make_subplots(rows=2, cols=1)."""
+        fig = create_figure(rows=2)
+        ref = make_subplots(rows=2, cols=1)
+        assert _strip_uid(fig.to_plotly_json()) == _strip_uid(ref.to_plotly_json())
+
+    def test_create_figure_cols_only_fills_rows_to_1(self):
+        """cols=2 without rows must route to make_subplots(rows=1, cols=2)."""
+        fig = create_figure(cols=2)
+        ref = make_subplots(rows=1, cols=2)
+        assert _strip_uid(fig.to_plotly_json()) == _strip_uid(ref.to_plotly_json())
+
+    def test_create_figure_figure_kwarg_routes_to_subplots(self):
+        """figure= is in _SUBPLOT_ONLY_KWARGS, so create_figure(figure=fig) must
+        route through make_subplots with Plotly's populate-existing semantics:
+        pre-existing traces and layout on the base figure are preserved."""
+        import plotly.graph_objects as go
+        base = make_figure()
+        base.add_trace(go.Scatter(x=[1, 2], y=[3, 4], name="existing"))
+        base.update_layout(title_text="preserved")
+        fig = create_figure(figure=base)
+        # Subplot metadata was injected.
+        assert fig.get_subplot(1, 1) is not None
+        # Pre-existing trace survived.
+        assert len(fig.data) == 1
+        assert fig.data[0].name == "existing"
+        # Pre-existing layout survived.
+        assert fig.layout.title.text == "preserved"
+
     def test_create_figure_rejects_positional_args(self):
         with pytest.raises(TypeError):
             create_figure(object())  # type: ignore[misc]
@@ -207,14 +236,29 @@ class TestCreateFigureRouting:
 
 class TestRegistryAPI:
     def test_register_backend_roundtrip(self):
+        called = []
         sentinel = object()
 
         def _dummy(*, rows, cols, **kw):
+            called.append((rows, cols, kw))
             return sentinel
 
         register_backend('dummy', _dummy)
         assert 'dummy' in list_backends()
         assert create_figure(backend='dummy') is sentinel
+        assert called == [(None, None, {})]
+
+    def test_register_backend_forwards_kwargs(self):
+        """create_figure must forward rows, cols, and extra kwargs to the factory."""
+        called = []
+
+        def _dummy(*, rows, cols, **kw):
+            called.append((rows, cols, kw))
+            return 'dummy-figure'
+
+        register_backend('dummy', _dummy)
+        create_figure(backend='dummy', rows=3, cols=2, shared_xaxes=True)
+        assert called == [(3, 2, {'shared_xaxes': True})]
 
     def test_register_backend_duplicate_raises(self):
         with pytest.raises(ValueError, match="already registered"):
@@ -227,8 +271,15 @@ class TestRegistryAPI:
         assert get_backend('plotly') is replacement
 
     def test_unknown_backend_raises_keyerror(self):
-        with pytest.raises(KeyError, match="plotly"):
+        with pytest.raises(KeyError, match="nope"):
             create_figure(backend='nope')
+
+    def test_unregistered_default_backend_raises_keyerror(self):
+        """When the default_backend setting points to an unknown name,
+        create_figure() without explicit backend= must raise KeyError."""
+        vbt.settings['plotting']['default_backend'] = 'nonexistent'
+        with pytest.raises(KeyError, match="nonexistent"):
+            create_figure()
 
     def test_settings_override_default_backend(self):
         called = []

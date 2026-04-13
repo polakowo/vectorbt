@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import pytest
 from plotly.basedatatypes import BaseFigure
 
+import vectorbt as vbt
 from vectorbt.utils.figure import (
     Figure,
     FigureWidget,
@@ -67,6 +68,15 @@ def assert_last_shape_matches(fig_under_test, expected_shape_kwargs):
 FIG_CLASSES = [Figure, FigureWidget]
 
 
+@pytest.fixture(params=[True, False], ids=["FigureWidget", "Figure"])
+def use_widgets_setting(request):
+    """Parametrize over both Figure and FigureWidget for tests that go through make_subplots()."""
+    saved = vbt.settings['plotting']['use_widgets']
+    vbt.settings['plotting']['use_widgets'] = request.param
+    yield request.param
+    vbt.settings['plotting']['use_widgets'] = saved
+
+
 # ############# Protocol conformance ############# #
 
 class TestProtocolConformance:
@@ -96,6 +106,15 @@ class TestProtocolConformance:
         """`.native` returns the figure itself — no wrapping."""
         fig = cls()
         assert fig.native is fig
+
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_to_html_returns_string(self, cls):
+        """to_html() is declared on FigureProtocol and must return an HTML string."""
+        fig = cls()
+        fig.plot_line(x_arr, y_arr, name="smoke")
+        html = fig.to_html()
+        assert isinstance(html, str)
+        assert "<div" in html.lower()
 
     @pytest.mark.parametrize("cls", FIG_CLASSES)
     def test_capabilities_has_all_flags(self, cls):
@@ -253,6 +272,13 @@ class TestPlotMarkers:
         assert trace.hovertemplate == "%{customdata}<extra></extra>"
 
     @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_hover_text_sequence_length_mismatch_raises(self, cls):
+        """hover_text sequence whose length differs from x must raise ValueError."""
+        fig = cls()
+        with pytest.raises(ValueError, match="hover_text sequence length"):
+            fig.plot_markers(x_arr, y_arr, hover_text=["a"])
+
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
     def test_hover_text_none_leaves_trace_unchanged(self, cls):
         fig = cls()
         fig.plot_markers(x_arr, y_arr)
@@ -349,8 +375,7 @@ class TestPlotOhlc:
                 x_arr, open_arr, high_arr, low_arr, close_arr, style='foo',
             )
 
-    @pytest.mark.parametrize("cls", FIG_CLASSES)
-    def test_style_bars_subplot_routing(self, cls):
+    def test_style_bars_subplot_routing(self, use_widgets_setting):
         """style='bars' must route to row/col subplots the same way as candlestick."""
         fig = make_subplots(rows=2, cols=1)
         fig.plot_ohlc(
@@ -381,6 +406,15 @@ class TestPlotHistogram:
             fig,
             go.Histogram(x=[1, 2, 3], name="h", opacity=0.6, showlegend=True),
         )
+
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_none_params_omitted(self, cls):
+        """opacity=None and name=None must not leak into the trace dict."""
+        fig = cls()
+        fig.plot_histogram([1, 2, 3], name=None, opacity=None)
+        dumped = trace_dict(fig.data[-1])
+        assert "name" not in dumped
+        assert "opacity" not in dumped
 
 # ############# add_bars ############# #
 
@@ -445,8 +479,7 @@ class TestPlotBars:
             go.Bar(x=x_arr, y=y_arr, name="volume", marker=dict(color=colors)),
         )
 
-    @pytest.mark.parametrize("cls", FIG_CLASSES)
-    def test_color_array_subplot_routing(self, cls):
+    def test_color_array_subplot_routing(self, use_widgets_setting):
         """Per-bar colors must still route cleanly to row/col subplots."""
         fig = make_subplots(rows=2, cols=1)
         colors = ["red", "green", "blue", "yellow", "purple"]
@@ -520,6 +553,15 @@ class TestPlotArea:
             ),
         )
 
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_none_params_omitted(self, cls):
+        """color=None must not emit a line key; fillcolor=None must not emit fillcolor."""
+        fig = cls()
+        fig.plot_area(x_arr, y_arr, color=None, fillcolor=None)
+        dumped = trace_dict(fig.data[-1])
+        assert "line" not in dumped
+        assert "fillcolor" not in dumped
+
 
 # ############# add_hline ############# #
 
@@ -549,7 +591,7 @@ class TestPlotHline:
             ),
         )
 
-    def test_subplot_domain_resolution(self):
+    def test_subplot_domain_resolution(self, use_widgets_setting):
         """Critical regression: plot_hline in a subplot must use vectorbt's pattern.
 
         Pins the resolution chain: (row, col) -> get_subplot -> xaxis.plotly_name
@@ -570,11 +612,72 @@ class TestPlotHline:
         assert shape.y0 == 7.0
         assert shape.y1 == 7.0
 
-    def test_subplot_row_1_uses_y1(self):
+    def test_subplot_row_1_uses_y1(self, use_widgets_setting):
         """Row 1 in a subplot figure still resolves to yref='y' (not 'y1')."""
         fig = make_subplots(rows=2, cols=1)
         fig.plot_line(x_arr, y_arr, row=1, col=1)
         fig.plot_hline(y=1.0, row=1, col=1)
+        shape = fig.layout.shapes[-1]
+        assert shape.yref == "y"
+
+
+# ############# plot_zone ############# #
+
+class TestPlotZone:
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_minimal_single_plot(self, cls):
+        fig = cls()
+        fig.plot_zone(y0=1.0, y1=3.0)
+        assert len(fig.layout.shapes) == 1
+        assert_last_shape_matches(
+            fig,
+            dict(type="rect", xref="paper", yref="y",
+                 x0=0, x1=1, y0=1.0, y1=3.0,
+                 layer="below", line_width=0),
+        )
+
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_with_color_and_opacity(self, cls):
+        fig = cls()
+        fig.plot_zone(y0=2.0, y1=4.0, color="green", opacity=0.3)
+        assert_last_shape_matches(
+            fig,
+            dict(type="rect", xref="paper", yref="y",
+                 x0=0, x1=1, y0=2.0, y1=4.0,
+                 layer="below", line_width=0,
+                 fillcolor="green", opacity=0.3),
+        )
+
+    @pytest.mark.parametrize("cls", FIG_CLASSES)
+    def test_none_params_omitted(self, cls):
+        """color=None must not emit fillcolor; opacity=None must not emit opacity."""
+        fig = cls()
+        fig.plot_zone(y0=0.0, y1=1.0, color=None, opacity=None)
+        dumped = shape_dict(fig.layout.shapes[-1])
+        assert "fillcolor" not in dumped
+        assert "opacity" not in dumped
+
+    def test_subplot_domain_resolution(self, use_widgets_setting):
+        """plot_zone in a subplot must resolve yref and x-domain correctly."""
+        fig = make_subplots(rows=2, cols=1)
+        fig.plot_line(x_arr, y_arr, row=2, col=1)
+        fig.plot_zone(y0=1.0, y1=5.0, row=2, col=1)
+
+        shape = fig.layout.shapes[-1]
+        assert shape.type == "rect"
+        assert shape.xref == "paper"
+        assert shape.yref == "y2"
+        expected_domain = get_domain("x2", fig)
+        assert shape.x0 == expected_domain[0]
+        assert shape.x1 == expected_domain[1]
+        assert shape.y0 == 1.0
+        assert shape.y1 == 5.0
+
+    def test_subplot_row_1_uses_y(self, use_widgets_setting):
+        """Row 1 in a subplot figure still resolves to yref='y' (not 'y1')."""
+        fig = make_subplots(rows=2, cols=1)
+        fig.plot_line(x_arr, y_arr, row=1, col=1)
+        fig.plot_zone(y0=0.0, y1=2.0, row=1, col=1)
         shape = fig.layout.shapes[-1]
         assert shape.yref == "y"
 
@@ -584,41 +687,89 @@ class TestPlotHline:
 class TestSubplotPositioning:
     """row/col on the trace-producing methods must route to correct subplot axes."""
 
-    def test_add_line_row_col(self):
+    def test_add_line_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_line(x_arr, y_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
 
-    def test_add_markers_row_col(self):
+    def test_add_markers_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_markers(x_arr, y_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
 
-    def test_add_area_row_col(self):
+    def test_add_area_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_area(x_arr, y_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
 
-    def test_add_ohlc_row_col(self):
+    def test_add_ohlc_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_ohlc(x_arr, open_arr, high_arr, low_arr, close_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
 
-    def test_add_histogram_row_col(self):
+    def test_add_histogram_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_histogram(y_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
 
-    def test_add_bars_row_col(self):
+    def test_add_bars_row_col(self, use_widgets_setting):
         fig = make_subplots(rows=2, cols=1)
         fig.plot_bars(x_arr, y_arr, row=2, col=1)
         assert fig.data[-1].xaxis == "x2"
         assert fig.data[-1].yaxis == "y2"
+
+
+class TestSubplotColumnRouting:
+    """Exercises the col dimension of subplot routing, which the row=2, cols=1 tests do not cover.
+
+    Uses a 1x2 layout targeting col=2 for traces and a 2x2 layout for shapes,
+    so a regression that drops or ignores col would be caught.
+    """
+
+    def test_line_col_2(self, use_widgets_setting):
+        fig = make_subplots(rows=1, cols=2)
+        fig.plot_line(x_arr, y_arr, row=1, col=2)
+        assert fig.data[-1].xaxis == "x2"
+        assert fig.data[-1].yaxis == "y2"
+
+    def test_markers_col_2(self, use_widgets_setting):
+        fig = make_subplots(rows=1, cols=2)
+        fig.plot_markers(x_arr, y_arr, row=1, col=2)
+        assert fig.data[-1].xaxis == "x2"
+        assert fig.data[-1].yaxis == "y2"
+
+    def test_bars_col_2(self, use_widgets_setting):
+        fig = make_subplots(rows=1, cols=2)
+        fig.plot_bars(x_arr, y_arr, row=1, col=2)
+        assert fig.data[-1].xaxis == "x2"
+        assert fig.data[-1].yaxis == "y2"
+
+    def test_hline_col_2_domain(self, use_widgets_setting):
+        """plot_hline in col=2 of a 2x2 layout must resolve to correct yref and x-domain."""
+        fig = make_subplots(rows=2, cols=2)
+        fig.plot_line(x_arr, y_arr, row=1, col=2)
+        fig.plot_hline(y=3.0, row=1, col=2)
+        shape = fig.layout.shapes[-1]
+        assert shape.yref == "y2"
+        expected_domain = get_domain("x2", fig)
+        assert shape.x0 == expected_domain[0]
+        assert shape.x1 == expected_domain[1]
+
+    def test_zone_col_2_domain(self, use_widgets_setting):
+        """plot_zone in col=2 of a 2x2 layout must resolve to correct yref and x-domain."""
+        fig = make_subplots(rows=2, cols=2)
+        fig.plot_line(x_arr, y_arr, row=1, col=2)
+        fig.plot_zone(y0=1.0, y1=5.0, row=1, col=2)
+        shape = fig.layout.shapes[-1]
+        assert shape.yref == "y2"
+        expected_domain = get_domain("x2", fig)
+        assert shape.x0 == expected_domain[0]
+        assert shape.x1 == expected_domain[1]
 
 
 # ############# Chainability ############# #
@@ -634,6 +785,7 @@ class TestChainability:
         assert fig.plot_histogram(y_arr) is fig
         assert fig.plot_bars(x_arr, y_arr) is fig
         assert fig.plot_hline(y=3.0) is fig
+        assert fig.plot_zone(y0=1.0, y1=2.0) is fig
 
     @pytest.mark.parametrize("cls", FIG_CLASSES)
     def test_fluent_chain(self, cls):
@@ -644,10 +796,11 @@ class TestChainability:
                .plot_markers(x_arr, y_arr, name="b")
                .plot_bars(x_arr, y_arr, name="c")
                .plot_hline(y=4.0)
+               .plot_zone(y0=1.0, y1=2.0)
         )
         assert result is fig
         assert len(fig.data) == 3
-        assert len(fig.layout.shapes) == 1
+        assert len(fig.layout.shapes) == 2
 
 
 # ############# make_figure factory ############# #
@@ -680,13 +833,18 @@ class TestPlotlyCompatibilityPreserved:
 
     @pytest.mark.parametrize("cls", FIG_CLASSES)
     def test_add_hline_with_plotly_kwargs(self, cls):
-        """Plotly's `add_hline` with `annotation_text` and `line_color` still works."""
+        """Plotly's `add_hline` with `annotation_text` and `line_color` still works.
+
+        Compared against a plain go.Figure reference so the test survives
+        upstream changes to Plotly's internal serialization details.
+        """
         fig = cls()
         fig.add_hline(y=5, annotation_text="target", line_color="red")
-        # Plotly's add_hline emits xref='x domain', not our xref='paper'
-        assert fig.layout.shapes[-1].xref == "x domain"
-        assert len(fig.layout.annotations) == 1
-        assert fig.layout.annotations[-1].text == "target"
+        ref = go.Figure()
+        ref.add_hline(y=5, annotation_text="target", line_color="red")
+        assert shape_dict(fig.layout.shapes[-1]) == shape_dict(ref.layout.shapes[-1])
+        assert len(fig.layout.annotations) == len(ref.layout.annotations)
+        assert fig.layout.annotations[-1].text == ref.layout.annotations[-1].text
 
     @pytest.mark.parametrize("cls", FIG_CLASSES)
     def test_add_ohlc_still_produces_ohlc_trace(self, cls):
@@ -786,6 +944,8 @@ class TestPartialRowColValidation:
         fn = getattr(fig, method_name)
         if method_name == "plot_hline":
             return fn(y=5, **extra)
+        if method_name == "plot_zone":
+            return fn(y0=0, y1=1, **extra)
         if method_name == "plot_ohlc":
             return fn(x_arr, open_arr, high_arr, low_arr, close_arr, **extra)
         if method_name == "plot_histogram":
@@ -794,7 +954,7 @@ class TestPartialRowColValidation:
 
     @pytest.mark.parametrize(
         "method",
-        ["plot_line", "plot_markers", "plot_area", "plot_ohlc", "plot_histogram", "plot_bars", "plot_hline"],
+        ["plot_line", "plot_markers", "plot_area", "plot_ohlc", "plot_histogram", "plot_bars", "plot_hline", "plot_zone"],
     )
     def test_row_without_col_raises(self, method):
         fig = make_subplots(rows=2, cols=1)
@@ -803,7 +963,7 @@ class TestPartialRowColValidation:
 
     @pytest.mark.parametrize(
         "method",
-        ["plot_line", "plot_markers", "plot_area", "plot_ohlc", "plot_histogram", "plot_bars", "plot_hline"],
+        ["plot_line", "plot_markers", "plot_area", "plot_ohlc", "plot_histogram", "plot_bars", "plot_hline", "plot_zone"],
     )
     def test_col_without_row_raises(self, method):
         fig = make_subplots(rows=2, cols=1)
