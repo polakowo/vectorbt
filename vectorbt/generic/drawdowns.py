@@ -171,7 +171,7 @@ import plotly.graph_objects as go
 from vectorbt import _typing as tp
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.reshape_fns import to_2d_array, to_pd_array
-from vectorbt.generic import nb
+from vectorbt.generic import dispatch
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbt.generic.ranges import Ranges
 from vectorbt.records.decorators import override_field_config, attach_fields
@@ -188,55 +188,41 @@ dd_field_config = Config(
     dict(
         dtype=drawdown_dt,
         settings=dict(
-            id=dict(
-                title='Drawdown Id'
-            ),
-            peak_idx=dict(
-                title='Peak Timestamp',
-                mapping='index'
-            ),
-            valley_idx=dict(
-                title='Valley Timestamp',
-                mapping='index'
-            ),
+            id=dict(title="Drawdown Id"),
+            peak_idx=dict(title="Peak Timestamp", mapping="index"),
+            valley_idx=dict(title="Valley Timestamp", mapping="index"),
             peak_val=dict(
-                title='Peak Value',
+                title="Peak Value",
             ),
             valley_val=dict(
-                title='Valley Value',
+                title="Valley Value",
             ),
             end_val=dict(
-                title='End Value',
+                title="End Value",
             ),
-            status=dict(
-                mapping=DrawdownStatus
-            )
-        )
+            status=dict(mapping=DrawdownStatus),
+        ),
     ),
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['dd_field_config'] = f"""Field config for `Drawdowns`.
+__pdoc__[
+    "dd_field_config"
+] = f"""Field config for `Drawdowns`.
 
 ```json
 {dd_field_config.to_doc()}
 ```
 """
 
-dd_attach_field_config = Config(
-    dict(
-        status=dict(
-            attach_filters=True
-        )
-    ),
-    readonly=True,
-    as_attrs=False
-)
+dd_attach_field_config = Config(dict(status=dict(attach_filters=True)), readonly=True, as_attrs=False)
 """_"""
 
-__pdoc__['dd_attach_field_config'] = f"""Config of fields to be attached to `Drawdowns`.
+__pdoc__[
+    "dd_attach_field_config"
+] = f"""Config of fields to be attached to `Drawdowns`.
 
 ```json
 {dd_attach_field_config.to_doc()}
@@ -251,51 +237,45 @@ DrawdownsT = tp.TypeVar("DrawdownsT", bound="Drawdowns")
 class Drawdowns(Ranges):
     """Extends `vectorbt.generic.ranges.Ranges` for working with drawdown records.
 
-    Requires `records_arr` to have all fields defined in `vectorbt.generic.enums.drawdown_dt`."""
+    Requires `records_arr` to have all fields defined in `vectorbt.generic.enums.drawdown_dt`.
+    """
 
     @property
     def field_config(self) -> Config:
         return self._field_config
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 records_arr: tp.RecordArray,
-                 ts: tp.Optional[tp.ArrayLike] = None,
-                 **kwargs) -> None:
-        Ranges.__init__(
-            self,
-            wrapper,
-            records_arr,
-            ts=ts,
-            **kwargs
-        )
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        ts: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        Ranges.__init__(self, wrapper, records_arr, ts=ts, **kwargs)
         self._ts = ts
 
     def indexing_func(self: DrawdownsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DrawdownsT:
         """Perform indexing on `Drawdowns`."""
-        new_wrapper, new_records_arr, _, col_idxs = \
-            Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, col_idxs = Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
         if self.ts is not None:
             new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
         else:
             new_ts = None
-        return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr,
-            ts=new_ts
-        )
+        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
 
     @classmethod
-    def from_ts(cls: tp.Type[DrawdownsT],
-                ts: tp.ArrayLike,
-                attach_ts: bool = True,
-                wrapper_kwargs: tp.KwargsLike = None,
-                **kwargs) -> DrawdownsT:
+    def from_ts(
+        cls: tp.Type[DrawdownsT],
+        ts: tp.ArrayLike,
+        attach_ts: bool = True,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DrawdownsT:
         """Build `Drawdowns` from time series `ts`.
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
         ts_pd = to_pd_array(ts)
-        records_arr = nb.get_drawdowns_nb(to_2d_array(ts_pd))
+        records_arr = dispatch.get_drawdowns(to_2d_array(ts_pd))
         wrapper = ArrayWrapper.from_obj(ts_pd, **merge_dicts({}, wrapper_kwargs))
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 
@@ -308,113 +288,124 @@ class Drawdowns(Ranges):
 
     @cached_property
     def drawdown(self) -> MappedArray:
-        """See `vectorbt.generic.nb.dd_drawdown_nb`.
+        """See `vectorbt.generic.dispatch.dd_drawdown`.
 
         Takes into account both recovered and active drawdowns."""
-        drawdown = nb.dd_drawdown_nb(
-            self.get_field_arr('peak_val'),
-            self.get_field_arr('valley_val')
-        )
+        drawdown = dispatch.dd_drawdown(self.get_field_arr("peak_val"), self.get_field_arr("valley_val"))
         return self.map_array(drawdown)
 
     @cached_method
-    def avg_drawdown(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def avg_drawdown(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Average drawdown (ADD).
 
         Based on `Drawdowns.drawdown`."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='avg_drawdown'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="avg_drawdown"), wrap_kwargs)
         return self.drawdown.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def max_drawdown(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def max_drawdown(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Maximum drawdown (MDD).
 
         Based on `Drawdowns.drawdown`."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="max_drawdown"), wrap_kwargs)
         return self.drawdown.min(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Recovery ############# #
 
     @cached_property
     def recovery_return(self) -> MappedArray:
-        """See `vectorbt.generic.nb.dd_recovery_return_nb`.
+        """See `vectorbt.generic.dispatch.dd_recovery_return`.
 
         Takes into account both recovered and active drawdowns."""
-        recovery_return = nb.dd_recovery_return_nb(
-            self.get_field_arr('valley_val'),
-            self.get_field_arr('end_val')
-        )
+        recovery_return = dispatch.dd_recovery_return(self.get_field_arr("valley_val"), self.get_field_arr("end_val"))
         return self.map_array(recovery_return)
 
     @cached_method
-    def avg_recovery_return(self, group_by: tp.GroupByLike = None,
-                            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def avg_recovery_return(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Average recovery return.
 
         Based on `Drawdowns.recovery_return`."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='avg_recovery_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="avg_recovery_return"), wrap_kwargs)
         return self.recovery_return.mean(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def max_recovery_return(self, group_by: tp.GroupByLike = None,
-                            wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def max_recovery_return(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Maximum recovery return.
 
         Based on `Drawdowns.recovery_return`."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='max_recovery_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="max_recovery_return"), wrap_kwargs)
         return self.recovery_return.max(group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Duration ############# #
 
     @cached_property
     def decline_duration(self) -> MappedArray:
-        """See `vectorbt.generic.nb.dd_decline_duration_nb`.
+        """See `vectorbt.generic.dispatch.dd_decline_duration`.
 
         Takes into account both recovered and active drawdowns."""
-        decline_duration = nb.dd_decline_duration_nb(
-            self.get_field_arr('start_idx'),
-            self.get_field_arr('valley_idx')
+        decline_duration = dispatch.dd_decline_duration(
+            self.get_field_arr("start_idx"), self.get_field_arr("valley_idx")
         )
         return self.map_array(decline_duration)
 
     @cached_property
     def recovery_duration(self) -> MappedArray:
-        """See `vectorbt.generic.nb.dd_recovery_duration_nb`.
+        """See `vectorbt.generic.dispatch.dd_recovery_duration`.
 
         A value higher than 1 means the recovery was slower than the decline.
 
         Takes into account both recovered and active drawdowns."""
-        recovery_duration = nb.dd_recovery_duration_nb(
-            self.get_field_arr('valley_idx'),
-            self.get_field_arr('end_idx')
+        recovery_duration = dispatch.dd_recovery_duration(
+            self.get_field_arr("valley_idx"), self.get_field_arr("end_idx")
         )
         return self.map_array(recovery_duration)
 
     @cached_property
     def recovery_duration_ratio(self) -> MappedArray:
-        """See `vectorbt.generic.nb.dd_recovery_duration_ratio_nb`.
+        """See `vectorbt.generic.dispatch.dd_recovery_duration_ratio`.
 
         Takes into account both recovered and active drawdowns."""
-        recovery_duration_ratio = nb.dd_recovery_duration_ratio_nb(
-            self.get_field_arr('start_idx'),
-            self.get_field_arr('valley_idx'),
-            self.get_field_arr('end_idx')
+        recovery_duration_ratio = dispatch.dd_recovery_duration_ratio(
+            self.get_field_arr("start_idx"),
+            self.get_field_arr("valley_idx"),
+            self.get_field_arr("end_idx"),
         )
         return self.map_array(recovery_duration_ratio)
 
     # ############# Status: Active ############# #
 
     @cached_method
-    def active_drawdown(self, group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def active_drawdown(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Drawdown of the last active drawdown only.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(name_or_index='active_drawdown'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="active_drawdown"), wrap_kwargs)
         active = self.active
         curr_end_val = active.end_val.nth(-1, group_by=group_by)
         curr_peak_val = active.peak_val.nth(-1, group_by=group_by)
@@ -422,25 +413,32 @@ class Drawdowns(Ranges):
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def active_duration(self, group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def active_duration(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Duration of the last active drawdown only.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='active_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index="active_duration"), wrap_kwargs)
         return self.active.duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def active_recovery(self, group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def active_recovery(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Recovery of the last active drawdown only.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(name_or_index='active_recovery'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="active_recovery"), wrap_kwargs)
         active = self.active
         curr_peak_val = active.peak_val.nth(-1, group_by=group_by)
         curr_end_val = active.end_val.nth(-1, group_by=group_by)
@@ -449,25 +447,36 @@ class Drawdowns(Ranges):
         return self.wrapper.wrap_reduced(curr_recovery, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def active_recovery_return(self, group_by: tp.GroupByLike = None,
-                               wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def active_recovery_return(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Recovery return of the last active drawdown only.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(name_or_index='active_recovery_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="active_recovery_return"), wrap_kwargs)
         return self.active.recovery_return.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     @cached_method
-    def active_recovery_duration(self, group_by: tp.GroupByLike = None,
-                                 wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.MaybeSeries:
+    def active_recovery_duration(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Recovery duration of the last active drawdown only.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='active_recovery_duration'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(
+            dict(to_timedelta=True, name_or_index="active_recovery_duration"),
+            wrap_kwargs,
+        )
         return self.active.recovery_duration.nth(-1, group_by=group_by, wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Stats ############# #
@@ -479,145 +488,139 @@ class Drawdowns(Ranges):
         Merges `vectorbt.generic.ranges.Ranges.stats_defaults` and
         `drawdowns.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        drawdowns_stats_cfg = settings['drawdowns']['stats']
 
-        return merge_dicts(
-            Ranges.stats_defaults.__get__(self),
-            drawdowns_stats_cfg
-        )
+        drawdowns_stats_cfg = settings["drawdowns"]["stats"]
+
+        return merge_dicts(Ranges.stats_defaults.__get__(self), drawdowns_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
-                title='Start',
+                title="Start",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             end=dict(
-                title='End',
+                title="End",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             coverage=dict(
-                title='Coverage [%]',
-                calc_func='coverage',
+                title="Coverage [%]",
+                calc_func="coverage",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['ranges', 'duration']
+                tags=["ranges", "duration"],
             ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
-            ),
+            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             total_recovered=dict(
-                title='Total Recovered Drawdowns',
-                calc_func='recovered.count',
-                tags='drawdowns'
+                title="Total Recovered Drawdowns",
+                calc_func="recovered.count",
+                tags="drawdowns",
             ),
             total_active=dict(
-                title='Total Active Drawdowns',
-                calc_func='active.count',
-                tags='drawdowns'
+                title="Total Active Drawdowns",
+                calc_func="active.count",
+                tags="drawdowns",
             ),
             active_dd=dict(
-                title='Active Drawdown [%]',
-                calc_func='active_drawdown',
+                title="Active Drawdown [%]",
+                calc_func="active_drawdown",
                 post_calc_func=lambda self, out, settings: -out * 100,
                 check_is_not_grouped=True,
-                tags=['drawdowns', 'active']
+                tags=["drawdowns", "active"],
             ),
             active_duration=dict(
-                title='Active Duration',
-                calc_func='active_duration',
+                title="Active Duration",
+                calc_func="active_duration",
                 fill_wrap_kwargs=True,
                 check_is_not_grouped=True,
-                tags=['drawdowns', 'active', 'duration']
+                tags=["drawdowns", "active", "duration"],
             ),
             active_recovery=dict(
-                title='Active Recovery [%]',
-                calc_func='active_recovery',
+                title="Active Recovery [%]",
+                calc_func="active_recovery",
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_is_not_grouped=True,
-                tags=['drawdowns', 'active']
+                tags=["drawdowns", "active"],
             ),
             active_recovery_return=dict(
-                title='Active Recovery Return [%]',
-                calc_func='active_recovery_return',
+                title="Active Recovery Return [%]",
+                calc_func="active_recovery_return",
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_is_not_grouped=True,
-                tags=['drawdowns', 'active']
+                tags=["drawdowns", "active"],
             ),
             active_recovery_duration=dict(
-                title='Active Recovery Duration',
-                calc_func='active_recovery_duration',
+                title="Active Recovery Duration",
+                calc_func="active_recovery_duration",
                 fill_wrap_kwargs=True,
                 check_is_not_grouped=True,
-                tags=['drawdowns', 'active', 'duration']
+                tags=["drawdowns", "active", "duration"],
             ),
             max_dd=dict(
-                title='Max Drawdown [%]',
+                title="Max Drawdown [%]",
                 calc_func=RepEval("'max_drawdown' if incl_active else 'recovered.max_drawdown'"),
                 post_calc_func=lambda self, out, settings: -out * 100,
-                tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']")
+                tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']"),
             ),
             avg_dd=dict(
-                title='Avg Drawdown [%]',
+                title="Avg Drawdown [%]",
                 calc_func=RepEval("'avg_drawdown' if incl_active else 'recovered.avg_drawdown'"),
                 post_calc_func=lambda self, out, settings: -out * 100,
-                tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']")
+                tags=RepEval("['drawdowns'] if incl_active else ['drawdowns', 'recovered']"),
             ),
             max_dd_duration=dict(
-                title='Max Drawdown Duration',
+                title="Max Drawdown Duration",
                 calc_func=RepEval("'max_duration' if incl_active else 'recovered.max_duration'"),
                 fill_wrap_kwargs=True,
-                tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
+                tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']"),
             ),
             avg_dd_duration=dict(
-                title='Avg Drawdown Duration',
+                title="Avg Drawdown Duration",
                 calc_func=RepEval("'avg_duration' if incl_active else 'recovered.avg_duration'"),
                 fill_wrap_kwargs=True,
-                tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']")
+                tags=RepEval("['drawdowns', 'duration'] if incl_active else ['drawdowns', 'recovered', 'duration']"),
             ),
             max_return=dict(
-                title='Max Recovery Return [%]',
-                calc_func='recovered.recovery_return.max',
+                title="Max Recovery Return [%]",
+                calc_func="recovered.recovery_return.max",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['drawdowns', 'recovered']
+                tags=["drawdowns", "recovered"],
             ),
             avg_return=dict(
-                title='Avg Recovery Return [%]',
-                calc_func='recovered.recovery_return.mean',
+                title="Avg Recovery Return [%]",
+                calc_func="recovered.recovery_return.mean",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['drawdowns', 'recovered']
+                tags=["drawdowns", "recovered"],
             ),
             max_recovery_duration=dict(
-                title='Max Recovery Duration',
-                calc_func='recovered.recovery_duration.max',
+                title="Max Recovery Duration",
+                calc_func="recovered.recovery_duration.max",
                 apply_to_timedelta=True,
-                tags=['drawdowns', 'recovered', 'duration']
+                tags=["drawdowns", "recovered", "duration"],
             ),
             avg_recovery_duration=dict(
-                title='Avg Recovery Duration',
-                calc_func='recovered.recovery_duration.mean',
+                title="Avg Recovery Duration",
+                calc_func="recovered.recovery_duration.mean",
                 apply_to_timedelta=True,
-                tags=['drawdowns', 'recovered', 'duration']
+                tags=["drawdowns", "recovered", "duration"],
             ),
             recovery_duration_ratio=dict(
-                title='Avg Recovery Duration Ratio',
-                calc_func='recovered.recovery_duration_ratio.mean',
-                tags=['drawdowns', 'recovered']
-            )
+                title="Avg Recovery Duration Ratio",
+                calc_func="recovered.recovery_duration_ratio.mean",
+                tags=["drawdowns", "recovered"],
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -626,23 +629,25 @@ class Drawdowns(Ranges):
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             top_n: int = 5,
-             plot_zones: bool = True,
-             ts_trace_kwargs: tp.KwargsLike = None,
-             peak_trace_kwargs: tp.KwargsLike = None,
-             valley_trace_kwargs: tp.KwargsLike = None,
-             recovery_trace_kwargs: tp.KwargsLike = None,
-             active_trace_kwargs: tp.KwargsLike = None,
-             decline_shape_kwargs: tp.KwargsLike = None,
-             recovery_shape_kwargs: tp.KwargsLike = None,
-             active_shape_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        top_n: int = 5,
+        plot_zones: bool = True,
+        ts_trace_kwargs: tp.KwargsLike = None,
+        peak_trace_kwargs: tp.KwargsLike = None,
+        valley_trace_kwargs: tp.KwargsLike = None,
+        recovery_trace_kwargs: tp.KwargsLike = None,
+        active_trace_kwargs: tp.KwargsLike = None,
+        decline_shape_kwargs: tp.KwargsLike = None,
+        recovery_shape_kwargs: tp.KwargsLike = None,
+        active_shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot drawdowns.
 
         Args:
@@ -677,7 +682,8 @@ class Drawdowns(Ranges):
             ![](/assets/images/drawdowns_plot.svg)
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_one(column=column, group_by=False)
         if top_n is not None:
@@ -686,11 +692,7 @@ class Drawdowns(Ranges):
 
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
-        ts_trace_kwargs = merge_dicts(dict(
-            line=dict(
-                color=plotting_cfg['color_schema']['blue']
-            )
-        ), ts_trace_kwargs)
+        ts_trace_kwargs = merge_dicts(dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), ts_trace_kwargs)
         if peak_trace_kwargs is None:
             peak_trace_kwargs = {}
         if valley_trace_kwargs is None:
@@ -718,46 +720,49 @@ class Drawdowns(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr('id')
-            id_title = self_col.get_field_title('id')
+            id_ = self_col.get_field_arr("id")
+            id_title = self_col.get_field_title("id")
 
-            peak_idx = self_col.get_map_field_to_index('peak_idx')
-            peak_idx_title = self_col.get_field_title('peak_idx')
+            peak_idx = self_col.get_map_field_to_index("peak_idx")
+            peak_idx_title = self_col.get_field_title("peak_idx")
 
             if self_col.ts is not None:
                 peak_val = self_col.ts.loc[peak_idx]
             else:
-                peak_val = self_col.get_field_arr('peak_val')
-            peak_val_title = self_col.get_field_title('peak_val')
+                peak_val = self_col.get_field_arr("peak_val")
+            peak_val_title = self_col.get_field_title("peak_val")
 
-            valley_idx = self_col.get_map_field_to_index('valley_idx')
-            valley_idx_title = self_col.get_field_title('valley_idx')
+            valley_idx = self_col.get_map_field_to_index("valley_idx")
+            valley_idx_title = self_col.get_field_title("valley_idx")
 
             if self_col.ts is not None:
                 valley_val = self_col.ts.loc[valley_idx]
             else:
-                valley_val = self_col.get_field_arr('valley_val')
-            valley_val_title = self_col.get_field_title('valley_val')
+                valley_val = self_col.get_field_arr("valley_val")
+            valley_val_title = self_col.get_field_title("valley_val")
 
-            end_idx = self_col.get_map_field_to_index('end_idx')
-            end_idx_title = self_col.get_field_title('end_idx')
+            end_idx = self_col.get_map_field_to_index("end_idx")
+            end_idx_title = self_col.get_field_title("end_idx")
 
             if self_col.ts is not None:
                 end_val = self_col.ts.loc[end_idx]
             else:
-                end_val = self_col.get_field_arr('end_val')
-            end_val_title = self_col.get_field_title('end_val')
+                end_val = self_col.get_field_arr("end_val")
+            end_val_title = self_col.get_field_title("end_val")
 
             drawdown = self_col.drawdown.values
             recovery_return = self_col.recovery_return.values
-            decline_duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
-                self_col.decline_duration.values, to_pd=True, silence_warnings=True))
-            recovery_duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
-                self_col.recovery_duration.values, to_pd=True, silence_warnings=True))
-            duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
-                self_col.duration.values, to_pd=True, silence_warnings=True))
+            decline_duration = np.vectorize(str)(
+                self_col.wrapper.to_timedelta(self_col.decline_duration.values, to_pd=True, silence_warnings=True)
+            )
+            recovery_duration = np.vectorize(str)(
+                self_col.wrapper.to_timedelta(self_col.recovery_duration.values, to_pd=True, silence_warnings=True)
+            )
+            duration = np.vectorize(str)(
+                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+            )
 
-            status = self_col.get_field_arr('status')
+            status = self_col.get_field_arr("status")
 
             peak_mask = peak_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
             if peak_mask.any():
@@ -766,21 +771,21 @@ class Drawdowns(Ranges):
                 peak_scatter = go.Scatter(
                     x=peak_idx[peak_mask],
                     y=peak_val[peak_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['blue'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["blue"],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
-                        )
+                            color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"]),
+                        ),
                     ),
-                    name='Peak',
+                    name="Peak",
                     customdata=peak_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{peak_idx_title}: %{{x}}"
-                                  f"<br>{peak_val_title}: %{{y}}"
+                    f"<br>{peak_idx_title}: %{{x}}"
+                    f"<br>{peak_val_title}: %{{y}}",
                 )
                 peak_scatter.update(**peak_trace_kwargs)
                 fig.add_trace(peak_scatter, **add_trace_kwargs)
@@ -788,31 +793,34 @@ class Drawdowns(Ranges):
             recovered_mask = status == DrawdownStatus.Recovered
             if recovered_mask.any():
                 # Plot valley markers
-                valley_customdata = np.stack((
-                    id_[recovered_mask],
-                    drawdown[recovered_mask],
-                    decline_duration[recovered_mask]
-                ), axis=1)
+                valley_customdata = np.stack(
+                    (
+                        id_[recovered_mask],
+                        drawdown[recovered_mask],
+                        decline_duration[recovered_mask],
+                    ),
+                    axis=1,
+                )
                 valley_scatter = go.Scatter(
                     x=valley_idx[recovered_mask],
                     y=valley_val[recovered_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['red'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["red"],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['red'])
-                        )
+                            color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"]),
+                        ),
                     ),
-                    name='Valley',
+                    name="Valley",
                     customdata=valley_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{valley_idx_title}: %{{x}}"
-                                  f"<br>{valley_val_title}: %{{y}}"
-                                  f"<br>Drawdown: %{{customdata[1]:.2%}}"
-                                  f"<br>Duration: %{{customdata[2]}}"
+                    f"<br>{valley_idx_title}: %{{x}}"
+                    f"<br>{valley_val_title}: %{{y}}"
+                    f"<br>Drawdown: %{{customdata[1]:.2%}}"
+                    f"<br>Duration: %{{customdata[2]}}",
                 )
                 valley_scatter.update(**valley_trace_kwargs)
                 fig.add_trace(valley_scatter, **add_trace_kwargs)
@@ -820,46 +828,54 @@ class Drawdowns(Ranges):
                 if plot_zones:
                     # Plot drawdown zones
                     for i in range(len(id_[recovered_mask])):
-                        fig.add_shape(**merge_dicts(dict(
-                            type="rect",
-                            xref=xref,
-                            yref="paper",
-                            x0=peak_idx[recovered_mask][i],
-                            y0=y_domain[0],
-                            x1=valley_idx[recovered_mask][i],
-                            y1=y_domain[1],
-                            fillcolor='red',
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
-                        ), decline_shape_kwargs))
+                        fig.add_shape(
+                            **merge_dicts(
+                                dict(
+                                    type="rect",
+                                    xref=xref,
+                                    yref="paper",
+                                    x0=peak_idx[recovered_mask][i],
+                                    y0=y_domain[0],
+                                    x1=valley_idx[recovered_mask][i],
+                                    y1=y_domain[1],
+                                    fillcolor="red",
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                ),
+                                decline_shape_kwargs,
+                            )
+                        )
 
                 # Plot recovery markers
-                recovery_customdata = np.stack((
-                    id_[recovered_mask],
-                    recovery_return[recovered_mask],
-                    recovery_duration[recovered_mask]
-                ), axis=1)
+                recovery_customdata = np.stack(
+                    (
+                        id_[recovered_mask],
+                        recovery_return[recovered_mask],
+                        recovery_duration[recovered_mask],
+                    ),
+                    axis=1,
+                )
                 recovery_scatter = go.Scatter(
                     x=end_idx[recovered_mask],
                     y=end_val[recovered_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['green'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["green"],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
-                        )
+                            color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"]),
+                        ),
                     ),
-                    name='Recovery/Peak',
+                    name="Recovery/Peak",
                     customdata=recovery_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{end_idx_title}: %{{x}}"
-                                  f"<br>{end_val_title}: %{{y}}"
-                                  f"<br>Return: %{{customdata[1]:.2%}}"
-                                  f"<br>Duration: %{{customdata[2]}}"
+                    f"<br>{end_idx_title}: %{{x}}"
+                    f"<br>{end_val_title}: %{{y}}"
+                    f"<br>Return: %{{customdata[1]:.2%}}"
+                    f"<br>Duration: %{{customdata[2]}}",
                 )
                 recovery_scatter.update(**recovery_trace_kwargs)
                 fig.add_trace(recovery_scatter, **add_trace_kwargs)
@@ -867,48 +883,52 @@ class Drawdowns(Ranges):
                 if plot_zones:
                     # Plot recovery zones
                     for i in range(len(id_[recovered_mask])):
-                        fig.add_shape(**merge_dicts(dict(
-                            type="rect",
-                            xref=xref,
-                            yref="paper",
-                            x0=valley_idx[recovered_mask][i],
-                            y0=y_domain[0],
-                            x1=end_idx[recovered_mask][i],
-                            y1=y_domain[1],
-                            fillcolor='green',
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
-                        ), recovery_shape_kwargs))
+                        fig.add_shape(
+                            **merge_dicts(
+                                dict(
+                                    type="rect",
+                                    xref=xref,
+                                    yref="paper",
+                                    x0=valley_idx[recovered_mask][i],
+                                    y0=y_domain[0],
+                                    x1=end_idx[recovered_mask][i],
+                                    y1=y_domain[1],
+                                    fillcolor="green",
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                ),
+                                recovery_shape_kwargs,
+                            )
+                        )
 
             # Plot active markers
             active_mask = status == DrawdownStatus.Active
             if active_mask.any():
-                active_customdata = np.stack((
-                    id_[active_mask],
-                    drawdown[active_mask],
-                    duration[active_mask]
-                ), axis=1)
+                active_customdata = np.stack(
+                    (id_[active_mask], drawdown[active_mask], duration[active_mask]),
+                    axis=1,
+                )
                 active_scatter = go.Scatter(
                     x=end_idx[active_mask],
                     y=end_val[active_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['orange'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["orange"],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['orange'])
-                        )
+                            color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"]),
+                        ),
                     ),
-                    name='Active',
+                    name="Active",
                     customdata=active_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{end_idx_title}: %{{x}}"
-                                  f"<br>{end_val_title}: %{{y}}"
-                                  f"<br>Return: %{{customdata[1]:.2%}}"
-                                  f"<br>Duration: %{{customdata[2]}}"
+                    f"<br>{end_idx_title}: %{{x}}"
+                    f"<br>{end_val_title}: %{{y}}"
+                    f"<br>Return: %{{customdata[1]:.2%}}"
+                    f"<br>Duration: %{{customdata[2]}}",
                 )
                 active_scatter.update(**active_trace_kwargs)
                 fig.add_trace(active_scatter, **add_trace_kwargs)
@@ -916,19 +936,24 @@ class Drawdowns(Ranges):
                 if plot_zones:
                     # Plot active drawdown zones
                     for i in range(len(id_[active_mask])):
-                        fig.add_shape(**merge_dicts(dict(
-                            type="rect",
-                            xref=xref,
-                            yref="paper",
-                            x0=peak_idx[active_mask][i],
-                            y0=y_domain[0],
-                            x1=end_idx[active_mask][i],
-                            y1=y_domain[1],
-                            fillcolor='orange',
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
-                        ), active_shape_kwargs))
+                        fig.add_shape(
+                            **merge_dicts(
+                                dict(
+                                    type="rect",
+                                    xref=xref,
+                                    yref="paper",
+                                    x0=peak_idx[active_mask][i],
+                                    y0=y_domain[0],
+                                    x1=end_idx[active_mask][i],
+                                    y1=y_domain[1],
+                                    fillcolor="orange",
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                ),
+                                active_shape_kwargs,
+                            )
+                        )
 
         return fig
 
@@ -939,23 +964,21 @@ class Drawdowns(Ranges):
         Merges `vectorbt.generic.ranges.Ranges.plots_defaults` and
         `drawdowns.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        drawdowns_plots_cfg = settings['drawdowns']['plots']
 
-        return merge_dicts(
-            Ranges.plots_defaults.__get__(self),
-            drawdowns_plots_cfg
-        )
+        drawdowns_plots_cfg = settings["drawdowns"]["plots"]
+
+        return merge_dicts(Ranges.plots_defaults.__get__(self), drawdowns_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             plot=dict(
                 title="Drawdowns",
                 check_is_not_grouped=True,
-                plot_func='plot',
-                tags='drawdowns'
+                plot_func="plot",
+                tags="drawdowns",
             )
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property

@@ -792,8 +792,9 @@ def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None,
             out[i] = np.nan
         else:
             mean = window_cumsum / window_len
-            out[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
-                                    mean + window_len * mean ** 2) / (window_len - ddof))
+            out[i] = np.sqrt(
+                np.abs(window_cumsum_sq - 2 * window_cumsum * mean + window_len * mean**2) / (window_len - ddof)
+            )
     return out
 
 
@@ -822,18 +823,18 @@ def ewm_mean_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False
     if N == 0:
         return out
     com = (span - 1) / 2.0
-    alpha = 1. / (1. + com)
-    old_wt_factor = 1. - alpha
-    new_wt = 1. if adjust else alpha
+    alpha = 1.0 / (1.0 + com)
+    old_wt_factor = 1.0 - alpha
+    new_wt = 1.0 if adjust else alpha
     weighted_avg = a[0]
-    is_observation = (weighted_avg == weighted_avg)
+    is_observation = weighted_avg == weighted_avg
     nobs = int(is_observation)
     out[0] = weighted_avg if (nobs >= minp) else np.nan
-    old_wt = 1.
+    old_wt = 1.0
 
     for i in range(1, N):
         cur = a[i]
-        is_observation = (cur == cur)
+        is_observation = cur == cur
         nobs += is_observation
         if weighted_avg == weighted_avg:
             old_wt *= old_wt_factor
@@ -844,7 +845,7 @@ def ewm_mean_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False
                 if adjust:
                     old_wt += new_wt
                 else:
-                    old_wt = 1.
+                    old_wt = 1.0
         elif is_observation:
             weighted_avg = cur
         out[i] = weighted_avg if (nobs >= minp) else np.nan
@@ -876,30 +877,30 @@ def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False,
     if N == 0:
         return out
     com = (span - 1) / 2.0
-    alpha = 1. / (1. + com)
-    old_wt_factor = 1. - alpha
-    new_wt = 1. if adjust else alpha
+    alpha = 1.0 / (1.0 + com)
+    old_wt_factor = 1.0 - alpha
+    new_wt = 1.0 if adjust else alpha
     mean_x = a[0]
     mean_y = a[0]
-    is_observation = ((mean_x == mean_x) and (mean_y == mean_y))
+    is_observation = (mean_x == mean_x) and (mean_y == mean_y)
     nobs = int(is_observation)
     if not is_observation:
         mean_x = np.nan
         mean_y = np.nan
     out[0] = np.nan
-    cov = 0.
-    sum_wt = 1.
-    sum_wt2 = 1.
-    old_wt = 1.
+    cov = 0.0
+    sum_wt = 1.0
+    sum_wt2 = 1.0
+    old_wt = 1.0
 
     for i in range(1, N):
         cur_x = a[i]
         cur_y = a[i]
-        is_observation = ((cur_x == cur_x) and (cur_y == cur_y))
+        is_observation = (cur_x == cur_x) and (cur_y == cur_y)
         nobs += is_observation
         if mean_x == mean_x:
             sum_wt *= old_wt_factor
-            sum_wt2 *= (old_wt_factor * old_wt_factor)
+            sum_wt2 *= old_wt_factor * old_wt_factor
             old_wt *= old_wt_factor
             if is_observation:
                 old_mean_x = mean_x
@@ -907,24 +908,22 @@ def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False,
 
                 # avoid numerical errors on constant series
                 if mean_x != cur_x:
-                    mean_x = ((old_wt * old_mean_x) +
-                              (new_wt * cur_x)) / (old_wt + new_wt)
+                    mean_x = ((old_wt * old_mean_x) + (new_wt * cur_x)) / (old_wt + new_wt)
 
                 # avoid numerical errors on constant series
                 if mean_y != cur_y:
-                    mean_y = ((old_wt * old_mean_y) +
-                              (new_wt * cur_y)) / (old_wt + new_wt)
-                cov = ((old_wt * (cov + ((old_mean_x - mean_x) *
-                                         (old_mean_y - mean_y)))) +
-                       (new_wt * ((cur_x - mean_x) *
-                                  (cur_y - mean_y)))) / (old_wt + new_wt)
+                    mean_y = ((old_wt * old_mean_y) + (new_wt * cur_y)) / (old_wt + new_wt)
+                cov = (
+                    (old_wt * (cov + ((old_mean_x - mean_x) * (old_mean_y - mean_y))))
+                    + (new_wt * ((cur_x - mean_x) * (cur_y - mean_y)))
+                ) / (old_wt + new_wt)
                 sum_wt += new_wt
-                sum_wt2 += (new_wt * new_wt)
+                sum_wt2 += new_wt * new_wt
                 old_wt += new_wt
                 if not adjust:
                     sum_wt /= old_wt
-                    sum_wt2 /= (old_wt * old_wt)
-                    old_wt = 1.
+                    sum_wt2 /= old_wt * old_wt
+                    old_wt = 1.0
         elif is_observation:
             mean_x = cur_x
             mean_y = cur_y
@@ -932,8 +931,8 @@ def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False,
         if nobs >= minp:
             numerator = sum_wt * sum_wt
             denominator = numerator - sum_wt2
-            if denominator > 0.:
-                out[i] = ((numerator / denominator) * cov)
+            if denominator > 0.0:
+                out[i] = (numerator / denominator) * cov
             else:
                 out[i] = np.nan
         else:
@@ -1071,8 +1070,9 @@ def row_apply_nb(a: tp.Array2d, apply_func_nb: tp.RowApplyFunc, *args) -> tp.Arr
 
 
 @njit
-def rolling_apply_nb(a: tp.Array2d, window: int, minp: tp.Optional[int],
-                     apply_func_nb: tp.RollApplyFunc, *args) -> tp.Array2d:
+def rolling_apply_nb(
+    a: tp.Array2d, window: int, minp: tp.Optional[int], apply_func_nb: tp.RollApplyFunc, *args
+) -> tp.Array2d:
     """Provide rolling window calculations.
 
     `apply_func_nb` should accept index of the row, index of the column,
@@ -1094,14 +1094,15 @@ def rolling_apply_nb(a: tp.Array2d, window: int, minp: tp.Optional[int],
             if valid_cnt < minp:
                 out[i, col] = np.nan
             else:
-                window_a = a[max(0, i + 1 - window):i + 1, col]
+                window_a = a[max(0, i + 1 - window) : i + 1, col]
                 out[i, col] = apply_func_nb(i, col, window_a, *args)
     return out
 
 
 @njit
-def rolling_matrix_apply_nb(a: tp.Array2d, window: int, minp: tp.Optional[int],
-                            apply_func_nb: tp.RollMatrixApplyFunc, *args) -> tp.Array2d:
+def rolling_matrix_apply_nb(
+    a: tp.Array2d, window: int, minp: tp.Optional[int], apply_func_nb: tp.RollMatrixApplyFunc, *args
+) -> tp.Array2d:
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` should accept index of the row, the 2-dim array, and `*args`.
@@ -1123,28 +1124,27 @@ def rolling_matrix_apply_nb(a: tp.Array2d, window: int, minp: tp.Optional[int],
         if valid_cnt < minp:
             out[i, :] = np.nan
         else:
-            window_a = a[max(0, i + 1 - window):i + 1, :]
+            window_a = a[max(0, i + 1 - window) : i + 1, :]
             out[i, :] = apply_func_nb(i, window_a, *args)
     return out
 
 
 @njit
-def expanding_apply_nb(a: tp.Array2d, minp: tp.Optional[int],
-                       apply_func_nb: tp.RollApplyFunc, *args) -> tp.Array2d:
+def expanding_apply_nb(a: tp.Array2d, minp: tp.Optional[int], apply_func_nb: tp.RollApplyFunc, *args) -> tp.Array2d:
     """Expanding version of `rolling_apply_nb`."""
     return rolling_apply_nb(a, a.shape[0], minp, apply_func_nb, *args)
 
 
 @njit
-def expanding_matrix_apply_nb(a: tp.Array2d, minp: tp.Optional[int],
-                              apply_func_nb: tp.RollMatrixApplyFunc, *args) -> tp.Array2d:
+def expanding_matrix_apply_nb(
+    a: tp.Array2d, minp: tp.Optional[int], apply_func_nb: tp.RollMatrixApplyFunc, *args
+) -> tp.Array2d:
     """Expanding version of `rolling_matrix_apply_nb`."""
     return rolling_matrix_apply_nb(a, a.shape[0], minp, apply_func_nb, *args)
 
 
 @njit
-def groupby_apply_nb(a: tp.Array2d, groups: Dict,
-                     apply_func_nb: tp.GroupByApplyFunc, *args) -> tp.Array2d:
+def groupby_apply_nb(a: tp.Array2d, groups: Dict, apply_func_nb: tp.GroupByApplyFunc, *args) -> tp.Array2d:
     """Provide group-by calculations.
 
     `groups` should be a dictionary, where each key is an index that points to an element in the new array
@@ -1163,8 +1163,7 @@ def groupby_apply_nb(a: tp.Array2d, groups: Dict,
 
 
 @njit
-def groupby_matrix_apply_nb(a: tp.Array2d, groups: Dict,
-                            apply_func_nb: tp.GroupByMatrixApplyFunc, *args) -> tp.Array2d:
+def groupby_matrix_apply_nb(a: tp.Array2d, groups: Dict, apply_func_nb: tp.GroupByMatrixApplyFunc, *args) -> tp.Array2d:
     """`groupby_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` should accept indices of the group, the 2-dim array, and `*args`.
@@ -1197,7 +1196,7 @@ def applymap_nb(a: tp.Array2d, map_func_nb: tp.ApplyMapFunc, *args) -> tp.Array2
 
 @njit
 def filter_nb(a: tp.Array2d, filter_func_nb: tp.FilterFunc, *args) -> tp.Array2d:
-    """Filter non-NA elements elementwise using `filter_func_nb`. 
+    """Filter non-NA elements elementwise using `filter_func_nb`.
     The filtered out elements will become NA.
 
     `filter_func_nb` should accept index of the row, index of the column,
@@ -1213,8 +1212,9 @@ def filter_nb(a: tp.Array2d, filter_func_nb: tp.FilterFunc, *args) -> tp.Array2d
 
 
 @njit
-def apply_and_reduce_nb(a: tp.Array2d, apply_func_nb: tp.ApplyFunc, apply_args: tuple,
-                        reduce_func_nb: tp.ReduceFunc, reduce_args: tuple) -> tp.Array1d:
+def apply_and_reduce_nb(
+    a: tp.Array2d, apply_func_nb: tp.ApplyFunc, apply_args: tuple, reduce_func_nb: tp.ReduceFunc, reduce_args: tuple
+) -> tp.Array1d:
     """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
 
     `apply_func_nb` should accept index of the column, the column itself, and `*apply_args`.
@@ -1262,8 +1262,7 @@ def reduce_to_array_nb(a: tp.Array2d, reduce_func_nb: tp.ReduceArrayFunc, *args)
 
 
 @njit
-def reduce_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d,
-                      reduce_func_nb: tp.GroupReduceFunc, *args) -> tp.Array1d:
+def reduce_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, reduce_func_nb: tp.GroupReduceFunc, *args) -> tp.Array1d:
     """Reduce each group of columns into a single value using `reduce_func_nb`.
 
     `reduce_func_nb` should accept index of the group, the array of row values, and `*args`.
@@ -1284,13 +1283,14 @@ def flatten_forder_nb(a: tp.Array2d) -> tp.Array1d:
     """Flatten `a` in F order."""
     out = np.empty(a.shape[0] * a.shape[1], dtype=a.dtype)
     for col in range(a.shape[1]):
-        out[col * a.shape[0]:(col + 1) * a.shape[0]] = a[:, col]
+        out[col * a.shape[0] : (col + 1) * a.shape[0]] = a[:, col]
     return out
 
 
 @njit
-def flat_reduce_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool,
-                           reduce_func_nb: tp.FlatGroupReduceFunc, *args) -> tp.Array1d:
+def flat_reduce_grouped_nb(
+    a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool, reduce_func_nb: tp.FlatGroupReduceFunc, *args
+) -> tp.Array1d:
     """Same as `reduce_grouped_nb` but passes flattened array."""
     from_col = 0
     for group in range(len(group_lens)):
@@ -1307,8 +1307,9 @@ def flat_reduce_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bo
 
 
 @njit
-def reduce_grouped_to_array_nb(a: tp.Array2d, group_lens: tp.Array1d,
-                               reduce_func_nb: tp.GroupReduceArrayFunc, *args) -> tp.Array2d:
+def reduce_grouped_to_array_nb(
+    a: tp.Array2d, group_lens: tp.Array1d, reduce_func_nb: tp.GroupReduceArrayFunc, *args
+) -> tp.Array2d:
     """Reduce each group of columns into an array of values using `reduce_func_nb`.
 
     `reduce_func_nb` same as for `reduce_grouped_nb` but should return an array.
@@ -1327,8 +1328,9 @@ def reduce_grouped_to_array_nb(a: tp.Array2d, group_lens: tp.Array1d,
 
 
 @njit
-def flat_reduce_grouped_to_array_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool,
-                                    reduce_func_nb: tp.FlatGroupReduceArrayFunc, *args) -> tp.Array2d:
+def flat_reduce_grouped_to_array_nb(
+    a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool, reduce_func_nb: tp.FlatGroupReduceArrayFunc, *args
+) -> tp.Array2d:
     """Same as `reduce_grouped_to_array_nb` but passes flattened 1D array."""
     from_col = 0
     for group in range(len(group_lens)):
@@ -1345,8 +1347,9 @@ def flat_reduce_grouped_to_array_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_
 
 
 @njit
-def squeeze_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d,
-                       squeeze_func_nb: tp.GroupSqueezeFunc, *args) -> tp.Array2d:
+def squeeze_grouped_nb(
+    a: tp.Array2d, group_lens: tp.Array1d, squeeze_func_nb: tp.GroupSqueezeFunc, *args
+) -> tp.Array2d:
     """Squeeze each group of columns into a single column using `squeeze_func_nb`.
 
     `squeeze_func_nb` should accept index of the row, index of the group,
@@ -1365,6 +1368,7 @@ def squeeze_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d,
 
 # ############# Reshaping ############# #
 
+
 @njit(cache=True)
 def flatten_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool) -> tp.Array2d:
     """Flatten each group of columns."""
@@ -1375,9 +1379,9 @@ def flatten_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool) 
         group_len = to_col - from_col
         for k in range(group_len):
             if in_c_order:
-                out[k::np.max(group_lens), group] = a[:, from_col + k]
+                out[k :: np.max(group_lens), group] = a[:, from_col + k]
             else:
-                out[k * a.shape[0]:(k + 1) * a.shape[0], group] = a[:, from_col + k]
+                out[k * a.shape[0] : (k + 1) * a.shape[0], group] = a[:, from_col + k]
         from_col = to_col
     return out
 
@@ -1392,9 +1396,9 @@ def flatten_uniform_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d, in_c_order
         group_len = to_col - from_col
         for k in range(group_len):
             if in_c_order:
-                out[k::np.max(group_lens), group] = a[:, from_col + k]
+                out[k :: np.max(group_lens), group] = a[:, from_col + k]
             else:
-                out[k * a.shape[0]:(k + 1) * a.shape[0], group] = a[:, from_col + k]
+                out[k * a.shape[0] : (k + 1) * a.shape[0], group] = a[:, from_col + k]
         from_col = to_col
     return out
 
@@ -1550,6 +1554,7 @@ def any_squeeze_nb(col: int, group: int, a: tp.Array1d) -> bool:
 
 # ############# Ranges ############# #
 
+
 @njit(cache=True)
 def find_ranges_nb(ts: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
     """Find ranges and store their information as records to an array.
@@ -1617,11 +1622,11 @@ def find_ranges_nb(ts: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
 
             if store_record:
                 # Save range to the records
-                out[ridx]['id'] = ridx
-                out[ridx]['col'] = col
-                out[ridx]['start_idx'] = start_idx
-                out[ridx]['end_idx'] = end_idx
-                out[ridx]['status'] = status
+                out[ridx]["id"] = ridx
+                out[ridx]["col"] = col
+                out[ridx]["start_idx"] = start_idx
+                out[ridx]["end_idx"] = end_idx
+                out[ridx]["status"] = status
                 ridx += 1
 
                 # Reset running vars for a new range
@@ -1631,9 +1636,7 @@ def find_ranges_nb(ts: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
 
 
 @njit(cache=True)
-def range_duration_nb(start_idx_arr: tp.Array1d,
-                      end_idx_arr: tp.Array1d,
-                      status_arr: tp.Array2d) -> tp.Array1d:
+def range_duration_nb(start_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d, status_arr: tp.Array2d) -> tp.Array1d:
     """Get duration of each duration record."""
     out = np.empty(start_idx_arr.shape[0], dtype=np.int64)
     for ridx in range(out.shape[0]):
@@ -1645,13 +1648,15 @@ def range_duration_nb(start_idx_arr: tp.Array1d,
 
 
 @njit(cache=True)
-def range_coverage_nb(start_idx_arr: tp.Array1d,
-                      end_idx_arr: tp.Array1d,
-                      status_arr: tp.Array2d,
-                      col_map: tp.ColMap,
-                      index_lens: tp.Array1d,
-                      overlapping: bool = False,
-                      normalize: bool = False) -> tp.Array1d:
+def range_coverage_nb(
+    start_idx_arr: tp.Array1d,
+    end_idx_arr: tp.Array1d,
+    status_arr: tp.Array2d,
+    col_map: tp.ColMap,
+    index_lens: tp.Array1d,
+    overlapping: bool = False,
+    normalize: bool = False,
+) -> tp.Array1d:
     """Get coverage of range records.
 
     Set `overlapping` to True to get the number of overlapping steps.
@@ -1667,13 +1672,13 @@ def range_coverage_nb(start_idx_arr: tp.Array1d,
         if col_len == 0:
             continue
         col_start_idx = col_start_idxs[col]
-        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        ridxs = col_idxs[col_start_idx : col_start_idx + col_len]
         temp = np.full(index_lens[col], 0, dtype=np.int64)
         for ridx in ridxs:
             if status_arr[ridx] == RangeStatus.Open:
-                temp[start_idx_arr[ridx]:end_idx_arr[ridx] + 1] += 1
+                temp[start_idx_arr[ridx] : end_idx_arr[ridx] + 1] += 1
             else:
-                temp[start_idx_arr[ridx]:end_idx_arr[ridx]] += 1
+                temp[start_idx_arr[ridx] : end_idx_arr[ridx]] += 1
         if overlapping:
             if normalize:
                 out[col] = np.sum(temp > 1) / np.sum(temp > 0)
@@ -1688,11 +1693,9 @@ def range_coverage_nb(start_idx_arr: tp.Array1d,
 
 
 @njit(cache=True)
-def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
-                      end_idx_arr: tp.Array1d,
-                      status_arr: tp.Array2d,
-                      col_map: tp.ColMap,
-                      index_len: int) -> tp.Array2d:
+def ranges_to_mask_nb(
+    start_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d, status_arr: tp.Array2d, col_map: tp.ColMap, index_len: int
+) -> tp.Array2d:
     """Convert ranges to 2-dim mask."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -1703,17 +1706,18 @@ def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
         if col_len == 0:
             continue
         col_start_idx = col_start_idxs[col]
-        ridxs = col_idxs[col_start_idx:col_start_idx + col_len]
+        ridxs = col_idxs[col_start_idx : col_start_idx + col_len]
         for ridx in ridxs:
             if status_arr[ridx] == RangeStatus.Open:
-                out[start_idx_arr[ridx]:end_idx_arr[ridx] + 1, col] = True
+                out[start_idx_arr[ridx] : end_idx_arr[ridx] + 1, col] = True
             else:
-                out[start_idx_arr[ridx]:end_idx_arr[ridx], col] = True
+                out[start_idx_arr[ridx] : end_idx_arr[ridx], col] = True
 
     return out
 
 
 # ############# Drawdowns ############# #
+
 
 @njit(cache=True)
 def get_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
@@ -1795,16 +1799,16 @@ def get_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
 
                 if store_record:
                     # Save drawdown to the records
-                    out[ddidx]['id'] = ddidx
-                    out[ddidx]['col'] = col
-                    out[ddidx]['peak_idx'] = peak_idx
-                    out[ddidx]['start_idx'] = peak_idx + 1
-                    out[ddidx]['valley_idx'] = valley_idx
-                    out[ddidx]['end_idx'] = i
-                    out[ddidx]['peak_val'] = peak_val
-                    out[ddidx]['valley_val'] = valley_val
-                    out[ddidx]['end_val'] = cur_val
-                    out[ddidx]['status'] = status
+                    out[ddidx]["id"] = ddidx
+                    out[ddidx]["col"] = col
+                    out[ddidx]["peak_idx"] = peak_idx
+                    out[ddidx]["start_idx"] = peak_idx + 1
+                    out[ddidx]["valley_idx"] = valley_idx
+                    out[ddidx]["end_idx"] = i
+                    out[ddidx]["peak_val"] = peak_val
+                    out[ddidx]["valley_val"] = valley_val
+                    out[ddidx]["end_val"] = cur_val
+                    out[ddidx]["status"] = status
                     ddidx += 1
 
                     # Reset running vars for a new drawdown
@@ -1831,16 +1835,15 @@ def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d
 
 
 @njit(cache=True)
-def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d,
-                            end_idx_arr: tp.Array1d) -> tp.Array1d:
+def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d) -> tp.Array1d:
     """Return the duration of the valley-to-recovery phase of each drawdown record."""
     return end_idx_arr - valley_idx_arr
 
 
 @njit(cache=True)
-def dd_recovery_duration_ratio_nb(start_idx_arr: tp.Array1d,
-                                  valley_idx_arr: tp.Array1d,
-                                  end_idx_arr: tp.Array1d) -> tp.Array1d:
+def dd_recovery_duration_ratio_nb(
+    start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d
+) -> tp.Array1d:
     """Return the ratio of the recovery duration to the decline duration of each drawdown record."""
     recovery_duration = dd_recovery_duration_nb(valley_idx_arr, end_idx_arr)
     decline_duration = dd_decline_duration_nb(start_idx_arr, valley_idx_arr)
@@ -1854,6 +1857,7 @@ def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -
 
 
 # ############# Crossover ############# #
+
 
 @njit(cache=True)
 def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp.Array1d:

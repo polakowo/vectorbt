@@ -10,12 +10,6 @@ from vectorbt.generic.enums import *
 from vectorbt.generic.ranges import Ranges
 from vectorbt.generic.splitters import RangeSplitter, RollingSplitter, ExpandingSplitter
 
-__all__ = [
-    'Ranges',
-    'Drawdowns',
-    'RangeSplitter',
-    'RollingSplitter',
-    'ExpandingSplitter'
-]
+__all__ = ["Ranges", "Drawdowns", "RangeSplitter", "RollingSplitter", "ExpandingSplitter"]
 
 __pdoc__ = {k: False for k in __all__}

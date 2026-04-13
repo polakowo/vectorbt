@@ -33,20 +33,22 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
         checks.assert_subclass_of(cls, Wrapping)
 
         for target_name, settings in config.items():
-            func = settings['func']
-            is_reducing = settings.get('is_reducing', False)
-            path = settings.get('path', func.__name__)
-            replace_signature = settings.get('replace_signature', True)
-            default_wrap_kwargs = settings.get('wrap_kwargs', dict(name_or_index=target_name) if is_reducing else None)
+            func = settings["func"]
+            is_reducing = settings.get("is_reducing", False)
+            path = settings.get("path", func.__name__)
+            replace_signature = settings.get("replace_signature", True)
+            default_wrap_kwargs = settings.get("wrap_kwargs", dict(name_or_index=target_name) if is_reducing else None)
 
-            def new_method(self,
-                           *args,
-                           _target_name: str = target_name,
-                           _func: tp.Callable = func,
-                           _is_reducing: bool = is_reducing,
-                           _default_wrap_kwargs: tp.KwargsLike = default_wrap_kwargs,
-                           wrap_kwargs: tp.KwargsLike = None,
-                           **kwargs) -> tp.SeriesFrame:
+            def new_method(
+                self,
+                *args,
+                _target_name: str = target_name,
+                _func: tp.Callable = func,
+                _is_reducing: bool = is_reducing,
+                _default_wrap_kwargs: tp.KwargsLike = default_wrap_kwargs,
+                wrap_kwargs: tp.KwargsLike = None,
+                **kwargs,
+            ) -> tp.SeriesFrame:
                 args = (self.to_2d_array(),) + args
                 inspect.signature(_func).bind(*args, **kwargs)
 
@@ -63,7 +65,8 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                 self_arg = new_method_params[0]
                 wrap_kwargs_arg = new_method_params[-2]
                 source_sig = source_sig.replace(
-                    parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,))
+                    parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,)
+                )
                 new_method.__signature__ = source_sig
 
             new_method.__doc__ = f"See `{path}`."
@@ -93,14 +96,16 @@ def attach_transform_methods(config: Config) -> WrapperFuncT:
         checks.assert_subclass_of(cls, "GenericAccessor")
 
         for target_name, settings in config.items():
-            transformer = settings['transformer']
-            docstring = settings.get('docstring', f"See `{transformer.__name__}`.")
-            replace_signature = settings.get('replace_signature', True)
+            transformer = settings["transformer"]
+            docstring = settings.get("docstring", f"See `{transformer.__name__}`.")
+            replace_signature = settings.get("replace_signature", True)
 
-            def new_method(self,
-                           _target_name: str = target_name,
-                           _transformer: tp.Union[tp.Type[TransformerT], TransformerT] = transformer,
-                           **kwargs) -> tp.SeriesFrame:
+            def new_method(
+                self,
+                _target_name: str = target_name,
+                _transformer: tp.Union[tp.Type[TransformerT], TransformerT] = transformer,
+                **kwargs,
+            ) -> tp.SeriesFrame:
                 if inspect.isclass(_transformer):
                     arg_names = get_func_arg_names(_transformer.__init__)
                     transformer_kwargs = dict()
@@ -116,7 +121,8 @@ def attach_transform_methods(config: Config) -> WrapperFuncT:
                 if inspect.isclass(transformer):
                     transformer_params = tuple(source_sig.parameters.values())
                     source_sig = inspect.Signature(
-                        (new_method_params[0],) + transformer_params[1:] + (new_method_params[-1],))
+                        (new_method_params[0],) + transformer_params[1:] + (new_method_params[-1],)
+                    )
                     new_method.__signature__ = source_sig
                 else:
                     source_sig = inspect.Signature((new_method_params[0],) + (new_method_params[-1],))
