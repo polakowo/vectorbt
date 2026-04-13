@@ -25,24 +25,27 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     """Class decorator to attach Plotly Express methods."""
 
     for px_func_name, px_func in getmembers(px, isfunction):
-        if checks.func_accepts_arg(px_func, 'data_frame') or px_func_name == 'imshow':
-            def plot_func(self, *args, _px_func_name: str = px_func_name,
-                          _px_func: tp.Callable = px_func, **kwargs) -> tp.BaseFigure:
+        if checks.func_accepts_arg(px_func, "data_frame") or px_func_name == "imshow":
+
+            def plot_func(
+                self, *args, _px_func_name: str = px_func_name, _px_func: tp.Callable = px_func, **kwargs
+            ) -> tp.BaseFigure:
                 from vectorbt._settings import settings
-                layout_cfg = settings['plotting']['layout']
+
+                layout_cfg = settings["plotting"]["layout"]
 
                 layout_kwargs = dict(
-                    template=kwargs.pop('template', layout_cfg['template']),
-                    width=kwargs.pop('width', layout_cfg['width']),
-                    height=kwargs.pop('height', layout_cfg['height'])
+                    template=kwargs.pop("template", layout_cfg["template"]),
+                    width=kwargs.pop("width", layout_cfg["width"]),
+                    height=kwargs.pop("height", layout_cfg["height"]),
                 )
                 # Fix category_orders
-                if 'color' in kwargs:
-                    if isinstance(kwargs['color'], str):
+                if "color" in kwargs:
+                    if isinstance(kwargs["color"], str):
                         if isinstance(self.obj, pd.DataFrame):
-                            if kwargs['color'] in self.obj.columns:
+                            if kwargs["color"] in self.obj.columns:
                                 category_orders = dict()
-                                category_orders[kwargs['color']] = sorted(self.obj[kwargs['color']].unique())
+                                category_orders[kwargs["color"]] = sorted(self.obj[kwargs["color"]].unique())
                                 kwargs = merge_dicts(dict(category_orders=category_orders), kwargs)
 
                 # Fix Series name
@@ -54,13 +57,11 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     obj.columns = clean_labels(obj.columns)
                 obj.index = clean_labels(obj.index)
 
-                if _px_func_name == 'imshow':
-                    return make_figure(_px_func(
-                        to_2d_array(obj), *args, **layout_kwargs, **kwargs
-                    ), layout=layout_kwargs)
-                return make_figure(_px_func(
-                    obj, *args, **layout_kwargs, **kwargs
-                ), layout=layout_kwargs)
+                if _px_func_name == "imshow":
+                    return make_figure(
+                        _px_func(to_2d_array(obj), *args, **layout_kwargs, **kwargs), layout=layout_kwargs
+                    )
+                return make_figure(_px_func(obj, *args, **layout_kwargs, **kwargs), layout=layout_kwargs)
 
             setattr(cls, px_func_name, plot_func)
     return cls
@@ -89,7 +90,7 @@ class PXAccessor(BaseAccessor):
         BaseAccessor.__init__(self, obj, **kwargs)
 
 
-@register_series_vbt_accessor('px')
+@register_series_vbt_accessor("px")
 class PXSRAccessor(PXAccessor, BaseSRAccessor):
     """Accessor for running Plotly Express functions. For Series only.
 
@@ -100,7 +101,7 @@ class PXSRAccessor(PXAccessor, BaseSRAccessor):
         PXAccessor.__init__(self, obj, **kwargs)
 
 
-@register_dataframe_vbt_accessor('px')
+@register_dataframe_vbt_accessor("px")
 class PXDFAccessor(PXAccessor, BaseDFAccessor):
     """Accessor for running Plotly Express functions. For DataFrames only.
 

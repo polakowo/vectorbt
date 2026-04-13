@@ -11,4 +11,4 @@ __blacklist__ = []
 try:
     import quantstats
 except ImportError:
-    __blacklist__.append('qs_adapter')
+    __blacklist__.append("qs_adapter")

@@ -10,9 +10,6 @@ occupying the user's memory."""
 from vectorbt.records.base import Records
 from vectorbt.records.mapped_array import MappedArray
 
-__all__ = [
-    'MappedArray',
-    'Records'
-]
+__all__ = ["MappedArray", "Records"]
 
 __pdoc__ = {k: False for k in __all__}

@@ -37,10 +37,7 @@ def prepare_for_doc(obj: tp.Any, replace: tp.DictLike = None, path: str = None) 
     if isinstance(obj, SafeToStr):
         return str(obj)
     if isinstance(obj, np.dtype) and hasattr(obj, "fields"):
-        return dict(zip(
-            dict(obj.fields).keys(),
-            list(map(lambda x: str(x[0]), dict(obj.fields).values()))
-        ))
+        return dict(zip(dict(obj.fields).keys(), list(map(lambda x: str(x[0]), dict(obj.fields).values()))))
     if isinstance(obj, tuple) and hasattr(obj, "_asdict"):
         return prepare_for_doc(obj._asdict(), replace, path)
     if isinstance(obj, (tuple, list)):
@@ -53,13 +50,13 @@ def prepare_for_doc(obj: tp.Any, replace: tp.DictLike = None, path: str = None) 
             if path is None:
                 new_path = k
             else:
-                new_path = path + '.' + k
+                new_path = path + "." + k
             if new_path in replace:
                 new_obj[k] = replace[new_path]
             else:
                 new_obj[k] = prepare_for_doc(v, replace, new_path)
         return new_obj
-    if hasattr(obj, 'shape') and isinstance(obj.shape, tuple):
+    if hasattr(obj, "shape") and isinstance(obj.shape, tuple):
         if len(obj.shape) == 0:
             return obj.item()
         return "{} of shape {}".format(object.__repr__(obj), obj.shape)

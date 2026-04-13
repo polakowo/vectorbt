@@ -15,12 +15,7 @@ class ColumnMapper(Wrapping):
     classes to make use of column and group metadata."""
 
     def __init__(self, wrapper: ArrayWrapper, col_arr: tp.Array1d, **kwargs) -> None:
-        Wrapping.__init__(
-            self,
-            wrapper,
-            col_arr=col_arr,
-            **kwargs
-        )
+        Wrapping.__init__(self, wrapper, col_arr=col_arr, **kwargs)
         self._wrapper = wrapper
         self._col_arr = col_arr
 

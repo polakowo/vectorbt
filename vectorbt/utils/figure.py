@@ -12,11 +12,11 @@ from vectorbt.utils.config import merge_dicts
 
 def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:
     """Get domain of a coordinate axis."""
-    axis = ref[0] + 'axis' + ref[1:]
+    axis = ref[0] + "axis" + ref[1:]
     if axis in fig.layout:
-        if 'domain' in fig.layout[axis]:
-            if fig.layout[axis]['domain'] is not None:
-                return fig.layout[axis]['domain']
+        if "domain" in fig.layout[axis]:
+            if fig.layout[axis]["domain"] is not None:
+                return fig.layout[axis]["domain"]
     return 0, 1
 
 
@@ -40,19 +40,21 @@ class Figure(_Figure, FigureMixin):
     def __init__(self, *args, **kwargs) -> None:
         """Extends `plotly.graph_objects.Figure`."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        layout = kwargs.pop('layout', {})
+        plotting_cfg = settings["plotting"]
+
+        layout = kwargs.pop("layout", {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(plotting_cfg['layout'], layout))
+        self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
         """Show the figure."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg['show_kwargs'], kwargs)
+        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
         _Figure.show(self, *args, **show_kwargs)
 
 
@@ -62,19 +64,21 @@ class FigureWidget(_FigureWidget, FigureMixin):
     def __init__(self, *args, **kwargs) -> None:
         """Extends `plotly.graph_objects.FigureWidget`."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        layout = kwargs.pop('layout', {})
+        plotting_cfg = settings["plotting"]
+
+        layout = kwargs.pop("layout", {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(plotting_cfg['layout'], layout))
+        self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
         """Show the figure."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg['show_kwargs'], kwargs)
+        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
         _Figure.show(self, *args, **show_kwargs)
 
 
@@ -84,9 +88,10 @@ def make_figure(*args, **kwargs) -> tp.BaseFigure:
     Returns either `Figure` or `FigureWidget`, depending on `use_widgets`
     defined under `plotting` in `vectorbt._settings.settings`."""
     from vectorbt._settings import settings
-    plotting_cfg = settings['plotting']
 
-    if plotting_cfg['use_widgets']:
+    plotting_cfg = settings["plotting"]
+
+    if plotting_cfg["use_widgets"]:
         return FigureWidget(*args, **kwargs)
     return Figure(*args, **kwargs)
 

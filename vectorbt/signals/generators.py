@@ -15,7 +15,7 @@ from vectorbt.signals.nb import (
     rand_by_prob_choice_nb,
     stop_choice_nb,
     ohlc_stop_choice_nb,
-    rand_choice_nb
+    rand_choice_nb,
 )
 from vectorbt.utils.config import Config
 from vectorbt.utils.figure import make_figure
@@ -23,20 +23,12 @@ from vectorbt.utils.figure import make_figure
 # ############# RAND ############# #
 
 RAND = SignalFactory(
-    class_name='RAND',
-    module_name=__name__,
-    short_name='rand',
-    mode='entries',
-    param_names=['n']
+    class_name="RAND", module_name=__name__, short_name="rand", mode="entries", param_names=["n"]
 ).from_choice_func(
     entry_choice_func=rand_choice_nb,
-    entry_settings=dict(
-        pass_params=['n']
-    ),
-    param_settings=dict(
-        n=flex_col_param_config
-    ),
-    seed=None
+    entry_settings=dict(pass_params=["n"]),
+    param_settings=dict(n=flex_col_param_config),
+    seed=None,
 )
 
 
@@ -87,22 +79,14 @@ class _RAND(RAND):
         7       False   True  False   True
         ```
     """
+
     pass
 
 
-setattr(RAND, '__doc__', _RAND.__doc__)
+setattr(RAND, "__doc__", _RAND.__doc__)
 
-RANDX = SignalFactory(
-    class_name='RANDX',
-    module_name=__name__,
-    short_name='randx',
-    mode='exits'
-).from_choice_func(
-    exit_choice_func=rand_choice_nb,
-    exit_settings=dict(
-        pass_kwargs=dict(n=1)
-    ),
-    seed=None
+RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").from_choice_func(
+    exit_choice_func=rand_choice_nb, exit_settings=dict(pass_kwargs=dict(n=1)), seed=None
 )
 
 
@@ -133,27 +117,22 @@ class _RANDX(RANDX):
         dtype: bool
         ```
     """
+
     pass
 
 
-setattr(RANDX, '__doc__', _RANDX.__doc__)
+setattr(RANDX, "__doc__", _RANDX.__doc__)
 
 RANDNX = SignalFactory(
-    class_name='RANDNX',
-    module_name=__name__,
-    short_name='randnx',
-    mode='both',
-    param_names=['n']
+    class_name="RANDNX", module_name=__name__, short_name="randnx", mode="both", param_names=["n"]
 ).from_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
     require_input_shape=True,
-    param_settings=dict(
-        n=flex_col_param_config
-    ),
-    kwargs_to_args=['entry_wait', 'exit_wait'],
+    param_settings=dict(n=flex_col_param_config),
+    kwargs_to_args=["entry_wait", "exit_wait"],
     entry_wait=1,
     exit_wait=1,
-    seed=None
+    seed=None,
 )
 
 
@@ -194,30 +173,24 @@ class _RANDNX(RANDNX):
         5         False  False   True
         ```
     """
+
     pass
 
 
-setattr(RANDNX, '__doc__', _RANDNX.__doc__)
+setattr(RANDNX, "__doc__", _RANDNX.__doc__)
 
 # ############# RPROB ############# #
 
 RPROB = SignalFactory(
-    class_name='RPROB',
-    module_name=__name__,
-    short_name='rprob',
-    mode='entries',
-    param_names=['prob']
+    class_name="RPROB", module_name=__name__, short_name="rprob", mode="entries", param_names=["prob"]
 ).from_choice_func(
     entry_choice_func=rand_by_prob_choice_nb,
-    entry_settings=dict(
-        pass_params=['prob'],
-        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
-    ),
+    entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
     pass_flex_2d=True,
     param_settings=dict(
         prob=flex_elem_param_config,
     ),
-    seed=None
+    seed=None,
 )
 
 
@@ -263,43 +236,29 @@ class _RPROB(RPROB):
         Name: array_0, dtype: bool
         ```
     """
+
     pass
 
 
-setattr(RPROB, '__doc__', _RPROB.__doc__)
+setattr(RPROB, "__doc__", _RPROB.__doc__)
 
 rprobx_config = Config(
-    dict(
-        class_name='RPROBX',
-        module_name=__name__,
-        short_name='rprobx',
-        mode='exits',
-        param_names=['prob']
-    )
+    dict(class_name="RPROBX", module_name=__name__, short_name="rprobx", mode="exits", param_names=["prob"])
 )
 """Factory config for `RPROBX`."""
 
 rprobx_func_config = Config(
     dict(
         exit_choice_func=rand_by_prob_choice_nb,
-        exit_settings=dict(
-            pass_params=['prob'],
-            pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
-        ),
+        exit_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
         pass_flex_2d=True,
-        param_settings=dict(
-            prob=flex_elem_param_config
-        ),
-        seed=None
+        param_settings=dict(prob=flex_elem_param_config),
+        seed=None,
     )
 )
 """Exit function config for `RPROBX`."""
 
-RPROBX = SignalFactory(
-    **rprobx_config
-).from_choice_func(
-    **rprobx_func_config
-)
+RPROBX = SignalFactory(**rprobx_config).from_choice_func(**rprobx_func_config)
 
 
 class _RPROBX(RPROBX):
@@ -308,22 +267,15 @@ class _RPROBX(RPROBX):
     Generates `exits` based on `entries` and `vectorbt.signals.nb.rand_by_prob_choice_nb`.
 
     See `RPROB` for notes on parameters."""
+
     pass
 
 
-setattr(RPROBX, '__doc__', _RPROBX.__doc__)
+setattr(RPROBX, "__doc__", _RPROBX.__doc__)
 
 RPROBCX = SignalFactory(
-    **rprobx_config.merge_with(
-        dict(
-            class_name='RPROBCX',
-            short_name='rprobcx',
-            mode='chain'
-        )
-    )
-).from_choice_func(
-    **rprobx_func_config
-)
+    **rprobx_config.merge_with(dict(class_name="RPROBCX", short_name="rprobcx", mode="chain"))
+).from_choice_func(**rprobx_func_config)
 
 
 class _RPROBCX(RPROBCX):
@@ -333,34 +285,26 @@ class _RPROBCX(RPROBCX):
     `vectorbt.signals.nb.rand_by_prob_choice_nb`.
 
     See `RPROB` for notes on parameters."""
+
     pass
 
 
-setattr(RPROBCX, '__doc__', _RPROBCX.__doc__)
+setattr(RPROBCX, "__doc__", _RPROBCX.__doc__)
 
 RPROBNX = SignalFactory(
-    class_name='RPROBNX',
+    class_name="RPROBNX",
     module_name=__name__,
-    short_name='rprobnx',
-    mode='both',
-    param_names=['entry_prob', 'exit_prob']
+    short_name="rprobnx",
+    mode="both",
+    param_names=["entry_prob", "exit_prob"],
 ).from_choice_func(
     entry_choice_func=rand_by_prob_choice_nb,
-    entry_settings=dict(
-        pass_params=['entry_prob'],
-        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
-    ),
+    entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
     exit_choice_func=rand_by_prob_choice_nb,
-    exit_settings=dict(
-        pass_params=['exit_prob'],
-        pass_kwargs=['pick_first', 'temp_idx_arr', 'flex_2d']
-    ),
+    exit_settings=dict(pass_params=["exit_prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
     pass_flex_2d=True,
-    param_settings=dict(
-        entry_prob=flex_elem_param_config,
-        exit_prob=flex_elem_param_config
-    ),
-    seed=None
+    param_settings=dict(entry_prob=flex_elem_param_config, exit_prob=flex_elem_param_config),
+    seed=None,
 )
 
 
@@ -435,21 +379,22 @@ class _RPROBNX(RPROBNX):
         4                    False    True
         ```
     """
+
     pass
 
 
-setattr(RPROBNX, '__doc__', _RPROBNX.__doc__)
+setattr(RPROBNX, "__doc__", _RPROBNX.__doc__)
 
 # ############# ST ############# #
 
 stx_config = Config(
     dict(
-        class_name='STX',
+        class_name="STX",
         module_name=__name__,
-        short_name='stx',
-        mode='exits',
-        input_names=['ts'],
-        param_names=['stop', 'trailing']
+        short_name="stx",
+        mode="exits",
+        input_names=["ts"],
+        param_names=["stop", "trailing"],
     )
 )
 """Factory config for `STX`."""
@@ -458,25 +403,18 @@ stx_func_config = Config(
     dict(
         exit_choice_func=stop_choice_nb,
         exit_settings=dict(
-            pass_inputs=['ts'],
-            pass_params=['stop', 'trailing'],
-            pass_kwargs=['wait', 'pick_first', 'temp_idx_arr', 'flex_2d']
+            pass_inputs=["ts"],
+            pass_params=["stop", "trailing"],
+            pass_kwargs=["wait", "pick_first", "temp_idx_arr", "flex_2d"],
         ),
         pass_flex_2d=True,
-        param_settings=dict(
-            stop=flex_elem_param_config,
-            trailing=flex_elem_param_config
-        ),
-        trailing=False
+        param_settings=dict(stop=flex_elem_param_config, trailing=flex_elem_param_config),
+        trailing=False,
     )
 )
 """Exit function config for `STX`."""
 
-STX = SignalFactory(
-    **stx_config
-).from_choice_func(
-    **stx_func_config
-)
+STX = SignalFactory(**stx_config).from_choice_func(**stx_func_config)
 
 
 class _STX(STX):
@@ -487,22 +425,15 @@ class _STX(STX):
     !!! hint
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists."""
+
     pass
 
 
-setattr(STX, '__doc__', _STX.__doc__)
+setattr(STX, "__doc__", _STX.__doc__)
 
 STCX = SignalFactory(
-    **stx_config.merge_with(
-        dict(
-            class_name='STCX',
-            short_name='stcx',
-            mode='chain'
-        )
-    )
-).from_choice_func(
-    **stx_func_config
-)
+    **stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain"))
+).from_choice_func(**stx_func_config)
 
 
 class _STCX(STCX):
@@ -512,25 +443,24 @@ class _STCX(STCX):
     `vectorbt.signals.nb.stop_choice_nb`.
 
     See `STX` for notes on parameters."""
+
     pass
 
 
-setattr(STCX, '__doc__', _STCX.__doc__)
+setattr(STCX, "__doc__", _STCX.__doc__)
 
 # ############# OHLCST ############# #
 
 ohlcstx_config = Config(
     dict(
-        class_name='OHLCSTX',
+        class_name="OHLCSTX",
         module_name=__name__,
-        short_name='ohlcstx',
-        mode='exits',
-        input_names=['open', 'high', 'low', 'close'],
-        in_output_names=['stop_price', 'stop_type'],
-        param_names=['sl_stop', 'sl_trail', 'tp_stop', 'reverse'],
-        attr_settings=dict(
-            stop_type=dict(dtype=StopType)  # creates rand_type_readable
-        )
+        short_name="ohlcstx",
+        mode="exits",
+        input_names=["open", "high", "low", "close"],
+        in_output_names=["stop_price", "stop_type"],
+        param_names=["sl_stop", "sl_trail", "tp_stop", "reverse"],
+        attr_settings=dict(stop_type=dict(dtype=StopType)),  # creates rand_type_readable
     )
 )
 """Factory config for `OHLCSTX`."""
@@ -539,59 +469,51 @@ ohlcstx_func_config = Config(
     dict(
         exit_choice_func=ohlc_stop_choice_nb,
         exit_settings=dict(
-            pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
-            pass_in_outputs=['stop_price', 'stop_type'],
-            pass_params=['sl_stop', 'sl_trail', 'tp_stop', 'reverse'],
-            pass_kwargs=[('is_open_safe', True), 'wait', 'pick_first', 'temp_idx_arr', 'flex_2d'],
+            pass_inputs=["open", "high", "low", "close"],  # do not pass entries
+            pass_in_outputs=["stop_price", "stop_type"],
+            pass_params=["sl_stop", "sl_trail", "tp_stop", "reverse"],
+            pass_kwargs=[("is_open_safe", True), "wait", "pick_first", "temp_idx_arr", "flex_2d"],
         ),
         pass_flex_2d=True,
-        in_output_settings=dict(
-            stop_price=dict(
-                dtype=np.float64
-            ),
-            stop_type=dict(
-                dtype=np.int64
-            )
-        ),
+        in_output_settings=dict(stop_price=dict(dtype=np.float64), stop_type=dict(dtype=np.int64)),
         param_settings=dict(
             sl_stop=flex_elem_param_config,
             sl_trail=flex_elem_param_config,
             tp_stop=flex_elem_param_config,
-            reverse=flex_elem_param_config
+            reverse=flex_elem_param_config,
         ),
         sl_stop=np.nan,
         sl_trail=False,
         tp_stop=np.nan,
         reverse=False,
         stop_price=np.nan,
-        stop_type=-1
+        stop_type=-1,
     )
 )
 """Exit function config for `OHLCSTX`."""
 
-OHLCSTX = SignalFactory(
-    **ohlcstx_config
-).from_choice_func(
-    **ohlcstx_func_config
-)
+OHLCSTX = SignalFactory(**ohlcstx_config).from_choice_func(**ohlcstx_func_config)
 
 
 def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
 
     base_cls_plot = base_cls.plot
 
-    def plot(self,
-             plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
-             ohlc_kwargs: tp.KwargsLike = None,
-             entry_trace_kwargs: tp.KwargsLike = None,
-             exit_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             _base_cls_plot: tp.Callable = base_cls_plot,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_kwargs: tp.KwargsLike = None,
+        entry_trace_kwargs: tp.KwargsLike = None,
+        exit_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        _base_cls_plot: tp.Callable = base_cls_plot,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         from vectorbt._settings import settings
-        ohlcv_cfg = settings['ohlcv']
-        plotting_cfg = settings['plotting']
+
+        ohlcv_cfg = settings["ohlcv"]
+        plotting_cfg = settings["plotting"]
 
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
@@ -604,21 +526,18 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         if fig is None:
             fig = make_figure()
             fig.update_layout(
-                showlegend=True,
-                xaxis_rangeslider_visible=False,
-                xaxis_showgrid=True,
-                yaxis_showgrid=True
+                showlegend=True, xaxis_rangeslider_visible=False, xaxis_showgrid=True, yaxis_showgrid=True
             )
         fig.update_layout(**layout_kwargs)
 
         if plot_type is None:
-            plot_type = ohlcv_cfg['plot_type']
+            plot_type = ohlcv_cfg["plot_type"]
         if isinstance(plot_type, str):
-            if plot_type.lower() == 'ohlc':
-                plot_type = 'OHLC'
+            if plot_type.lower() == "ohlc":
+                plot_type = "OHLC"
                 plot_obj = go.Ohlc
-            elif plot_type.lower() == 'candlestick':
-                plot_type = 'Candlestick'
+            elif plot_type.lower() == "candlestick":
+                plot_type = "Candlestick"
                 plot_obj = go.Candlestick
             else:
                 raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
@@ -631,16 +550,8 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
             low=self.low,
             close=self.close,
             name=plot_type,
-            increasing=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['increasing']
-                )
-            ),
-            decreasing=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['decreasing']
-                )
-            )
+            increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
+            decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
@@ -654,7 +565,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
-            fig=fig
+            fig=fig,
         )
         return fig
 
@@ -668,9 +579,11 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         exit_trace_kwargs (dict): Keyword arguments passed to \
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
         fig (Figure or FigureWidget): Figure to add traces to.
-        **layout_kwargs: Keyword arguments for layout.""".format(base_cls.__name__, entries_attr)
+        **layout_kwargs: Keyword arguments for layout.""".format(
+        base_cls.__name__, entries_attr
+    )
 
-    if entries_attr == 'entries':
+    if entries_attr == "entries":
         plot.__doc__ += """
     Usage:
         ```pycon
@@ -759,23 +672,15 @@ class _OHLCSTX(OHLCSTX):
         ```
     """
 
-    plot = _bind_ohlcstx_plot(OHLCSTX, 'entries')
+    plot = _bind_ohlcstx_plot(OHLCSTX, "entries")
 
 
-setattr(OHLCSTX, '__doc__', _OHLCSTX.__doc__)
-setattr(OHLCSTX, 'plot', _OHLCSTX.plot)
+setattr(OHLCSTX, "__doc__", _OHLCSTX.__doc__)
+setattr(OHLCSTX, "plot", _OHLCSTX.plot)
 
 OHLCSTCX = SignalFactory(
-    **ohlcstx_config.merge_with(
-        dict(
-            class_name='OHLCSTCX',
-            short_name='ohlcstcx',
-            mode='chain'
-        )
-    )
-).from_choice_func(
-    **ohlcstx_func_config
-)
+    **ohlcstx_config.merge_with(dict(class_name="OHLCSTCX", short_name="ohlcstcx", mode="chain"))
+).from_choice_func(**ohlcstx_func_config)
 
 
 class _OHLCSTCX(OHLCSTCX):
@@ -786,8 +691,8 @@ class _OHLCSTCX(OHLCSTCX):
 
     See `OHLCSTX` for notes on parameters."""
 
-    plot = _bind_ohlcstx_plot(OHLCSTCX, 'new_entries')
+    plot = _bind_ohlcstx_plot(OHLCSTCX, "new_entries")
 
 
-setattr(OHLCSTCX, '__doc__', _OHLCSTCX.__doc__)
-setattr(OHLCSTCX, 'plot', _OHLCSTCX.plot)
+setattr(OHLCSTCX, "__doc__", _OHLCSTCX.__doc__)
+setattr(OHLCSTCX, "plot", _OHLCSTCX.plot)

@@ -1450,35 +1450,37 @@ __pdoc__ = {}
 
 returns_acc_config = Config(
     {
-        'daily_returns': dict(source_name='daily'),
-        'annual_returns': dict(source_name='annual'),
-        'cumulative_returns': dict(source_name='cumulative'),
-        'annualized_return': dict(source_name='annualized'),
-        'annualized_volatility': dict(),
-        'calmar_ratio': dict(),
-        'omega_ratio': dict(),
-        'sharpe_ratio': dict(),
-        'deflated_sharpe_ratio': dict(),
-        'downside_risk': dict(),
-        'sortino_ratio': dict(),
-        'information_ratio': dict(),
-        'beta': dict(),
-        'alpha': dict(),
-        'tail_ratio': dict(),
-        'value_at_risk': dict(),
-        'cond_value_at_risk': dict(),
-        'capture': dict(),
-        'up_capture': dict(),
-        'down_capture': dict(),
-        'drawdown': dict(),
-        'max_drawdown': dict()
+        "daily_returns": dict(source_name="daily"),
+        "annual_returns": dict(source_name="annual"),
+        "cumulative_returns": dict(source_name="cumulative"),
+        "annualized_return": dict(source_name="annualized"),
+        "annualized_volatility": dict(),
+        "calmar_ratio": dict(),
+        "omega_ratio": dict(),
+        "sharpe_ratio": dict(),
+        "deflated_sharpe_ratio": dict(),
+        "downside_risk": dict(),
+        "sortino_ratio": dict(),
+        "information_ratio": dict(),
+        "beta": dict(),
+        "alpha": dict(),
+        "tail_ratio": dict(),
+        "value_at_risk": dict(),
+        "cond_value_at_risk": dict(),
+        "capture": dict(),
+        "up_capture": dict(),
+        "down_capture": dict(),
+        "drawdown": dict(),
+        "max_drawdown": dict(),
     },
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be added to `Portfolio`.
+__pdoc__[
+    "returns_acc_config"
+] = f"""Config of returns accessor methods to be added to `Portfolio`.
 
 ```json
 {returns_acc_config.to_doc()}
@@ -1524,16 +1526,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.replace`."""
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 close: tp.ArrayLike,
-                 order_records: tp.RecordArray,
-                 log_records: tp.RecordArray,
-                 init_cash: tp.ArrayLike,
-                 cash_sharing: bool,
-                 call_seq: tp.Optional[tp.Array2d] = None,
-                 fillna_close: tp.Optional[bool] = None,
-                 trades_type: tp.Optional[tp.Union[int, str]] = None) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        close: tp.ArrayLike,
+        order_records: tp.RecordArray,
+        log_records: tp.RecordArray,
+        init_cash: tp.ArrayLike,
+        cash_sharing: bool,
+        call_seq: tp.Optional[tp.Array2d] = None,
+        fillna_close: tp.Optional[bool] = None,
+        trades_type: tp.Optional[tp.Union[int, str]] = None,
+    ) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -1544,19 +1548,20 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_sharing=cash_sharing,
             call_seq=call_seq,
             fillna_close=fillna_close,
-            trades_type=trades_type
+            trades_type=trades_type,
         )
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
 
         # Get defaults
         from vectorbt._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if fillna_close is None:
-            fillna_close = portfolio_cfg['fillna_close']
+            fillna_close = portfolio_cfg["fillna_close"]
         if trades_type is None:
-            trades_type = portfolio_cfg['trades_type']
+            trades_type = portfolio_cfg["trades_type"]
         if isinstance(trades_type, str):
             trades_type = map_enum_fields(trades_type, TradesType)
 
@@ -1572,8 +1577,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
-        new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func, column_only_select=True, **kwargs
+        )
         new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
         new_log_records = self.logs.get_by_col_idxs(col_idxs)
@@ -1592,44 +1598,46 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             order_records=new_order_records,
             log_records=new_log_records,
             init_cash=new_init_cash,
-            call_seq=new_call_seq
+            call_seq=new_call_seq,
         )
 
     # ############# Class methods ############# #
 
     @classmethod
-    def from_orders(cls: tp.Type[PortfolioT],
-                    close: tp.ArrayLike,
-                    size: tp.Optional[tp.ArrayLike] = None,
-                    size_type: tp.Optional[tp.ArrayLike] = None,
-                    direction: tp.Optional[tp.ArrayLike] = None,
-                    price: tp.Optional[tp.ArrayLike] = None,
-                    fees: tp.Optional[tp.ArrayLike] = None,
-                    fixed_fees: tp.Optional[tp.ArrayLike] = None,
-                    slippage: tp.Optional[tp.ArrayLike] = None,
-                    min_size: tp.Optional[tp.ArrayLike] = None,
-                    max_size: tp.Optional[tp.ArrayLike] = None,
-                    size_granularity: tp.Optional[tp.ArrayLike] = None,
-                    reject_prob: tp.Optional[tp.ArrayLike] = None,
-                    lock_cash: tp.Optional[tp.ArrayLike] = None,
-                    allow_partial: tp.Optional[tp.ArrayLike] = None,
-                    raise_reject: tp.Optional[tp.ArrayLike] = None,
-                    log: tp.Optional[tp.ArrayLike] = None,
-                    val_price: tp.Optional[tp.ArrayLike] = None,
-                    init_cash: tp.Optional[tp.ArrayLike] = None,
-                    cash_sharing: tp.Optional[bool] = None,
-                    call_seq: tp.Optional[tp.ArrayLike] = None,
-                    ffill_val_price: tp.Optional[bool] = None,
-                    update_value: tp.Optional[bool] = None,
-                    max_orders: tp.Optional[int] = None,
-                    max_logs: tp.Optional[int] = None,
-                    seed: tp.Optional[int] = None,
-                    group_by: tp.GroupByLike = None,
-                    broadcast_kwargs: tp.KwargsLike = None,
-                    wrapper_kwargs: tp.KwargsLike = None,
-                    freq: tp.Optional[tp.FrequencyLike] = None,
-                    attach_call_seq: tp.Optional[bool] = None,
-                    **kwargs) -> PortfolioT:
+    def from_orders(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        size: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        price: tp.Optional[tp.ArrayLike] = None,
+        fees: tp.Optional[tp.ArrayLike] = None,
+        fixed_fees: tp.Optional[tp.ArrayLike] = None,
+        slippage: tp.Optional[tp.ArrayLike] = None,
+        min_size: tp.Optional[tp.ArrayLike] = None,
+        max_size: tp.Optional[tp.ArrayLike] = None,
+        size_granularity: tp.Optional[tp.ArrayLike] = None,
+        reject_prob: tp.Optional[tp.ArrayLike] = None,
+        lock_cash: tp.Optional[tp.ArrayLike] = None,
+        allow_partial: tp.Optional[tp.ArrayLike] = None,
+        raise_reject: tp.Optional[tp.ArrayLike] = None,
+        log: tp.Optional[tp.ArrayLike] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         Args:
@@ -1865,46 +1873,47 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """
         # Get defaults
         from vectorbt._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if size_type is None:
-            size_type = portfolio_cfg['size_type']
+            size_type = portfolio_cfg["size_type"]
         size_type = map_enum_fields(size_type, SizeType)
         if direction is None:
-            direction = portfolio_cfg['order_direction']
+            direction = portfolio_cfg["order_direction"]
         direction = map_enum_fields(direction, Direction)
         if price is None:
             price = np.inf
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if fees is None:
-            fees = portfolio_cfg['fees']
+            fees = portfolio_cfg["fees"]
         if fixed_fees is None:
-            fixed_fees = portfolio_cfg['fixed_fees']
+            fixed_fees = portfolio_cfg["fixed_fees"]
         if slippage is None:
-            slippage = portfolio_cfg['slippage']
+            slippage = portfolio_cfg["slippage"]
         if min_size is None:
-            min_size = portfolio_cfg['min_size']
+            min_size = portfolio_cfg["min_size"]
         if max_size is None:
-            max_size = portfolio_cfg['max_size']
+            max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
-            size_granularity = portfolio_cfg['size_granularity']
+            size_granularity = portfolio_cfg["size_granularity"]
         if reject_prob is None:
-            reject_prob = portfolio_cfg['reject_prob']
+            reject_prob = portfolio_cfg["reject_prob"]
         if lock_cash is None:
-            lock_cash = portfolio_cfg['lock_cash']
+            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
-            allow_partial = portfolio_cfg['allow_partial']
+            allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
-            raise_reject = portfolio_cfg['raise_reject']
+            raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
-            log = portfolio_cfg['log']
+            log = portfolio_cfg["log"]
         if val_price is None:
-            val_price = portfolio_cfg['val_price']
+            val_price = portfolio_cfg["val_price"]
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -1913,11 +1922,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
+            call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
             call_seq = map_enum_fields(call_seq, CallSeqType)
@@ -1926,22 +1935,22 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = portfolio_cfg['freq']
+            freq = portfolio_cfg["freq"]
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Prepare the simulation
@@ -1963,14 +1972,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             raise_reject,
             log,
             val_price,
-            close
+            close,
         )
         keep_raw = [True] * len(broadcastable_args)
         keep_raw[-1] = False
-        broadcast_kwargs = merge_dicts(dict(
-            keep_raw=keep_raw,
-            require_kwargs=dict(requirements='W')
-        ), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(keep_raw=keep_raw, require_kwargs=dict(requirements="W")), broadcast_kwargs)
         broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs)
         close = broadcasted_args[-1]
         if not checks.is_pandas(close):
@@ -2003,7 +2009,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             update_value,
             max_orders,
             max_logs,
-            close.ndim == 2
+            close.ndim == 2,
         )
 
         # Create an instance
@@ -2015,70 +2021,72 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq=call_seq if attach_call_seq else None,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def from_signals(cls: tp.Type[PortfolioT],
-                     close: tp.ArrayLike,
-                     entries: tp.Optional[tp.ArrayLike] = None,
-                     exits: tp.Optional[tp.ArrayLike] = None,
-                     short_entries: tp.Optional[tp.ArrayLike] = None,
-                     short_exits: tp.Optional[tp.ArrayLike] = None,
-                     signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
-                     signal_args: tp.ArgsLike = (),
-                     size: tp.Optional[tp.ArrayLike] = None,
-                     size_type: tp.Optional[tp.ArrayLike] = None,
-                     price: tp.Optional[tp.ArrayLike] = None,
-                     fees: tp.Optional[tp.ArrayLike] = None,
-                     fixed_fees: tp.Optional[tp.ArrayLike] = None,
-                     slippage: tp.Optional[tp.ArrayLike] = None,
-                     min_size: tp.Optional[tp.ArrayLike] = None,
-                     max_size: tp.Optional[tp.ArrayLike] = None,
-                     size_granularity: tp.Optional[tp.ArrayLike] = None,
-                     reject_prob: tp.Optional[tp.ArrayLike] = None,
-                     lock_cash: tp.Optional[tp.ArrayLike] = None,
-                     allow_partial: tp.Optional[tp.ArrayLike] = None,
-                     raise_reject: tp.Optional[tp.ArrayLike] = None,
-                     log: tp.Optional[tp.ArrayLike] = None,
-                     accumulate: tp.Optional[tp.ArrayLike] = None,
-                     upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
-                     direction: tp.Optional[tp.ArrayLike] = None,
-                     val_price: tp.Optional[tp.ArrayLike] = None,
-                     open: tp.Optional[tp.ArrayLike] = None,
-                     high: tp.Optional[tp.ArrayLike] = None,
-                     low: tp.Optional[tp.ArrayLike] = None,
-                     sl_stop: tp.Optional[tp.ArrayLike] = None,
-                     sl_trail: tp.Optional[tp.ArrayLike] = None,
-                     tp_stop: tp.Optional[tp.ArrayLike] = None,
-                     stop_entry_price: tp.Optional[tp.ArrayLike] = None,
-                     stop_exit_price: tp.Optional[tp.ArrayLike] = None,
-                     upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
-                     upon_stop_update: tp.Optional[tp.ArrayLike] = None,
-                     adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
-                     adjust_sl_args: tp.Args = (),
-                     adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
-                     adjust_tp_args: tp.Args = (),
-                     use_stops: tp.Optional[bool] = None,
-                     init_cash: tp.Optional[tp.ArrayLike] = None,
-                     cash_sharing: tp.Optional[bool] = None,
-                     call_seq: tp.Optional[tp.ArrayLike] = None,
-                     ffill_val_price: tp.Optional[bool] = None,
-                     update_value: tp.Optional[bool] = None,
-                     max_orders: tp.Optional[int] = None,
-                     max_logs: tp.Optional[int] = None,
-                     seed: tp.Optional[int] = None,
-                     group_by: tp.GroupByLike = None,
-                     broadcast_named_args: tp.KwargsLike = None,
-                     broadcast_kwargs: tp.KwargsLike = None,
-                     template_mapping: tp.Optional[tp.Mapping] = None,
-                     wrapper_kwargs: tp.KwargsLike = None,
-                     freq: tp.Optional[tp.FrequencyLike] = None,
-                     attach_call_seq: tp.Optional[bool] = None,
-                     **kwargs) -> PortfolioT:
+    def from_signals(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        entries: tp.Optional[tp.ArrayLike] = None,
+        exits: tp.Optional[tp.ArrayLike] = None,
+        short_entries: tp.Optional[tp.ArrayLike] = None,
+        short_exits: tp.Optional[tp.ArrayLike] = None,
+        signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
+        signal_args: tp.ArgsLike = (),
+        size: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        price: tp.Optional[tp.ArrayLike] = None,
+        fees: tp.Optional[tp.ArrayLike] = None,
+        fixed_fees: tp.Optional[tp.ArrayLike] = None,
+        slippage: tp.Optional[tp.ArrayLike] = None,
+        min_size: tp.Optional[tp.ArrayLike] = None,
+        max_size: tp.Optional[tp.ArrayLike] = None,
+        size_granularity: tp.Optional[tp.ArrayLike] = None,
+        reject_prob: tp.Optional[tp.ArrayLike] = None,
+        lock_cash: tp.Optional[tp.ArrayLike] = None,
+        allow_partial: tp.Optional[tp.ArrayLike] = None,
+        raise_reject: tp.Optional[tp.ArrayLike] = None,
+        log: tp.Optional[tp.ArrayLike] = None,
+        accumulate: tp.Optional[tp.ArrayLike] = None,
+        upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
+        sl_stop: tp.Optional[tp.ArrayLike] = None,
+        sl_trail: tp.Optional[tp.ArrayLike] = None,
+        tp_stop: tp.Optional[tp.ArrayLike] = None,
+        stop_entry_price: tp.Optional[tp.ArrayLike] = None,
+        stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+        upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
+        upon_stop_update: tp.Optional[tp.ArrayLike] = None,
+        adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
+        adjust_sl_args: tp.Args = (),
+        adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
+        adjust_tp_args: tp.Args = (),
+        use_stops: tp.Optional[bool] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_mapping: tp.Optional[tp.Mapping] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
         See `vectorbt.portfolio.nb.simulate_from_signal_func_nb`.
@@ -2687,7 +2695,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """
         # Get defaults
         from vectorbt._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         ls_mode = short_entries is not None or short_exits is not None
         signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
@@ -2710,56 +2719,56 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             else:
                 signal_func_nb = nb.dir_enex_signal_func_nb
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if size_type is None:
-            size_type = portfolio_cfg['size_type']
+            size_type = portfolio_cfg["size_type"]
         size_type = map_enum_fields(size_type, SizeType)
         if price is None:
             price = np.inf
         if fees is None:
-            fees = portfolio_cfg['fees']
+            fees = portfolio_cfg["fees"]
         if fixed_fees is None:
-            fixed_fees = portfolio_cfg['fixed_fees']
+            fixed_fees = portfolio_cfg["fixed_fees"]
         if slippage is None:
-            slippage = portfolio_cfg['slippage']
+            slippage = portfolio_cfg["slippage"]
         if min_size is None:
-            min_size = portfolio_cfg['min_size']
+            min_size = portfolio_cfg["min_size"]
         if max_size is None:
-            max_size = portfolio_cfg['max_size']
+            max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
-            size_granularity = portfolio_cfg['size_granularity']
+            size_granularity = portfolio_cfg["size_granularity"]
         if reject_prob is None:
-            reject_prob = portfolio_cfg['reject_prob']
+            reject_prob = portfolio_cfg["reject_prob"]
         if lock_cash is None:
-            lock_cash = portfolio_cfg['lock_cash']
+            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
-            allow_partial = portfolio_cfg['allow_partial']
+            allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
-            raise_reject = portfolio_cfg['raise_reject']
+            raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
-            log = portfolio_cfg['log']
+            log = portfolio_cfg["log"]
         if accumulate is None:
-            accumulate = portfolio_cfg['accumulate']
+            accumulate = portfolio_cfg["accumulate"]
         accumulate = map_enum_fields(accumulate, AccumulationMode, ignore_type=(int, bool))
         if upon_long_conflict is None:
-            upon_long_conflict = portfolio_cfg['upon_long_conflict']
+            upon_long_conflict = portfolio_cfg["upon_long_conflict"]
         upon_long_conflict = map_enum_fields(upon_long_conflict, ConflictMode)
         if upon_short_conflict is None:
-            upon_short_conflict = portfolio_cfg['upon_short_conflict']
+            upon_short_conflict = portfolio_cfg["upon_short_conflict"]
         upon_short_conflict = map_enum_fields(upon_short_conflict, ConflictMode)
         if upon_dir_conflict is None:
-            upon_dir_conflict = portfolio_cfg['upon_dir_conflict']
+            upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
         upon_dir_conflict = map_enum_fields(upon_dir_conflict, DirectionConflictMode)
         if upon_opposite_entry is None:
-            upon_opposite_entry = portfolio_cfg['upon_opposite_entry']
+            upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
         upon_opposite_entry = map_enum_fields(upon_opposite_entry, OppositeEntryMode)
         if direction is not None and ls_mode:
             warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
         if direction is None:
-            direction = portfolio_cfg['signal_direction']
+            direction = portfolio_cfg["signal_direction"]
         direction = map_enum_fields(direction, Direction)
         if val_price is None:
-            val_price = portfolio_cfg['val_price']
+            val_price = portfolio_cfg["val_price"]
         if open is None:
             open = np.nan
         if high is None:
@@ -2767,38 +2776,40 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if low is None:
             low = np.nan
         if sl_stop is None:
-            sl_stop = portfolio_cfg['sl_stop']
+            sl_stop = portfolio_cfg["sl_stop"]
         if sl_trail is None:
-            sl_trail = portfolio_cfg['sl_trail']
+            sl_trail = portfolio_cfg["sl_trail"]
         if tp_stop is None:
-            tp_stop = portfolio_cfg['tp_stop']
+            tp_stop = portfolio_cfg["tp_stop"]
         if stop_entry_price is None:
-            stop_entry_price = portfolio_cfg['stop_entry_price']
+            stop_entry_price = portfolio_cfg["stop_entry_price"]
         stop_entry_price = map_enum_fields(stop_entry_price, StopEntryPrice)
         if stop_exit_price is None:
-            stop_exit_price = portfolio_cfg['stop_exit_price']
+            stop_exit_price = portfolio_cfg["stop_exit_price"]
         stop_exit_price = map_enum_fields(stop_exit_price, StopExitPrice)
         if upon_stop_exit is None:
-            upon_stop_exit = portfolio_cfg['upon_stop_exit']
+            upon_stop_exit = portfolio_cfg["upon_stop_exit"]
         upon_stop_exit = map_enum_fields(upon_stop_exit, StopExitMode)
         if upon_stop_update is None:
-            upon_stop_update = portfolio_cfg['upon_stop_update']
+            upon_stop_update = portfolio_cfg["upon_stop_update"]
         upon_stop_update = map_enum_fields(upon_stop_update, StopUpdateMode)
         if use_stops is None:
-            use_stops = portfolio_cfg['use_stops']
+            use_stops = portfolio_cfg["use_stops"]
         if use_stops is None:
-            if isinstance(sl_stop, float) and \
-                    np.isnan(sl_stop) and \
-                    isinstance(tp_stop, float) and \
-                    np.isnan(tp_stop) and \
-                    adjust_sl_func_nb == nb.no_adjust_sl_func_nb and \
-                    adjust_tp_func_nb == nb.no_adjust_tp_func_nb:
+            if (
+                isinstance(sl_stop, float)
+                and np.isnan(sl_stop)
+                and isinstance(tp_stop, float)
+                and np.isnan(tp_stop)
+                and adjust_sl_func_nb == nb.no_adjust_sl_func_nb
+                and adjust_tp_func_nb == nb.no_adjust_tp_func_nb
+            ):
                 use_stops = False
             else:
                 use_stops = True
 
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -2807,11 +2818,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
+            call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
             call_seq = map_enum_fields(call_seq, CallSeqType)
@@ -2820,17 +2831,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = portfolio_cfg['freq']
+            freq = portfolio_cfg["freq"]
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -2839,7 +2850,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             template_mapping = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Prepare the simulation
@@ -2874,33 +2885,30 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
-            upon_stop_update=upon_stop_update
+            upon_stop_update=upon_stop_update,
         )
         if not signal_func_mode:
             if ls_mode:
-                broadcastable_args['entries'] = entries
-                broadcastable_args['exits'] = exits
-                broadcastable_args['short_entries'] = short_entries
-                broadcastable_args['short_exits'] = short_exits
+                broadcastable_args["entries"] = entries
+                broadcastable_args["exits"] = exits
+                broadcastable_args["short_entries"] = short_entries
+                broadcastable_args["short_exits"] = short_exits
             else:
-                broadcastable_args['entries'] = entries
-                broadcastable_args['exits'] = exits
-                broadcastable_args['direction'] = direction
+                broadcastable_args["entries"] = entries
+                broadcastable_args["exits"] = exits
+                broadcastable_args["direction"] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        close_idx = list(broadcastable_args.keys()).index('close')
+        close_idx = list(broadcastable_args.keys()).index("close")
         keep_raw = [True] * len(broadcastable_args)
         keep_raw[close_idx] = False
-        broadcast_kwargs = merge_dicts(dict(
-            keep_raw=keep_raw,
-            require_kwargs=dict(requirements='W')
-        ), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(keep_raw=keep_raw, require_kwargs=dict(requirements="W")), broadcast_kwargs)
         broadcasted_args = broadcast(*broadcastable_args.values(), **broadcast_kwargs)
         broadcasted_args = dict(zip(broadcastable_args.keys(), broadcasted_args))
-        close = broadcasted_args['close']
+        close = broadcasted_args["close"]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        broadcasted_args['close'] = to_2d_array(close)
+        broadcasted_args["close"] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
@@ -2916,24 +2924,28 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             max_logs = target_shape_2d[0] * target_shape_2d[1]
         if not np.any(log):
             max_logs = 1
-        template_mapping = {**broadcasted_args, **dict(
-            target_shape=target_shape_2d,
-            group_lens=cs_group_lens,
-            init_cash=init_cash,
-            call_seq=call_seq,
-            adjust_sl_func_nb=adjust_sl_func_nb,
-            adjust_sl_args=adjust_sl_args,
-            adjust_tp_func_nb=adjust_tp_func_nb,
-            adjust_tp_args=adjust_tp_args,
-            use_stops=use_stops,
-            auto_call_seq=auto_call_seq,
-            ffill_val_price=ffill_val_price,
-            update_value=update_value,
-            max_orders=max_orders,
-            max_logs=max_logs,
-            flex_2d=close.ndim == 2,
-            wrapper=wrapper
-        ), **template_mapping}
+        template_mapping = {
+            **broadcasted_args,
+            **dict(
+                target_shape=target_shape_2d,
+                group_lens=cs_group_lens,
+                init_cash=init_cash,
+                call_seq=call_seq,
+                adjust_sl_func_nb=adjust_sl_func_nb,
+                adjust_sl_args=adjust_sl_args,
+                adjust_tp_func_nb=adjust_tp_func_nb,
+                adjust_tp_args=adjust_tp_args,
+                use_stops=use_stops,
+                auto_call_seq=auto_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=close.ndim == 2,
+                wrapper=wrapper,
+            ),
+            **template_mapping,
+        }
         adjust_sl_args = deep_substitute(adjust_sl_args, template_mapping)
         adjust_tp_args = deep_substitute(adjust_tp_args, template_mapping)
         if signal_func_mode:
@@ -2941,17 +2953,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             if ls_mode:
                 signal_args = (
-                    broadcasted_args['entries'],
-                    broadcasted_args['exits'],
-                    broadcasted_args['short_entries'],
-                    broadcasted_args['short_exits']
+                    broadcasted_args["entries"],
+                    broadcasted_args["exits"],
+                    broadcasted_args["short_entries"],
+                    broadcasted_args["short_exits"],
                 )
             else:
-                signal_args = (
-                    broadcasted_args['entries'],
-                    broadcasted_args['exits'],
-                    broadcasted_args['direction']
-                )
+                signal_args = (broadcasted_args["entries"], broadcasted_args["exits"], broadcasted_args["direction"])
         checks.assert_numba_func(signal_func_nb)
         checks.assert_numba_func(adjust_sl_func_nb)
         checks.assert_numba_func(adjust_tp_func_nb)
@@ -2964,37 +2972,37 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             call_seq,
             signal_func_nb=signal_func_nb,
             signal_args=signal_args,
-            size=broadcasted_args['size'],
-            price=broadcasted_args['price'],
-            size_type=broadcasted_args['size_type'],
-            fees=broadcasted_args['fees'],
-            fixed_fees=broadcasted_args['fixed_fees'],
-            slippage=broadcasted_args['slippage'],
-            min_size=broadcasted_args['min_size'],
-            max_size=broadcasted_args['max_size'],
-            size_granularity=broadcasted_args['size_granularity'],
-            reject_prob=broadcasted_args['reject_prob'],
-            lock_cash=broadcasted_args['lock_cash'],
-            allow_partial=broadcasted_args['allow_partial'],
-            raise_reject=broadcasted_args['raise_reject'],
-            log=broadcasted_args['log'],
-            accumulate=broadcasted_args['accumulate'],
-            upon_long_conflict=broadcasted_args['upon_long_conflict'],
-            upon_short_conflict=broadcasted_args['upon_short_conflict'],
-            upon_dir_conflict=broadcasted_args['upon_dir_conflict'],
-            upon_opposite_entry=broadcasted_args['upon_opposite_entry'],
-            val_price=broadcasted_args['val_price'],
-            open=broadcasted_args['open'],
-            high=broadcasted_args['high'],
-            low=broadcasted_args['low'],
-            close=broadcasted_args['close'],
-            sl_stop=broadcasted_args['sl_stop'],
-            sl_trail=broadcasted_args['sl_trail'],
-            tp_stop=broadcasted_args['tp_stop'],
-            stop_entry_price=broadcasted_args['stop_entry_price'],
-            stop_exit_price=broadcasted_args['stop_exit_price'],
-            upon_stop_exit=broadcasted_args['upon_stop_exit'],
-            upon_stop_update=broadcasted_args['upon_stop_update'],
+            size=broadcasted_args["size"],
+            price=broadcasted_args["price"],
+            size_type=broadcasted_args["size_type"],
+            fees=broadcasted_args["fees"],
+            fixed_fees=broadcasted_args["fixed_fees"],
+            slippage=broadcasted_args["slippage"],
+            min_size=broadcasted_args["min_size"],
+            max_size=broadcasted_args["max_size"],
+            size_granularity=broadcasted_args["size_granularity"],
+            reject_prob=broadcasted_args["reject_prob"],
+            lock_cash=broadcasted_args["lock_cash"],
+            allow_partial=broadcasted_args["allow_partial"],
+            raise_reject=broadcasted_args["raise_reject"],
+            log=broadcasted_args["log"],
+            accumulate=broadcasted_args["accumulate"],
+            upon_long_conflict=broadcasted_args["upon_long_conflict"],
+            upon_short_conflict=broadcasted_args["upon_short_conflict"],
+            upon_dir_conflict=broadcasted_args["upon_dir_conflict"],
+            upon_opposite_entry=broadcasted_args["upon_opposite_entry"],
+            val_price=broadcasted_args["val_price"],
+            open=broadcasted_args["open"],
+            high=broadcasted_args["high"],
+            low=broadcasted_args["low"],
+            close=broadcasted_args["close"],
+            sl_stop=broadcasted_args["sl_stop"],
+            sl_trail=broadcasted_args["sl_trail"],
+            tp_stop=broadcasted_args["tp_stop"],
+            stop_entry_price=broadcasted_args["stop_entry_price"],
+            stop_exit_price=broadcasted_args["stop_exit_price"],
+            upon_stop_exit=broadcasted_args["upon_stop_exit"],
+            upon_stop_update=broadcasted_args["upon_stop_update"],
             adjust_sl_func_nb=adjust_sl_func_nb,
             adjust_sl_args=adjust_sl_args,
             adjust_tp_func_nb=adjust_tp_func_nb,
@@ -3005,7 +3013,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             update_value=update_value,
             max_orders=max_orders,
             max_logs=max_logs,
-            flex_2d=close.ndim == 2
+            flex_2d=close.ndim == 2,
         )
 
         # Create an instance
@@ -3017,7 +3025,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq=call_seq if attach_call_seq else None,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -3035,16 +3043,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return cls.from_signals(close, entries=True, exits=False, **kwargs)
 
     @classmethod
-    def from_random_signals(cls: tp.Type[PortfolioT],
-                            close: tp.ArrayLike,
-                            n: tp.Optional[tp.ArrayLike] = None,
-                            prob: tp.Optional[tp.ArrayLike] = None,
-                            entry_prob: tp.Optional[tp.ArrayLike] = None,
-                            exit_prob: tp.Optional[tp.ArrayLike] = None,
-                            param_product: bool = False,
-                            seed: tp.Optional[int] = None,
-                            run_kwargs: tp.KwargsLike = None,
-                            **kwargs) -> PortfolioT:
+    def from_random_signals(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        n: tp.Optional[tp.ArrayLike] = None,
+        prob: tp.Optional[tp.ArrayLike] = None,
+        entry_prob: tp.Optional[tp.ArrayLike] = None,
+        exit_prob: tp.Optional[tp.ArrayLike] = None,
+        param_product: bool = False,
+        seed: tp.Optional[int] = None,
+        run_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -3097,7 +3107,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             ```
         """
         from vectorbt._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         close = to_pd_array(close)
         close_wrapper = ArrayWrapper.from_obj(close)
@@ -3106,7 +3117,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if exit_prob is None:
             exit_prob = prob
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if run_kwargs is None:
             run_kwargs = {}
 
@@ -3119,7 +3130,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,
-                **run_kwargs
+                **run_kwargs,
             )
             entries = rand.entries
             exits = rand.exits
@@ -3132,7 +3143,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,
-                **run_kwargs
+                **run_kwargs,
             )
             entries = rprobnx.entries
             exits = rprobnx.exits
@@ -3142,51 +3153,53 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return cls.from_signals(close, entries, exits, seed=seed, **kwargs)
 
     @classmethod
-    def from_order_func(cls: tp.Type[PortfolioT],
-                        close: tp.ArrayLike,
-                        order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
-                        *order_args,
-                        flexible: tp.Optional[bool] = None,
-                        init_cash: tp.Optional[tp.ArrayLike] = None,
-                        cash_sharing: tp.Optional[bool] = None,
-                        call_seq: tp.Optional[tp.ArrayLike] = None,
-                        segment_mask: tp.Optional[tp.ArrayLike] = None,
-                        call_pre_segment: tp.Optional[bool] = None,
-                        call_post_segment: tp.Optional[bool] = None,
-                        pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
-                        pre_sim_args: tp.Args = (),
-                        post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
-                        post_sim_args: tp.Args = (),
-                        pre_group_func_nb: nb.PreGroupFuncT = nb.no_pre_func_nb,
-                        pre_group_args: tp.Args = (),
-                        post_group_func_nb: nb.PostGroupFuncT = nb.no_post_func_nb,
-                        post_group_args: tp.Args = (),
-                        pre_row_func_nb: nb.PreRowFuncT = nb.no_pre_func_nb,
-                        pre_row_args: tp.Args = (),
-                        post_row_func_nb: nb.PostRowFuncT = nb.no_post_func_nb,
-                        post_row_args: tp.Args = (),
-                        pre_segment_func_nb: nb.PreSegmentFuncT = nb.no_pre_func_nb,
-                        pre_segment_args: tp.Args = (),
-                        post_segment_func_nb: nb.PostSegmentFuncT = nb.no_post_func_nb,
-                        post_segment_args: tp.Args = (),
-                        post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
-                        post_order_args: tp.Args = (),
-                        ffill_val_price: tp.Optional[bool] = None,
-                        update_value: tp.Optional[bool] = None,
-                        fill_pos_record: tp.Optional[bool] = None,
-                        row_wise: tp.Optional[bool] = None,
-                        use_numba: tp.Optional[bool] = None,
-                        max_orders: tp.Optional[int] = None,
-                        max_logs: tp.Optional[int] = None,
-                        seed: tp.Optional[int] = None,
-                        group_by: tp.GroupByLike = None,
-                        broadcast_named_args: tp.KwargsLike = None,
-                        broadcast_kwargs: tp.KwargsLike = None,
-                        template_mapping: tp.Optional[tp.Mapping] = None,
-                        wrapper_kwargs: tp.KwargsLike = None,
-                        freq: tp.Optional[tp.FrequencyLike] = None,
-                        attach_call_seq: tp.Optional[bool] = None,
-                        **kwargs) -> PortfolioT:
+    def from_order_func(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
+        *order_args,
+        flexible: tp.Optional[bool] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        segment_mask: tp.Optional[tp.ArrayLike] = None,
+        call_pre_segment: tp.Optional[bool] = None,
+        call_post_segment: tp.Optional[bool] = None,
+        pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
+        pre_sim_args: tp.Args = (),
+        post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
+        post_sim_args: tp.Args = (),
+        pre_group_func_nb: nb.PreGroupFuncT = nb.no_pre_func_nb,
+        pre_group_args: tp.Args = (),
+        post_group_func_nb: nb.PostGroupFuncT = nb.no_post_func_nb,
+        post_group_args: tp.Args = (),
+        pre_row_func_nb: nb.PreRowFuncT = nb.no_pre_func_nb,
+        pre_row_args: tp.Args = (),
+        post_row_func_nb: nb.PostRowFuncT = nb.no_post_func_nb,
+        post_row_args: tp.Args = (),
+        pre_segment_func_nb: nb.PreSegmentFuncT = nb.no_pre_func_nb,
+        pre_segment_args: tp.Args = (),
+        post_segment_func_nb: nb.PostSegmentFuncT = nb.no_post_func_nb,
+        post_segment_args: tp.Args = (),
+        post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
+        post_order_args: tp.Args = (),
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        fill_pos_record: tp.Optional[bool] = None,
+        row_wise: tp.Optional[bool] = None,
+        use_numba: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_mapping: tp.Optional[tp.Mapping] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Build portfolio from a custom order function.
 
         !!! hint
@@ -3636,13 +3649,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """
         # Get defaults
         from vectorbt._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         close = to_pd_array(close)
         if flexible is None:
-            flexible = portfolio_cfg['flexible']
+            flexible = portfolio_cfg["flexible"]
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -3651,72 +3665,72 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if not flexible:
             if call_seq is None:
-                call_seq = portfolio_cfg['call_seq']
+                call_seq = portfolio_cfg["call_seq"]
             call_seq = map_enum_fields(call_seq, CallSeqType)
             if isinstance(call_seq, int):
                 if call_seq == CallSeqType.Auto:
-                    raise ValueError("CallSeqType.Auto must be implemented manually. "
-                                     "Use sort_call_seq_nb in pre_segment_func_nb.")
+                    raise ValueError(
+                        "CallSeqType.Auto must be implemented manually. " "Use sort_call_seq_nb in pre_segment_func_nb."
+                    )
         if segment_mask is None:
             segment_mask = True
         if call_pre_segment is None:
-            call_pre_segment = portfolio_cfg['call_pre_segment']
+            call_pre_segment = portfolio_cfg["call_pre_segment"]
         if call_post_segment is None:
-            call_post_segment = portfolio_cfg['call_post_segment']
+            call_post_segment = portfolio_cfg["call_post_segment"]
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if fill_pos_record is None:
-            fill_pos_record = portfolio_cfg['fill_pos_record']
+            fill_pos_record = portfolio_cfg["fill_pos_record"]
         if row_wise is None:
-            row_wise = portfolio_cfg['row_wise']
+            row_wise = portfolio_cfg["row_wise"]
         if use_numba is None:
-            use_numba = portfolio_cfg['use_numba']
+            use_numba = portfolio_cfg["use_numba"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = portfolio_cfg['freq']
+            freq = portfolio_cfg["freq"]
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        require_kwargs = dict(require_kwargs=dict(requirements='W'))
+        require_kwargs = dict(require_kwargs=dict(requirements="W"))
         broadcast_kwargs = merge_dicts(require_kwargs, broadcast_kwargs)
         if template_mapping is None:
             template_mapping = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Prepare the simulation
         broadcastable_args = {**dict(close=close), **broadcast_named_args}
         if len(broadcastable_args) > 1:
-            close_idx = list(broadcastable_args.keys()).index('close')
+            close_idx = list(broadcastable_args.keys()).index("close")
             keep_raw = [True] * len(broadcastable_args)
             keep_raw[close_idx] = False
-            broadcast_kwargs = merge_dicts(dict(
-                keep_raw=keep_raw,
-                require_kwargs=dict(requirements='W')
-            ), broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(
+                dict(keep_raw=keep_raw, require_kwargs=dict(requirements="W")), broadcast_kwargs
+            )
             broadcasted_args = broadcast(*broadcastable_args.values(), **broadcast_kwargs)
             broadcasted_args = dict(zip(broadcastable_args.keys(), broadcasted_args))
-            close = broadcasted_args['close']
+            close = broadcasted_args["close"]
             if not checks.is_pandas(close):
                 close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         else:
             broadcasted_args = broadcastable_args
-        broadcasted_args['close'] = to_2d_array(close)
+        broadcasted_args["close"] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
@@ -3728,10 +3742,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             segment_mask = _segment_mask
         else:
             segment_mask = broadcast(
-                segment_mask,
-                to_shape=(target_shape_2d[0], len(group_lens)),
-                to_pd=False,
-                **require_kwargs
+                segment_mask, to_shape=(target_shape_2d[0], len(group_lens)), to_pd=False, **require_kwargs
             )
         if not flexible:
             if checks.is_any_array(call_seq):
@@ -3742,42 +3753,46 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             max_orders = target_shape_2d[0] * target_shape_2d[1]
         if max_logs is None:
             max_logs = target_shape_2d[0] * target_shape_2d[1]
-        template_mapping = {**broadcasted_args, **dict(
-            target_shape=target_shape_2d,
-            group_lens=group_lens,
-            init_cash=init_cash,
-            cash_sharing=cash_sharing,
-            segment_mask=segment_mask,
-            call_pre_segment=call_pre_segment,
-            call_post_segment=call_post_segment,
-            pre_sim_func_nb=pre_sim_func_nb,
-            pre_sim_args=pre_sim_args,
-            post_sim_func_nb=post_sim_func_nb,
-            post_sim_args=post_sim_args,
-            pre_group_func_nb=pre_group_func_nb,
-            pre_group_args=pre_group_args,
-            post_group_func_nb=post_group_func_nb,
-            post_group_args=post_group_args,
-            pre_row_func_nb=pre_row_func_nb,
-            pre_row_args=pre_row_args,
-            post_row_func_nb=post_row_func_nb,
-            post_row_args=post_row_args,
-            pre_segment_func_nb=pre_segment_func_nb,
-            pre_segment_args=pre_segment_args,
-            post_segment_func_nb=post_segment_func_nb,
-            post_segment_args=post_segment_args,
-            flex_order_func_nb=order_func_nb,
-            flex_order_args=order_args,
-            post_order_func_nb=post_order_func_nb,
-            post_order_args=post_order_args,
-            ffill_val_price=ffill_val_price,
-            update_value=update_value,
-            fill_pos_record=fill_pos_record,
-            max_orders=max_orders,
-            max_logs=max_logs,
-            flex_2d=close.ndim == 2,
-            wrapper=wrapper
-        ), **template_mapping}
+        template_mapping = {
+            **broadcasted_args,
+            **dict(
+                target_shape=target_shape_2d,
+                group_lens=group_lens,
+                init_cash=init_cash,
+                cash_sharing=cash_sharing,
+                segment_mask=segment_mask,
+                call_pre_segment=call_pre_segment,
+                call_post_segment=call_post_segment,
+                pre_sim_func_nb=pre_sim_func_nb,
+                pre_sim_args=pre_sim_args,
+                post_sim_func_nb=post_sim_func_nb,
+                post_sim_args=post_sim_args,
+                pre_group_func_nb=pre_group_func_nb,
+                pre_group_args=pre_group_args,
+                post_group_func_nb=post_group_func_nb,
+                post_group_args=post_group_args,
+                pre_row_func_nb=pre_row_func_nb,
+                pre_row_args=pre_row_args,
+                post_row_func_nb=post_row_func_nb,
+                post_row_args=post_row_args,
+                pre_segment_func_nb=pre_segment_func_nb,
+                pre_segment_args=pre_segment_args,
+                post_segment_func_nb=post_segment_func_nb,
+                post_segment_args=post_segment_args,
+                flex_order_func_nb=order_func_nb,
+                flex_order_args=order_args,
+                post_order_func_nb=post_order_func_nb,
+                post_order_args=post_order_args,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                fill_pos_record=fill_pos_record,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=close.ndim == 2,
+                wrapper=wrapper,
+            ),
+            **template_mapping,
+        }
         pre_sim_args = deep_substitute(pre_sim_args, template_mapping)
         post_sim_args = deep_substitute(post_sim_args, template_mapping)
         pre_group_args = deep_substitute(pre_group_args, template_mapping)
@@ -3804,7 +3819,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if row_wise:
             if flexible:
                 simulate_func = nb.flex_simulate_row_wise_nb
-                if not use_numba and hasattr(simulate_func, 'py_func'):
+                if not use_numba and hasattr(simulate_func, "py_func"):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
@@ -3830,17 +3845,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    close=broadcasted_args['close'],
+                    close=broadcasted_args["close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
                     max_logs=max_logs,
-                    flex_2d=close.ndim == 2
+                    flex_2d=close.ndim == 2,
                 )
             else:
                 simulate_func = nb.simulate_row_wise_nb
-                if not use_numba and hasattr(simulate_func, 'py_func'):
+                if not use_numba and hasattr(simulate_func, "py_func"):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
@@ -3867,18 +3882,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    close=broadcasted_args['close'],
+                    close=broadcasted_args["close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
                     max_logs=max_logs,
-                    flex_2d=close.ndim == 2
+                    flex_2d=close.ndim == 2,
                 )
         else:
             if flexible:
                 simulate_func = nb.flex_simulate_nb
-                if not use_numba and hasattr(simulate_func, 'py_func'):
+                if not use_numba and hasattr(simulate_func, "py_func"):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
@@ -3904,17 +3919,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    close=broadcasted_args['close'],
+                    close=broadcasted_args["close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
                     max_logs=max_logs,
-                    flex_2d=close.ndim == 2
+                    flex_2d=close.ndim == 2,
                 )
             else:
                 simulate_func = nb.simulate_nb
-                if not use_numba and hasattr(simulate_func, 'py_func'):
+                if not use_numba and hasattr(simulate_func, "py_func"):
                     simulate_func = simulate_func.py_func
                 order_records, log_records = simulate_func(
                     target_shape=target_shape_2d,
@@ -3941,13 +3956,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    close=broadcasted_args['close'],
+                    close=broadcasted_args["close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
                     max_orders=max_orders,
                     max_logs=max_logs,
-                    flex_2d=close.ndim == 2
+                    flex_2d=close.ndim == 2,
                 )
 
         # Create an instance
@@ -3959,7 +3974,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq=call_seq if not flexible and attach_call_seq else None,
-            **kwargs
+            **kwargs,
         )
 
     # ############# Properties ############# #
@@ -3969,10 +3984,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Array wrapper."""
         if self.cash_sharing:
             # Allow only disabling grouping when needed (but not globally, see regroup)
-            return self._wrapper.replace(
-                allow_enable=False,
-                allow_modify=False
-            )
+            return self._wrapper.replace(allow_enable=False, allow_modify=False)
         return self._wrapper
 
     def regroup(self: PortfolioT, group_by: tp.GroupByLike, **kwargs) -> PortfolioT:
@@ -4114,8 +4126,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.get_drawdowns()
 
     @cached_method
-    def get_drawdowns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None,
-                      wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> Drawdowns:
         """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
@@ -4126,36 +4143,34 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     # ############# Assets ############# #
 
     @cached_method
-    def asset_flow(self, direction: str = 'both', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def asset_flow(self, direction: str = "both", wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
         direction = map_enum_fields(direction, Direction)
         asset_flow = nb.asset_flow_nb(
-            self.wrapper.shape_2d,
-            self.orders.values,
-            self.orders.col_mapper.col_map,
-            direction
+            self.wrapper.shape_2d, self.orders.values, self.orders.col_mapper.col_map, direction
         )
         return self.wrapper.wrap(asset_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def assets(self, direction: str = 'both', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def assets(self, direction: str = "both", wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset series per column.
 
         Returns the current position at each time step."""
         direction = map_enum_fields(direction, Direction)
-        asset_flow = to_2d_array(self.asset_flow(direction='both'))
+        asset_flow = to_2d_array(self.asset_flow(direction="both"))
         assets = nb.assets_nb(asset_flow)
         if direction == Direction.LongOnly:
-            assets = np.where(assets > 0, assets, 0.)
+            assets = np.where(assets > 0, assets, 0.0)
         if direction == Direction.ShortOnly:
-            assets = np.where(assets < 0, -assets, 0.)
+            assets = np.where(assets < 0, -assets, 0.0)
         return self.wrapper.wrap(assets, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def position_mask(self, direction: str = 'both', group_by: tp.GroupByLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def position_mask(
+        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get position mask per column/group.
 
         An element is True if the asset is in the market at this tick."""
@@ -4170,8 +4185,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(position_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def position_coverage(self, direction: str = 'both', group_by: tp.GroupByLike = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def position_coverage(
+        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
         direction = map_enum_fields(direction, Direction)
         assets = to_2d_array(self.assets(direction=direction))
@@ -4181,14 +4197,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             position_coverage = nb.position_coverage_grouped_nb(position_mask, group_lens)
         else:
             position_coverage = np.mean(assets != 0, axis=0)
-        wrap_kwargs = merge_dicts(dict(name_or_index='position_coverage'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="position_coverage"), wrap_kwargs)
         return self.wrapper.wrap_reduced(position_coverage, group_by=group_by, **wrap_kwargs)
 
     # ############# Cash ############# #
 
     @cached_method
-    def cash_flow(self, group_by: tp.GroupByLike = None, free: bool = False,
-                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def cash_flow(
+        self, group_by: tp.GroupByLike = None, free: bool = False, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
         Use `free` to return the flow of the free cash, which never goes above the initial level,
@@ -4198,12 +4215,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             cash_flow = nb.cash_flow_grouped_nb(cash_flow, group_lens)
         else:
-            cash_flow = nb.cash_flow_nb(
-                self.wrapper.shape_2d,
-                self.orders.values,
-                self.orders.col_mapper.col_map,
-                free
-            )
+            cash_flow = nb.cash_flow_nb(self.wrapper.shape_2d, self.orders.values, self.orders.col_mapper.col_map, free)
         return self.wrapper.wrap(cash_flow, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_property
@@ -4212,8 +4224,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.get_init_cash()
 
     @cached_method
-    def get_init_cash(self, group_by: tp.GroupByLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_cash(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Initial amount of cash per column/group with default arguments.
 
         !!! note
@@ -4223,7 +4234,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if isinstance(self._init_cash, int):
             cash_flow = to_2d_array(self.cash_flow(group_by=group_by))
             cash_min = np.min(np.cumsum(cash_flow, axis=0), axis=0)
-            init_cash = np.where(cash_min < 0, np.abs(cash_min), 1.)
+            init_cash = np.where(cash_min < 0, np.abs(cash_min), 1.0)
             if self._init_cash == InitCashMode.AutoAlign:
                 init_cash = np.full(init_cash.shape, np.max(init_cash))
         else:
@@ -4234,12 +4245,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             else:
                 group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = nb.init_cash_nb(init_cash, group_lens, self.cash_sharing)
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_cash'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_cash"), wrap_kwargs)
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, free: bool = False,
-             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def cash(
+        self,
+        group_by: tp.GroupByLike = None,
+        in_sim_order: bool = False,
+        free: bool = False,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get cash balance series per column/group.
 
         See the explanation on `in_sim_order` in `Portfolio.value`.
@@ -4251,18 +4267,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
-            cash = nb.cash_grouped_nb(
-                self.wrapper.shape_2d,
-                cash_flow,
-                group_lens,
-                init_cash
-            )
+            cash = nb.cash_grouped_nb(self.wrapper.shape_2d, cash_flow, group_lens, init_cash)
         else:
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
                 if self.call_seq is None:
-                    raise ValueError("No call sequence attached. "
-                                     "Pass `attach_call_seq=True` to the class method "
-                                     "(flexible simulations are not supported)")
+                    raise ValueError(
+                        "No call sequence attached. "
+                        "Pass `attach_call_seq=True` to the class method "
+                        "(flexible simulations are not supported)"
+                    )
                 group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = to_1d_array(self.init_cash)
                 call_seq = to_2d_array(self.call_seq)
@@ -4275,8 +4288,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     # ############# Performance ############# #
 
     @cached_method
-    def asset_value(self, direction: str = 'both', group_by: tp.GroupByLike = None,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def asset_value(
+        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
         direction = map_enum_fields(direction, Direction)
         if self.fillna_close:
@@ -4284,7 +4298,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             close = to_2d_array(self.close).copy()
         assets = to_2d_array(self.assets(direction=direction))
-        close[assets == 0] = 0.  # for price being NaN
+        close[assets == 0] = 0.0  # for price being NaN
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             asset_value = to_2d_array(self.asset_value(direction=direction, group_by=False))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -4294,8 +4308,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(asset_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def gross_exposure(self, direction: str = 'both', group_by: tp.GroupByLike = None,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def gross_exposure(
+        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get gross exposure.
 
         Gross exposure is the sum of absolute position values divided by portfolio value.
@@ -4314,17 +4329,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def net_exposure(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def net_exposure(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get net exposure."""
-        long_exposure = to_2d_array(self.gross_exposure(direction='longonly', group_by=group_by))
-        short_exposure = to_2d_array(self.gross_exposure(direction='shortonly', group_by=group_by))
+        long_exposure = to_2d_array(self.gross_exposure(direction="longonly", group_by=group_by))
+        short_exposure = to_2d_array(self.gross_exposure(direction="shortonly", group_by=group_by))
         net_exposure = long_exposure - short_exposure
         return self.wrapper.wrap(net_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def value(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False,
-              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def value(
+        self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get portfolio value series per column/group.
 
         By default, will generate portfolio value for each asset based on cash flows and thus
@@ -4339,9 +4354,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         asset_value = to_2d_array(self.asset_value(group_by=group_by))
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             if self.call_seq is None:
-                raise ValueError("No call sequence attached. "
-                                 "Pass `attach_call_seq=True` to the class method "
-                                 "(flexible simulations are not supported)")
+                raise ValueError(
+                    "No call sequence attached. "
+                    "Pass `attach_call_seq=True` to the class method "
+                    "(flexible simulations are not supported)"
+                )
             group_lens = self.wrapper.grouper.get_group_lens()
             call_seq = to_2d_array(self.call_seq)
             value = nb.value_in_sim_order_nb(cash, asset_value, group_lens, call_seq)
@@ -4351,62 +4368,56 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def total_profit(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total_profit(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group.
 
         Calculated directly from order records (fast)."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             total_profit = to_1d_array(self.total_profit(group_by=False))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            total_profit = nb.total_profit_grouped_nb(
-                total_profit,
-                group_lens
-            )
+            total_profit = nb.total_profit_grouped_nb(total_profit, group_lens)
         else:
             if self.fillna_close:
                 close = to_2d_array(self.get_filled_close())
             else:
                 close = to_2d_array(self.close)
             total_profit = nb.total_profit_nb(
-                self.wrapper.shape_2d,
-                close,
-                self.orders.values,
-                self.orders.col_mapper.col_map
+                self.wrapper.shape_2d, close, self.orders.values, self.orders.col_mapper.col_map
             )
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_profit'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_profit"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def final_value(self, group_by: tp.GroupByLike = None,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def final_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
         final_value = nb.final_value_nb(total_profit, init_cash)
-        wrap_kwargs = merge_dicts(dict(name_or_index='final_value'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="final_value"), wrap_kwargs)
         return self.wrapper.wrap_reduced(final_value, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def total_return(self, group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total_return(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
         total_return = nb.total_return_nb(total_profit, init_cash)
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_return, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def returns(self, group_by: tp.GroupByLike = None, in_sim_order=False,
-                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def returns(
+        self, group_by: tp.GroupByLike = None, in_sim_order=False, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """Get return series per column/group based on portfolio value."""
         value = to_2d_array(self.value(group_by=group_by, in_sim_order=in_sim_order))
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             if self.call_seq is None:
-                raise ValueError("No call sequence attached. "
-                                 "Pass `attach_call_seq=True` to the class method "
-                                 "(flexible simulations are not supported)")
+                raise ValueError(
+                    "No call sequence attached. "
+                    "Pass `attach_call_seq=True` to the class method "
+                    "(flexible simulations are not supported)"
+                )
             group_lens = self.wrapper.grouper.get_group_lens()
             init_cash_grouped = to_1d_array(self.init_cash)
             call_seq = to_2d_array(self.call_seq)
@@ -4417,8 +4428,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def asset_returns(self, group_by: tp.GroupByLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def asset_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset return series per column/group.
 
         This type of returns is based solely on cash flows and asset value rather than portfolio
@@ -4436,14 +4446,16 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.get_returns_acc()
 
     @cached_method
-    def get_returns_acc(self,
-                        group_by: tp.GroupByLike = None,
-                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-                        freq: tp.Optional[tp.FrequencyLike] = None,
-                        year_freq: tp.Optional[tp.FrequencyLike] = None,
-                        use_asset_returns: bool = False,
-                        defaults: tp.KwargsLike = None,
-                        **kwargs) -> ReturnsAccessor:
+    def get_returns_acc(
+        self,
+        group_by: tp.GroupByLike = None,
+        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        defaults: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbt.returns.accessors.ReturnsAccessor`.
 
         !!! hint
@@ -4457,11 +4469,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_returns(group_by=group_by)
         return returns.vbt.returns(
-            benchmark_rets=benchmark_rets,
-            freq=freq,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs
+            benchmark_rets=benchmark_rets, freq=freq, year_freq=year_freq, defaults=defaults, **kwargs
         )
 
     @cached_property
@@ -4470,13 +4478,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.get_qs()
 
     @cached_method
-    def get_qs(self,
-               group_by: tp.GroupByLike = None,
-               benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-               freq: tp.Optional[tp.FrequencyLike] = None,
-               year_freq: tp.Optional[tp.FrequencyLike] = None,
-               use_asset_returns: bool = False,
-               **kwargs) -> QSAdapterT:
+    def get_qs(
+        self,
+        group_by: tp.GroupByLike = None,
+        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        **kwargs,
+    ) -> QSAdapterT:
         """Get quantstats adapter of type `vectorbt.returns.qs_adapter.QSAdapter`.
 
         `**kwargs` are passed to the adapter constructor."""
@@ -4487,13 +4497,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             benchmark_rets=benchmark_rets,
             freq=freq,
             year_freq=year_freq,
-            use_asset_returns=use_asset_returns
+            use_asset_returns=use_asset_returns,
         )
         return QSAdapter(returns_acc, **kwargs)
 
     @cached_method
-    def benchmark_value(self, group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def benchmark_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get market benchmark value series per column/group.
 
         If grouped, evenly distributes the initial cash among assets in the group.
@@ -4514,8 +4523,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return self.wrapper.wrap(benchmark_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def benchmark_returns(self, group_by: tp.GroupByLike = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def benchmark_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get return series per column/group based on benchmark value."""
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
@@ -4525,12 +4533,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     benchmark_rets = benchmark_returns
 
     @cached_method
-    def total_benchmark_return(self, group_by: tp.GroupByLike = None,
-                               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total_benchmark_return(
+        self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.MaybeSeries:
         """Get total benchmark return."""
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
         total_benchmark_return = nb.total_benchmark_return_nb(benchmark_value)
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_benchmark_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_benchmark_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_benchmark_return, group_by=group_by, **wrap_kwargs)
 
     # ############# Resolution ############# #
@@ -4538,7 +4547,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     @property
     def self_aliases(self) -> tp.Set[str]:
         """Names to associate with this object."""
-        return {'self', 'portfolio', 'pf'}
+        return {"self", "portfolio", "pf"}
 
     def pre_resolve_attr(self, attr: str, final_kwargs: tp.KwargsLike = None) -> str:
         """Pre-process an attribute before resolution.
@@ -4547,20 +4556,20 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         * `use_asset_returns`: Whether to use `Portfolio.asset_returns` when resolving `returns` argument.
         * `trades_type`: Which trade type to use when resolving `trades` argument."""
-        if 'use_asset_returns' in final_kwargs:
-            if attr == 'returns' and final_kwargs['use_asset_returns']:
-                attr = 'asset_returns'
-        if 'trades_type' in final_kwargs:
-            trades_type = final_kwargs['trades_type']
-            if isinstance(final_kwargs['trades_type'], str):
+        if "use_asset_returns" in final_kwargs:
+            if attr == "returns" and final_kwargs["use_asset_returns"]:
+                attr = "asset_returns"
+        if "trades_type" in final_kwargs:
+            trades_type = final_kwargs["trades_type"]
+            if isinstance(final_kwargs["trades_type"], str):
                 trades_type = map_enum_fields(trades_type, TradesType)
-            if attr == 'trades' and trades_type != self.trades_type:
+            if attr == "trades" and trades_type != self.trades_type:
                 if trades_type == TradesType.EntryTrades:
-                    attr = 'entry_trades'
+                    attr = "entry_trades"
                 elif trades_type == TradesType.ExitTrades:
-                    attr = 'exit_trades'
+                    attr = "exit_trades"
                 else:
-                    attr = 'positions'
+                    attr = "positions"
         return attr
 
     def post_resolve_attr(self, attr: str, out: tp.Any, final_kwargs: tp.KwargsLike = None) -> str:
@@ -4570,8 +4579,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         * `incl_open`: Whether to include open trades/positions when resolving an argument
             that is an instance of `vectorbt.portfolio.trades.Trades`."""
-        if 'incl_open' in final_kwargs:
-            if isinstance(out, Trades) and not final_kwargs['incl_open']:
+        if "incl_open" in final_kwargs:
+            if isinstance(out, Trades) and not final_kwargs["incl_open"]:
                 out = out.closed
         return out
 
@@ -4584,205 +4593,176 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `portfolio.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        returns_cfg = settings['returns']
-        portfolio_stats_cfg = settings['portfolio']['stats']
+
+        returns_cfg = settings["returns"]
+        portfolio_stats_cfg = settings["portfolio"]["stats"]
 
         return merge_dicts(
             StatsBuilderMixin.stats_defaults.__get__(self),
-            dict(
-                settings=dict(
-                    year_freq=returns_cfg['year_freq'],
-                    trades_type=self.trades_type
-                )
-            ),
-            portfolio_stats_cfg
+            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            portfolio_stats_cfg,
         )
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            start_value=dict(
-                title='Start Value',
-                calc_func='get_init_cash',
-                tags='portfolio'
-            ),
-            end_value=dict(
-                title='End Value',
-                calc_func='final_value',
-                tags='portfolio'
-            ),
+            start_value=dict(title="Start Value", calc_func="get_init_cash", tags="portfolio"),
+            end_value=dict(title="End Value", calc_func="final_value", tags="portfolio"),
             total_return=dict(
-                title='Total Return [%]',
-                calc_func='total_return',
+                title="Total Return [%]",
+                calc_func="total_return",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='portfolio'
+                tags="portfolio",
             ),
             benchmark_return=dict(
-                title='Benchmark Return [%]',
-                calc_func='benchmark_rets.vbt.returns.total',
+                title="Benchmark Return [%]",
+                calc_func="benchmark_rets.vbt.returns.total",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='portfolio'
+                tags="portfolio",
             ),
             max_gross_exposure=dict(
-                title='Max Gross Exposure [%]',
-                calc_func='gross_exposure.vbt.max',
+                title="Max Gross Exposure [%]",
+                calc_func="gross_exposure.vbt.max",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='portfolio'
+                tags="portfolio",
             ),
-            total_fees_paid=dict(
-                title='Total Fees Paid',
-                calc_func='orders.fees.sum',
-                tags=['portfolio', 'orders']
-            ),
+            total_fees_paid=dict(title="Total Fees Paid", calc_func="orders.fees.sum", tags=["portfolio", "orders"]),
             max_dd=dict(
-                title='Max Drawdown [%]',
-                calc_func='drawdowns.max_drawdown',
+                title="Max Drawdown [%]",
+                calc_func="drawdowns.max_drawdown",
                 post_calc_func=lambda self, out, settings: -out * 100,
-                tags=['portfolio', 'drawdowns']
+                tags=["portfolio", "drawdowns"],
             ),
             max_dd_duration=dict(
-                title='Max Drawdown Duration',
-                calc_func='drawdowns.max_duration',
+                title="Max Drawdown Duration",
+                calc_func="drawdowns.max_duration",
                 fill_wrap_kwargs=True,
-                tags=['portfolio', 'drawdowns', 'duration']
+                tags=["portfolio", "drawdowns", "duration"],
             ),
             total_trades=dict(
-                title='Total Trades',
-                calc_func='trades.count',
-                incl_open=True,
-                tags=['portfolio', 'trades']
+                title="Total Trades", calc_func="trades.count", incl_open=True, tags=["portfolio", "trades"]
             ),
             total_closed_trades=dict(
-                title='Total Closed Trades',
-                calc_func='trades.closed.count',
-                tags=['portfolio', 'trades', 'closed']
+                title="Total Closed Trades", calc_func="trades.closed.count", tags=["portfolio", "trades", "closed"]
             ),
             total_open_trades=dict(
-                title='Total Open Trades',
-                calc_func='trades.open.count',
+                title="Total Open Trades",
+                calc_func="trades.open.count",
                 incl_open=True,
-                tags=['portfolio', 'trades', 'open']
+                tags=["portfolio", "trades", "open"],
             ),
             open_trade_pnl=dict(
-                title='Open Trade PnL',
-                calc_func='trades.open.pnl.sum',
+                title="Open Trade PnL",
+                calc_func="trades.open.pnl.sum",
                 incl_open=True,
-                tags=['portfolio', 'trades', 'open']
+                tags=["portfolio", "trades", "open"],
             ),
             win_rate=dict(
-                title='Win Rate [%]',
-                calc_func='trades.win_rate',
+                title="Win Rate [%]",
+                calc_func="trades.win_rate",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             best_trade=dict(
-                title='Best Trade [%]',
-                calc_func='trades.returns.max',
+                title="Best Trade [%]",
+                calc_func="trades.returns.max",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             worst_trade=dict(
-                title='Worst Trade [%]',
-                calc_func='trades.returns.min',
+                title="Worst Trade [%]",
+                calc_func="trades.returns.min",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             avg_winning_trade=dict(
-                title='Avg Winning Trade [%]',
-                calc_func='trades.winning.returns.mean',
+                title="Avg Winning Trade [%]",
+                calc_func="trades.winning.returns.mean",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning']"),
             ),
             avg_losing_trade=dict(
-                title='Avg Losing Trade [%]',
-                calc_func='trades.losing.returns.mean',
+                title="Avg Losing Trade [%]",
+                calc_func="trades.losing.returns.mean",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing']"),
             ),
             avg_winning_trade_duration=dict(
-                title='Avg Winning Trade Duration',
-                calc_func='trades.winning.duration.mean',
+                title="Avg Winning Trade Duration",
+                calc_func="trades.winning.duration.mean",
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning', 'duration']"),
             ),
             avg_losing_trade_duration=dict(
-                title='Avg Losing Trade Duration',
-                calc_func='trades.losing.duration.mean',
+                title="Avg Losing Trade Duration",
+                calc_func="trades.losing.duration.mean",
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing', 'duration']"),
             ),
             profit_factor=dict(
-                title='Profit Factor',
-                calc_func='trades.profit_factor',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                title="Profit Factor",
+                calc_func="trades.profit_factor",
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             expectancy=dict(
-                title='Expectancy',
-                calc_func='trades.expectancy',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                title="Expectancy",
+                calc_func="trades.expectancy",
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             sharpe_ratio=dict(
-                title='Sharpe Ratio',
-                calc_func='returns_acc.sharpe_ratio',
+                title="Sharpe Ratio",
+                calc_func="returns_acc.sharpe_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             calmar_ratio=dict(
-                title='Calmar Ratio',
-                calc_func='returns_acc.calmar_ratio',
+                title="Calmar Ratio",
+                calc_func="returns_acc.calmar_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             omega_ratio=dict(
-                title='Omega Ratio',
-                calc_func='returns_acc.omega_ratio',
+                title="Omega Ratio",
+                calc_func="returns_acc.omega_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             sortino_ratio=dict(
-                title='Sortino Ratio',
-                calc_func='returns_acc.sortino_ratio',
+                title="Sortino Ratio",
+                calc_func="returns_acc.sortino_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
-            )
+                tags=["portfolio", "returns"],
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
     def metrics(self) -> Config:
         return self._metrics
 
-    def returns_stats(self,
-                      group_by: tp.GroupByLike = None,
-                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-                      freq: tp.Optional[tp.FrequencyLike] = None,
-                      year_freq: tp.Optional[tp.FrequencyLike] = None,
-                      use_asset_returns: bool = False,
-                      defaults: tp.KwargsLike = None,
-                      **kwargs) -> tp.SeriesFrame:
+    def returns_stats(
+        self,
+        group_by: tp.GroupByLike = None,
+        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        defaults: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
 
         See `Portfolio.returns_acc` and `vectorbt.returns.accessors.ReturnsAccessor.metrics`.
@@ -4795,20 +4775,20 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
-            defaults=defaults
+            defaults=defaults,
         )
-        return getattr(returns_acc, 'stats')(**kwargs)
+        return getattr(returns_acc, "stats")(**kwargs)
 
     # ############# Plotting ############# #
 
     def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of orders."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.orders.regroup(False).plot(column=column, **kwargs)
 
     def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trades."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.trades.regroup(False).plot(column=column, **kwargs)
 
     def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
@@ -4817,20 +4797,22 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of positions."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.positions.regroup(False).plot(column=column, **kwargs)
 
     def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of position PnL."""
         return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
 
-    def plot_asset_flow(self,
-                        column: tp.Optional[tp.Label] = None,
-                        direction: str = 'both',
-                        xref: str = 'x',
-                        yref: str = 'y',
-                        hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_asset_flow(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        direction: str = "both",
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of asset flow.
 
         Args:
@@ -4842,43 +4824,46 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['brown']
-                ),
-                name='Assets'
-            )
-        ), kwargs)
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets")), kwargs
+        )
         asset_flow = self.asset_flow(direction=direction)
         asset_flow = self.select_one_from_obj(asset_flow, self.wrapper.regroup(False), column=column)
         fig = asset_flow.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cash_flow(self,
-                       column: tp.Optional[tp.Label] = None,
-                       group_by: tp.GroupByLike = None,
-                       free: bool = False,
-                       xref: str = 'x',
-                       yref: str = 'y',
-                       hline_shape_kwargs: tp.KwargsLike = None,
-                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cash_flow(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        free: bool = False,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash flow.
 
         Args:
@@ -4891,42 +4876,45 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['green']
-                ),
-                name='Cash'
-            )
-        ), kwargs)
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash")), kwargs
+        )
         cash_flow = self.cash_flow(group_by=group_by, free=free)
         cash_flow = self.select_one_from_obj(cash_flow, self.wrapper.regroup(group_by), column=column)
         fig = cash_flow.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_assets(self,
-                    column: tp.Optional[tp.Label] = None,
-                    direction: str = 'both',
-                    xref: str = 'x',
-                    yref: str = 'y',
-                    hline_shape_kwargs: tp.KwargsLike = None,
-                    **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_assets(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        direction: str = "both",
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of assets.
 
         Args:
@@ -4938,50 +4926,52 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['brown']
-                ),
-                name='Assets'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["brown"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['brown'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         assets = self.assets(direction=direction)
         assets = self.select_one_from_obj(assets, self.wrapper.regroup(False), column=column)
         fig = assets.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cash(self,
-                  column: tp.Optional[tp.Label] = None,
-                  group_by: tp.GroupByLike = None,
-                  free: bool = False,
-                  xref: str = 'x',
-                  yref: str = 'y',
-                  hline_shape_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cash(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        free: bool = False,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash balance.
 
         Args:
@@ -4994,52 +4984,54 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['green']
-                ),
-                name='Cash'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["green"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['green'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         init_cash = self.get_init_cash(group_by=group_by)
         init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
         cash = self.cash(group_by=group_by, free=free)
         cash = self.select_one_from_obj(cash, self.wrapper.regroup(group_by), column=column)
         fig = cash.vbt.plot_against(init_cash, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=init_cash,
-            x1=x_domain[1],
-            y1=init_cash
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=init_cash,
+                    x1=x_domain[1],
+                    y1=init_cash,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_asset_value(self,
-                         column: tp.Optional[tp.Label] = None,
-                         group_by: tp.GroupByLike = None,
-                         direction: str = 'both',
-                         xref: str = 'x',
-                         yref: str = 'y',
-                         hline_shape_kwargs: tp.KwargsLike = None,
-                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_asset_value(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        direction: str = "both",
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of asset value.
 
         Args:
@@ -5052,49 +5044,51 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['cyan']
-                ),
-                name='Asset Value'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["cyan"]), name="Asset Value"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['cyan'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         asset_value = self.asset_value(direction=direction, group_by=group_by)
         asset_value = self.select_one_from_obj(asset_value, self.wrapper.regroup(group_by), column=column)
         fig = asset_value.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_value(self,
-                   column: tp.Optional[tp.Label] = None,
-                   group_by: tp.GroupByLike = None,
-                   xref: str = 'x',
-                   yref: str = 'y',
-                   hline_shape_kwargs: tp.KwargsLike = None,
-                   **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_value(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of value.
 
         Args:
@@ -5107,44 +5101,50 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['purple']
-                ),
-                name='Value'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value"),
+                other_trace_kwargs="hidden",
             ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         init_cash = self.get_init_cash(group_by=group_by)
         init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
         value = self.value(group_by=group_by)
         value = self.select_one_from_obj(value, self.wrapper.regroup(group_by), column=column)
         fig = value.vbt.plot_against(init_cash, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=init_cash,
-            x1=x_domain[1],
-            y1=init_cash
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=init_cash,
+                    x1=x_domain[1],
+                    y1=init_cash,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cum_returns(self,
-                         column: tp.Optional[tp.Label] = None,
-                         group_by: tp.GroupByLike = None,
-                         benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-                         use_asset_returns: bool = False,
-                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cum_returns(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+        use_asset_returns: bool = False,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cumulative returns.
 
         Args:
@@ -5157,31 +5157,30 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.returns.accessors.ReturnsSRAccessor.plot_cumulative`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_returns(group_by=group_by)
         else:
             benchmark_rets = broadcast_to(benchmark_rets, self.obj)
         benchmark_rets = self.select_one_from_obj(benchmark_rets, self.wrapper.regroup(group_by), column=column)
-        kwargs = merge_dicts(dict(
-            benchmark_rets=benchmark_rets,
-            main_kwargs=dict(
-                trace_kwargs=dict(
+        kwargs = merge_dicts(
+            dict(
+                benchmark_rets=benchmark_rets,
+                main_kwargs=dict(
+                    trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")
+                ),
+                hline_shape_kwargs=dict(
+                    type="line",
                     line=dict(
-                        color=plotting_cfg['color_schema']['purple']
+                        color="gray",
+                        dash="dash",
                     ),
-                    name='Value'
-                )
+                ),
             ),
-            hline_shape_kwargs=dict(
-                type='line',
-                line=dict(
-                    color='gray',
-                    dash="dash",
-                )
-            )
-        ), kwargs)
+            kwargs,
+        )
         if use_asset_returns:
             returns = self.asset_returns(group_by=group_by)
         else:
@@ -5189,10 +5188,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         returns = self.select_one_from_obj(returns, self.wrapper.regroup(group_by), column=column)
         return returns.vbt.returns.plot_cumulative(**kwargs)
 
-    def plot_drawdowns(self,
-                       column: tp.Optional[tp.Label] = None,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_drawdowns(
+        self, column: tp.Optional[tp.Label] = None, group_by: tp.GroupByLike = None, **kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of drawdowns.
 
         Args:
@@ -5201,25 +5199,23 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.drawdowns.Drawdowns.plot`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            ts_trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['purple']
-                ),
-                name='Value'
-            )
-        ), kwargs)
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(ts_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")), kwargs
+        )
         return self.get_drawdowns(group_by=group_by).plot(column=column, **kwargs)
 
-    def plot_underwater(self,
-                        column: tp.Optional[tp.Label] = None,
-                        group_by: tp.GroupByLike = None,
-                        xref: str = 'x',
-                        yref: str = 'y',
-                        hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_underwater(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of underwater.
 
         Args:
@@ -5231,47 +5227,56 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['red']
-                ),
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3),
-                fill='tozeroy',
-                name='Drawdown'
-            )
-        ), kwargs)
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(
+                    line=dict(color=plotting_cfg["color_schema"]["red"]),
+                    fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3),
+                    fill="tozeroy",
+                    name="Drawdown",
+                )
+            ),
+            kwargs,
+        )
         drawdown = self.drawdown(group_by=group_by)
         drawdown = self.select_one_from_obj(drawdown, self.wrapper.regroup(group_by), column=column)
         fig = drawdown.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
-        yaxis = 'yaxis' + yref[1:]
-        fig.layout[yaxis]['tickformat'] = '%'
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        yaxis = "yaxis" + yref[1:]
+        fig.layout[yaxis]["tickformat"] = "%"
         return fig
 
-    def plot_gross_exposure(self,
-                            column: tp.Optional[tp.Label] = None,
-                            group_by: tp.GroupByLike = None,
-                            direction: str = 'both',
-                            xref: str = 'x',
-                            yref: str = 'y',
-                            hline_shape_kwargs: tp.KwargsLike = None,
-                            **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_gross_exposure(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        direction: str = "both",
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of gross exposure.
 
         Args:
@@ -5284,49 +5289,51 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['pink']
-                ),
-                name='Exposure'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["pink"]), name="Exposure"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         gross_exposure = self.gross_exposure(direction=direction, group_by=group_by)
         gross_exposure = self.select_one_from_obj(gross_exposure, self.wrapper.regroup(group_by), column=column)
         fig = gross_exposure.vbt.plot_against(1, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=1,
-            x1=x_domain[1],
-            y1=1
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=1,
+                    x1=x_domain[1],
+                    y1=1,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_net_exposure(self,
-                          column: tp.Optional[tp.Label] = None,
-                          group_by: tp.GroupByLike = None,
-                          xref: str = 'x',
-                          yref: str = 'y',
-                          hline_shape_kwargs: tp.KwargsLike = None,
-                          **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_net_exposure(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of net exposure.
 
         Args:
@@ -5338,40 +5345,40 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['pink']
-                ),
-                name='Exposure'
+        plotting_cfg = settings["plotting"]
+
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["pink"]), name="Exposure"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         net_exposure = self.net_exposure(group_by=group_by)
         net_exposure = self.select_one_from_obj(net_exposure, self.wrapper.regroup(group_by), column=column)
         fig = net_exposure.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
     @property
@@ -5381,18 +5388,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `portfolio.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        returns_cfg = settings['returns']
-        portfolio_plots_cfg = settings['portfolio']['plots']
+
+        returns_cfg = settings["returns"]
+        portfolio_plots_cfg = settings["portfolio"]["plots"]
 
         return merge_dicts(
             PlotsBuilderMixin.plots_defaults.__get__(self),
-            dict(
-                settings=dict(
-                    year_freq=returns_cfg['year_freq'],
-                    trades_type=self.trades_type
-                )
-            ),
-            portfolio_plots_cfg
+            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            portfolio_plots_cfg,
         )
 
     _subplots: tp.ClassVar[Config] = Config(
@@ -5401,109 +5404,109 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 title="Orders",
                 yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
-                plot_func='orders.plot',
-                tags=['portfolio', 'orders']
+                plot_func="orders.plot",
+                tags=["portfolio", "orders"],
             ),
             trades=dict(
                 title="Trades",
                 yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
-                plot_func='trades.plot',
-                tags=['portfolio', 'trades']
+                plot_func="trades.plot",
+                tags=["portfolio", "trades"],
             ),
             trade_pnl=dict(
                 title="Trade PnL",
                 yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
-                plot_func='trades.plot_pnl',
-                tags=['portfolio', 'trades']
+                plot_func="trades.plot_pnl",
+                tags=["portfolio", "trades"],
             ),
             asset_flow=dict(
                 title="Asset Flow",
                 yaxis_kwargs=dict(title="Asset flow"),
                 check_is_not_grouped=True,
-                plot_func='plot_asset_flow',
+                plot_func="plot_asset_flow",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets']
+                tags=["portfolio", "assets"],
             ),
             cash_flow=dict(
                 title="Cash Flow",
                 yaxis_kwargs=dict(title="Cash flow"),
-                plot_func='plot_cash_flow',
+                plot_func="plot_cash_flow",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'cash']
+                tags=["portfolio", "cash"],
             ),
             assets=dict(
                 title="Assets",
                 yaxis_kwargs=dict(title="Assets"),
                 check_is_not_grouped=True,
-                plot_func='plot_assets',
+                plot_func="plot_assets",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets']
+                tags=["portfolio", "assets"],
             ),
             cash=dict(
                 title="Cash",
                 yaxis_kwargs=dict(title="Cash"),
-                plot_func='plot_cash',
+                plot_func="plot_cash",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'cash']
+                tags=["portfolio", "cash"],
             ),
             asset_value=dict(
                 title="Asset Value",
                 yaxis_kwargs=dict(title="Asset value"),
-                plot_func='plot_asset_value',
+                plot_func="plot_asset_value",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets', 'value']
+                tags=["portfolio", "assets", "value"],
             ),
             value=dict(
                 title="Value",
                 yaxis_kwargs=dict(title="Value"),
-                plot_func='plot_value',
+                plot_func="plot_value",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'value']
+                tags=["portfolio", "value"],
             ),
             cum_returns=dict(
                 title="Cumulative Returns",
                 yaxis_kwargs=dict(title="Cumulative returns"),
-                plot_func='plot_cum_returns',
+                plot_func="plot_cum_returns",
                 pass_hline_shape_kwargs=True,
                 pass_add_trace_kwargs=True,
                 pass_xref=True,
                 pass_yref=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             drawdowns=dict(
                 title="Drawdowns",
                 yaxis_kwargs=dict(title="Value"),
-                plot_func='plot_drawdowns',
+                plot_func="plot_drawdowns",
                 pass_add_trace_kwargs=True,
                 pass_xref=True,
                 pass_yref=True,
-                tags=['portfolio', 'value', 'drawdowns']
+                tags=["portfolio", "value", "drawdowns"],
             ),
             underwater=dict(
                 title="Underwater",
                 yaxis_kwargs=dict(title="Drawdown"),
-                plot_func='plot_underwater',
+                plot_func="plot_underwater",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'value', 'drawdowns']
+                tags=["portfolio", "value", "drawdowns"],
             ),
             gross_exposure=dict(
                 title="Gross Exposure",
                 yaxis_kwargs=dict(title="Gross exposure"),
-                plot_func='plot_gross_exposure',
+                plot_func="plot_gross_exposure",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'exposure']
+                tags=["portfolio", "exposure"],
             ),
             net_exposure=dict(
                 title="Net Exposure",
                 yaxis_kwargs=dict(title="Net exposure"),
-                plot_func='plot_net_exposure',
+                plot_func="plot_net_exposure",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'exposure']
-            )
+                tags=["portfolio", "exposure"],
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     plot = PlotsBuilderMixin.plots
@@ -5516,4 +5519,4 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
 
-__pdoc__['Portfolio.plot'] = "See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`."
+__pdoc__["Portfolio.plot"] = "See `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots`."

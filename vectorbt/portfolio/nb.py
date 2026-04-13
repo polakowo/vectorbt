@@ -56,12 +56,7 @@ from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio.enums import *
 from vectorbt.returns import nb as returns_nb
 from vectorbt.utils.array_ import insert_argsort_nb
-from vectorbt.utils.math_ import (
-    is_close_nb,
-    is_close_or_less_nb,
-    is_less_nb,
-    add_nb
-)
+from vectorbt.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, add_nb
 
 
 # ############# Order processing ############# #
@@ -74,19 +69,21 @@ def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
 
 
 @njit(cache=True)
-def buy_nb(exec_state: ExecuteOrderState,
-           size: float,
-           price: float,
-           direction: int = Direction.Both,
-           fees: float = 0.,
-           fixed_fees: float = 0.,
-           slippage: float = 0.,
-           min_size: float = 0.,
-           max_size: float = np.inf,
-           size_granularity: float = np.nan,
-           lock_cash: bool = False,
-           allow_partial: bool = True,
-           percent: float = np.nan) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def buy_nb(
+    exec_state: ExecuteOrderState,
+    size: float,
+    price: float,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    percent: float = np.nan,
+) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Buy or/and cover."""
 
     # Get price adjusted with slippage
@@ -107,7 +104,7 @@ def buy_nb(exec_state: ExecuteOrderState,
             elif cover_free_cash < 0:
                 # Not enough cash to close out the short position
                 avg_entry_price = exec_state.debt / abs(exec_state.position)
-                max_short_size = ((exec_state.free_cash - fixed_fees) / (adj_price * (1 + fees) - 2 * avg_entry_price))
+                max_short_size = (exec_state.free_cash - fixed_fees) / (adj_price * (1 + fees) - 2 * avg_entry_price)
                 cash_limit = max_short_size * adj_price * (1 + fees) + fixed_fees
             else:
                 # Exact amount of cash to close out the short position
@@ -209,37 +206,27 @@ def buy_nb(exec_state: ExecuteOrderState,
         new_free_cash = add_nb(exec_state.free_cash, -final_req_cash)
 
     # Return filled order
-    order_result = OrderResult(
-        final_size,
-        adj_price,
-        fees_paid,
-        OrderSide.Buy,
-        OrderStatus.Filled,
-        -1
-    )
-    new_exec_state = ExecuteOrderState(
-        cash=new_cash,
-        position=new_position,
-        debt=new_debt,
-        free_cash=new_free_cash
-    )
+    order_result = OrderResult(final_size, adj_price, fees_paid, OrderSide.Buy, OrderStatus.Filled, -1)
+    new_exec_state = ExecuteOrderState(cash=new_cash, position=new_position, debt=new_debt, free_cash=new_free_cash)
     return new_exec_state, order_result
 
 
 @njit(cache=True)
-def sell_nb(exec_state: ExecuteOrderState,
-            size: float,
-            price: float,
-            direction: int = Direction.Both,
-            fees: float = 0.,
-            fixed_fees: float = 0.,
-            slippage: float = 0.,
-            min_size: float = 0.,
-            max_size: float = np.inf,
-            size_granularity: float = np.nan,
-            lock_cash: bool = False,
-            allow_partial: bool = True,
-            percent: float = np.nan) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def sell_nb(
+    exec_state: ExecuteOrderState,
+    size: float,
+    price: float,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    percent: float = np.nan,
+) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Sell or/and short sell."""
 
     # Get price adjusted with slippage
@@ -347,20 +334,8 @@ def sell_nb(exec_state: ExecuteOrderState,
         new_free_cash = exec_state.free_cash + final_acq_cash
 
     # Return filled order
-    order_result = OrderResult(
-        size_limit,
-        adj_price,
-        fees_paid,
-        OrderSide.Sell,
-        OrderStatus.Filled,
-        -1
-    )
-    new_exec_state = ExecuteOrderState(
-        cash=new_cash,
-        position=new_position,
-        debt=new_debt,
-        free_cash=new_free_cash
-    )
+    order_result = OrderResult(size_limit, adj_price, fees_paid, OrderSide.Sell, OrderStatus.Filled, -1)
+    new_exec_state = ExecuteOrderState(cash=new_cash, position=new_position, debt=new_debt, free_cash=new_free_cash)
     return new_exec_state, order_result
 
 
@@ -379,30 +354,25 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
     # numerical stability
     cash = state.cash
     if is_close_nb(cash, 0):
-        cash = 0.
+        cash = 0.0
     position = state.position
     if is_close_nb(position, 0):
-        position = 0.
+        position = 0.0
     debt = state.debt
     if is_close_nb(debt, 0):
-        debt = 0.
+        debt = 0.0
     free_cash = state.free_cash
     if is_close_nb(free_cash, 0):
-        free_cash = 0.
+        free_cash = 0.0
     val_price = state.val_price
     if is_close_nb(val_price, 0):
-        val_price = 0.
+        val_price = 0.0
     value = state.value
     if is_close_nb(value, 0):
-        value = 0.
+        value = 0.0
 
     # Pre-fill execution state for convenience
-    exec_state = ExecuteOrderState(
-        cash=cash,
-        position=position,
-        debt=debt,
-        free_cash=free_cash
-    )
+    exec_state = ExecuteOrderState(cash=cash, position=position, debt=debt, free_cash=free_cash)
 
     # Ignore order
     if np.isnan(order.size):
@@ -485,7 +455,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         if order.direction == Direction.ShortOnly or order.direction == Direction.Both:
             if order_size < 0 and np.isinf(order_size):
                 # Infinite negative size has a special meaning: 100% to short
-                order_size = -1.
+                order_size = -1.0
                 order_size_type = SizeType.Percent
 
     percent = np.nan
@@ -509,7 +479,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
             size_granularity=order.size_granularity,
             lock_cash=order.lock_cash,
             allow_partial=order.allow_partial,
-            percent=percent
+            percent=percent,
         )
     else:
         new_exec_state, order_result = sell_nb(
@@ -525,7 +495,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
             size_granularity=order.size_granularity,
             lock_cash=order.lock_cash,
             allow_partial=order.allow_partial,
-            percent=percent
+            percent=percent,
         )
 
     if order.reject_prob > 0:
@@ -536,83 +506,81 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
 
 
 @njit(cache=True)
-def fill_log_record_nb(record: tp.Record,
-                       record_id: int,
-                       i: int,
-                       col: int,
-                       group: int,
-                       cash: float,
-                       position: float,
-                       debt: float,
-                       free_cash: float,
-                       val_price: float,
-                       value: float,
-                       order: Order,
-                       new_cash: float,
-                       new_position: float,
-                       new_debt: float,
-                       new_free_cash: float,
-                       new_val_price: float,
-                       new_value: float,
-                       order_result: OrderResult,
-                       order_id: int) -> None:
+def fill_log_record_nb(
+    record: tp.Record,
+    record_id: int,
+    i: int,
+    col: int,
+    group: int,
+    cash: float,
+    position: float,
+    debt: float,
+    free_cash: float,
+    val_price: float,
+    value: float,
+    order: Order,
+    new_cash: float,
+    new_position: float,
+    new_debt: float,
+    new_free_cash: float,
+    new_val_price: float,
+    new_value: float,
+    order_result: OrderResult,
+    order_id: int,
+) -> None:
     """Fill a log record."""
 
-    record['id'] = record_id
-    record['group'] = group
-    record['col'] = col
-    record['idx'] = i
-    record['cash'] = cash
-    record['position'] = position
-    record['debt'] = debt
-    record['free_cash'] = free_cash
-    record['val_price'] = val_price
-    record['value'] = value
-    record['req_size'] = order.size
-    record['req_price'] = order.price
-    record['req_size_type'] = order.size_type
-    record['req_direction'] = order.direction
-    record['req_fees'] = order.fees
-    record['req_fixed_fees'] = order.fixed_fees
-    record['req_slippage'] = order.slippage
-    record['req_min_size'] = order.min_size
-    record['req_max_size'] = order.max_size
-    record['req_size_granularity'] = order.size_granularity
-    record['req_reject_prob'] = order.reject_prob
-    record['req_lock_cash'] = order.lock_cash
-    record['req_allow_partial'] = order.allow_partial
-    record['req_raise_reject'] = order.raise_reject
-    record['req_log'] = order.log
-    record['new_cash'] = new_cash
-    record['new_position'] = new_position
-    record['new_debt'] = new_debt
-    record['new_free_cash'] = new_free_cash
-    record['new_val_price'] = new_val_price
-    record['new_value'] = new_value
-    record['res_size'] = order_result.size
-    record['res_price'] = order_result.price
-    record['res_fees'] = order_result.fees
-    record['res_side'] = order_result.side
-    record['res_status'] = order_result.status
-    record['res_status_info'] = order_result.status_info
-    record['order_id'] = order_id
+    record["id"] = record_id
+    record["group"] = group
+    record["col"] = col
+    record["idx"] = i
+    record["cash"] = cash
+    record["position"] = position
+    record["debt"] = debt
+    record["free_cash"] = free_cash
+    record["val_price"] = val_price
+    record["value"] = value
+    record["req_size"] = order.size
+    record["req_price"] = order.price
+    record["req_size_type"] = order.size_type
+    record["req_direction"] = order.direction
+    record["req_fees"] = order.fees
+    record["req_fixed_fees"] = order.fixed_fees
+    record["req_slippage"] = order.slippage
+    record["req_min_size"] = order.min_size
+    record["req_max_size"] = order.max_size
+    record["req_size_granularity"] = order.size_granularity
+    record["req_reject_prob"] = order.reject_prob
+    record["req_lock_cash"] = order.lock_cash
+    record["req_allow_partial"] = order.allow_partial
+    record["req_raise_reject"] = order.raise_reject
+    record["req_log"] = order.log
+    record["new_cash"] = new_cash
+    record["new_position"] = new_position
+    record["new_debt"] = new_debt
+    record["new_free_cash"] = new_free_cash
+    record["new_val_price"] = new_val_price
+    record["new_value"] = new_value
+    record["res_size"] = order_result.size
+    record["res_price"] = order_result.price
+    record["res_fees"] = order_result.fees
+    record["res_side"] = order_result.side
+    record["res_status"] = order_result.status
+    record["res_status_info"] = order_result.status_info
+    record["order_id"] = order_id
 
 
 @njit(cache=True)
-def fill_order_record_nb(record: tp.Record,
-                         record_id: int,
-                         i: int,
-                         col: int,
-                         order_result: OrderResult) -> None:
+def fill_order_record_nb(record: tp.Record, record_id: int, i: int, col: int, order_result: OrderResult) -> None:
     """Fill an order record."""
 
-    record['id'] = record_id
-    record['col'] = col
-    record['idx'] = i
-    record['size'] = order_result.size
-    record['price'] = order_result.price
-    record['fees'] = order_result.fees
-    record['side'] = order_result.side
+    record["id"] = record_id
+    record["col"] = col
+    record["idx"] = i
+    record["size"] = order_result.size
+    record["price"] = order_result.price
+    record["fees"] = order_result.fees
+    record["side"] = order_result.side
 
 
 @njit(cache=True)
@@ -651,38 +619,42 @@ def raise_rejected_order_nb(order_result: OrderResult) -> None:
 
 
 @njit(cache=True)
-def update_value_nb(cash_before: float,
-                    cash_now: float,
-                    position_before: float,
-                    position_now: float,
-                    val_price_before: float,
-                    price: float,
-                    value_before: float) -> tp.Tuple[float, float]:
+def update_value_nb(
+    cash_before: float,
+    cash_now: float,
+    position_before: float,
+    position_now: float,
+    val_price_before: float,
+    price: float,
+    value_before: float,
+) -> tp.Tuple[float, float]:
     """Update valuation price and value."""
     val_price_now = price
     cash_flow = cash_now - cash_before
     if position_before != 0:
         asset_value_before = position_before * val_price_before
     else:
-        asset_value_before = 0.
+        asset_value_before = 0.0
     if position_now != 0:
         asset_value_now = position_now * val_price_now
     else:
-        asset_value_now = 0.
+        asset_value_now = 0.0
     asset_value_diff = asset_value_now - asset_value_before
     value_now = value_before + cash_flow + asset_value_diff
     return val_price_now, value_now
 
 
 @njit(cache=True)
-def process_order_nb(i: int,
-                     col: int,
-                     group: int,
-                     state: ProcessOrderState,
-                     update_value: bool,
-                     order: Order,
-                     order_records: tp.RecordArray,
-                     log_records: tp.RecordArray) -> tp.Tuple[OrderResult, ProcessOrderState]:
+def process_order_nb(
+    i: int,
+    col: int,
+    group: int,
+    state: ProcessOrderState,
+    update_value: bool,
+    order: Order,
+    order_records: tp.RecordArray,
+    log_records: tp.RecordArray,
+) -> tp.Tuple[OrderResult, ProcessOrderState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
@@ -703,7 +675,7 @@ def process_order_nb(i: int,
             exec_state.position,
             state.val_price,
             order_result.price,
-            state.value
+            state.value,
         )
     else:
         new_val_price = state.val_price
@@ -714,13 +686,7 @@ def process_order_nb(i: int,
         # Fill order record
         if state.oidx > len(order_records) - 1:
             raise IndexError("order_records index out of range. Set a higher max_orders.")
-        fill_order_record_nb(
-            order_records[state.oidx],
-            state.oidx,
-            i,
-            col,
-            order_result
-        )
+        fill_order_record_nb(order_records[state.oidx], state.oidx, i, col, order_result)
         new_oidx += 1
 
     new_lidx = state.lidx
@@ -748,7 +714,7 @@ def process_order_nb(i: int,
             new_val_price,
             new_value,
             order_result,
-            state.oidx if is_filled else -1
+            state.oidx if is_filled else -1,
         )
         new_lidx += 1
 
@@ -761,28 +727,30 @@ def process_order_nb(i: int,
         val_price=new_val_price,
         value=new_value,
         oidx=new_oidx,
-        lidx=new_lidx
+        lidx=new_lidx,
     )
 
     return order_result, new_state
 
 
 @njit(cache=True)
-def order_nb(size: float = np.nan,
-             price: float = np.inf,
-             size_type: int = SizeType.Amount,
-             direction: int = Direction.Both,
-             fees: float = 0.,
-             fixed_fees: float = 0.,
-             slippage: float = 0.,
-             min_size: float = 0.,
-             max_size: float = np.inf,
-             size_granularity: float = np.nan,
-             reject_prob: float = 0.,
-             lock_cash: bool = False,
-             allow_partial: bool = True,
-             raise_reject: bool = False,
-             log: bool = False) -> Order:
+def order_nb(
+    size: float = np.nan,
+    price: float = np.inf,
+    size_type: int = SizeType.Amount,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    reject_prob: float = 0.0,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    raise_reject: bool = False,
+    log: bool = False,
+) -> Order:
     """Create an order.
 
     See `vectorbt.portfolio.enums.Order` for details on arguments."""
@@ -802,27 +770,29 @@ def order_nb(size: float = np.nan,
         lock_cash=bool(lock_cash),
         allow_partial=bool(allow_partial),
         raise_reject=bool(raise_reject),
-        log=bool(log)
+        log=bool(log),
     )
 
 
 @njit(cache=True)
-def close_position_nb(price: float = np.inf,
-                      fees: float = 0.,
-                      fixed_fees: float = 0.,
-                      slippage: float = 0.,
-                      min_size: float = 0.,
-                      max_size: float = np.inf,
-                      size_granularity: float = np.nan,
-                      reject_prob: float = 0.,
-                      lock_cash: bool = False,
-                      allow_partial: bool = True,
-                      raise_reject: bool = False,
-                      log: bool = False) -> Order:
+def close_position_nb(
+    price: float = np.inf,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    reject_prob: float = 0.0,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    raise_reject: bool = False,
+    log: bool = False,
+) -> Order:
     """Close the current position."""
 
     return order_nb(
-        size=0.,
+        size=0.0,
         price=price,
         size_type=SizeType.TargetAmount,
         direction=Direction.Both,
@@ -836,7 +806,7 @@ def close_position_nb(price: float = np.inf,
         lock_cash=lock_cash,
         allow_partial=allow_partial,
         raise_reject=raise_reject,
-        log=log
+        log=log,
     )
 
 
@@ -888,9 +858,9 @@ def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.Array1d) -> None:
 
 
 @njit(cache=True)
-def build_call_seq_nb(target_shape: tp.Shape,
-                      group_lens: tp.Array1d,
-                      call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
+def build_call_seq_nb(
+    target_shape: tp.Shape, group_lens: tp.Array1d, call_seq_type: int = CallSeqType.Default
+) -> tp.Array2d:
     """Build a new call sequence array."""
     if call_seq_type == CallSeqType.Reversed:
         out = np.full(target_shape[1], 1, dtype=np.int64)
@@ -909,12 +879,12 @@ def build_call_seq_nb(target_shape: tp.Shape,
 
 def require_call_seq(call_seq: tp.Array2d) -> tp.Array2d:
     """Force the call sequence array to pass our requirements."""
-    return np.require(call_seq, dtype=np.int64, requirements=['A', 'O', 'W', 'F'])
+    return np.require(call_seq, dtype=np.int64, requirements=["A", "O", "W", "F"])
 
 
-def build_call_seq(target_shape: tp.Shape,
-                   group_lens: tp.Array1d,
-                   call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
+def build_call_seq(
+    target_shape: tp.Shape, group_lens: tp.Array1d, call_seq_type: int = CallSeqType.Default
+) -> tp.Array2d:
     """Not compiled but faster version of `build_call_seq_nb`."""
     call_seq = np.full(target_shape[1], 1, dtype=np.int64)
     if call_seq_type == CallSeqType.Reversed:
@@ -932,26 +902,25 @@ def build_call_seq(target_shape: tp.Shape,
 
 # ############# Helper functions ############# #
 
+
 @njit(cache=True)
-def get_col_elem_nb(ctx: tp.Union[RowContext, SegmentContext, FlexOrderContext], col: int,
-                    a: tp.ArrayLike) -> tp.Scalar:
+def get_col_elem_nb(
+    ctx: tp.Union[RowContext, SegmentContext, FlexOrderContext], col: int, a: tp.ArrayLike
+) -> tp.Scalar:
     """Get the current element using flexible indexing given the context and the column."""
     return flex_select_auto_nb(a, ctx.i, col, ctx.flex_2d)
 
 
 @njit(cache=True)
-def get_elem_nb(ctx: tp.Union[OrderContext, PostOrderContext, SignalContext],
-                a: tp.ArrayLike) -> tp.Scalar:
+def get_elem_nb(ctx: tp.Union[OrderContext, PostOrderContext, SignalContext], a: tp.ArrayLike) -> tp.Scalar:
     """Get the current element using flexible indexing given just the context."""
     return flex_select_auto_nb(a, ctx.i, ctx.col, ctx.flex_2d)
 
 
 @njit(cache=True)
-def get_group_value_nb(from_col: int,
-                       to_col: int,
-                       cash_now: float,
-                       last_position: tp.Array1d,
-                       last_val_price: tp.Array1d) -> float:
+def get_group_value_nb(
+    from_col: int, to_col: int, cash_now: float, last_position: tp.Array1d, last_val_price: tp.Array1d
+) -> float:
     """Get group value."""
     group_value = cash_now
     group_len = to_col - from_col
@@ -980,19 +949,21 @@ def get_group_value_ctx_nb(seg_ctx: SegmentContext) -> float:
         seg_ctx.to_col,
         seg_ctx.last_cash[seg_ctx.group],
         seg_ctx.last_position,
-        seg_ctx.last_val_price
+        seg_ctx.last_val_price,
     )
 
 
 @njit(cache=True)
-def approx_order_value_nb(size: float,
-                          size_type: int,
-                          direction: int,
-                          cash_now: float,
-                          position_now: float,
-                          free_cash_now: float,
-                          val_price_now: float,
-                          value_now: float) -> float:
+def approx_order_value_nb(
+    size: float,
+    size_type: int,
+    direction: int,
+    cash_now: float,
+    position_now: float,
+    free_cash_now: float,
+    val_price_now: float,
+    value_now: float,
+) -> float:
     """Approximate value of an order."""
     if direction == Direction.ShortOnly:
         size *= -1
@@ -1018,13 +989,15 @@ def approx_order_value_nb(size: float,
 
 
 @njit(cache=True)
-def sort_call_seq_out_nb(ctx: SegmentContext,
-                         size: tp.ArrayLike,
-                         size_type: tp.ArrayLike,
-                         direction: tp.ArrayLike,
-                         order_value_out: tp.Array1d,
-                         call_seq_out: tp.Array1d,
-                         ctx_select: bool = True) -> None:
+def sort_call_seq_out_nb(
+    ctx: SegmentContext,
+    size: tp.ArrayLike,
+    size_type: tp.ArrayLike,
+    direction: tp.ArrayLike,
+    order_value_out: tp.Array1d,
+    call_seq_out: tp.Array1d,
+    ctx_select: bool = True,
+) -> None:
     """Sort call sequence `call_seq_out` based on the value of each potential order.
 
     Accepts `vectorbt.portfolio.enums.SegmentContext` and other arguments, sorts `call_seq_out` in place,
@@ -1081,19 +1054,21 @@ def sort_call_seq_out_nb(ctx: SegmentContext,
             ctx.last_position[col],
             free_cash_now,
             ctx.last_val_price[col],
-            group_value_now
+            group_value_now,
         )
     # Sort by order value
     insert_argsort_nb(order_value_out, call_seq_out)
 
 
 @njit(cache=True)
-def sort_call_seq_nb(ctx: SegmentContext,
-                     size: tp.ArrayLike,
-                     size_type: tp.ArrayLike,
-                     direction: tp.ArrayLike,
-                     order_value_out: tp.Array1d,
-                     ctx_select: bool = True) -> None:
+def sort_call_seq_nb(
+    ctx: SegmentContext,
+    size: tp.ArrayLike,
+    size_type: tp.ArrayLike,
+    direction: tp.ArrayLike,
+    order_value_out: tp.Array1d,
+    ctx_select: bool = True,
+) -> None:
     """Sort call sequence attached to `vectorbt.portfolio.enums.SegmentContext`.
 
     See `sort_call_seq_out_nb`.
@@ -1102,15 +1077,7 @@ def sort_call_seq_nb(ctx: SegmentContext,
         Can only be used in non-flexible simulation functions."""
     if ctx.call_seq_now is None:
         raise ValueError("Call sequence array is None. Use sort_call_seq_out_nb to sort a custom array.")
-    sort_call_seq_out_nb(
-        ctx,
-        size,
-        size_type,
-        direction,
-        order_value_out,
-        ctx.call_seq_now,
-        ctx_select=ctx_select
-    )
+    sort_call_seq_out_nb(ctx, size, size_type, direction, order_value_out, ctx.call_seq_now, ctx_select=ctx_select)
 
 
 @njit(cache=True)
@@ -1136,7 +1103,7 @@ def replace_inf_price_nb(prev_close: float, close: float, order: Order) -> Order
         lock_cash=order.lock_cash,
         allow_partial=order.allow_partial,
         raise_reject=order.raise_reject,
-        log=order.log
+        log=order.log,
     )
 
 
@@ -1151,7 +1118,7 @@ def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState,
         val_price=ctx.val_price_now,
         value=ctx.value_now,
         oidx=-1,
-        lidx=-1
+        lidx=-1,
     )
     if np.isinf(order.price):
         if ctx.i > 0:
@@ -1164,9 +1131,9 @@ def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState,
 
 
 @njit(cache=True)
-def init_records_nb(target_shape: tp.Shape,
-                    max_orders: tp.Optional[int] = None,
-                    max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def init_records_nb(
+    target_shape: tp.Shape, max_orders: tp.Optional[int] = None, max_logs: int = 0
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Initialize order and log records."""
     if max_orders is None:
         _max_orders = target_shape[0] * target_shape[1]
@@ -1182,153 +1149,148 @@ def init_records_nb(target_shape: tp.Shape,
 @njit(cache=True)
 def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
     """Update statistics of an open position record using custom price."""
-    if record['id'] >= 0 and record['status'] == TradeStatus.Open:
-        if np.isnan(record['exit_price']):
+    if record["id"] >= 0 and record["status"] == TradeStatus.Open:
+        if np.isnan(record["exit_price"]):
             exit_price = price
         else:
-            exit_size_sum = record['size'] - abs(position_now)
-            exit_gross_sum = exit_size_sum * record['exit_price']
+            exit_size_sum = record["size"] - abs(position_now)
+            exit_gross_sum = exit_size_sum * record["exit_price"]
             exit_gross_sum += abs(position_now) * price
-            exit_price = exit_gross_sum / record['size']
+            exit_price = exit_gross_sum / record["size"]
         pnl, ret = get_trade_stats_nb(
-            record['size'],
-            record['entry_price'],
-            record['entry_fees'],
+            record["size"],
+            record["entry_price"],
+            record["entry_fees"],
             exit_price,
-            record['exit_fees'],
-            record['direction']
+            record["exit_fees"],
+            record["direction"],
         )
-        record['pnl'] = pnl
-        record['return'] = ret
+        record["pnl"] = pnl
+        record["return"] = ret
 
 
 @njit(cache=True)
-def update_pos_record_nb(record: tp.Record,
-                         i: int,
-                         col: int,
-                         position_before: float,
-                         position_now: float,
-                         order_result: OrderResult) -> None:
+def update_pos_record_nb(
+    record: tp.Record, i: int, col: int, position_before: float, position_now: float, order_result: OrderResult
+) -> None:
     """Update position record after filling an order."""
     if order_result.status == OrderStatus.Filled:
         if position_before == 0 and position_now != 0:
             # New position opened
-            record['id'] += 1
-            record['col'] = col
-            record['size'] = order_result.size
-            record['entry_idx'] = i
-            record['entry_price'] = order_result.price
-            record['entry_fees'] = order_result.fees
-            record['exit_idx'] = -1
-            record['exit_price'] = np.nan
-            record['exit_fees'] = 0.
+            record["id"] += 1
+            record["col"] = col
+            record["size"] = order_result.size
+            record["entry_idx"] = i
+            record["entry_price"] = order_result.price
+            record["entry_fees"] = order_result.fees
+            record["exit_idx"] = -1
+            record["exit_price"] = np.nan
+            record["exit_fees"] = 0.0
             if order_result.side == OrderSide.Buy:
-                record['direction'] = TradeDirection.Long
+                record["direction"] = TradeDirection.Long
             else:
-                record['direction'] = TradeDirection.Short
-            record['status'] = TradeStatus.Open
-            record['parent_id'] = record['id']
+                record["direction"] = TradeDirection.Short
+            record["status"] = TradeStatus.Open
+            record["parent_id"] = record["id"]
         elif position_before != 0 and position_now == 0:
             # Position closed
-            record['exit_idx'] = i
-            if np.isnan(record['exit_price']):
+            record["exit_idx"] = i
+            if np.isnan(record["exit_price"]):
                 exit_price = order_result.price
             else:
-                exit_size_sum = record['size'] - abs(position_before)
-                exit_gross_sum = exit_size_sum * record['exit_price']
+                exit_size_sum = record["size"] - abs(position_before)
+                exit_gross_sum = exit_size_sum * record["exit_price"]
                 exit_gross_sum += abs(position_before) * order_result.price
-                exit_price = exit_gross_sum / record['size']
-            record['exit_price'] = exit_price
-            record['exit_fees'] += order_result.fees
+                exit_price = exit_gross_sum / record["size"]
+            record["exit_price"] = exit_price
+            record["exit_fees"] += order_result.fees
             pnl, ret = get_trade_stats_nb(
-                record['size'],
-                record['entry_price'],
-                record['entry_fees'],
-                record['exit_price'],
-                record['exit_fees'],
-                record['direction']
+                record["size"],
+                record["entry_price"],
+                record["entry_fees"],
+                record["exit_price"],
+                record["exit_fees"],
+                record["direction"],
             )
-            record['pnl'] = pnl
-            record['return'] = ret
-            record['status'] = TradeStatus.Closed
+            record["pnl"] = pnl
+            record["return"] = ret
+            record["status"] = TradeStatus.Closed
         elif np.sign(position_before) != np.sign(position_now):
             # Position reversed
-            record['id'] += 1
-            record['size'] = abs(position_now)
-            record['entry_idx'] = i
-            record['entry_price'] = order_result.price
+            record["id"] += 1
+            record["size"] = abs(position_now)
+            record["entry_idx"] = i
+            record["entry_price"] = order_result.price
             new_pos_fraction = abs(position_now) / abs(position_now - position_before)
-            record['entry_fees'] = new_pos_fraction * order_result.fees
-            record['exit_idx'] = -1
-            record['exit_price'] = np.nan
-            record['exit_fees'] = 0.
+            record["entry_fees"] = new_pos_fraction * order_result.fees
+            record["exit_idx"] = -1
+            record["exit_price"] = np.nan
+            record["exit_fees"] = 0.0
             if order_result.side == OrderSide.Buy:
-                record['direction'] = TradeDirection.Long
+                record["direction"] = TradeDirection.Long
             else:
-                record['direction'] = TradeDirection.Short
-            record['status'] = TradeStatus.Open
-            record['parent_id'] = record['id']
+                record["direction"] = TradeDirection.Short
+            record["status"] = TradeStatus.Open
+            record["parent_id"] = record["id"]
         else:
             # Position changed
             if abs(position_before) <= abs(position_now):
                 # Position increased
-                entry_gross_sum = record['size'] * record['entry_price']
+                entry_gross_sum = record["size"] * record["entry_price"]
                 entry_gross_sum += order_result.size * order_result.price
-                entry_price = entry_gross_sum / (record['size'] + order_result.size)
-                record['entry_price'] = entry_price
-                record['entry_fees'] += order_result.fees
-                record['size'] += order_result.size
+                entry_price = entry_gross_sum / (record["size"] + order_result.size)
+                record["entry_price"] = entry_price
+                record["entry_fees"] += order_result.fees
+                record["size"] += order_result.size
             else:
                 # Position decreased
-                if np.isnan(record['exit_price']):
+                if np.isnan(record["exit_price"]):
                     exit_price = order_result.price
                 else:
-                    exit_size_sum = record['size'] - abs(position_before)
-                    exit_gross_sum = exit_size_sum * record['exit_price']
+                    exit_size_sum = record["size"] - abs(position_before)
+                    exit_gross_sum = exit_size_sum * record["exit_price"]
                     exit_gross_sum += order_result.size * order_result.price
                     exit_price = exit_gross_sum / (exit_size_sum + order_result.size)
-                record['exit_price'] = exit_price
-                record['exit_fees'] += order_result.fees
+                record["exit_price"] = exit_price
+                record["exit_fees"] += order_result.fees
 
         # Update open position stats
-        update_open_pos_stats_nb(
-            record,
-            position_now,
-            order_result.price
-        )
+        update_open_pos_stats_nb(record, position_now, order_result.price)
 
 
 # ############# Simulation ############# #
 
 
 @njit(cache=True)
-def simulate_from_orders_nb(target_shape: tp.Shape,
-                            group_lens: tp.Array1d,
-                            init_cash: tp.Array1d,
-                            call_seq: tp.Array2d,
-                            size: tp.ArrayLike = np.asarray(np.inf),
-                            price: tp.ArrayLike = np.asarray(np.inf),
-                            size_type: tp.ArrayLike = np.asarray(SizeType.Amount),
-                            direction: tp.ArrayLike = np.asarray(Direction.Both),
-                            fees: tp.ArrayLike = np.asarray(0.),
-                            fixed_fees: tp.ArrayLike = np.asarray(0.),
-                            slippage: tp.ArrayLike = np.asarray(0.),
-                            min_size: tp.ArrayLike = np.asarray(0.),
-                            max_size: tp.ArrayLike = np.asarray(np.inf),
-                            size_granularity: tp.ArrayLike = np.asarray(np.nan),
-                            reject_prob: tp.ArrayLike = np.asarray(0.),
-                            lock_cash: tp.ArrayLike = np.asarray(False),
-                            allow_partial: tp.ArrayLike = np.asarray(True),
-                            raise_reject: tp.ArrayLike = np.asarray(False),
-                            log: tp.ArrayLike = np.asarray(False),
-                            val_price: tp.ArrayLike = np.asarray(np.inf),
-                            close: tp.ArrayLike = np.asarray(np.nan),
-                            auto_call_seq: bool = False,
-                            ffill_val_price: bool = True,
-                            update_value: bool = False,
-                            max_orders: tp.Optional[int] = None,
-                            max_logs: int = 0,
-                            flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def simulate_from_orders_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    call_seq: tp.Array2d,
+    size: tp.ArrayLike = np.asarray(np.inf),
+    price: tp.ArrayLike = np.asarray(np.inf),
+    size_type: tp.ArrayLike = np.asarray(SizeType.Amount),
+    direction: tp.ArrayLike = np.asarray(Direction.Both),
+    fees: tp.ArrayLike = np.asarray(0.0),
+    fixed_fees: tp.ArrayLike = np.asarray(0.0),
+    slippage: tp.ArrayLike = np.asarray(0.0),
+    min_size: tp.ArrayLike = np.asarray(0.0),
+    max_size: tp.ArrayLike = np.asarray(np.inf),
+    size_granularity: tp.ArrayLike = np.asarray(np.nan),
+    reject_prob: tp.ArrayLike = np.asarray(0.0),
+    lock_cash: tp.ArrayLike = np.asarray(False),
+    allow_partial: tp.ArrayLike = np.asarray(True),
+    raise_reject: tp.ArrayLike = np.asarray(False),
+    log: tp.ArrayLike = np.asarray(False),
+    val_price: tp.ArrayLike = np.asarray(np.inf),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    auto_call_seq: bool = False,
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Creates on order out of each element.
 
     Iterates in the column-major order.
@@ -1374,8 +1336,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     order_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     temp_order_value = np.empty(target_shape[1], dtype=np.float64)
@@ -1439,7 +1401,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                             last_position[col],
                             free_cash_now,
                             last_val_price[col],
-                            value_now
+                            value_now,
                         )
 
                     # Sort by order value
@@ -1478,7 +1440,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                     lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
                     allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
                     raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
-                    log=flex_select_auto_nb(log, i, col, flex_2d)
+                    log=flex_select_auto_nb(log, i, col, flex_2d),
                 )
 
                 # Process the order
@@ -1490,16 +1452,11 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                     val_price=val_price_now,
                     value=value_now,
                     oidx=oidx,
-                    lidx=lidx
+                    lidx=lidx,
                 )
 
                 order_result, new_state = process_order_nb(
-                    i, col, group,
-                    state,
-                    update_value,
-                    order,
-                    order_records,
-                    log_records
+                    i, col, group, state, update_value, order, order_records, log_records
                 )
 
                 # Update state
@@ -1524,9 +1481,9 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
 
 @njit(cache=True)
-def generate_stop_signal_nb(position_now: float,
-                            upon_stop_exit: int,
-                            accumulate: int) -> tp.Tuple[bool, bool, bool, bool, int]:
+def generate_stop_signal_nb(
+    position_now: float, upon_stop_exit: int, accumulate: int
+) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Generate stop signal and change accumulation if needed."""
     is_long_entry = False
     is_long_exit = False
@@ -1558,27 +1515,23 @@ def generate_stop_signal_nb(position_now: float,
 
 
 @njit(cache=True)
-def resolve_stop_price_and_slippage_nb(stop_price: float,
-                                       price: float,
-                                       close: float,
-                                       slippage: float,
-                                       stop_exit_price: int) -> tp.Tuple[float, float]:
+def resolve_stop_price_and_slippage_nb(
+    stop_price: float, price: float, close: float, slippage: float, stop_exit_price: int
+) -> tp.Tuple[float, float]:
     """Resolve price and slippage of a stop order."""
     if stop_exit_price == StopExitPrice.StopMarket:
         return stop_price, slippage
     elif stop_exit_price == StopExitPrice.StopLimit:
-        return stop_price, 0.
+        return stop_price, 0.0
     elif stop_exit_price == StopExitPrice.Close:
         return close, slippage
     return price, slippage
 
 
 @njit(cache=True)
-def resolve_signal_conflict_nb(position_now: float,
-                               is_entry: bool,
-                               is_exit: bool,
-                               direction: int,
-                               conflict_mode: int) -> tp.Tuple[bool, bool]:
+def resolve_signal_conflict_nb(
+    position_now: float, is_entry: bool, is_exit: bool, direction: int, conflict_mode: int
+) -> tp.Tuple[bool, bool]:
     """Resolve any conflict between an entry and an exit."""
     if is_entry and is_exit:
         # Conflict
@@ -1623,10 +1576,9 @@ def resolve_signal_conflict_nb(position_now: float,
 
 
 @njit(cache=True)
-def resolve_dir_conflict_nb(position_now: float,
-                            is_long_entry: bool,
-                            is_short_entry: bool,
-                            upon_dir_conflict: int) -> tp.Tuple[bool, bool]:
+def resolve_dir_conflict_nb(
+    position_now: float, is_long_entry: bool, is_short_entry: bool, upon_dir_conflict: int
+) -> tp.Tuple[bool, bool]:
     """Resolve any direction conflict between a long entry and a short entry."""
     if is_long_entry and is_short_entry:
         if upon_dir_conflict == DirectionConflictMode.Long:
@@ -1656,13 +1608,15 @@ def resolve_dir_conflict_nb(position_now: float,
 
 
 @njit(cache=True)
-def resolve_opposite_entry_nb(position_now: float,
-                              is_long_entry: bool,
-                              is_long_exit: bool,
-                              is_short_entry: bool,
-                              is_short_exit: bool,
-                              upon_opposite_entry: int,
-                              accumulate: int) -> tp.Tuple[bool, bool, bool, bool, int]:
+def resolve_opposite_entry_nb(
+    position_now: float,
+    is_long_entry: bool,
+    is_long_exit: bool,
+    is_short_entry: bool,
+    is_short_exit: bool,
+    upon_opposite_entry: int,
+    accumulate: int,
+) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Resolve opposite entry."""
     if position_now > 0 and is_short_entry:
         if upon_opposite_entry == OppositeEntryMode.Ignore:
@@ -1692,19 +1646,21 @@ def resolve_opposite_entry_nb(position_now: float,
 
 
 @njit(cache=True)
-def signals_to_size_nb(position_now: float,
-                       is_long_entry: bool,
-                       is_long_exit: bool,
-                       is_short_entry: bool,
-                       is_short_exit: bool,
-                       size: float,
-                       size_type: int,
-                       accumulate: int,
-                       val_price_now: float) -> tp.Tuple[float, int, int]:
+def signals_to_size_nb(
+    position_now: float,
+    is_long_entry: bool,
+    is_long_exit: bool,
+    is_short_entry: bool,
+    is_short_exit: bool,
+    size: float,
+    size_type: int,
+    accumulate: int,
+    val_price_now: float,
+) -> tp.Tuple[float, int, int]:
     """Translate direction-aware signals into size, size type, and direction."""
     if size_type != SizeType.Amount and size_type != SizeType.Value and size_type != SizeType.Percent:
         raise ValueError("Only SizeType.Amount, SizeType.Value, and SizeType.Percent are supported")
-    order_size = 0.
+    order_size = 0.0
     direction = Direction.Both
     abs_position_now = abs(position_now)
     if is_less_nb(size, 0):
@@ -1721,8 +1677,7 @@ def signals_to_size_nb(position_now: float,
                 order_size = -abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError(
-                            "SizeType.Percent does not support position reversal using signals")
+                        raise ValueError("SizeType.Percent does not support position reversal using signals")
                     if size_type == SizeType.Value:
                         order_size -= size / val_price_now
                     else:
@@ -1794,13 +1749,9 @@ def should_update_stop_nb(stop: float, upon_stop_update: int) -> bool:
 
 
 @njit(cache=True)
-def get_stop_price_nb(position_now: float,
-                      stop_price: float,
-                      stop: float,
-                      open: float,
-                      low: float,
-                      high: float,
-                      hit_below: bool) -> float:
+def get_stop_price_nb(
+    position_now: float, stop_price: float, stop: float, open: float, low: float, high: float, hit_below: bool
+) -> float:
     """Get stop price.
 
     If hit before open, returns open."""
@@ -1847,54 +1798,56 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 
 
 @njit
-def simulate_from_signal_func_nb(target_shape: tp.Shape,
-                                 group_lens: tp.Array1d,
-                                 init_cash: tp.Array1d,
-                                 call_seq: tp.Array2d,
-                                 signal_func_nb: SignalFuncT = no_signal_func_nb,
-                                 signal_args: tp.ArgsLike = (),
-                                 size: tp.ArrayLike = np.asarray(np.inf),
-                                 price: tp.ArrayLike = np.asarray(np.inf),
-                                 size_type: tp.ArrayLike = np.asarray(SizeType.Amount),
-                                 fees: tp.ArrayLike = np.asarray(0.),
-                                 fixed_fees: tp.ArrayLike = np.asarray(0.),
-                                 slippage: tp.ArrayLike = np.asarray(0.),
-                                 min_size: tp.ArrayLike = np.asarray(0.),
-                                 max_size: tp.ArrayLike = np.asarray(np.inf),
-                                 size_granularity: tp.ArrayLike = np.asarray(np.nan),
-                                 reject_prob: tp.ArrayLike = np.asarray(0.),
-                                 lock_cash: tp.ArrayLike = np.asarray(False),
-                                 allow_partial: tp.ArrayLike = np.asarray(True),
-                                 raise_reject: tp.ArrayLike = np.asarray(False),
-                                 log: tp.ArrayLike = np.asarray(False),
-                                 accumulate: tp.ArrayLike = np.asarray(AccumulationMode.Disabled),
-                                 upon_long_conflict: tp.ArrayLike = np.asarray(ConflictMode.Ignore),
-                                 upon_short_conflict: tp.ArrayLike = np.asarray(ConflictMode.Ignore),
-                                 upon_dir_conflict: tp.ArrayLike = np.asarray(DirectionConflictMode.Ignore),
-                                 upon_opposite_entry: tp.ArrayLike = np.asarray(OppositeEntryMode.ReverseReduce),
-                                 val_price: tp.ArrayLike = np.asarray(np.inf),
-                                 open: tp.ArrayLike = np.asarray(np.nan),
-                                 high: tp.ArrayLike = np.asarray(np.nan),
-                                 low: tp.ArrayLike = np.asarray(np.nan),
-                                 close: tp.ArrayLike = np.asarray(np.nan),
-                                 sl_stop: tp.ArrayLike = np.asarray(np.nan),
-                                 sl_trail: tp.ArrayLike = np.asarray(False),
-                                 tp_stop: tp.ArrayLike = np.asarray(np.nan),
-                                 stop_entry_price: tp.ArrayLike = np.asarray(StopEntryPrice.Close),
-                                 stop_exit_price: tp.ArrayLike = np.asarray(StopExitPrice.StopLimit),
-                                 upon_stop_exit: tp.ArrayLike = np.asarray(StopExitMode.Close),
-                                 upon_stop_update: tp.ArrayLike = np.asarray(StopUpdateMode.Override),
-                                 adjust_sl_func_nb: AdjustSLFuncT = no_adjust_sl_func_nb,
-                                 adjust_sl_args: tp.Args = (),
-                                 adjust_tp_func_nb: AdjustTPFuncT = no_adjust_tp_func_nb,
-                                 adjust_tp_args: tp.Args = (),
-                                 use_stops: bool = True,
-                                 auto_call_seq: bool = False,
-                                 ffill_val_price: bool = True,
-                                 update_value: bool = False,
-                                 max_orders: tp.Optional[int] = None,
-                                 max_logs: int = 0,
-                                 flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def simulate_from_signal_func_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    call_seq: tp.Array2d,
+    signal_func_nb: SignalFuncT = no_signal_func_nb,
+    signal_args: tp.ArgsLike = (),
+    size: tp.ArrayLike = np.asarray(np.inf),
+    price: tp.ArrayLike = np.asarray(np.inf),
+    size_type: tp.ArrayLike = np.asarray(SizeType.Amount),
+    fees: tp.ArrayLike = np.asarray(0.0),
+    fixed_fees: tp.ArrayLike = np.asarray(0.0),
+    slippage: tp.ArrayLike = np.asarray(0.0),
+    min_size: tp.ArrayLike = np.asarray(0.0),
+    max_size: tp.ArrayLike = np.asarray(np.inf),
+    size_granularity: tp.ArrayLike = np.asarray(np.nan),
+    reject_prob: tp.ArrayLike = np.asarray(0.0),
+    lock_cash: tp.ArrayLike = np.asarray(False),
+    allow_partial: tp.ArrayLike = np.asarray(True),
+    raise_reject: tp.ArrayLike = np.asarray(False),
+    log: tp.ArrayLike = np.asarray(False),
+    accumulate: tp.ArrayLike = np.asarray(AccumulationMode.Disabled),
+    upon_long_conflict: tp.ArrayLike = np.asarray(ConflictMode.Ignore),
+    upon_short_conflict: tp.ArrayLike = np.asarray(ConflictMode.Ignore),
+    upon_dir_conflict: tp.ArrayLike = np.asarray(DirectionConflictMode.Ignore),
+    upon_opposite_entry: tp.ArrayLike = np.asarray(OppositeEntryMode.ReverseReduce),
+    val_price: tp.ArrayLike = np.asarray(np.inf),
+    open: tp.ArrayLike = np.asarray(np.nan),
+    high: tp.ArrayLike = np.asarray(np.nan),
+    low: tp.ArrayLike = np.asarray(np.nan),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    sl_stop: tp.ArrayLike = np.asarray(np.nan),
+    sl_trail: tp.ArrayLike = np.asarray(False),
+    tp_stop: tp.ArrayLike = np.asarray(np.nan),
+    stop_entry_price: tp.ArrayLike = np.asarray(StopEntryPrice.Close),
+    stop_exit_price: tp.ArrayLike = np.asarray(StopExitPrice.StopLimit),
+    upon_stop_exit: tp.ArrayLike = np.asarray(StopExitMode.Close),
+    upon_stop_update: tp.ArrayLike = np.asarray(StopUpdateMode.Override),
+    adjust_sl_func_nb: AdjustSLFuncT = no_adjust_sl_func_nb,
+    adjust_sl_args: tp.Args = (),
+    adjust_tp_func_nb: AdjustTPFuncT = no_adjust_tp_func_nb,
+    adjust_tp_args: tp.Args = (),
+    use_stops: bool = True,
+    auto_call_seq: bool = False,
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Creates an order out of each element by resolving entry and exit signals returned by `signal_func_nb`.
 
     Iterates in the column-major order. Utilizes flexible broadcasting.
@@ -1950,8 +1903,8 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     if use_stops:
         sl_init_i = np.full(target_shape[1], -1, dtype=np.int64)
@@ -2040,7 +1993,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         curr_i=sl_curr_i[col],
                         curr_price=sl_curr_price[col],
                         curr_stop=sl_curr_stop[col],
-                        curr_trail=sl_curr_trail[col]
+                        curr_trail=sl_curr_trail[col],
                     )
                     sl_curr_stop[col], sl_curr_trail[col] = adjust_sl_func_nb(adjust_sl_ctx, *adjust_sl_args)
                     adjust_tp_ctx = AdjustTPContext(
@@ -2050,7 +2003,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         val_price_now=last_val_price[col],
                         init_i=tp_init_i[col],
                         init_price=tp_init_price[col],
-                        curr_stop=tp_curr_stop[col]
+                        curr_stop=tp_curr_stop[col],
                     )
                     tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
 
@@ -2070,19 +2023,11 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         # Get stop price
                         if not np.isnan(sl_curr_stop[col]):
                             stop_price = get_stop_price_nb(
-                                position_now,
-                                sl_curr_price[col],
-                                sl_curr_stop[col],
-                                _open, _low, _high,
-                                True
+                                position_now, sl_curr_price[col], sl_curr_stop[col], _open, _low, _high, True
                             )
                         if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                             stop_price = get_stop_price_nb(
-                                position_now,
-                                tp_init_price[col],
-                                tp_curr_stop[col],
-                                _open, _low, _high,
-                                False
+                                position_now, tp_init_price[col], tp_curr_stop[col], _open, _low, _high, False
                             )
 
                         if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
@@ -2101,61 +2046,44 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                 if use_stops and not np.isnan(stop_price):
                     # Stop signal comes first
                     _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = \
-                        generate_stop_signal_nb(position_now, _upon_stop_exit, _accumulate)
+                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = generate_stop_signal_nb(
+                        position_now, _upon_stop_exit, _accumulate
+                    )
 
                     _close = flex_select_auto_nb(close, i, col, flex_2d)
                     _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                     _price, _slippage = resolve_stop_price_and_slippage_nb(
-                        stop_price,
-                        _price,
-                        _close,
-                        _slippage,
-                        _stop_exit_price
+                        stop_price, _price, _close, _slippage, _stop_exit_price
                     )
                 else:
                     # User-defined signal comes first
                     signal_ctx = SignalContext(
-                        i=i,
-                        col=col,
-                        position_now=position_now,
-                        val_price_now=last_val_price[col],
-                        flex_2d=flex_2d
+                        i=i, col=col, position_now=position_now, val_price_now=last_val_price[col], flex_2d=flex_2d
                     )
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit = \
-                        signal_func_nb(signal_ctx, *signal_args)
+                    is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(
+                        signal_ctx, *signal_args
+                    )
 
                     # Resolve signal conflicts
                     if is_long_entry or is_short_entry:
                         _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
                         is_long_entry, is_long_exit = resolve_signal_conflict_nb(
-                            position_now,
-                            is_long_entry,
-                            is_long_exit,
-                            Direction.LongOnly,
-                            _upon_long_conflict
+                            position_now, is_long_entry, is_long_exit, Direction.LongOnly, _upon_long_conflict
                         )
                         _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
                         is_short_entry, is_short_exit = resolve_signal_conflict_nb(
-                            position_now,
-                            is_short_entry,
-                            is_short_exit,
-                            Direction.ShortOnly,
-                            _upon_short_conflict
+                            position_now, is_short_entry, is_short_exit, Direction.ShortOnly, _upon_short_conflict
                         )
 
                         # Resolve direction conflicts
                         _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
                         is_long_entry, is_short_entry = resolve_dir_conflict_nb(
-                            position_now,
-                            is_long_entry,
-                            is_short_entry,
-                            _upon_dir_conflict
+                            position_now, is_long_entry, is_short_entry, _upon_dir_conflict
                         )
 
                         # Resolve opposite entry
                         _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
-                        is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = \
+                        is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = (
                             resolve_opposite_entry_nb(
                                 position_now,
                                 is_long_entry,
@@ -2163,8 +2091,9 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 is_short_entry,
                                 is_short_exit,
                                 _upon_opposite_entry,
-                                _accumulate
+                                _accumulate,
                             )
+                        )
 
                 # Convert both signals to size (direction-aware), size type, and direction
                 _size, _size_type, _direction = signals_to_size_nb(
@@ -2176,7 +2105,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                     flex_select_auto_nb(size, i, col, flex_2d),
                     flex_select_auto_nb(size_type, i, col, flex_2d),
                     _accumulate,
-                    last_val_price[col]
+                    last_val_price[col],
                 )
 
                 # Save all info
@@ -2188,7 +2117,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
 
                 if cash_sharing:
                     if _size == 0:
-                        temp_order_value[k] = 0.
+                        temp_order_value[k] = 0.0
                     else:
                         # Approximate order value
                         if _size_type == SizeType.Amount:
@@ -2203,7 +2132,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 if _direction == Direction.LongOnly:
                                     temp_order_value[k] = _size * asset_value_now
                                 else:
-                                    max_exposure = (2 * max(asset_value_now, 0) + max(free_cash_now, 0))
+                                    max_exposure = 2 * max(asset_value_now, 0) + max(free_cash_now, 0)
                                     temp_order_value[k] = _size * max_exposure
 
             if cash_sharing:
@@ -2263,7 +2192,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
                         allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
                         raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
-                        log=flex_select_auto_nb(log, i, col, flex_2d)
+                        log=flex_select_auto_nb(log, i, col, flex_2d),
                     )
 
                     # Process the order
@@ -2275,16 +2204,11 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
-                        lidx=lidx
+                        lidx=lidx,
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group,
-                        state,
-                        update_value,
-                        order,
-                        order_records,
-                        log_records
+                        i, col, group, state, update_value, order, order_records, log_records
                     )
 
                     # Update state
@@ -2357,10 +2281,9 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
 
 
 @njit
-def dir_enex_signal_func_nb(c: SignalContext,
-                            entries: tp.ArrayLike,
-                            exits: tp.ArrayLike,
-                            direction: tp.ArrayLike) -> tp.Tuple[bool, bool, bool, bool]:
+def dir_enex_signal_func_nb(
+    c: SignalContext, entries: tp.ArrayLike, exits: tp.ArrayLike, direction: tp.ArrayLike
+) -> tp.Tuple[bool, bool, bool, bool]:
     """Resolve direction-aware signals out of entries, exits, and direction."""
     is_entry = flex_select_auto_nb(entries, c.i, c.col, c.flex_2d)
     is_exit = flex_select_auto_nb(exits, c.i, c.col, c.flex_2d)
@@ -2373,11 +2296,13 @@ def dir_enex_signal_func_nb(c: SignalContext,
 
 
 @njit
-def ls_enex_signal_func_nb(c: SignalContext,
-                           long_entries: tp.ArrayLike,
-                           long_exits: tp.ArrayLike,
-                           short_entries: tp.ArrayLike,
-                           short_exits: tp.ArrayLike) -> tp.Tuple[bool, bool, bool, bool]:
+def ls_enex_signal_func_nb(
+    c: SignalContext,
+    long_entries: tp.ArrayLike,
+    long_exits: tp.ArrayLike,
+    short_entries: tp.ArrayLike,
+    short_exits: tp.ArrayLike,
+) -> tp.Tuple[bool, bool, bool, bool]:
     """Get an element of direction-aware signals."""
     is_long_entry = flex_select_auto_nb(long_entries, c.i, c.col, c.flex_2d)
     is_long_exit = flex_select_auto_nb(long_exits, c.i, c.col, c.flex_2d)
@@ -2417,37 +2342,39 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
 
 
 @njit
-def simulate_nb(target_shape: tp.Shape,
-                group_lens: tp.Array1d,
-                init_cash: tp.Array1d,
-                cash_sharing: bool,
-                call_seq: tp.Array2d,
-                segment_mask: tp.ArrayLike = np.asarray(True),
-                call_pre_segment: bool = False,
-                call_post_segment: bool = False,
-                pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
-                pre_sim_args: tp.Args = (),
-                post_sim_func_nb: PostSimFuncT = no_post_func_nb,
-                post_sim_args: tp.Args = (),
-                pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
-                pre_group_args: tp.Args = (),
-                post_group_func_nb: PostGroupFuncT = no_post_func_nb,
-                post_group_args: tp.Args = (),
-                pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
-                pre_segment_args: tp.Args = (),
-                post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
-                post_segment_args: tp.Args = (),
-                order_func_nb: OrderFuncT = no_order_func_nb,
-                order_args: tp.Args = (),
-                post_order_func_nb: PostOrderFuncT = no_post_func_nb,
-                post_order_args: tp.Args = (),
-                close: tp.ArrayLike = np.asarray(np.nan),
-                ffill_val_price: bool = True,
-                update_value: bool = False,
-                fill_pos_record: bool = True,
-                max_orders: tp.Optional[int] = None,
-                max_logs: int = 0,
-                flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def simulate_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    cash_sharing: bool,
+    call_seq: tp.Array2d,
+    segment_mask: tp.ArrayLike = np.asarray(True),
+    call_pre_segment: bool = False,
+    call_post_segment: bool = False,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_args: tp.Args = (),
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_args: tp.Args = (),
+    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
+    pre_group_args: tp.Args = (),
+    post_group_func_nb: PostGroupFuncT = no_post_func_nb,
+    post_group_args: tp.Args = (),
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_args: tp.Args = (),
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_args: tp.Args = (),
+    order_func_nb: OrderFuncT = no_order_func_nb,
+    order_args: tp.Args = (),
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_args: tp.Args = (),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    fill_pos_record: bool = True,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Fill order and log records by iterating over a shape and calling a range of user-defined functions.
 
     Starting with initial cash `init_cash`, iterates over each group and column in `target_shape`,
@@ -2791,8 +2718,8 @@ def simulate_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
@@ -2800,7 +2727,7 @@ def simulate_nb(target_shape: tp.Shape,
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record['id'][:] = -1
+    last_pos_record["id"][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -2833,7 +2760,7 @@ def simulate_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -2873,7 +2800,7 @@ def simulate_nb(target_shape: tp.Shape,
             group=group,
             group_len=group_len,
             from_col=from_col,
-            to_col=to_col
+            to_col=to_col,
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
@@ -2915,27 +2842,19 @@ def simulate_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=call_seq_now
+                    call_seq_now=call_seq_now,
                 )
                 pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_group_out, *pre_segment_args)
 
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -3014,7 +2933,7 @@ def simulate_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
                     if np.isinf(order.price):
@@ -3034,16 +2953,11 @@ def simulate_nb(target_shape: tp.Shape,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
-                        lidx=lidx
+                        lidx=lidx,
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group,
-                        state,
-                        update_value,
-                        order,
-                        order_records,
-                        log_records
+                        i, col, group, state, update_value, order, order_records, log_records
                     )
 
                     # Update state
@@ -3082,12 +2996,7 @@ def simulate_nb(target_shape: tp.Shape,
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(
-                            pos_record_now,
-                            i, col,
-                            state.position, position_now,
-                            order_result
-                        )
+                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3139,7 +3048,7 @@ def simulate_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -3153,11 +3062,7 @@ def simulate_nb(target_shape: tp.Shape,
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -3175,11 +3080,7 @@ def simulate_nb(target_shape: tp.Shape,
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or segment_mask[i, group]:
@@ -3216,7 +3117,7 @@ def simulate_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=call_seq_now
+                    call_seq_now=call_seq_now,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
 
@@ -3251,7 +3152,7 @@ def simulate_nb(target_shape: tp.Shape,
             group=group,
             group_len=group_len,
             from_col=from_col,
-            to_col=to_col
+            to_col=to_col,
         )
         post_group_func_nb(post_group_ctx, *pre_sim_out, *post_group_args)
 
@@ -3284,7 +3185,7 @@ def simulate_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -3292,37 +3193,39 @@ def simulate_nb(target_shape: tp.Shape,
 
 
 @njit
-def simulate_row_wise_nb(target_shape: tp.Shape,
-                         group_lens: tp.Array1d,
-                         init_cash: tp.Array1d,
-                         cash_sharing: bool,
-                         call_seq: tp.Array2d,
-                         segment_mask: tp.ArrayLike = np.asarray(True),
-                         call_pre_segment: bool = False,
-                         call_post_segment: bool = False,
-                         pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
-                         pre_sim_args: tp.Args = (),
-                         post_sim_func_nb: PostSimFuncT = no_post_func_nb,
-                         post_sim_args: tp.Args = (),
-                         pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
-                         pre_row_args: tp.Args = (),
-                         post_row_func_nb: PostRowFuncT = no_post_func_nb,
-                         post_row_args: tp.Args = (),
-                         pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
-                         pre_segment_args: tp.Args = (),
-                         post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
-                         post_segment_args: tp.Args = (),
-                         order_func_nb: OrderFuncT = no_order_func_nb,
-                         order_args: tp.Args = (),
-                         post_order_func_nb: PostOrderFuncT = no_post_func_nb,
-                         post_order_args: tp.Args = (),
-                         close: tp.ArrayLike = np.asarray(np.nan),
-                         ffill_val_price: bool = True,
-                         update_value: bool = False,
-                         fill_pos_record: bool = True,
-                         max_orders: tp.Optional[int] = None,
-                         max_logs: int = 0,
-                         flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def simulate_row_wise_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    cash_sharing: bool,
+    call_seq: tp.Array2d,
+    segment_mask: tp.ArrayLike = np.asarray(True),
+    call_pre_segment: bool = False,
+    call_post_segment: bool = False,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_args: tp.Args = (),
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_args: tp.Args = (),
+    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
+    pre_row_args: tp.Args = (),
+    post_row_func_nb: PostRowFuncT = no_post_func_nb,
+    post_row_args: tp.Args = (),
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_args: tp.Args = (),
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_args: tp.Args = (),
+    order_func_nb: OrderFuncT = no_order_func_nb,
+    order_args: tp.Args = (),
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_args: tp.Args = (),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    fill_pos_record: bool = True,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `simulate_nb`, but iterates in row-major order.
 
     Row-major order means processing the entire row with all groups/columns before moving to the next one.
@@ -3423,8 +3326,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
@@ -3432,7 +3335,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record['id'][:] = -1
+    last_pos_record["id"][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -3465,7 +3368,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -3499,7 +3402,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
             last_oidx=last_oidx,
             last_lidx=last_lidx,
             last_pos_record=last_pos_record,
-            i=i
+            i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
 
@@ -3544,27 +3447,19 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=call_seq_now
+                    call_seq_now=call_seq_now,
                 )
                 pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_row_out, *pre_segment_args)
 
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -3643,7 +3538,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
                     if np.isinf(order.price):
@@ -3663,16 +3558,11 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
-                        lidx=lidx
+                        lidx=lidx,
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group,
-                        state,
-                        update_value,
-                        order,
-                        order_records,
-                        log_records
+                        i, col, group, state, update_value, order, order_records, log_records
                     )
 
                     # Update state
@@ -3711,12 +3601,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(
-                            pos_record_now,
-                            i, col,
-                            state.position, position_now,
-                            order_result
-                        )
+                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3768,7 +3653,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -3782,11 +3667,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -3804,11 +3685,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or segment_mask[i, group]:
@@ -3845,7 +3722,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=call_seq_now
+                    call_seq_now=call_seq_now,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_row_out, *post_segment_args)
 
@@ -3879,7 +3756,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
             last_oidx=last_oidx,
             last_lidx=last_lidx,
             last_pos_record=last_pos_record,
-            i=i
+            i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
 
@@ -3910,7 +3787,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -3927,36 +3804,38 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
 
 
 @njit
-def flex_simulate_nb(target_shape: tp.Shape,
-                     group_lens: tp.Array1d,
-                     init_cash: tp.Array1d,
-                     cash_sharing: bool,
-                     segment_mask: tp.ArrayLike = np.asarray(True),
-                     call_pre_segment: bool = False,
-                     call_post_segment: bool = False,
-                     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
-                     pre_sim_args: tp.Args = (),
-                     post_sim_func_nb: PostSimFuncT = no_post_func_nb,
-                     post_sim_args: tp.Args = (),
-                     pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
-                     pre_group_args: tp.Args = (),
-                     post_group_func_nb: PostGroupFuncT = no_post_func_nb,
-                     post_group_args: tp.Args = (),
-                     pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
-                     pre_segment_args: tp.Args = (),
-                     post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
-                     post_segment_args: tp.Args = (),
-                     flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
-                     flex_order_args: tp.Args = (),
-                     post_order_func_nb: PostOrderFuncT = no_post_func_nb,
-                     post_order_args: tp.Args = (),
-                     close: tp.ArrayLike = np.asarray(np.nan),
-                     ffill_val_price: bool = True,
-                     update_value: bool = False,
-                     fill_pos_record: bool = True,
-                     max_orders: tp.Optional[int] = None,
-                     max_logs: int = 0,
-                     flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def flex_simulate_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    cash_sharing: bool,
+    segment_mask: tp.ArrayLike = np.asarray(True),
+    call_pre_segment: bool = False,
+    call_post_segment: bool = False,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_args: tp.Args = (),
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_args: tp.Args = (),
+    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
+    pre_group_args: tp.Args = (),
+    post_group_func_nb: PostGroupFuncT = no_post_func_nb,
+    post_group_args: tp.Args = (),
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_args: tp.Args = (),
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_args: tp.Args = (),
+    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+    flex_order_args: tp.Args = (),
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_args: tp.Args = (),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    fill_pos_record: bool = True,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `simulate_nb`, but with no predefined call sequence.
 
     In contrast to `order_func_nb` in`simulate_nb`, `post_order_func_nb` is a segment-level order function
@@ -4129,8 +4008,8 @@ def flex_simulate_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
@@ -4138,7 +4017,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record['id'][:] = -1
+    last_pos_record["id"][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -4171,7 +4050,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -4211,7 +4090,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
             group=group,
             group_len=group_len,
             from_col=from_col,
-            to_col=to_col
+            to_col=to_col,
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
@@ -4251,27 +4130,19 @@ def flex_simulate_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=None
+                    call_seq_now=None,
                 )
                 pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_group_out, *pre_segment_args)
 
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -4323,7 +4194,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
                         to_col=to_col,
                         i=i,
                         call_seq_now=None,
-                        call_idx=call_idx
+                        call_idx=call_idx,
                     )
                     col, order = flex_order_func_nb(flex_order_ctx, *pre_segment_out, *flex_order_args)
 
@@ -4365,16 +4236,11 @@ def flex_simulate_nb(target_shape: tp.Shape,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
-                        lidx=lidx
+                        lidx=lidx,
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group,
-                        state,
-                        update_value,
-                        order,
-                        order_records,
-                        log_records
+                        i, col, group, state, update_value, order, order_records, log_records
                     )
 
                     # Update state
@@ -4413,12 +4279,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(
-                            pos_record_now,
-                            i, col,
-                            state.position, position_now,
-                            order_result
-                        )
+                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -4470,7 +4331,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -4484,11 +4345,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -4506,11 +4363,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or segment_mask[i, group]:
@@ -4547,7 +4400,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=None
+                    call_seq_now=None,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
 
@@ -4582,7 +4435,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
             group=group,
             group_len=group_len,
             from_col=from_col,
-            to_col=to_col
+            to_col=to_col,
         )
         post_group_func_nb(post_group_ctx, *pre_sim_out, *post_group_args)
 
@@ -4615,7 +4468,7 @@ def flex_simulate_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -4623,36 +4476,38 @@ def flex_simulate_nb(target_shape: tp.Shape,
 
 
 @njit
-def flex_simulate_row_wise_nb(target_shape: tp.Shape,
-                              group_lens: tp.Array1d,
-                              init_cash: tp.Array1d,
-                              cash_sharing: bool,
-                              segment_mask: tp.ArrayLike = np.asarray(True),
-                              call_pre_segment: bool = False,
-                              call_post_segment: bool = False,
-                              pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
-                              pre_sim_args: tp.Args = (),
-                              post_sim_func_nb: PostSimFuncT = no_post_func_nb,
-                              post_sim_args: tp.Args = (),
-                              pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
-                              pre_row_args: tp.Args = (),
-                              post_row_func_nb: PostRowFuncT = no_post_func_nb,
-                              post_row_args: tp.Args = (),
-                              pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
-                              pre_segment_args: tp.Args = (),
-                              post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
-                              post_segment_args: tp.Args = (),
-                              flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
-                              flex_order_args: tp.Args = (),
-                              post_order_func_nb: PostOrderFuncT = no_post_func_nb,
-                              post_order_args: tp.Args = (),
-                              close: tp.ArrayLike = np.asarray(np.nan),
-                              ffill_val_price: bool = True,
-                              update_value: bool = False,
-                              fill_pos_record: bool = True,
-                              max_orders: tp.Optional[int] = None,
-                              max_logs: int = 0,
-                              flex_2d: bool = True) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+def flex_simulate_row_wise_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    cash_sharing: bool,
+    segment_mask: tp.ArrayLike = np.asarray(True),
+    call_pre_segment: bool = False,
+    call_post_segment: bool = False,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_args: tp.Args = (),
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_args: tp.Args = (),
+    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
+    pre_row_args: tp.Args = (),
+    post_row_func_nb: PostRowFuncT = no_post_func_nb,
+    post_row_args: tp.Args = (),
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_args: tp.Args = (),
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_args: tp.Args = (),
+    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+    flex_order_args: tp.Args = (),
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_args: tp.Args = (),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    fill_pos_record: bool = True,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `flex_simulate_nb`, but iterates using row-major order, with the rows
     changing fastest, and the columns/groups changing slowest."""
 
@@ -4662,8 +4517,8 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
-    last_position = np.full(target_shape[1], 0., dtype=np.float64)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float64)
+    last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     last_value = init_cash.copy()
@@ -4671,7 +4526,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record['id'][:] = -1
+    last_pos_record["id"][:] = -1
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -4704,7 +4559,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -4738,7 +4593,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
             last_oidx=last_oidx,
             last_lidx=last_lidx,
             last_pos_record=last_pos_record,
-            i=i
+            i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
 
@@ -4782,27 +4637,19 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=None
+                    call_seq_now=None,
                 )
                 pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_row_out, *pre_segment_args)
 
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -4854,7 +4701,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
                         to_col=to_col,
                         i=i,
                         call_seq_now=None,
-                        call_idx=call_idx
+                        call_idx=call_idx,
                     )
                     col, order = flex_order_func_nb(flex_order_ctx, *pre_segment_out, *flex_order_args)
 
@@ -4896,16 +4743,11 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
-                        lidx=lidx
+                        lidx=lidx,
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group,
-                        state,
-                        update_value,
-                        order,
-                        order_records,
-                        log_records
+                        i, col, group, state, update_value, order, order_records, log_records
                     )
 
                     # Update state
@@ -4944,12 +4786,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(
-                            pos_record_now,
-                            i, col,
-                            state.position, position_now,
-                            order_result
-                        )
+                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -5001,7 +4838,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now
+                        pos_record_now=pos_record_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -5015,11 +4852,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col,
-                    to_col,
-                    last_cash[group],
-                    last_position,
-                    last_val_price
+                    from_col, to_col, last_cash[group], last_position, last_val_price
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -5037,11 +4870,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
             # Update open position stats
             if fill_pos_record:
                 for col in range(from_col, to_col):
-                    update_open_pos_stats_nb(
-                        last_pos_record[col],
-                        last_position[col],
-                        last_val_price[col]
-                    )
+                    update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or segment_mask[i, group]:
@@ -5078,7 +4907,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
                     from_col=from_col,
                     to_col=to_col,
                     i=i,
-                    call_seq_now=None
+                    call_seq_now=None,
                 )
                 post_segment_func_nb(post_seg_ctx, *pre_row_out, *post_segment_args)
 
@@ -5112,7 +4941,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
             last_oidx=last_oidx,
             last_lidx=last_lidx,
             last_pos_record=last_pos_record,
-            i=i
+            i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
 
@@ -5143,7 +4972,7 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
         last_return=last_return,
         last_oidx=last_oidx,
         last_lidx=last_lidx,
-        last_pos_record=last_pos_record
+        last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -5157,12 +4986,9 @@ price_zero_neg_err = "Found order with price 0 or less"
 
 
 @njit(cache=True)
-def get_trade_stats_nb(size: float,
-                       entry_price: float,
-                       entry_fees: float,
-                       exit_price: float,
-                       exit_fees: float,
-                       direction: int) -> tp.Tuple[float, float]:
+def get_trade_stats_nb(
+    size: float, entry_price: float, entry_fees: float, exit_price: float, exit_fees: float, direction: int
+) -> tp.Tuple[float, float]:
     """Get trade statistics."""
     entry_val = size * entry_price
     exit_val = size * exit_price
@@ -5175,64 +5001,61 @@ def get_trade_stats_nb(size: float,
 
 
 @njit(cache=True)
-def fill_trade_record_nb(record: tp.Record,
-                         id_: int,
-                         col: int,
-                         size: float,
-                         entry_idx: int,
-                         entry_price: float,
-                         entry_fees: float,
-                         exit_idx: int,
-                         exit_price: float,
-                         exit_fees: float,
-                         direction: int,
-                         status: int,
-                         parent_id: int) -> None:
+def fill_trade_record_nb(
+    record: tp.Record,
+    id_: int,
+    col: int,
+    size: float,
+    entry_idx: int,
+    entry_price: float,
+    entry_fees: float,
+    exit_idx: int,
+    exit_price: float,
+    exit_fees: float,
+    direction: int,
+    status: int,
+    parent_id: int,
+) -> None:
     """Fill a trade record."""
     # Calculate PnL and return
-    pnl, ret = get_trade_stats_nb(
-        size,
-        entry_price,
-        entry_fees,
-        exit_price,
-        exit_fees,
-        direction
-    )
+    pnl, ret = get_trade_stats_nb(size, entry_price, entry_fees, exit_price, exit_fees, direction)
 
     # Save trade
-    record['id'] = id_
-    record['col'] = col
-    record['size'] = size
-    record['entry_idx'] = entry_idx
-    record['entry_price'] = entry_price
-    record['entry_fees'] = entry_fees
-    record['exit_idx'] = exit_idx
-    record['exit_price'] = exit_price
-    record['exit_fees'] = exit_fees
-    record['pnl'] = pnl
-    record['return'] = ret
-    record['direction'] = direction
-    record['status'] = status
-    record['parent_id'] = parent_id
+    record["id"] = id_
+    record["col"] = col
+    record["size"] = size
+    record["entry_idx"] = entry_idx
+    record["entry_price"] = entry_price
+    record["entry_fees"] = entry_fees
+    record["exit_idx"] = exit_idx
+    record["exit_price"] = exit_price
+    record["exit_fees"] = exit_fees
+    record["pnl"] = pnl
+    record["return"] = ret
+    record["direction"] = direction
+    record["status"] = status
+    record["parent_id"] = parent_id
 
 
 @njit(cache=True)
-def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
-                                     col_map: tp.ColMap,
-                                     col: int,
-                                     first_c: int,
-                                     last_c: int,
-                                     first_entry_size: float,
-                                     first_entry_fees: float,
-                                     exit_idx: int,
-                                     exit_size_sum: float,
-                                     exit_gross_sum: float,
-                                     exit_fees_sum: float,
-                                     direction: int,
-                                     status: int,
-                                     parent_id: int,
-                                     trade_records: tp.RecordArray,
-                                     tidx: int) -> int:
+def fill_entry_trades_in_position_nb(
+    order_records: tp.RecordArray,
+    col_map: tp.ColMap,
+    col: int,
+    first_c: int,
+    last_c: int,
+    first_entry_size: float,
+    first_entry_fees: float,
+    exit_idx: int,
+    exit_size_sum: float,
+    exit_gross_sum: float,
+    exit_fees_sum: float,
+    direction: int,
+    status: int,
+    parent_id: int,
+    trade_records: tp.RecordArray,
+    tidx: int,
+) -> int:
     """Fill entry trades located within a single position."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -5241,19 +5064,20 @@ def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
     for c in range(first_c, last_c + 1):
         oidx = col_idxs[col_start_idxs[col] + c]
         record = order_records[oidx]
-        order_side = record['side']
+        order_side = record["side"]
 
         # Ignore exit orders
-        if (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
-                or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+        if (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+            direction == TradeDirection.Short and order_side == OrderSide.Buy
+        ):
             continue
 
         if c == first_c:
             entry_size = first_entry_size
             entry_fees = first_entry_fees
         else:
-            entry_size = record['size']
-            entry_fees = record['fees']
+            entry_size = record["size"]
+            entry_fees = record["fees"]
 
         # Take a size-weighted average of exit price
         exit_price = exit_gross_sum / exit_size_sum
@@ -5268,15 +5092,15 @@ def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
             tidx,
             col,
             entry_size,
-            record['idx'],
-            record['price'],
+            record["idx"],
+            record["price"],
             entry_fees,
             exit_idx,
             exit_price,
             exit_fees,
             direction,
             status,
-            parent_id
+            parent_id,
         )
         tidx += 1
 
@@ -5370,19 +5194,19 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
             oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
-            order_idx = record['idx']
-            order_size = record['size']
-            order_price = record['price']
-            order_fees = record['fees']
-            order_side = record['side']
+            order_idx = record["idx"]
+            order_size = record["size"]
+            order_price = record["price"]
+            order_fees = record["fees"]
+            order_side = record["side"]
 
-            if order_size <= 0.:
+            if order_size <= 0.0:
                 raise ValueError(size_zero_neg_err)
-            if order_price <= 0.:
+            if order_price <= 0.0:
                 raise ValueError(price_zero_neg_err)
 
             if not in_position:
@@ -5394,24 +5218,26 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
                     direction = TradeDirection.Long
                 else:
                     direction = TradeDirection.Short
-                entry_size_sum = 0.
-                entry_gross_sum = 0.
-                entry_fees_sum = 0.
-                exit_size_sum = 0.
-                exit_gross_sum = 0.
-                exit_fees_sum = 0.
+                entry_size_sum = 0.0
+                entry_gross_sum = 0.0
+                entry_fees_sum = 0.0
+                exit_size_sum = 0.0
+                exit_gross_sum = 0.0
+                exit_fees_sum = 0.0
                 first_entry_size = order_size
                 first_entry_fees = order_fees
 
-            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Sell
+            ):
                 # Position increased
                 entry_size_sum += order_size
                 entry_gross_sum += order_size * order_price
                 entry_fees_sum += order_fees
 
-            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Buy
+            ):
                 if is_close_nb(exit_size_sum + order_size, entry_size_sum):
                     # Position closed
                     last_c = c
@@ -5437,7 +5263,7 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
                         TradeStatus.Closed,
                         parent_id,
                         records,
-                        tidx
+                        tidx,
                     )
                 elif is_less_nb(exit_size_sum + order_size, entry_size_sum):
                     # Position decreased
@@ -5469,7 +5295,7 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
                         TradeStatus.Closed,
                         parent_id,
                         records,
-                        tidx
+                        tidx,
                     )
 
                     # New position opened
@@ -5484,9 +5310,9 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
                     entry_fees_sum = entry_size_sum / order_size * order_fees
                     first_entry_size = entry_size_sum
                     first_entry_fees = entry_fees_sum
-                    exit_size_sum = 0.
-                    exit_gross_sum = 0.
-                    exit_fees_sum = 0.
+                    exit_size_sum = 0.0
+                    exit_gross_sum = 0.0
+                    exit_fees_sum = 0.0
 
         if in_position and is_less_nb(exit_size_sum, entry_size_sum):
             # Position hasn't been closed
@@ -5512,7 +5338,7 @@ def get_entry_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_ma
                 TradeStatus.Open,
                 parent_id,
                 records,
-                tidx
+                tidx,
             )
 
     return records[:tidx]
@@ -5605,19 +5431,19 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
             oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
-            i = record['idx']
-            order_size = record['size']
-            order_price = record['price']
-            order_fees = record['fees']
-            order_side = record['side']
+            i = record["idx"]
+            order_size = record["size"]
+            order_price = record["price"]
+            order_fees = record["fees"]
+            order_side = record["side"]
 
-            if order_size <= 0.:
+            if order_size <= 0.0:
                 raise ValueError(size_zero_neg_err)
-            if order_price <= 0.:
+            if order_price <= 0.0:
                 raise ValueError(price_zero_neg_err)
 
             if not in_position:
@@ -5629,19 +5455,21 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
                 else:
                     direction = TradeDirection.Short
                 parent_id += 1
-                entry_size_sum = 0.
-                entry_gross_sum = 0.
-                entry_fees_sum = 0.
+                entry_size_sum = 0.0
+                entry_gross_sum = 0.0
+                entry_fees_sum = 0.0
 
-            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Sell
+            ):
                 # Position increased
                 entry_size_sum += order_size
                 entry_gross_sum += order_size * order_price
                 entry_fees_sum += order_fees
 
-            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
-                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Buy
+            ):
                 if is_close_or_less_nb(order_size, entry_size_sum):
                     # Trade closed
                     if is_close_nb(order_size, entry_size_sum):
@@ -5672,7 +5500,7 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
                         exit_fees,
                         direction,
                         TradeStatus.Closed,
-                        parent_id
+                        parent_id,
                     )
                     tidx += 1
 
@@ -5715,7 +5543,7 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
                         cl_exit_fees,
                         direction,
                         TradeStatus.Closed,
-                        parent_id
+                        parent_id,
                     )
                     tidx += 1
 
@@ -5734,7 +5562,7 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
             # Trade hasn't been closed
             exit_size = entry_size_sum
             exit_price = close[close.shape[0] - 1, col]
-            exit_fees = 0.
+            exit_fees = 0.0
             exit_idx = close.shape[0] - 1
 
             # Take a size-weighted average of entry price
@@ -5757,7 +5585,7 @@ def get_exit_trades_nb(order_records: tp.RecordArray, close: tp.Array2d, col_map
                 exit_fees,
                 direction,
                 TradeStatus.Open,
-                parent_id
+                parent_id,
             )
             tidx += 1
 
@@ -5770,7 +5598,7 @@ def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     out = np.full(len(records), 0, dtype=np.int64)
     curr_rank = 0
     for i in range(len(records)):
-        if records[i]['pnl'] > 0:
+        if records[i]["pnl"] > 0:
             curr_rank += 1
         else:
             curr_rank = 0
@@ -5784,7 +5612,7 @@ def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     out = np.full(len(records), 0, dtype=np.int64)
     curr_rank = 0
     for i in range(len(records)):
-        if records[i]['pnl'] < 0:
+        if records[i]["pnl"] < 0:
             curr_rank += 1
         else:
             curr_rank = 0
@@ -5794,63 +5622,57 @@ def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
 
 # ############# Position records ############# #
 
+
 @njit(cache=True)
 def fill_position_record_nb(record: tp.Record, id_: int, trade_records: tp.RecordArray) -> None:
     """Fill a position record by aggregating trade records."""
     # Aggregate trades
-    col = trade_records['col'][0]
-    size = np.sum(trade_records['size'])
-    entry_idx = trade_records['entry_idx'][0]
-    entry_price = np.sum(trade_records['size'] * trade_records['entry_price']) / size
-    entry_fees = np.sum(trade_records['entry_fees'])
-    exit_idx = trade_records['exit_idx'][-1]
-    exit_price = np.sum(trade_records['size'] * trade_records['exit_price']) / size
-    exit_fees = np.sum(trade_records['exit_fees'])
-    direction = trade_records['direction'][-1]
-    status = trade_records['status'][-1]
-    pnl, ret = get_trade_stats_nb(
-        size,
-        entry_price,
-        entry_fees,
-        exit_price,
-        exit_fees,
-        direction
-    )
+    col = trade_records["col"][0]
+    size = np.sum(trade_records["size"])
+    entry_idx = trade_records["entry_idx"][0]
+    entry_price = np.sum(trade_records["size"] * trade_records["entry_price"]) / size
+    entry_fees = np.sum(trade_records["entry_fees"])
+    exit_idx = trade_records["exit_idx"][-1]
+    exit_price = np.sum(trade_records["size"] * trade_records["exit_price"]) / size
+    exit_fees = np.sum(trade_records["exit_fees"])
+    direction = trade_records["direction"][-1]
+    status = trade_records["status"][-1]
+    pnl, ret = get_trade_stats_nb(size, entry_price, entry_fees, exit_price, exit_fees, direction)
 
     # Save position
-    record['id'] = id_
-    record['col'] = col
-    record['size'] = size
-    record['entry_idx'] = entry_idx
-    record['entry_price'] = entry_price
-    record['entry_fees'] = entry_fees
-    record['exit_idx'] = exit_idx
-    record['exit_price'] = exit_price
-    record['exit_fees'] = exit_fees
-    record['pnl'] = pnl
-    record['return'] = ret
-    record['direction'] = direction
-    record['status'] = status
-    record['parent_id'] = id_
+    record["id"] = id_
+    record["col"] = col
+    record["size"] = size
+    record["entry_idx"] = entry_idx
+    record["entry_price"] = entry_price
+    record["entry_fees"] = entry_fees
+    record["exit_idx"] = exit_idx
+    record["exit_price"] = exit_price
+    record["exit_fees"] = exit_fees
+    record["pnl"] = pnl
+    record["return"] = ret
+    record["direction"] = direction
+    record["status"] = status
+    record["parent_id"] = id_
 
 
 @njit(cache=True)
 def copy_trade_record_nb(record: tp.Record, trade_record: tp.Record) -> None:
     """Copy a trade record."""
-    record['id'] = trade_record['id']
-    record['col'] = trade_record['col']
-    record['size'] = trade_record['size']
-    record['entry_idx'] = trade_record['entry_idx']
-    record['entry_price'] = trade_record['entry_price']
-    record['entry_fees'] = trade_record['entry_fees']
-    record['exit_idx'] = trade_record['exit_idx']
-    record['exit_price'] = trade_record['exit_price']
-    record['exit_fees'] = trade_record['exit_fees']
-    record['pnl'] = trade_record['pnl']
-    record['return'] = trade_record['return']
-    record['direction'] = trade_record['direction']
-    record['status'] = trade_record['status']
-    record['parent_id'] = trade_record['parent_id']
+    record["id"] = trade_record["id"]
+    record["col"] = trade_record["col"]
+    record["size"] = trade_record["size"]
+    record["entry_idx"] = trade_record["entry_idx"]
+    record["entry_price"] = trade_record["entry_price"]
+    record["entry_fees"] = trade_record["entry_fees"]
+    record["exit_idx"] = trade_record["exit_idx"]
+    record["exit_price"] = trade_record["exit_price"]
+    record["exit_fees"] = trade_record["exit_fees"]
+    record["pnl"] = trade_record["pnl"]
+    record["return"] = trade_record["return"]
+    record["direction"] = trade_record["direction"]
+    record["status"] = trade_record["status"]
+    record["parent_id"] = trade_record["parent_id"]
 
 
 @njit(cache=True)
@@ -5902,11 +5724,11 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.Re
             tidx = col_idxs[col_start_idxs[col] + c]
             record = trade_records[tidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
-            parent_id = record['parent_id']
+            parent_id = record["parent_id"]
 
             if parent_id != last_position_id:
                 if last_position_id != -1:
@@ -5915,19 +5737,19 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.Re
                     else:
                         # Speed up
                         copy_trade_record_nb(records[pidx], trade_records[from_tidx])
-                        records[pidx]['id'] = pidx
-                        records[pidx]['parent_id'] = pidx
+                        records[pidx]["id"] = pidx
+                        records[pidx]["parent_id"] = pidx
                     pidx += 1
                 from_tidx = tidx
                 last_position_id = parent_id
 
         if tidx - from_tidx > 0:
-            fill_position_record_nb(records[pidx], pidx, trade_records[from_tidx:tidx + 1])
+            fill_position_record_nb(records[pidx], pidx, trade_records[from_tidx : tidx + 1])
         else:
             # Speed up
             copy_trade_record_nb(records[pidx], trade_records[from_tidx])
-            records[pidx]['id'] = pidx
-            records[pidx]['parent_id'] = pidx
+            records[pidx]["id"] = pidx
+            records[pidx]["parent_id"] = pidx
         pidx += 1
 
     return records[:pidx]
@@ -5940,7 +5762,7 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.Re
 def get_long_size_nb(position_before: float, position_now: float) -> float:
     """Get long size."""
     if position_before <= 0 and position_now <= 0:
-        return 0.
+        return 0.0
     if position_before >= 0 and position_now < 0:
         return -position_before
     if position_before < 0 and position_now >= 0:
@@ -5952,7 +5774,7 @@ def get_long_size_nb(position_before: float, position_now: float) -> float:
 def get_short_size_nb(position_before: float, position_now: float) -> float:
     """Get short size."""
     if position_before >= 0 and position_now >= 0:
-        return 0.
+        return 0.0
     if position_before >= 0 and position_now < 0:
         return -position_now
     if position_before < 0 and position_now >= 0:
@@ -5961,35 +5783,34 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
 
 
 @njit(cache=True)
-def asset_flow_nb(target_shape: tp.Shape,
-                  order_records: tp.RecordArray,
-                  col_map: tp.ColMap,
-                  direction: int) -> tp.Array2d:
+def asset_flow_nb(
+    target_shape: tp.Shape, order_records: tp.RecordArray, col_map: tp.ColMap, direction: int
+) -> tp.Array2d:
     """Get asset flow series per column.
 
     Returns the total transacted amount of assets at each time step."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full(target_shape, 0., dtype=np.float64)
+    out = np.full(target_shape, 0.0, dtype=np.float64)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
         if col_len == 0:
             continue
         last_id = -1
-        position_now = 0.
+        position_now = 0.0
 
         for c in range(col_len):
             oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
-            i = record['idx']
-            side = record['side']
-            size = record['size']
+            i = record["idx"]
+            side = record["side"]
+            size = record["size"]
 
             if side == OrderSide.Sell:
                 size *= -1
@@ -6012,7 +5833,7 @@ def assets_nb(asset_flow: tp.Array2d) -> tp.Array2d:
     Returns the current position at each time step."""
     out = np.empty_like(asset_flow)
     for col in range(asset_flow.shape[1]):
-        position_now = 0.
+        position_now = 0.0
         for i in range(asset_flow.shape[0]):
             flow_value = asset_flow[i, col]
             position_now = add_nb(position_now, flow_value)
@@ -6048,17 +5869,15 @@ def position_coverage_grouped_nb(position_mask: tp.Array2d, group_lens: tp.Array
 
 
 @njit(cache=True)
-def get_free_cash_diff_nb(position_before: float,
-                          position_now: float,
-                          debt_now: float,
-                          price: float,
-                          fees: float) -> tp.Tuple[float, float]:
+def get_free_cash_diff_nb(
+    position_before: float, position_now: float, debt_now: float, price: float, fees: float
+) -> tp.Tuple[float, float]:
     """Get updated debt and free cash flow."""
     size = add_nb(position_now, -position_before)
     final_cash = -size * price - fees
     if is_close_nb(size, 0):
         new_debt = debt_now
-        free_cash_diff = 0.
+        free_cash_diff = 0.0
     elif size > 0:
         if position_before < 0:
             if position_now < 0:
@@ -6088,48 +5907,39 @@ def get_free_cash_diff_nb(position_before: float,
 
 
 @njit(cache=True)
-def cash_flow_nb(target_shape: tp.Shape,
-                 order_records: tp.RecordArray,
-                 col_map: tp.ColMap,
-                 free: bool) -> tp.Array2d:
+def cash_flow_nb(target_shape: tp.Shape, order_records: tp.RecordArray, col_map: tp.ColMap, free: bool) -> tp.Array2d:
     """Get (free) cash flow series per column."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full(target_shape, 0., dtype=np.float64)
+    out = np.full(target_shape, 0.0, dtype=np.float64)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
         if col_len == 0:
             continue
         last_id = -1
-        position_now = 0.
-        debt_now = 0.
+        position_now = 0.0
+        debt_now = 0.0
 
         for c in range(col_len):
             oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
-            i = record['idx']
-            side = record['side']
-            size = record['size']
-            price = record['price']
-            fees = record['fees']
+            i = record["idx"]
+            side = record["side"]
+            size = record["size"]
+            price = record["price"]
+            fees = record["fees"]
 
             if side == OrderSide.Sell:
                 size *= -1
             new_position_now = add_nb(position_now, size)
             if free:
-                debt_now, cash_flow = get_free_cash_diff_nb(
-                    position_now,
-                    new_position_now,
-                    debt_now,
-                    price,
-                    fees
-                )
+                debt_now, cash_flow = get_free_cash_diff_nb(position_now, new_position_now, debt_now, price, fees)
             else:
                 cash_flow = -size * price - fees
             out[i, col] = add_nb(out[i, col], cash_flow)
@@ -6166,7 +5976,7 @@ def init_cash_grouped_nb(init_cash: tp.Array1d, group_lens: tp.Array1d, cash_sha
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
-        cash_sum = 0.
+        cash_sum = 0.0
         for col in range(from_col, to_col):
             cash_sum += init_cash[col]
         out[group] = cash_sum
@@ -6198,10 +6008,9 @@ def cash_nb(cash_flow: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
 
 
 @njit(cache=True)
-def cash_in_sim_order_nb(cash_flow: tp.Array2d,
-                         group_lens: tp.Array1d,
-                         init_cash_grouped: tp.Array1d,
-                         call_seq: tp.Array2d) -> tp.Array2d:
+def cash_in_sim_order_nb(
+    cash_flow: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d, call_seq: tp.Array2d
+) -> tp.Array2d:
     """Get cash series in simulation order."""
     check_group_lens_nb(group_lens, cash_flow.shape[1])
 
@@ -6221,10 +6030,9 @@ def cash_in_sim_order_nb(cash_flow: tp.Array2d,
 
 
 @njit(cache=True)
-def cash_grouped_nb(target_shape: tp.Shape,
-                    cash_flow_grouped: tp.Array2d,
-                    group_lens: tp.Array1d,
-                    init_cash_grouped: tp.Array1d) -> tp.Array2d:
+def cash_grouped_nb(
+    target_shape: tp.Shape, cash_flow_grouped: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d
+) -> tp.Array2d:
     """Get cash series per group."""
     check_group_lens_nb(group_lens, target_shape[1])
 
@@ -6257,10 +6065,9 @@ def asset_value_grouped_nb(asset_value: tp.Array2d, group_lens: tp.Array1d) -> t
 
 
 @njit(cache=True)
-def value_in_sim_order_nb(cash: tp.Array2d,
-                          asset_value: tp.Array2d,
-                          group_lens: tp.Array1d,
-                          call_seq: tp.Array2d) -> tp.Array2d:
+def value_in_sim_order_nb(
+    cash: tp.Array2d, asset_value: tp.Array2d, group_lens: tp.Array1d, call_seq: tp.Array2d
+) -> tp.Array2d:
     """Get portfolio value series in simulation order."""
     check_group_lens_nb(group_lens, cash.shape[1])
 
@@ -6269,7 +6076,7 @@ def value_in_sim_order_nb(cash: tp.Array2d,
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
-        asset_value_now = 0.
+        asset_value_now = 0.0
         # Without correctly treating NaN values, after one NaN all will be NaN
         since_last_nan = group_len
         for j in range(cash.shape[0] * group_len):
@@ -6302,17 +6109,16 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 
 
 @njit(cache=True)
-def total_profit_nb(target_shape: tp.Shape,
-                    close: tp.Array2d,
-                    order_records: tp.RecordArray,
-                    col_map: tp.ColMap) -> tp.Array1d:
+def total_profit_nb(
+    target_shape: tp.Shape, close: tp.Array2d, order_records: tp.RecordArray, col_map: tp.ColMap
+) -> tp.Array1d:
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    assets = np.full(target_shape[1], 0., dtype=np.float64)
-    cash = np.full(target_shape[1], 0., dtype=np.float64)
+    assets = np.full(target_shape[1], 0.0, dtype=np.float64)
+    cash = np.full(target_shape[1], 0.0, dtype=np.float64)
     zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
 
     for col in range(col_lens.shape[0]):
@@ -6326,28 +6132,28 @@ def total_profit_nb(target_shape: tp.Shape,
             oidx = col_idxs[col_start_idxs[col] + c]
             record = order_records[oidx]
 
-            if record['id'] < last_id:
+            if record["id"] < last_id:
                 raise ValueError("id must come in ascending order per column")
-            last_id = record['id']
+            last_id = record["id"]
 
             # Fill assets
-            if record['side'] == OrderSide.Buy:
-                order_size = record['size']
+            if record["side"] == OrderSide.Buy:
+                order_size = record["size"]
                 assets[col] = add_nb(assets[col], order_size)
             else:
-                order_size = record['size']
+                order_size = record["size"]
                 assets[col] = add_nb(assets[col], -order_size)
 
             # Fill cash balance
-            if record['side'] == OrderSide.Buy:
-                order_cash = record['size'] * record['price'] + record['fees']
+            if record["side"] == OrderSide.Buy:
+                order_cash = record["size"] * record["price"] + record["fees"]
                 cash[col] = add_nb(cash[col], -order_cash)
             else:
-                order_cash = record['size'] * record['price'] - record['fees']
+                order_cash = record["size"] * record["price"] - record["fees"]
                 cash[col] = add_nb(cash[col], order_cash)
 
     total_profit = cash + assets * close[-1, :]
-    total_profit[zero_mask] = 0.
+    total_profit[zero_mask] = 0.0
     return total_profit
 
 
@@ -6378,10 +6184,9 @@ def total_return_nb(total_profit: tp.Array1d, init_cash: tp.Array1d) -> tp.Array
 
 
 @njit(cache=True)
-def returns_in_sim_order_nb(value_iso: tp.Array2d,
-                            group_lens: tp.Array1d,
-                            init_cash_grouped: tp.Array1d,
-                            call_seq: tp.Array2d) -> tp.Array2d:
+def returns_in_sim_order_nb(
+    value_iso: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d, call_seq: tp.Array2d
+) -> tp.Array2d:
     """Get portfolio return series in simulation order."""
     check_group_lens_nb(group_lens, value_iso.shape[1])
 
@@ -6407,7 +6212,7 @@ def asset_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array
     out = np.empty_like(cash_flow)
     for col in range(cash_flow.shape[1]):
         for i in range(cash_flow.shape[0]):
-            input_value = 0. if i == 0 else asset_value[i - 1, col]
+            input_value = 0.0 if i == 0 else asset_value[i - 1, col]
             output_value = asset_value[i, col] + cash_flow[i, col]
             out[i, col] = returns_nb.get_return_nb(input_value, output_value)
     return out
@@ -6453,7 +6258,7 @@ def gross_exposure_nb(asset_value: tp.Array2d, cash: tp.Array2d) -> tp.Array2d:
         for i in range(out.shape[0]):
             denom = add_nb(asset_value[i, col], cash[i, col])
             if denom == 0:
-                out[i, col] = 0.
+                out[i, col] = 0.0
             else:
                 out[i, col] = asset_value[i, col] / denom
     return out

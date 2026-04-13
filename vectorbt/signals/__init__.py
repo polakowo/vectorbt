@@ -16,22 +16,22 @@ from vectorbt.signals.generators import (
     STX,
     STCX,
     OHLCSTX,
-    OHLCSTCX
+    OHLCSTCX,
 )
 
 __all__ = [
-    'SignalFactory',
-    'RAND',
-    'RANDX',
-    'RANDNX',
-    'RPROB',
-    'RPROBX',
-    'RPROBCX',
-    'RPROBNX',
-    'STX',
-    'STCX',
-    'OHLCSTX',
-    'OHLCSTCX'
+    "SignalFactory",
+    "RAND",
+    "RANDX",
+    "RANDNX",
+    "RPROB",
+    "RPROBX",
+    "RPROBCX",
+    "RPROBNX",
+    "STX",
+    "STCX",
+    "OHLCSTX",
+    "OHLCSTCX",
 ]
 
 __pdoc__ = {k: False for k in __all__}

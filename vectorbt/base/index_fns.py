@@ -56,14 +56,14 @@ def index_from_values(values: tp.ArrayLikeSequence, name: tp.Optional[str] = Non
                 if np.isclose(v, v.item(0), equal_nan=True).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append('array_%d' % i)
+                    value_names.append("array_%d" % i)
             else:
                 if np.equal(v, v.item(0)).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append('array_%d' % i)
+                    value_names.append("array_%d" % i)
         else:
-            value_names.append('%s_%d' % (str(type(v).__name__), i))
+            value_names.append("%s_%d" % (str(type(v).__name__), i))
     return pd.Index(value_names, name=name)
 
 
@@ -72,10 +72,11 @@ def repeat_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] 
 
     Set `ignore_default` to None to use the default."""
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     if ignore_default is None:
-        ignore_default = broadcasting_cfg['ignore_default']
+        ignore_default = broadcasting_cfg["ignore_default"]
 
     index = to_any_index(index)
     if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
@@ -88,10 +89,11 @@ def tile_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] = 
 
     Set `ignore_default` to None to use the default."""
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     if ignore_default is None:
-        ignore_default = broadcasting_cfg['ignore_default']
+        ignore_default = broadcasting_cfg["ignore_default"]
 
     index = to_any_index(index)
     if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
@@ -101,20 +103,25 @@ def tile_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] = 
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indexes(indexes: tp.Sequence[tp.IndexLike], drop_duplicates: tp.Optional[bool] = None,
-                  keep: tp.Optional[str] = None, drop_redundant: tp.Optional[bool] = None) -> tp.Index:
+def stack_indexes(
+    indexes: tp.Sequence[tp.IndexLike],
+    drop_duplicates: tp.Optional[bool] = None,
+    keep: tp.Optional[str] = None,
+    drop_redundant: tp.Optional[bool] = None,
+) -> tp.Index:
     """Stack each index in `indexes` on top of each other, from top to bottom.
 
     Set `drop_duplicates`, `keep`, or `drop_redundant` to None to use the default."""
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     if drop_duplicates is None:
-        drop_duplicates = broadcasting_cfg['drop_duplicates']
+        drop_duplicates = broadcasting_cfg["drop_duplicates"]
     if keep is None:
-        keep = broadcasting_cfg['keep']
+        keep = broadcasting_cfg["keep"]
     if drop_redundant is None:
-        drop_redundant = broadcasting_cfg['drop_redundant']
+        drop_redundant = broadcasting_cfg["drop_redundant"]
 
     levels = []
     for i in range(len(indexes)):
@@ -133,8 +140,7 @@ def stack_indexes(indexes: tp.Sequence[tp.IndexLike], drop_duplicates: tp.Option
     return new_index
 
 
-def combine_indexes(indexes: tp.Sequence[tp.IndexLike],
-                    ignore_default: tp.Optional[bool] = None, **kwargs) -> tp.Index:
+def combine_indexes(indexes: tp.Sequence[tp.IndexLike], ignore_default: tp.Optional[bool] = None, **kwargs) -> tp.Index:
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
@@ -218,17 +224,18 @@ def drop_duplicate_levels(index: tp.Index, keep: tp.Optional[str] = None) -> tp.
 
     Set `keep` to None to use the default."""
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     if keep is None:
-        keep = broadcasting_cfg['keep']
+        keep = broadcasting_cfg["keep"]
     if not isinstance(index, pd.MultiIndex):
         return index
-    checks.assert_in(keep.lower(), ['first', 'last'])
+    checks.assert_in(keep.lower(), ["first", "last"])
 
     levels = []
     levels_to_drop = []
-    if keep == 'first':
+    if keep == "first":
         r = range(0, index.nlevels)
     else:
         r = range(index.nlevels - 1, -1, -1)  # loop backwards
@@ -286,13 +293,12 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
     # Factorize first to be accepted by Numba
     factorized = []
     for k, v in mapper.items():
-        factorized.append(pd.factorize(pd.concat((
-            index1.get_level_values(k).to_series(),
-            index2.get_level_values(v).to_series()
-        )))[0])
+        factorized.append(
+            pd.factorize(pd.concat((index1.get_level_values(k).to_series(), index2.get_level_values(v).to_series())))[0]
+        )
     stacked = np.transpose(np.stack(factorized))
-    indices1 = stacked[:len(index1)]
-    indices2 = stacked[len(index1):]
+    indices1 = stacked[: len(index1)]
+    indices2 = stacked[len(index1) :]
     if len(np.unique(indices1, axis=0)) != len(indices1):
         raise ValueError("Duplicated values in first index are not allowed")
 
@@ -305,8 +311,8 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
 
     # Do element-wise comparison
     unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
-    unique1 = unique_indices[:len(index1)]
-    unique2 = unique_indices[len(index1):]
+    unique1 = unique_indices[: len(index1)]
+    unique2 = unique_indices[len(index1) :]
     return pd.IndexSlice[_align_index_to_nb(unique1, unique2)]
 
 
@@ -335,9 +341,9 @@ def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
 OptionalLevelSequence = tp.Optional[tp.Sequence[tp.Union[None, tp.Level]]]
 
 
-def pick_levels(index: tp.Index,
-                required_levels: OptionalLevelSequence = None,
-                optional_levels: OptionalLevelSequence = None) -> tp.Tuple[tp.List[int], tp.List[int]]:
+def pick_levels(
+    index: tp.Index, required_levels: OptionalLevelSequence = None, optional_levels: OptionalLevelSequence = None
+) -> tp.Tuple[tp.List[int], tp.List[int]]:
     """Pick optional and required levels and return their indices.
 
     Raises an exception if index has less or more levels than expected."""

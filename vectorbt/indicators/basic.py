@@ -74,37 +74,33 @@ from vectorbt.utils.figure import make_figure
 
 
 MA = IndicatorFactory(
-    class_name='MA',
+    class_name="MA",
     module_name=__name__,
-    short_name='ma',
-    input_names=['close'],
-    param_names=['window', 'ewm'],
-    output_names=['ma']
-).from_apply_func(
-    nb.ma_apply_nb,
-    cache_func=nb.ma_cache_nb,
-    kwargs_to_args=['adjust'],
-    ewm=False,
-    adjust=False
-)
+    short_name="ma",
+    input_names=["close"],
+    param_names=["window", "ewm"],
+    output_names=["ma"],
+).from_apply_func(nb.ma_apply_nb, cache_func=nb.ma_cache_nb, kwargs_to_args=["adjust"], ewm=False, adjust=False)
 
 
 class _MA(MA):
     """Moving Average (MA).
 
     A moving average is a widely used indicator in technical analysis that helps smooth out
-    price action by filtering out the “noise” from random short-term price fluctuations. 
+    price action by filtering out the “noise” from random short-term price fluctuations.
 
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             plot_close: bool = True,
-             close_trace_kwargs: tp.KwargsLike = None,
-             ma_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        ma_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MA.ma` against `MA.close`.
 
         Args:
@@ -124,7 +120,8 @@ class _MA(MA):
             ![](/assets/images/MA.svg)
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_one(column=column)
 
@@ -136,47 +133,33 @@ class _MA(MA):
             close_trace_kwargs = {}
         if ma_trace_kwargs is None:
             ma_trace_kwargs = {}
-        close_trace_kwargs = merge_dicts(dict(
-            name='Close',
-            line=dict(
-                color=plotting_cfg['color_schema']['blue']
-            )
-        ), close_trace_kwargs)
-        ma_trace_kwargs = merge_dicts(dict(
-            name='MA'
-        ), ma_trace_kwargs)
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+        )
+        ma_trace_kwargs = merge_dicts(dict(name="MA"), ma_trace_kwargs)
 
         if plot_close:
-            fig = self_col.close.vbt.plot(
-                trace_kwargs=close_trace_kwargs,
-                add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.ma.vbt.plot(
-            trace_kwargs=ma_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.ma.vbt.plot(trace_kwargs=ma_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
 
-setattr(MA, '__doc__', _MA.__doc__)
-setattr(MA, 'plot', _MA.plot)
+setattr(MA, "__doc__", _MA.__doc__)
+setattr(MA, "plot", _MA.plot)
 
 # ############# MSTD ############# #
 
 
 MSTD = IndicatorFactory(
-    class_name='MSTD',
+    class_name="MSTD",
     module_name=__name__,
-    short_name='mstd',
-    input_names=['close'],
-    param_names=['window', 'ewm'],
-    output_names=['mstd']
+    short_name="mstd",
+    input_names=["close"],
+    param_names=["window", "ewm"],
+    output_names=["mstd"],
 ).from_apply_func(
-    nb.mstd_apply_nb,
-    cache_func=nb.mstd_cache_nb,
-    kwargs_to_args=['adjust', 'ddof'],
-    ewm=False,
-    adjust=False,
-    ddof=0
+    nb.mstd_apply_nb, cache_func=nb.mstd_cache_nb, kwargs_to_args=["adjust", "ddof"], ewm=False, adjust=False, ddof=0
 )
 
 
@@ -186,12 +169,14 @@ class _MSTD(MSTD):
     Standard deviation is an indicator that measures the size of an assets recent price moves
     in order to predict how volatile the price may be in the future."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             mstd_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        mstd_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MSTD.mstd`.
 
         Args:
@@ -216,45 +201,41 @@ class _MSTD(MSTD):
 
         if mstd_trace_kwargs is None:
             mstd_trace_kwargs = {}
-        mstd_trace_kwargs = merge_dicts(dict(
-            name='MSTD'
-        ), mstd_trace_kwargs)
+        mstd_trace_kwargs = merge_dicts(dict(name="MSTD"), mstd_trace_kwargs)
 
-        fig = self_col.mstd.vbt.plot(
-            trace_kwargs=mstd_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.mstd.vbt.plot(trace_kwargs=mstd_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
 
-setattr(MSTD, '__doc__', _MSTD.__doc__)
-setattr(MSTD, 'plot', _MSTD.plot)
+setattr(MSTD, "__doc__", _MSTD.__doc__)
+setattr(MSTD, "plot", _MSTD.plot)
 
 # ############# BBANDS ############# #
 
 
 BBANDS = IndicatorFactory(
-    class_name='BBANDS',
+    class_name="BBANDS",
     module_name=__name__,
-    short_name='bb',
-    input_names=['close'],
-    param_names=['window', 'ewm', 'alpha'],
-    output_names=['middle', 'upper', 'lower'],
+    short_name="bb",
+    input_names=["close"],
+    param_names=["window", "ewm", "alpha"],
+    output_names=["middle", "upper", "lower"],
     custom_output_props=dict(
         percent_b=lambda self: self.wrapper.wrap(
-            (self.close.values - self.lower.values) / (self.upper.values - self.lower.values)),
-        bandwidth=lambda self: self.wrapper.wrap(
-            (self.upper.values - self.lower.values) / self.middle.values)
-    )
+            (self.close.values - self.lower.values) / (self.upper.values - self.lower.values)
+        ),
+        bandwidth=lambda self: self.wrapper.wrap((self.upper.values - self.lower.values) / self.middle.values),
+    ),
 ).from_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
-    kwargs_to_args=['adjust', 'ddof'],
+    kwargs_to_args=["adjust", "ddof"],
     window=20,
     ewm=False,
     alpha=2,
     adjust=False,
-    ddof=0
+    ddof=0,
 )
 
 
@@ -267,16 +248,18 @@ class _BBANDS(BBANDS):
 
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             plot_close: bool = True,
-             close_trace_kwargs: tp.KwargsLike = None,
-             middle_trace_kwargs: tp.KwargsLike = None,
-             upper_trace_kwargs: tp.KwargsLike = None,
-             lower_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        middle_trace_kwargs: tp.KwargsLike = None,
+        upper_trace_kwargs: tp.KwargsLike = None,
+        lower_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
         `BBANDS.close`.
 
@@ -299,7 +282,8 @@ class _BBANDS(BBANDS):
             ![](/assets/images/BBANDS.svg)
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_one(column=column)
 
@@ -315,65 +299,51 @@ class _BBANDS(BBANDS):
             upper_trace_kwargs = {}
         if lower_trace_kwargs is None:
             lower_trace_kwargs = {}
-        lower_trace_kwargs = merge_dicts(dict(
-            name='Lower Band',
-            line=dict(
-                color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+        lower_trace_kwargs = merge_dicts(
+            dict(
+                name="Lower Band",
+                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
             ),
-        ), lower_trace_kwargs)
-        upper_trace_kwargs = merge_dicts(dict(
-            name='Upper Band',
-            line=dict(
-                color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+            lower_trace_kwargs,
+        )
+        upper_trace_kwargs = merge_dicts(
+            dict(
+                name="Upper Band",
+                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
+                fill="tonexty",
+                fillcolor="rgba(128, 128, 128, 0.2)",
             ),
-            fill='tonexty',
-            fillcolor='rgba(128, 128, 128, 0.2)'
-        ), upper_trace_kwargs)  # default kwargs
-        middle_trace_kwargs = merge_dicts(dict(
-            name='Middle Band'
-        ), middle_trace_kwargs)
-        close_trace_kwargs = merge_dicts(dict(
-            name='Close',
-            line=dict(color=plotting_cfg['color_schema']['blue'])
-        ), close_trace_kwargs)
+            upper_trace_kwargs,
+        )  # default kwargs
+        middle_trace_kwargs = merge_dicts(dict(name="Middle Band"), middle_trace_kwargs)
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+        )
 
-        fig = self_col.lower.vbt.plot(
-            trace_kwargs=lower_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.upper.vbt.plot(
-            trace_kwargs=upper_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.middle.vbt.plot(
-            trace_kwargs=middle_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.lower.vbt.plot(trace_kwargs=lower_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.upper.vbt.plot(trace_kwargs=upper_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.middle.vbt.plot(trace_kwargs=middle_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         if plot_close:
-            fig = self_col.close.vbt.plot(
-                trace_kwargs=close_trace_kwargs,
-                add_trace_kwargs=add_trace_kwargs, fig=fig)
+            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
 
-setattr(BBANDS, '__doc__', _BBANDS.__doc__)
-setattr(BBANDS, 'plot', _BBANDS.plot)
+setattr(BBANDS, "__doc__", _BBANDS.__doc__)
+setattr(BBANDS, "plot", _BBANDS.plot)
 
 # ############# RSI ############# #
 
 
 RSI = IndicatorFactory(
-    class_name='RSI',
+    class_name="RSI",
     module_name=__name__,
-    short_name='rsi',
-    input_names=['close'],
-    param_names=['window', 'ewm'],
-    output_names=['rsi']
+    short_name="rsi",
+    input_names=["close"],
+    param_names=["window", "ewm"],
+    output_names=["rsi"],
 ).from_apply_func(
-    nb.rsi_apply_nb,
-    cache_func=nb.rsi_cache_nb,
-    kwargs_to_args=['adjust'],
-    window=14,
-    ewm=False,
-    adjust=False
+    nb.rsi_apply_nb, cache_func=nb.rsi_cache_nb, kwargs_to_args=["adjust"], window=14, ewm=False, adjust=False
 )
 
 
@@ -387,15 +357,17 @@ class _RSI(RSI):
 
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             levels: tp.Tuple[float, float] = (30, 70),
-             rsi_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        levels: tp.Tuple[float, float] = (30, 70),
+        rsi_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
@@ -420,19 +392,15 @@ class _RSI(RSI):
         if fig is None:
             fig = make_figure()
         default_layout = dict()
-        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
+        default_layout["yaxis" + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
         fig.update_layout(**layout_kwargs)
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
-        rsi_trace_kwargs = merge_dicts(dict(
-            name='RSI'
-        ), rsi_trace_kwargs)
+        rsi_trace_kwargs = merge_dicts(dict(name="RSI"), rsi_trace_kwargs)
 
-        fig = self_col.rsi.vbt.plot(
-            trace_kwargs=rsi_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.rsi.vbt.plot(trace_kwargs=rsi_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Fill void between levels
         fig.add_shape(
@@ -452,27 +420,27 @@ class _RSI(RSI):
         return fig
 
 
-setattr(RSI, '__doc__', _RSI.__doc__)
-setattr(RSI, 'plot', _RSI.plot)
+setattr(RSI, "__doc__", _RSI.__doc__)
+setattr(RSI, "plot", _RSI.plot)
 
 # ############# STOCH ############# #
 
 
 STOCH = IndicatorFactory(
-    class_name='STOCH',
+    class_name="STOCH",
     module_name=__name__,
-    short_name='stoch',
-    input_names=['high', 'low', 'close'],
-    param_names=['k_window', 'd_window', 'd_ewm'],
-    output_names=['percent_k', 'percent_d']
+    short_name="stoch",
+    input_names=["high", "low", "close"],
+    param_names=["k_window", "d_window", "d_ewm"],
+    output_names=["percent_k", "percent_d"],
 ).from_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
-    kwargs_to_args=['adjust'],
+    kwargs_to_args=["adjust"],
     k_window=14,
     d_window=3,
     d_ewm=False,
-    adjust=False
+    adjust=False,
 )
 
 
@@ -485,17 +453,19 @@ class _STOCH(STOCH):
 
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             levels: tp.Tuple[float, float] = (30, 70),
-             percent_k_trace_kwargs: tp.KwargsLike = None,
-             percent_d_trace_kwargs: tp.KwargsLike = None,
-             shape_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        levels: tp.Tuple[float, float] = (30, 70),
+        percent_k_trace_kwargs: tp.KwargsLike = None,
+        percent_d_trace_kwargs: tp.KwargsLike = None,
+        shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
@@ -522,7 +492,7 @@ class _STOCH(STOCH):
         if fig is None:
             fig = make_figure()
         default_layout = dict()
-        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
+        default_layout["yaxis" + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
         fig.update_layout(**layout_kwargs)
 
@@ -532,66 +502,65 @@ class _STOCH(STOCH):
             percent_d_trace_kwargs = {}
         if shape_kwargs is None:
             shape_kwargs = {}
-        percent_k_trace_kwargs = merge_dicts(dict(
-            name='%K'
-        ), percent_k_trace_kwargs)
-        percent_d_trace_kwargs = merge_dicts(dict(
-            name='%D'
-        ), percent_d_trace_kwargs)
+        percent_k_trace_kwargs = merge_dicts(dict(name="%K"), percent_k_trace_kwargs)
+        percent_d_trace_kwargs = merge_dicts(dict(name="%D"), percent_d_trace_kwargs)
 
         fig = self_col.percent_k.vbt.plot(
-            trace_kwargs=percent_k_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+            trace_kwargs=percent_k_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig
+        )
         fig = self_col.percent_d.vbt.plot(
-            trace_kwargs=percent_d_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+            trace_kwargs=percent_d_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig
+        )
 
         # Plot levels
         # Fill void between levels
-        shape_kwargs = merge_dicts(dict(
-            type="rect",
-            xref=xref,
-            yref=yref,
-            x0=self_col.percent_k.index[0],
-            y0=levels[0],
-            x1=self_col.percent_k.index[-1],
-            y1=levels[1],
-            fillcolor="purple",
-            opacity=0.2,
-            layer="below",
-            line_width=0,
-        ), shape_kwargs)
+        shape_kwargs = merge_dicts(
+            dict(
+                type="rect",
+                xref=xref,
+                yref=yref,
+                x0=self_col.percent_k.index[0],
+                y0=levels[0],
+                x1=self_col.percent_k.index[-1],
+                y1=levels[1],
+                fillcolor="purple",
+                opacity=0.2,
+                layer="below",
+                line_width=0,
+            ),
+            shape_kwargs,
+        )
         fig.add_shape(**shape_kwargs)
 
         return fig
 
 
-setattr(STOCH, '__doc__', _STOCH.__doc__)
-setattr(STOCH, 'plot', _STOCH.plot)
+setattr(STOCH, "__doc__", _STOCH.__doc__)
+setattr(STOCH, "plot", _STOCH.plot)
 
 # ############# MACD ############# #
 
 
 MACD = IndicatorFactory(
-    class_name='MACD',
+    class_name="MACD",
     module_name=__name__,
-    short_name='macd',
-    input_names=['close'],
-    param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
-    output_names=['macd', 'signal'],
+    short_name="macd",
+    input_names=["close"],
+    param_names=["fast_window", "slow_window", "signal_window", "macd_ewm", "signal_ewm"],
+    output_names=["macd", "signal"],
     custom_output_props=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
-    )
+    ),
 ).from_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
-    kwargs_to_args=['adjust'],
+    kwargs_to_args=["adjust"],
     fast_window=12,
     slow_window=26,
     signal_window=9,
     macd_ewm=False,
     signal_ewm=False,
-    adjust=False
+    adjust=False,
 )
 
 
@@ -603,14 +572,16 @@ class _MACD(MACD):
 
     See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             macd_trace_kwargs: tp.KwargsLike = None,
-             signal_trace_kwargs: tp.KwargsLike = None,
-             hist_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        macd_trace_kwargs: tp.KwargsLike = None,
+        signal_trace_kwargs: tp.KwargsLike = None,
+        hist_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
 
         Args:
@@ -642,35 +613,24 @@ class _MACD(MACD):
             signal_trace_kwargs = {}
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
-        macd_trace_kwargs = merge_dicts(dict(
-            name='MACD'
-        ), macd_trace_kwargs)
-        signal_trace_kwargs = merge_dicts(dict(
-            name='Signal'
-        ), signal_trace_kwargs)
-        hist_trace_kwargs = merge_dicts(dict(name='Histogram'), hist_trace_kwargs)
+        macd_trace_kwargs = merge_dicts(dict(name="MACD"), macd_trace_kwargs)
+        signal_trace_kwargs = merge_dicts(dict(name="Signal"), signal_trace_kwargs)
+        hist_trace_kwargs = merge_dicts(dict(name="Histogram"), hist_trace_kwargs)
 
-        fig = self_col.macd.vbt.plot(
-            trace_kwargs=macd_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.signal.vbt.plot(
-            trace_kwargs=signal_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.macd.vbt.plot(trace_kwargs=macd_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.signal.vbt.plot(trace_kwargs=signal_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Plot hist
         hist = self_col.hist.values
         hist_diff = generic_nb.diff_1d_nb(hist)
-        marker_colors = np.full(hist.shape, adjust_opacity('silver', 0.75), dtype=object)
-        marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity('green', 0.75)
-        marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity('lightgreen', 0.75)
-        marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity('red', 0.75)
-        marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity('lightcoral', 0.75)
+        marker_colors = np.full(hist.shape, adjust_opacity("silver", 0.75), dtype=object)
+        marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity("green", 0.75)
+        marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity("lightgreen", 0.75)
+        marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity("red", 0.75)
+        marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity("lightcoral", 0.75)
 
         hist_bar = go.Bar(
-            x=self_col.hist.index,
-            y=self_col.hist.values,
-            marker_color=marker_colors,
-            marker_line_width=0
+            x=self_col.hist.index, y=self_col.hist.values, marker_color=marker_colors, marker_line_width=0
         )
         hist_bar.update(**hist_trace_kwargs)
         if add_trace_kwargs is None:
@@ -680,26 +640,21 @@ class _MACD(MACD):
         return fig
 
 
-setattr(MACD, '__doc__', _MACD.__doc__)
-setattr(MACD, 'plot', _MACD.plot)
+setattr(MACD, "__doc__", _MACD.__doc__)
+setattr(MACD, "plot", _MACD.plot)
 
 # ############# ATR ############# #
 
 
 ATR = IndicatorFactory(
-    class_name='ATR',
+    class_name="ATR",
     module_name=__name__,
-    short_name='atr',
-    input_names=['high', 'low', 'close'],
-    param_names=['window', 'ewm'],
-    output_names=['tr', 'atr']
+    short_name="atr",
+    input_names=["high", "low", "close"],
+    param_names=["window", "ewm"],
+    output_names=["tr", "atr"],
 ).from_apply_func(
-    nb.atr_apply_nb,
-    cache_func=nb.atr_cache_nb,
-    kwargs_to_args=['adjust'],
-    window=14,
-    ewm=True,
-    adjust=False
+    nb.atr_apply_nb, cache_func=nb.atr_cache_nb, kwargs_to_args=["adjust"], window=14, ewm=True, adjust=False
 )
 
 
@@ -716,13 +671,15 @@ class _ATR(ATR):
         Uses Simple MA and Exponential MA as compared to Wilder.
     """
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             tr_trace_kwargs: tp.KwargsLike = None,
-             atr_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        tr_trace_kwargs: tp.KwargsLike = None,
+        atr_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
@@ -750,36 +707,28 @@ class _ATR(ATR):
             tr_trace_kwargs = {}
         if atr_trace_kwargs is None:
             atr_trace_kwargs = {}
-        tr_trace_kwargs = merge_dicts(dict(
-            name='TR'
-        ), tr_trace_kwargs)
-        atr_trace_kwargs = merge_dicts(dict(
-            name='ATR'
-        ), atr_trace_kwargs)
+        tr_trace_kwargs = merge_dicts(dict(name="TR"), tr_trace_kwargs)
+        atr_trace_kwargs = merge_dicts(dict(name="ATR"), atr_trace_kwargs)
 
-        fig = self_col.tr.vbt.plot(
-            trace_kwargs=tr_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.atr.vbt.plot(
-            trace_kwargs=atr_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.tr.vbt.plot(trace_kwargs=tr_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.atr.vbt.plot(trace_kwargs=atr_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
 
-setattr(ATR, '__doc__', _ATR.__doc__)
-setattr(ATR, 'plot', _ATR.plot)
+setattr(ATR, "__doc__", _ATR.__doc__)
+setattr(ATR, "plot", _ATR.plot)
 
 # ############# OBV ############# #
 
 
 OBV = IndicatorFactory(
-    class_name='OBV',
+    class_name="OBV",
     module_name=__name__,
-    short_name='obv',
-    input_names=['close', 'volume'],
+    short_name="obv",
+    input_names=["close", "volume"],
     param_names=[],
-    output_names=['obv'],
+    output_names=["obv"],
 ).from_custom_func(nb.obv_custom_nb)
 
 
@@ -790,12 +739,14 @@ class _OBV(OBV):
 
     See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp)."""
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             obv_trace_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        obv_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `OBV.obv`.
 
         Args:
@@ -820,16 +771,12 @@ class _OBV(OBV):
 
         if obv_trace_kwargs is None:
             obv_trace_kwargs = {}
-        obv_trace_kwargs = merge_dicts(dict(
-            name='OBV'
-        ), obv_trace_kwargs)
+        obv_trace_kwargs = merge_dicts(dict(name="OBV"), obv_trace_kwargs)
 
-        fig = self_col.obv.vbt.plot(
-            trace_kwargs=obv_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.obv.vbt.plot(trace_kwargs=obv_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
 
-setattr(OBV, '__doc__', _OBV.__doc__)
-setattr(OBV, 'plot', _OBV.plot)
+setattr(OBV, "__doc__", _OBV.__doc__)
+setattr(OBV, "plot", _OBV.plot)

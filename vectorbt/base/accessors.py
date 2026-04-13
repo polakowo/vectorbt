@@ -78,7 +78,8 @@ BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
 @attach_binary_magic_methods(
-    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func))
+    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func)
+)
 @attach_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
 class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
@@ -128,16 +129,8 @@ class BaseAccessor(Wrapping):
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
         if checks.is_series(new_obj):
-            return self.replace(
-                cls_=self.sr_accessor_cls,
-                obj=new_obj,
-                wrapper=new_wrapper
-            )
-        return self.replace(
-            cls_=self.df_accessor_cls,
-            obj=new_obj,
-            wrapper=new_wrapper
-        )
+            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)
+        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=new_wrapper)
 
     @property
     def obj(self):
@@ -170,8 +163,9 @@ class BaseAccessor(Wrapping):
 
     # ############# Index and columns ############# #
 
-    def apply_on_index(self, apply_func: tp.Callable, *args, axis: int = 1,
-                       inplace: bool = False, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def apply_on_index(
+        self, apply_func: tp.Callable, *args, axis: int = 1, inplace: bool = False, **kwargs
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Apply function `apply_func` on index of the pandas object.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -197,8 +191,9 @@ class BaseAccessor(Wrapping):
                 obj.index = obj_index
             return obj
 
-    def stack_index(self, index: tp.Index, on_top: bool = True, axis: int = 1,
-                    inplace: bool = False, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def stack_index(
+        self, index: tp.Index, on_top: bool = True, axis: int = 1, inplace: bool = False, **kwargs
+    ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.stack_indexes`.
 
         Set `on_top` to False to stack at bottom.
@@ -212,8 +207,9 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
-    def drop_levels(self, levels: tp.MaybeLevelSequence, axis: int = 1,
-                    inplace: bool = False, strict: bool = True) -> tp.Optional[tp.SeriesFrame]:
+    def drop_levels(
+        self, levels: tp.MaybeLevelSequence, axis: int = 1, inplace: bool = False, strict: bool = True
+    ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.drop_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
@@ -223,8 +219,9 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
-    def rename_levels(self, name_dict: tp.Dict[str, tp.Any], axis: int = 1,
-                      inplace: bool = False, strict: bool = True) -> tp.Optional[tp.SeriesFrame]:
+    def rename_levels(
+        self, name_dict: tp.Dict[str, tp.Any], axis: int = 1, inplace: bool = False, strict: bool = True
+    ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.rename_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
@@ -234,8 +231,9 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
-    def select_levels(self, level_names: tp.MaybeLevelSequence, axis: int = 1,
-                      inplace: bool = False) -> tp.Optional[tp.SeriesFrame]:
+    def select_levels(
+        self, level_names: tp.MaybeLevelSequence, axis: int = 1, inplace: bool = False
+    ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.select_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
@@ -255,8 +253,9 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
-    def drop_duplicate_levels(self, keep: tp.Optional[str] = None, axis: int = 1,
-                              inplace: bool = False) -> tp.Optional[tp.SeriesFrame]:
+    def drop_duplicate_levels(
+        self, keep: tp.Optional[str] = None, axis: int = 1, inplace: bool = False
+    ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
@@ -280,8 +279,9 @@ class BaseAccessor(Wrapping):
         See `vectorbt.base.reshape_fns.to_2d`."""
         return reshape_fns.to_2d_array(self.obj)
 
-    def tile(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
-             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def tile(
+        self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.tile`.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -291,15 +291,18 @@ class BaseAccessor(Wrapping):
             if axis == 1:
                 new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
                 return ArrayWrapper.from_obj(tiled).wrap(
-                    tiled.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
+                    tiled.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs)
+                )
             else:
                 new_index = index_fns.combine_indexes([keys, self.wrapper.index])
                 return ArrayWrapper.from_obj(tiled).wrap(
-                    tiled.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
+                    tiled.values, **merge_dicts(dict(index=new_index), wrap_kwargs)
+                )
         return tiled
 
-    def repeat(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
-               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def repeat(
+        self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.repeat`.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -309,11 +312,13 @@ class BaseAccessor(Wrapping):
             if axis == 1:
                 new_columns = index_fns.combine_indexes([self.wrapper.columns, keys])
                 return ArrayWrapper.from_obj(repeated).wrap(
-                    repeated.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
+                    repeated.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs)
+                )
             else:
                 new_index = index_fns.combine_indexes([self.wrapper.index, keys])
                 return ArrayWrapper.from_obj(repeated).wrap(
-                    repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
+                    repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs)
+                )
         return repeated
 
     def align_to(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
@@ -353,8 +358,8 @@ class BaseAccessor(Wrapping):
         aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
         return self.wrapper.wrap(
-            obj.values, group_by=False,
-            **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs))
+            obj.values, group_by=False, **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs)
+        )
 
     @class_or_instancemethod
     def broadcast(cls_or_self, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
@@ -388,8 +393,15 @@ class BaseAccessor(Wrapping):
 
     # ############# Combining ############# #
 
-    def apply(self, *args, apply_func: tp.Optional[tp.Callable] = None, keep_pd: bool = False,
-              to_2d: bool = False, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def apply(
+        self,
+        *args,
+        apply_func: tp.Optional[tp.Callable] = None,
+        keep_pd: bool = False,
+        to_2d: bool = False,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Apply a function `apply_func`.
 
         Args:
@@ -432,8 +444,12 @@ class BaseAccessor(Wrapping):
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @class_or_instancemethod
-    def concat(cls_or_self, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
-               keys: tp.Optional[tp.IndexLike] = None) -> tp.Frame:
+    def concat(
+        cls_or_self,
+        *others: tp.ArrayLike,
+        broadcast_kwargs: tp.KwargsLike = None,
+        keys: tp.Optional[tp.IndexLike] = None,
+    ) -> tp.Frame:
         """Concatenate with `others` along columns.
 
         Args:
@@ -469,10 +485,19 @@ class BaseAccessor(Wrapping):
             out.columns = pd.RangeIndex(start=0, stop=len(out.columns), step=1)
         return out
 
-    def apply_and_concat(self, ntimes: int, *args, apply_func: tp.Optional[tp.Callable] = None,
-                         keep_pd: bool = False, to_2d: bool = False, numba_loop: bool = False,
-                         use_ray: bool = False, keys: tp.Optional[tp.IndexLike] = None,
-                         wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Frame:
+    def apply_and_concat(
+        self,
+        ntimes: int,
+        *args,
+        apply_func: tp.Optional[tp.Callable] = None,
+        keep_pd: bool = False,
+        to_2d: bool = False,
+        numba_loop: bool = False,
+        use_ray: bool = False,
+        keys: tp.Optional[tp.IndexLike] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Frame:
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
@@ -551,15 +576,27 @@ class BaseAccessor(Wrapping):
         if keys is not None:
             new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
         else:
-            top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
+            top_columns = pd.Index(np.arange(ntimes), name="apply_idx")
             new_columns = index_fns.combine_indexes([top_columns, self.wrapper.columns])
         return self.wrapper.wrap(result, group_by=False, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
 
-    def combine(self, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, "BaseAccessor"]], *args,
-                allow_multiple: bool = True, combine_func: tp.Optional[tp.Callable] = None,
-                keep_pd: bool = False, to_2d: bool = False, concat: bool = False, numba_loop: bool = False,
-                use_ray: bool = False, broadcast: bool = True, broadcast_kwargs: tp.KwargsLike = None,
-                keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def combine(
+        self,
+        other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, "BaseAccessor"]],
+        *args,
+        allow_multiple: bool = True,
+        combine_func: tp.Optional[tp.Callable] = None,
+        keep_pd: bool = False,
+        to_2d: bool = False,
+        concat: bool = False,
+        numba_loop: bool = False,
+        use_ray: bool = False,
+        broadcast: bool = True,
+        broadcast_kwargs: tp.KwargsLike = None,
+        keys: tp.Optional[tp.IndexLike] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Combine with `other` using `combine_func`.
 
         Args:
@@ -651,7 +688,7 @@ class BaseAccessor(Wrapping):
             if checks.is_numba_func(combine_func):
                 # Numba requires writeable arrays
                 # Plus all of our arrays must be in the same order
-                broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements=["W", "C"])), broadcast_kwargs)
             new_obj, *new_others = reshape_fns.broadcast(self.obj, *others, **broadcast_kwargs)
         else:
             new_obj, new_others = self.obj, others
@@ -675,20 +712,17 @@ class BaseAccessor(Wrapping):
                     raise ValueError("Ray cannot be used within Numba")
                 for i in range(1, len(inputs)):
                     checks.assert_meta_equal(inputs[i - 1], inputs[i])
-                result = combine_fns.combine_and_concat_nb(
-                    inputs[0], inputs[1:], combine_func, *args, **kwargs)
+                result = combine_fns.combine_and_concat_nb(inputs[0], inputs[1:], combine_func, *args, **kwargs)
             else:
                 if use_ray:
-                    result = combine_fns.combine_and_concat_ray(
-                        inputs[0], inputs[1:], combine_func, *args, **kwargs)
+                    result = combine_fns.combine_and_concat_ray(inputs[0], inputs[1:], combine_func, *args, **kwargs)
                 else:
-                    result = combine_fns.combine_and_concat(
-                        inputs[0], inputs[1:], combine_func, *args, **kwargs)
+                    result = combine_fns.combine_and_concat(inputs[0], inputs[1:], combine_func, *args, **kwargs)
             columns = ArrayWrapper.from_obj(new_obj).columns
             if keys is not None:
                 new_columns = index_fns.combine_indexes([keys, columns])
             else:
-                top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
+                top_columns = pd.Index(np.arange(len(new_others)), name="combine_idx")
                 new_columns = index_fns.combine_indexes([top_columns, columns])
             return ArrayWrapper.from_obj(new_obj).wrap(result, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
         else:

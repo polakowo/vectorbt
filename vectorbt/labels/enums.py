@@ -8,9 +8,7 @@ Defines enums and other schemas for `vectorbt.labels`."""
 from vectorbt import _typing as tp
 from vectorbt.utils.docs import to_doc
 
-__all__ = [
-    'TrendMode'
-]
+__all__ = ["TrendMode"]
 
 __pdoc__ = {}
 
@@ -26,7 +24,9 @@ class TrendModeT(tp.NamedTuple):
 TrendMode = TrendModeT()
 """_"""
 
-__pdoc__['TrendMode'] = f"""Trend mode.
+__pdoc__[
+    "TrendMode"
+] = f"""Trend mode.
 
 ```json
 {to_doc(TrendMode)}

@@ -12,6 +12,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 from numba import njit
+
 try:
     from numpy import broadcast_shapes
 
@@ -66,7 +67,7 @@ def soft_to_ndim(arg: tp.ArrayLike, ndim: int, raw: bool = False) -> tp.AnyArray
 
 
 def to_1d(arg: tp.ArrayLike, raw: bool = False) -> tp.AnyArray1d:
-    """Reshape argument to one dimension. 
+    """Reshape argument to one dimension.
 
     If `raw` is True, returns NumPy array.
     If 2-dim, will collapse along axis 1 (i.e., DataFrame with one column to Series)."""
@@ -87,7 +88,7 @@ to_1d_array = functools.partial(to_1d, raw=True)
 
 
 def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyArray2d:
-    """Reshape argument to two dimensions. 
+    """Reshape argument to two dimensions.
 
     If `raw` is True, returns NumPy array.
     If 1-dim, will expand along axis 1 (i.e., Series to DataFrame with one column)."""
@@ -109,10 +110,10 @@ def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyA
 to_2d_array = functools.partial(to_2d, raw=True)
 
 
-def to_dict(arg: tp.ArrayLike, orient: str = 'dict') -> dict:
+def to_dict(arg: tp.ArrayLike, orient: str = "dict") -> dict:
     """Convert object to dict."""
     arg = to_pd_array(arg)
-    if orient == 'index_series':
+    if orient == "index_series":
         return {arg.index[i]: arg.iloc[i] for i in range(len(arg.index))}
     return arg.to_dict(orient)
 
@@ -123,13 +124,15 @@ def repeat(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False) -> tp.An
     if axis == 0:
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.repeat(arg.values, n, axis=0), index=index_fns.repeat_index(arg.index, n))
+                np.repeat(arg.values, n, axis=0), index=index_fns.repeat_index(arg.index, n)
+            )
         return np.repeat(arg, n, axis=0)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.repeat(arg.values, n, axis=1), columns=index_fns.repeat_index(arg.columns, n))
+                np.repeat(arg.values, n, axis=1), columns=index_fns.repeat_index(arg.columns, n)
+            )
         return np.repeat(arg, n, axis=1)
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -142,17 +145,20 @@ def tile(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False) -> tp.AnyA
         if arg.ndim == 2:
             if checks.is_pandas(arg):
                 return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                    np.tile(arg.values, (n, 1)), index=index_fns.tile_index(arg.index, n))
+                    np.tile(arg.values, (n, 1)), index=index_fns.tile_index(arg.index, n)
+                )
             return np.tile(arg, (n, 1))
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.tile(arg.values, n), index=index_fns.tile_index(arg.index, n))
+                np.tile(arg.values, n), index=index_fns.tile_index(arg.index, n)
+            )
         return np.tile(arg, n)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.tile(arg.values, (1, n)), columns=index_fns.tile_index(arg.columns, n))
+                np.tile(arg.values, (1, n)), columns=index_fns.tile_index(arg.columns, n)
+            )
         return np.tile(arg, (1, n))
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -162,12 +168,14 @@ IndexFromLike = tp.Union[None, str, int, tp.Any]
 """Any object that can be coerced into a `index_from` argument."""
 
 
-def broadcast_index(args: tp.Sequence[tp.AnyArray],
-                    to_shape: tp.Shape,
-                    index_from: IndexFromLike = None,
-                    axis: int = 0,
-                    ignore_sr_names: tp.Optional[bool] = None,
-                    **kwargs) -> tp.Optional[tp.Index]:
+def broadcast_index(
+    args: tp.Sequence[tp.AnyArray],
+    to_shape: tp.Shape,
+    index_from: IndexFromLike = None,
+    axis: int = 0,
+    ignore_sr_names: tp.Optional[bool] = None,
+    **kwargs,
+) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
     Args:
@@ -199,17 +207,18 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
         better to drop it altogether by setting it to None.
     """
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     if ignore_sr_names is None:
-        ignore_sr_names = broadcasting_cfg['ignore_sr_names']
-    index_str = 'columns' if axis == 1 else 'index'
+        ignore_sr_names = broadcasting_cfg["ignore_sr_names"]
+    index_str = "columns" if axis == 1 else "index"
     to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
     # maxlen stores the length of the longest index
     maxlen = to_shape_2d[1] if axis == 1 else to_shape_2d[0]
     new_index = None
 
-    if index_from is None or (isinstance(index_from, str) and index_from.lower() == 'keep'):
+    if index_from is None or (isinstance(index_from, str) and index_from.lower() == "keep"):
         return None
     if isinstance(index_from, int):
         # Take index/columns of the object indexed by index_from
@@ -217,10 +226,10 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
             raise TypeError(f"Argument under index {index_from} must be a pandas object")
         new_index = index_fns.get_index(args[index_from], axis)
     elif isinstance(index_from, str):
-        if index_from.lower() == 'reset':
+        if index_from.lower() == "reset":
             # Ignore index/columns
             new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
-        elif index_from.lower() in ('stack', 'strict'):
+        elif index_from.lower() in ("stack", "strict"):
             # Check whether all indexes/columns are equal
             last_index = None  # of type pd.Index
             index_conflict = False
@@ -250,10 +259,11 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                         else:
                             if checks.is_index_equal(index, new_index):
                                 continue
-                            if index_from.lower() == 'strict':
+                            if index_from.lower() == "strict":
                                 # If pandas objects have different index/columns, raise an exception
                                 raise ValueError(
-                                    f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
+                                    f"Broadcasting {index_str} is not allowed when {index_str}_from=strict"
+                                )
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
                             # 1. rule: if indexes are of the same length, they are simply stacked
@@ -273,7 +283,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
         new_index = index_from
     if new_index is not None:
         if maxlen > len(new_index):
-            if isinstance(index_from, str) and index_from.lower() == 'strict':
+            if isinstance(index_from, str) and index_from.lower() == "strict":
                 raise ValueError(f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
             # This happens only when some numpy object is longer than the new pandas index
             # In this case, new pandas index (one element) should be repeated to match this length.
@@ -287,12 +297,14 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
     return new_index
 
 
-def wrap_broadcasted(old_arg: tp.AnyArray,
-                     new_arg: tp.Array,
-                     is_pd: bool = False,
-                     new_index: tp.Optional[tp.Index] = None,
-                     new_columns: tp.Optional[tp.Index] = None) -> tp.AnyArray:
-    """If the newly brodcasted array was originally a pandas object, make it pandas object again 
+def wrap_broadcasted(
+    old_arg: tp.AnyArray,
+    new_arg: tp.Array,
+    is_pd: bool = False,
+    new_index: tp.Optional[tp.Index] = None,
+    new_columns: tp.Optional[tp.Index] = None,
+) -> tp.AnyArray:
+    """If the newly brodcasted array was originally a pandas object, make it pandas object again
     and assign it the newly broadcast index/columns."""
     if is_pd:
         if checks.is_pandas(old_arg):
@@ -325,22 +337,24 @@ def wrap_broadcasted(old_arg: tp.AnyArray,
 
 BCRT = tp.Union[
     tp.MaybeTuple[tp.AnyArray],
-    tp.Tuple[tp.MaybeTuple[tp.AnyArray], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]]
+    tp.Tuple[tp.MaybeTuple[tp.AnyArray], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]],
 ]
 
 
-def broadcast(*args: tp.ArrayLike,
-              to_shape: tp.Optional[tp.RelaxedShape] = None,
-              to_pd: tp.Optional[tp.MaybeSequence[bool]] = None,
-              to_frame: tp.Optional[bool] = None,
-              align_index: tp.Optional[bool] = None,
-              align_columns: tp.Optional[bool] = None,
-              index_from: tp.Optional[IndexFromLike] = None,
-              columns_from: tp.Optional[IndexFromLike] = None,
-              require_kwargs: tp.KwargsLikeSequence = None,
-              keep_raw: tp.Optional[tp.MaybeSequence[bool]] = False,
-              return_meta: bool = False,
-              **kwargs) -> BCRT:
+def broadcast(
+    *args: tp.ArrayLike,
+    to_shape: tp.Optional[tp.RelaxedShape] = None,
+    to_pd: tp.Optional[tp.MaybeSequence[bool]] = None,
+    to_frame: tp.Optional[bool] = None,
+    align_index: tp.Optional[bool] = None,
+    align_columns: tp.Optional[bool] = None,
+    index_from: tp.Optional[IndexFromLike] = None,
+    columns_from: tp.Optional[IndexFromLike] = None,
+    require_kwargs: tp.KwargsLikeSequence = None,
+    keep_raw: tp.Optional[tp.MaybeSequence[bool]] = False,
+    return_meta: bool = False,
+    **kwargs,
+) -> BCRT:
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
     See [Broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html).
@@ -497,20 +511,21 @@ def broadcast(*args: tp.ArrayLike,
         ```
     """
     from vectorbt._settings import settings
-    broadcasting_cfg = settings['broadcasting']
+
+    broadcasting_cfg = settings["broadcasting"]
 
     is_pd = False
     is_2d = False
     if require_kwargs is None:
         require_kwargs = {}
     if align_index is None:
-        align_index = broadcasting_cfg['align_index']
+        align_index = broadcasting_cfg["align_index"]
     if align_columns is None:
-        align_columns = broadcasting_cfg['align_columns']
+        align_columns = broadcasting_cfg["align_columns"]
     if index_from is None:
-        index_from = broadcasting_cfg['index_from']
+        index_from = broadcasting_cfg["index_from"]
     if columns_from is None:
-        columns_from = broadcasting_cfg['columns_from']
+        columns_from = broadcasting_cfg["columns_from"]
 
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data
@@ -615,11 +630,7 @@ def broadcast(*args: tp.ArrayLike,
         else:
             _is_pd = is_pd
         new_args[i] = wrap_broadcasted(
-            arr_args[i],
-            new_args[i],
-            is_pd=_is_pd,
-            new_index=new_index,
-            new_columns=new_columns
+            arr_args[i], new_args[i], is_pd=_is_pd, new_index=new_index, new_columns=new_columns
         )
 
     if len(new_args) > 1:
@@ -631,12 +642,14 @@ def broadcast(*args: tp.ArrayLike,
     return new_args[0]
 
 
-def broadcast_to(arg1: tp.ArrayLike,
-                 arg2: tp.ArrayLike,
-                 to_pd: tp.Optional[bool] = None,
-                 index_from: tp.Optional[IndexFromLike] = None,
-                 columns_from: tp.Optional[IndexFromLike] = None,
-                 **kwargs) -> BCRT:
+def broadcast_to(
+    arg1: tp.ArrayLike,
+    arg2: tp.ArrayLike,
+    to_pd: tp.Optional[bool] = None,
+    index_from: tp.Optional[IndexFromLike] = None,
+    columns_from: tp.Optional[IndexFromLike] = None,
+    **kwargs,
+) -> BCRT:
     """Broadcast `arg1` to `arg2`.
 
     Pass None to `index_from`/`columns_from` to use index/columns of the second argument.
@@ -710,8 +723,9 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
     return np.tile(arg1, (1, *arg2.shape))
 
 
-def broadcast_to_axis_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: int,
-                         require_kwargs: tp.KwargsLike = None) -> tp.Array:
+def broadcast_to_axis_of(
+    arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: int, require_kwargs: tp.KwargsLike = None
+) -> tp.Array:
     """Broadcast `arg1` to an axis of `arg2`.
 
     If `arg2` has less dimensions than requested, will broadcast `arg1` to a single number.
@@ -864,14 +878,16 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
     return df_out
 
 
-def unstack_to_df(arg: tp.SeriesFrame,
-                  index_levels: tp.Optional[tp.MaybeLevelSequence] = None,
-                  column_levels: tp.Optional[tp.MaybeLevelSequence] = None,
-                  symmetric: bool = False,
-                  sort: bool = True) -> tp.Frame:
+def unstack_to_df(
+    arg: tp.SeriesFrame,
+    index_levels: tp.Optional[tp.MaybeLevelSequence] = None,
+    column_levels: tp.Optional[tp.MaybeLevelSequence] = None,
+    symmetric: bool = False,
+    sort: bool = True,
+) -> tp.Frame:
     """Reshape `arg` based on its multi-index into a DataFrame.
 
-    Use `index_levels` to specify what index levels will form new index, and `column_levels` 
+    Use `index_levels` to specify what index levels will form new index, and `column_levels`
     for new columns. Set `symmetric` to True to make DataFrame symmetric.
 
     Usage:

@@ -114,13 +114,13 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
 
     checks.assert_subclass_of(cls, "QSAdapter")
 
-    for module_name in ['utils', 'stats', 'plots', 'reports']:
+    for module_name in ["utils", "stats", "plots", "reports"]:
         for qs_func_name, qs_func in getmembers(getattr(qs, module_name), isfunction):
-            if not qs_func_name.startswith('_') and checks.func_accepts_arg(qs_func, 'returns'):
-                if module_name == 'plots':
-                    new_method_name = 'plot_' + qs_func_name
-                elif module_name == 'reports':
-                    new_method_name = qs_func_name + '_report'
+            if not qs_func_name.startswith("_") and checks.func_accepts_arg(qs_func, "returns"):
+                if module_name == "plots":
+                    new_method_name = "plot_" + qs_func_name
+                elif module_name == "reports":
+                    new_method_name = qs_func_name + "_report"
                 else:
                     new_method_name = qs_func_name
 
@@ -138,23 +138,23 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                         if arg_name not in kwargs:
                             if arg_name in defaults:
                                 pass_kwargs[arg_name] = defaults[arg_name]
-                            elif arg_name == 'benchmark':
+                            elif arg_name == "benchmark":
                                 if self.returns_accessor.benchmark_rets is not None:
-                                    pass_kwargs['benchmark'] = self.returns_accessor.benchmark_rets
-                            elif arg_name == 'periods':
-                                pass_kwargs['periods'] = int(self.returns_accessor.ann_factor)
-                            elif arg_name == 'periods_per_year':
-                                pass_kwargs['periods_per_year'] = int(self.returns_accessor.ann_factor)
+                                    pass_kwargs["benchmark"] = self.returns_accessor.benchmark_rets
+                            elif arg_name == "periods":
+                                pass_kwargs["periods"] = int(self.returns_accessor.ann_factor)
+                            elif arg_name == "periods_per_year":
+                                pass_kwargs["periods_per_year"] = int(self.returns_accessor.ann_factor)
                         else:
                             pass_kwargs[arg_name] = kwargs[arg_name]
 
-                    if 'benchmark' in pass_kwargs:
-                        if isinstance(pass_kwargs['benchmark'], pd.DataFrame):
-                            bm_null_mask = pass_kwargs['benchmark'].isnull().any(axis=1)
+                    if "benchmark" in pass_kwargs:
+                        if isinstance(pass_kwargs["benchmark"], pd.DataFrame):
+                            bm_null_mask = pass_kwargs["benchmark"].isnull().any(axis=1)
                         else:
-                            bm_null_mask = pass_kwargs['benchmark'].isnull()
+                            bm_null_mask = pass_kwargs["benchmark"].isnull()
                         null_mask = null_mask | bm_null_mask
-                        pass_kwargs['benchmark'] = pass_kwargs['benchmark'].loc[~null_mask]
+                        pass_kwargs["benchmark"] = pass_kwargs["benchmark"].loc[~null_mask]
                     returns = returns.loc[~null_mask]
 
                     signature(_func).bind(returns=returns, **pass_kwargs)
@@ -166,9 +166,11 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                     new_method_params = tuple(signature(new_method).parameters.values())
                     self_arg = new_method_params[0]
                     other_args = [
-                        p.replace(kind=Parameter.KEYWORD_ONLY)
-                        if p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
-                        else p
+                        (
+                            p.replace(kind=Parameter.KEYWORD_ONLY)
+                            if p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+                            else p
+                        )
                         for p in list(source_sig.parameters.values())[1:]
                     ]
                     source_sig = source_sig.replace(parameters=(self_arg,) + tuple(other_args))
@@ -209,7 +211,7 @@ class QSAdapter(Configured):
     @property
     def defaults_mapping(self) -> tp.Dict:
         """Common argument names in quantstats mapped to `ReturnsAccessor.defaults`."""
-        return dict(rf='risk_free')
+        return dict(rf="risk_free")
 
     @property
     def defaults(self) -> tp.Kwargs:
@@ -218,14 +220,11 @@ class QSAdapter(Configured):
         Merges `qs_adapter.defaults` from `vectorbt._settings.settings`, `returns_accessor.defaults`
         (with adapted naming), and `defaults` from `QSAdapter.__init__`."""
         from vectorbt._settings import settings
-        qs_adapter_defaults_cfg = settings['qs_adapter']['defaults']
+
+        qs_adapter_defaults_cfg = settings["qs_adapter"]["defaults"]
 
         mapped_defaults = dict()
         for k, v in self.defaults_mapping.items():
             if v in self.returns_accessor.defaults:
                 mapped_defaults[k] = self.returns_accessor.defaults[v]
-        return merge_dicts(
-            qs_adapter_defaults_cfg,
-            mapped_defaults,
-            self._defaults
-        )
+        return merge_dicts(qs_adapter_defaults_cfg, mapped_defaults, self._defaults)

@@ -89,14 +89,7 @@ import pandas as pd
 
 from vectorbt import _typing as tp
 from vectorbt.base.reshape_fns import to_dict
-from vectorbt.portfolio.enums import (
-    log_dt,
-    SizeType,
-    Direction,
-    OrderSide,
-    OrderStatus,
-    OrderStatusInfo
-)
+from vectorbt.portfolio.enums import log_dt, SizeType, Direction, OrderSide, OrderStatus, OrderStatusInfo
 from vectorbt.records.base import Records
 from vectorbt.records.decorators import attach_fields, override_field_config
 from vectorbt.utils.config import merge_dicts, Config
@@ -107,127 +100,52 @@ logs_field_config = Config(
     dict(
         dtype=log_dt,
         settings=dict(
-            id=dict(
-                title='Log Id'
-            ),
-            group=dict(
-                title='Group'
-            ),
-            cash=dict(
-                title='Cash'
-            ),
-            position=dict(
-                title='Position'
-            ),
-            debt=dict(
-                title='Debt'
-            ),
-            free_cash=dict(
-                title='Free Cash'
-            ),
-            val_price=dict(
-                title='Val Price'
-            ),
-            value=dict(
-                title='Value'
-            ),
-            req_size=dict(
-                title='Request Size'
-            ),
-            req_price=dict(
-                title='Request Price'
-            ),
-            req_size_type=dict(
-                title='Request Size Type',
-                mapping=SizeType
-            ),
-            req_direction=dict(
-                title='Request Direction',
-                mapping=Direction
-            ),
-            req_fees=dict(
-                title='Request Fees'
-            ),
-            req_fixed_fees=dict(
-                title='Request Fixed Fees'
-            ),
-            req_slippage=dict(
-                title='Request Slippage'
-            ),
-            req_min_size=dict(
-                title='Request Min Size'
-            ),
-            req_max_size=dict(
-                title='Request Max Size'
-            ),
-            req_size_granularity=dict(
-                title='Request Size Granularity'
-            ),
-            req_reject_prob=dict(
-                title='Request Rejection Prob'
-            ),
-            req_lock_cash=dict(
-                title='Request Lock Cash'
-            ),
-            req_allow_partial=dict(
-                title='Request Allow Partial'
-            ),
-            req_raise_reject=dict(
-                title='Request Raise Rejection'
-            ),
-            req_log=dict(
-                title='Request Log'
-            ),
-            new_cash=dict(
-                title='New Cash'
-            ),
-            new_position=dict(
-                title='New Position'
-            ),
-            new_debt=dict(
-                title='New Debt'
-            ),
-            new_free_cash=dict(
-                title='New Free Cash'
-            ),
-            new_val_price=dict(
-                title='New Val Price'
-            ),
-            new_value=dict(
-                title='New Value'
-            ),
-            res_size=dict(
-                title='Result Size'
-            ),
-            res_price=dict(
-                title='Result Price'
-            ),
-            res_fees=dict(
-                title='Result Fees'
-            ),
-            res_side=dict(
-                title='Result Side',
-                mapping=OrderSide
-            ),
-            res_status=dict(
-                title='Result Status',
-                mapping=OrderStatus
-            ),
-            res_status_info=dict(
-                title='Result Status Info',
-                mapping=OrderStatusInfo
-            ),
-            order_id=dict(
-                title='Order Id'
-            )
-        )
+            id=dict(title="Log Id"),
+            group=dict(title="Group"),
+            cash=dict(title="Cash"),
+            position=dict(title="Position"),
+            debt=dict(title="Debt"),
+            free_cash=dict(title="Free Cash"),
+            val_price=dict(title="Val Price"),
+            value=dict(title="Value"),
+            req_size=dict(title="Request Size"),
+            req_price=dict(title="Request Price"),
+            req_size_type=dict(title="Request Size Type", mapping=SizeType),
+            req_direction=dict(title="Request Direction", mapping=Direction),
+            req_fees=dict(title="Request Fees"),
+            req_fixed_fees=dict(title="Request Fixed Fees"),
+            req_slippage=dict(title="Request Slippage"),
+            req_min_size=dict(title="Request Min Size"),
+            req_max_size=dict(title="Request Max Size"),
+            req_size_granularity=dict(title="Request Size Granularity"),
+            req_reject_prob=dict(title="Request Rejection Prob"),
+            req_lock_cash=dict(title="Request Lock Cash"),
+            req_allow_partial=dict(title="Request Allow Partial"),
+            req_raise_reject=dict(title="Request Raise Rejection"),
+            req_log=dict(title="Request Log"),
+            new_cash=dict(title="New Cash"),
+            new_position=dict(title="New Position"),
+            new_debt=dict(title="New Debt"),
+            new_free_cash=dict(title="New Free Cash"),
+            new_val_price=dict(title="New Val Price"),
+            new_value=dict(title="New Value"),
+            res_size=dict(title="Result Size"),
+            res_price=dict(title="Result Price"),
+            res_fees=dict(title="Result Fees"),
+            res_side=dict(title="Result Side", mapping=OrderSide),
+            res_status=dict(title="Result Status", mapping=OrderStatus),
+            res_status_info=dict(title="Result Status Info", mapping=OrderStatusInfo),
+            order_id=dict(title="Order Id"),
+        ),
     ),
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['logs_field_config'] = f"""Field config for `Logs`.
+__pdoc__[
+    "logs_field_config"
+] = f"""Field config for `Logs`.
 
 ```json
 {logs_field_config.to_doc()}
@@ -236,22 +154,18 @@ __pdoc__['logs_field_config'] = f"""Field config for `Logs`.
 
 logs_attach_field_config = Config(
     dict(
-        res_side=dict(
-            attach_filters=True
-        ),
-        res_status=dict(
-            attach_filters=True
-        ),
-        res_status_info=dict(
-            attach_filters=True
-        )
+        res_side=dict(attach_filters=True),
+        res_status=dict(attach_filters=True),
+        res_status_info=dict(attach_filters=True),
     ),
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['logs_attach_field_config'] = f"""Config of fields to be attached to `Logs`.
+__pdoc__[
+    "logs_attach_field_config"
+] = f"""Config of fields to be attached to `Logs`.
 
 ```json
 {logs_attach_field_config.to_doc()}
@@ -279,54 +193,38 @@ class Logs(Records):
         Merges `vectorbt.records.base.Records.stats_defaults` and
         `logs.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        logs_stats_cfg = settings['logs']['stats']
 
-        return merge_dicts(
-            Records.stats_defaults.__get__(self),
-            logs_stats_cfg
-        )
+        logs_stats_cfg = settings["logs"]["stats"]
+
+        return merge_dicts(Records.stats_defaults.__get__(self), logs_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
-            ),
+            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             res_status_counts=dict(
-                title='Status Counts',
-                calc_func='res_status.value_counts',
+                title="Status Counts",
+                calc_func="res_status.value_counts",
                 incl_all_keys=True,
-                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
-                tags=['logs', 'res_status', 'value_counts']
+                post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+                tags=["logs", "res_status", "value_counts"],
             ),
             res_status_info_counts=dict(
-                title='Status Info Counts',
-                calc_func='res_status_info.value_counts',
-                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
-                tags=['logs', 'res_status_info', 'value_counts']
-            )
+                title="Status Info Counts",
+                calc_func="res_status_info.value_counts",
+                post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+                tags=["logs", "res_status_info", "value_counts"],
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -342,12 +240,10 @@ class Logs(Records):
         Merges `vectorbt.records.base.Records.plots_defaults` and
         `logs.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        logs_plots_cfg = settings['logs']['plots']
 
-        return merge_dicts(
-            Records.plots_defaults.__get__(self),
-            logs_plots_cfg
-        )
+        logs_plots_cfg = settings["logs"]["plots"]
+
+        return merge_dicts(Records.plots_defaults.__get__(self), logs_plots_cfg)
 
     @property
     def subplots(self) -> Config:
