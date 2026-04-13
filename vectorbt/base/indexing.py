@@ -224,7 +224,9 @@ class ParamLoc(LocBase):
 
 
 def indexing_on_mapper(
-    mapper: tp.Series, ref_obj: tp.SeriesFrame, pd_indexing_func: tp.Callable
+    mapper: tp.Series,
+    ref_obj: tp.SeriesFrame,
+    pd_indexing_func: tp.Callable,
 ) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
     checks.assert_instance_of(mapper, pd.Series)
@@ -241,7 +243,9 @@ def indexing_on_mapper(
 
 
 def build_param_indexer(
-    param_names: tp.Sequence[str], class_name: str = "ParamIndexer", module_name: tp.Optional[str] = None
+    param_names: tp.Sequence[str],
+    class_name: str = "ParamIndexer",
+    module_name: tp.Optional[str] = None,
 ) -> tp.Type[IndexingBase]:
     """A factory to create a class with parameter indexing.
 
@@ -298,7 +302,10 @@ def build_param_indexer(
 
     class ParamIndexer(IndexingBase):
         def __init__(
-            self, param_mappers: tp.Sequence[tp.Series], level_names: tp.Optional[tp.LevelSequence] = None, **kwargs
+            self,
+            param_mappers: tp.Sequence[tp.Series],
+            level_names: tp.Optional[tp.LevelSequence] = None,
+            **kwargs,
         ) -> None:
             checks.assert_len_equal(param_names, param_mappers)
 

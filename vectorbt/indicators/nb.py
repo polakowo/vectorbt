@@ -38,7 +38,10 @@ def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: in
 
 @njit(cache=True)
 def ma_cache_nb(
-    close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], adjust: bool
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool,
 ) -> tp.Dict[int, tp.Array2d]:
     """Caching function for `vectorbt.indicators.basic.MA`."""
     cache_dict = dict()
@@ -51,7 +54,11 @@ def ma_cache_nb(
 
 @njit(cache=True)
 def ma_apply_nb(
-    close: tp.Array2d, window: int, ewm: bool, adjust: bool, cache_dict: tp.Dict[int, tp.Array2d]
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool,
+    cache_dict: tp.Dict[int, tp.Array2d],
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.MA`."""
     h = hash((window, ewm))
@@ -60,7 +67,11 @@ def ma_apply_nb(
 
 @njit(cache=True)
 def mstd_cache_nb(
-    close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], adjust: bool, ddof: int
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool,
+    ddof: int,
 ) -> tp.Dict[int, tp.Array2d]:
     """Caching function for `vectorbt.indicators.basic.MSTD`."""
     cache_dict = dict()
@@ -73,7 +84,12 @@ def mstd_cache_nb(
 
 @njit(cache=True)
 def mstd_apply_nb(
-    close: tp.Array2d, window: int, ewm: bool, adjust: bool, ddof: int, cache_dict: tp.Dict[int, tp.Array2d]
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool,
+    ddof: int,
+    cache_dict: tp.Dict[int, tp.Array2d],
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.MSTD`."""
     h = hash((window, ewm))
@@ -82,7 +98,12 @@ def mstd_apply_nb(
 
 @njit(cache=True)
 def bb_cache_nb(
-    close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], alphas: tp.List[float], adjust: bool, ddof: int
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    alphas: tp.List[float],
+    adjust: bool,
+    ddof: int,
 ) -> tp.Tuple[tp.Dict[int, tp.Array2d], tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbt.indicators.basic.BBANDS`."""
     ma_cache_dict = ma_cache_nb(close, windows, ewms, adjust)
@@ -112,7 +133,10 @@ def bb_apply_nb(
 
 @njit(cache=True)
 def rsi_cache_nb(
-    close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], adjust: bool
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool,
 ) -> tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]:
     """Caching function for `vectorbt.indicators.basic.RSI`."""
     delta = generic_nb.diff_nb(close)
@@ -133,7 +157,11 @@ def rsi_cache_nb(
 
 @njit(cache=True)
 def rsi_apply_nb(
-    close: tp.Array2d, window: int, ewm: bool, adjust: bool, cache_dict: tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool,
+    cache_dict: tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]],
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.RSI`."""
     h = hash((window, ewm))
@@ -237,7 +265,12 @@ def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Ar
 
 @njit(cache=True)
 def atr_cache_nb(
-    high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], adjust: bool
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool,
 ) -> tp.Tuple[tp.Array2d, tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbt.indicators.basic.ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb

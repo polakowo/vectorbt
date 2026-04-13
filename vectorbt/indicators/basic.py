@@ -134,7 +134,8 @@ class _MA(MA):
         if ma_trace_kwargs is None:
             ma_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
-            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
         )
         ma_trace_kwargs = merge_dicts(dict(name="MA"), ma_trace_kwargs)
 
@@ -159,7 +160,12 @@ MSTD = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["mstd"],
 ).from_apply_func(
-    nb.mstd_apply_nb, cache_func=nb.mstd_cache_nb, kwargs_to_args=["adjust", "ddof"], ewm=False, adjust=False, ddof=0
+    nb.mstd_apply_nb,
+    cache_func=nb.mstd_cache_nb,
+    kwargs_to_args=["adjust", "ddof"],
+    ewm=False,
+    adjust=False,
+    ddof=0,
 )
 
 
@@ -317,7 +323,8 @@ class _BBANDS(BBANDS):
         )  # default kwargs
         middle_trace_kwargs = merge_dicts(dict(name="Middle Band"), middle_trace_kwargs)
         close_trace_kwargs = merge_dicts(
-            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
         )
 
         fig = self_col.lower.vbt.plot(trace_kwargs=lower_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
@@ -343,7 +350,12 @@ RSI = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["rsi"],
 ).from_apply_func(
-    nb.rsi_apply_nb, cache_func=nb.rsi_cache_nb, kwargs_to_args=["adjust"], window=14, ewm=False, adjust=False
+    nb.rsi_apply_nb,
+    cache_func=nb.rsi_cache_nb,
+    kwargs_to_args=["adjust"],
+    window=14,
+    ewm=False,
+    adjust=False,
 )
 
 
@@ -506,10 +518,14 @@ class _STOCH(STOCH):
         percent_d_trace_kwargs = merge_dicts(dict(name="%D"), percent_d_trace_kwargs)
 
         fig = self_col.percent_k.vbt.plot(
-            trace_kwargs=percent_k_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig
+            trace_kwargs=percent_k_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
         )
         fig = self_col.percent_d.vbt.plot(
-            trace_kwargs=percent_d_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig
+            trace_kwargs=percent_d_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
         )
 
         # Plot levels
@@ -630,7 +646,10 @@ class _MACD(MACD):
         marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity("lightcoral", 0.75)
 
         hist_bar = go.Bar(
-            x=self_col.hist.index, y=self_col.hist.values, marker_color=marker_colors, marker_line_width=0
+            x=self_col.hist.index,
+            y=self_col.hist.values,
+            marker_color=marker_colors,
+            marker_line_width=0,
         )
         hist_bar.update(**hist_trace_kwargs)
         if add_trace_kwargs is None:
@@ -654,7 +673,12 @@ ATR = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["tr", "atr"],
 ).from_apply_func(
-    nb.atr_apply_nb, cache_func=nb.atr_cache_nb, kwargs_to_args=["adjust"], window=14, ewm=True, adjust=False
+    nb.atr_apply_nb,
+    cache_func=nb.atr_cache_nb,
+    kwargs_to_args=["adjust"],
+    window=14,
+    ewm=True,
+    adjust=False,
 )
 
 

@@ -2752,7 +2752,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         return heatmap
 
     def ts_heatmap(
-        self, is_y_category: bool = True, **kwargs
+        self,
+        is_y_category: bool = True,
+        **kwargs,
     ) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)

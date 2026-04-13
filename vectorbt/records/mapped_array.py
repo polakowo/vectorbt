@@ -496,7 +496,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func, column_only_select=True, **kwargs
+            pd_indexing_func,
+            column_only_select=True,
+            **kwargs,
         )
         new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
         new_mapped_arr = self.values[new_indices]
@@ -510,10 +512,15 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     def indexing_func(self: MappedArrayT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = self.indexing_func_meta(
-            pd_indexing_func, **kwargs
+            pd_indexing_func,
+            **kwargs,
         )
         return self.replace(
-            wrapper=new_wrapper, mapped_arr=new_mapped_arr, col_arr=new_col_arr, id_arr=new_id_arr, idx_arr=new_idx_arr
+            wrapper=new_wrapper,
+            mapped_arr=new_mapped_arr,
+            col_arr=new_col_arr,
+            id_arr=new_id_arr,
+            idx_arr=new_idx_arr,
         )
 
     @property
@@ -671,12 +678,18 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         if ignore_index:
             if self.wrapper.ndim == 1:
                 return self.wrapper.wrap(
-                    self.values, index=np.arange(len(self.values)), group_by=group_by, **merge_dicts({}, wrap_kwargs)
+                    self.values,
+                    index=np.arange(len(self.values)),
+                    group_by=group_by,
+                    **merge_dicts({}, wrap_kwargs),
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
             out = nb.stack_expand_mapped_nb(self.values, col_map, fill_value)
             return self.wrapper.wrap(
-                out, index=np.arange(out.shape[0]), group_by=group_by, **merge_dicts({}, wrap_kwargs)
+                out,
+                index=np.arange(out.shape[0]),
+                group_by=group_by,
+                **merge_dicts({}, wrap_kwargs),
             )
         if idx_arr is None:
             if self.idx_arr is None:
@@ -771,7 +784,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
     @cached_method
     def nth(
-        self, n: int, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return n-th element of each column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="nth"), wrap_kwargs)
@@ -787,7 +804,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
     @cached_method
     def nth_index(
-        self, n: int, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return index of n-th element of each column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="nth_index"), wrap_kwargs)
@@ -855,7 +876,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
     @cached_method
     def std(
-        self, ddof: int = 1, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs
+        self,
+        ddof: int = 1,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return std by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="std"), wrap_kwargs)
@@ -871,7 +896,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
     @cached_method
     def sum(
-        self, fill_value: tp.Scalar = 0.0, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, **kwargs
+        self,
+        fill_value: tp.Scalar = 0.0,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="sum"), wrap_kwargs)
@@ -954,7 +983,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return number of values by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="count"), wrap_kwargs)
         return self.wrapper.wrap_reduced(
-            self.col_mapper.get_col_map(group_by=group_by)[1], group_by=group_by, **wrap_kwargs
+            self.col_mapper.get_col_map(group_by=group_by)[1],
+            group_by=group_by,
+            **wrap_kwargs,
         )
 
     @cached_method
@@ -1014,7 +1045,10 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             value_counts = value_counts[new_indices]
             mapped_uniques = mapped_uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(
-            value_counts, index=mapped_uniques, group_by=group_by, **merge_dicts({}, wrap_kwargs)
+            value_counts,
+            index=mapped_uniques,
+            group_by=group_by,
+            **merge_dicts({}, wrap_kwargs),
         )
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
@@ -1067,7 +1101,10 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             std=dict(title="Std", calc_func="std", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
             min=dict(title="Min", calc_func="min", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
             median=dict(
-                title="Median", calc_func="median", inv_check_has_mapping=True, tags=["mapped_array", "describe"]
+                title="Median",
+                calc_func="median",
+                inv_check_has_mapping=True,
+                tags=["mapped_array", "describe"],
             ),
             max=dict(title="Max", calc_func="max", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
             idx_min=dict(
@@ -1124,7 +1161,10 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             to_pd_plot=dict(
-                check_is_not_grouped=True, plot_func="to_pd.vbt.plot", pass_trace_names=False, tags="mapped_array"
+                check_is_not_grouped=True,
+                plot_func="to_pd.vbt.plot",
+                pass_trace_names=False,
+                tags="mapped_array",
             )
         ),
         copy_kwargs=dict(copy_mode="deep"),

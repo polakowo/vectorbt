@@ -24,21 +24,38 @@ FMEAN = IndicatorFactory(
 FMEAN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_mean_apply_nb`."""
 
 FSTD = IndicatorFactory(
-    class_name="FSTD", module_name=__name__, input_names=["close"], param_names=["window", "ewm"], output_names=["fstd"]
+    class_name="FSTD",
+    module_name=__name__,
+    input_names=["close"],
+    param_names=["window", "ewm"],
+    output_names=["fstd"],
 ).from_apply_func(
-    nb.future_std_apply_nb, kwargs_to_args=["wait", "adjust", "ddof"], ewm=False, wait=1, adjust=False, ddof=0
+    nb.future_std_apply_nb,
+    kwargs_to_args=["wait", "adjust", "ddof"],
+    ewm=False,
+    wait=1,
+    adjust=False,
+    ddof=0,
 )
 
 FSTD.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_std_apply_nb`."""
 
 FMIN = IndicatorFactory(
-    class_name="FMIN", module_name=__name__, input_names=["close"], param_names=["window"], output_names=["fmin"]
+    class_name="FMIN",
+    module_name=__name__,
+    input_names=["close"],
+    param_names=["window"],
+    output_names=["fmin"],
 ).from_apply_func(nb.future_min_apply_nb, kwargs_to_args=["wait"], wait=1)
 
 FMIN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_min_apply_nb`."""
 
 FMAX = IndicatorFactory(
-    class_name="FMAX", module_name=__name__, input_names=["close"], param_names=["window"], output_names=["fmax"]
+    class_name="FMAX",
+    module_name=__name__,
+    input_names=["close"],
+    param_names=["window"],
+    output_names=["fmax"],
 ).from_apply_func(nb.future_max_apply_nb, kwargs_to_args=["wait"], wait=1)
 
 FMAX.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_max_apply_nb`."""
@@ -57,7 +74,11 @@ def _plot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure
 
 
 FIXLB = IndicatorFactory(
-    class_name="FIXLB", module_name=__name__, input_names=["close"], param_names=["n"], output_names=["labels"]
+    class_name="FIXLB",
+    module_name=__name__,
+    input_names=["close"],
+    param_names=["n"],
+    output_names=["labels"],
 ).from_apply_func(nb.fixed_labels_apply_nb)
 
 

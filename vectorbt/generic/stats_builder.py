@@ -470,7 +470,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             return out
 
                         calc_func = custom_reself.deep_getattr(
-                            calc_func, getattr_func=_getattr_func, call_last_attr=False
+                            calc_func,
+                            getattr_func=_getattr_func,
+                            call_last_attr=False,
                         )
 
                         if "group_by" in passed_kwargs_out:
@@ -549,7 +551,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     if checks.is_series(v):
                         if _column is not None:
                             v = custom_reself.select_one_from_obj(
-                                v, custom_reself.wrapper.regroup(_group_by), column=_column
+                                v,
+                                custom_reself.wrapper.regroup(_group_by),
+                                column=_column,
                             )
                         elif _agg_func is not None and agg_func is not None:
                             v = _agg_func(v)
@@ -597,7 +601,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         if source_cls is None:
             source_cls = StatsBuilderMixin
         return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "metrics").__doc__)).substitute(
-            {"metrics": cls.metrics.to_doc(), "cls_name": cls.__name__}
+            {"metrics": cls.metrics.to_doc(), "cls_name": cls.__name__},
         )
 
     @classmethod

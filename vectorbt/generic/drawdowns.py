@@ -364,7 +364,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         decline_duration = dispatch.dd_decline_duration(
-            self.get_field_arr("start_idx"), self.get_field_arr("valley_idx")
+            self.get_field_arr("start_idx"),
+            self.get_field_arr("valley_idx"),
         )
         return self.map_array(decline_duration)
 
@@ -376,7 +377,8 @@ class Drawdowns(Ranges):
 
         Takes into account both recovered and active drawdowns."""
         recovery_duration = dispatch.dd_recovery_duration(
-            self.get_field_arr("valley_idx"), self.get_field_arr("end_idx")
+            self.get_field_arr("valley_idx"),
+            self.get_field_arr("end_idx"),
         )
         return self.map_array(recovery_duration)
 
@@ -753,13 +755,13 @@ class Drawdowns(Ranges):
             drawdown = self_col.drawdown.values
             recovery_return = self_col.recovery_return.values
             decline_duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.decline_duration.values, to_pd=True, silence_warnings=True)
+                self_col.wrapper.to_timedelta(self_col.decline_duration.values, to_pd=True, silence_warnings=True),
             )
             recovery_duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.recovery_duration.values, to_pd=True, silence_warnings=True)
+                self_col.wrapper.to_timedelta(self_col.recovery_duration.values, to_pd=True, silence_warnings=True),
             )
             duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True),
             )
 
             status = self_col.get_field_arr("status")

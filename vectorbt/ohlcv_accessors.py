@@ -314,7 +314,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             else:
                 fig = make_figure()
             fig.update_layout(
-                showlegend=True, xaxis=dict(rangeslider_visible=False, showgrid=True), yaxis=dict(showgrid=True)
+                showlegend=True,
+                xaxis=dict(rangeslider_visible=False, showgrid=True),
+                yaxis=dict(showgrid=True),
             )
             if show_volume:
                 fig.update_layout(xaxis2=dict(showgrid=True), yaxis2=dict(showgrid=True), bargap=0)

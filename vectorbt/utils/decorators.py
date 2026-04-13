@@ -517,7 +517,8 @@ BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 
 def attach_binary_magic_methods(
-    translate_func: BinaryTranslateFuncT, config: tp.Optional[Config] = None
+    translate_func: BinaryTranslateFuncT,
+    config: tp.Optional[Config] = None,
 ) -> WrapperFuncT:
     """Class decorator to add binary magic methods to a class.
 
@@ -540,7 +541,10 @@ def attach_binary_magic_methods(
             func = settings["func"]
 
             def new_method(
-                self, other: tp.Any, _translate_func: BinaryTranslateFuncT = translate_func, _func: tp.Callable = func
+                self,
+                other: tp.Any,
+                _translate_func: BinaryTranslateFuncT = translate_func,
+                _func: tp.Callable = func,
             ) -> tp.SeriesFrame:
                 return _translate_func(self, other, _func)
 
@@ -598,7 +602,9 @@ def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT, config: tp.O
             func = settings["func"]
 
             def new_method(
-                self, _translate_func: UnaryTranslateFuncT = translate_func, _func: tp.Callable = func
+                self,
+                _translate_func: UnaryTranslateFuncT = translate_func,
+                _func: tp.Callable = func,
             ) -> tp.SeriesFrame:
                 return _translate_func(self, _func)
 

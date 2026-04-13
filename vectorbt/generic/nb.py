@@ -1071,7 +1071,11 @@ def row_apply_nb(a: tp.Array2d, apply_func_nb: tp.RowApplyFunc, *args) -> tp.Arr
 
 @njit
 def rolling_apply_nb(
-    a: tp.Array2d, window: int, minp: tp.Optional[int], apply_func_nb: tp.RollApplyFunc, *args
+    a: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    apply_func_nb: tp.RollApplyFunc,
+    *args,
 ) -> tp.Array2d:
     """Provide rolling window calculations.
 
@@ -1101,7 +1105,11 @@ def rolling_apply_nb(
 
 @njit
 def rolling_matrix_apply_nb(
-    a: tp.Array2d, window: int, minp: tp.Optional[int], apply_func_nb: tp.RollMatrixApplyFunc, *args
+    a: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    apply_func_nb: tp.RollMatrixApplyFunc,
+    *args,
 ) -> tp.Array2d:
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
@@ -1137,7 +1145,10 @@ def expanding_apply_nb(a: tp.Array2d, minp: tp.Optional[int], apply_func_nb: tp.
 
 @njit
 def expanding_matrix_apply_nb(
-    a: tp.Array2d, minp: tp.Optional[int], apply_func_nb: tp.RollMatrixApplyFunc, *args
+    a: tp.Array2d,
+    minp: tp.Optional[int],
+    apply_func_nb: tp.RollMatrixApplyFunc,
+    *args,
 ) -> tp.Array2d:
     """Expanding version of `rolling_matrix_apply_nb`."""
     return rolling_matrix_apply_nb(a, a.shape[0], minp, apply_func_nb, *args)
@@ -1213,7 +1224,11 @@ def filter_nb(a: tp.Array2d, filter_func_nb: tp.FilterFunc, *args) -> tp.Array2d
 
 @njit
 def apply_and_reduce_nb(
-    a: tp.Array2d, apply_func_nb: tp.ApplyFunc, apply_args: tuple, reduce_func_nb: tp.ReduceFunc, reduce_args: tuple
+    a: tp.Array2d,
+    apply_func_nb: tp.ApplyFunc,
+    apply_args: tuple,
+    reduce_func_nb: tp.ReduceFunc,
+    reduce_args: tuple,
 ) -> tp.Array1d:
     """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
 
@@ -1289,7 +1304,11 @@ def flatten_forder_nb(a: tp.Array2d) -> tp.Array1d:
 
 @njit
 def flat_reduce_grouped_nb(
-    a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool, reduce_func_nb: tp.FlatGroupReduceFunc, *args
+    a: tp.Array2d,
+    group_lens: tp.Array1d,
+    in_c_order: bool,
+    reduce_func_nb: tp.FlatGroupReduceFunc,
+    *args,
 ) -> tp.Array1d:
     """Same as `reduce_grouped_nb` but passes flattened array."""
     from_col = 0
@@ -1308,7 +1327,10 @@ def flat_reduce_grouped_nb(
 
 @njit
 def reduce_grouped_to_array_nb(
-    a: tp.Array2d, group_lens: tp.Array1d, reduce_func_nb: tp.GroupReduceArrayFunc, *args
+    a: tp.Array2d,
+    group_lens: tp.Array1d,
+    reduce_func_nb: tp.GroupReduceArrayFunc,
+    *args,
 ) -> tp.Array2d:
     """Reduce each group of columns into an array of values using `reduce_func_nb`.
 
@@ -1329,7 +1351,11 @@ def reduce_grouped_to_array_nb(
 
 @njit
 def flat_reduce_grouped_to_array_nb(
-    a: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool, reduce_func_nb: tp.FlatGroupReduceArrayFunc, *args
+    a: tp.Array2d,
+    group_lens: tp.Array1d,
+    in_c_order: bool,
+    reduce_func_nb: tp.FlatGroupReduceArrayFunc,
+    *args,
 ) -> tp.Array2d:
     """Same as `reduce_grouped_to_array_nb` but passes flattened 1D array."""
     from_col = 0
@@ -1348,7 +1374,10 @@ def flat_reduce_grouped_to_array_nb(
 
 @njit
 def squeeze_grouped_nb(
-    a: tp.Array2d, group_lens: tp.Array1d, squeeze_func_nb: tp.GroupSqueezeFunc, *args
+    a: tp.Array2d,
+    group_lens: tp.Array1d,
+    squeeze_func_nb: tp.GroupSqueezeFunc,
+    *args,
 ) -> tp.Array2d:
     """Squeeze each group of columns into a single column using `squeeze_func_nb`.
 
@@ -1694,7 +1723,11 @@ def range_coverage_nb(
 
 @njit(cache=True)
 def ranges_to_mask_nb(
-    start_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d, status_arr: tp.Array2d, col_map: tp.ColMap, index_len: int
+    start_idx_arr: tp.Array1d,
+    end_idx_arr: tp.Array1d,
+    status_arr: tp.Array2d,
+    col_map: tp.ColMap,
+    index_len: int,
 ) -> tp.Array2d:
     """Convert ranges to 2-dim mask."""
     col_idxs, col_lens = col_map
@@ -1842,7 +1875,9 @@ def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d)
 
 @njit(cache=True)
 def dd_recovery_duration_ratio_nb(
-    start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d
+    start_idx_arr: tp.Array1d,
+    valley_idx_arr: tp.Array1d,
+    end_idx_arr: tp.Array1d,
 ) -> tp.Array1d:
     """Return the ratio of the recovery duration to the decline duration of each drawdown record."""
     recovery_duration = dd_recovery_duration_nb(valley_idx_arr, end_idx_arr)

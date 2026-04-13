@@ -1585,7 +1585,8 @@ def run_pipeline(
     if param_settings is None:
         param_settings = {}
     checks.assert_dict_sequence_valid(
-        param_settings, ["dtype", "is_tuple", "is_array_like", "bc_to_input", "broadcast_kwargs", "per_column"]
+        param_settings,
+        ["dtype", "is_tuple", "is_array_like", "bc_to_input", "broadcast_kwargs", "per_column"],
     )
     if hide_levels is None:
         hide_levels = []
@@ -1613,7 +1614,9 @@ def run_pipeline(
             broadcast_kwargs,
         )
         bc_input_list, input_shape, input_index, input_columns = reshape_fns.broadcast(
-            *input_list, return_meta=True, **broadcast_kwargs
+            *input_list,
+            return_meta=True,
+            **broadcast_kwargs,
         )
         if input_index is None:
             input_index = pd.RangeIndex(start=0, step=1, stop=input_shape[0])
@@ -1797,10 +1800,18 @@ def run_pipeline(
                         **_func_kwargs,
                     )
                 return custom_func(
-                    _input_list_ready, _in_output_list_ready, _param_list_ready, *_func_args, **_func_kwargs
+                    _input_list_ready,
+                    _in_output_list_ready,
+                    _param_list_ready,
+                    *_func_args,
+                    **_func_kwargs,
                 )
             return custom_func(
-                *_input_list_ready, *_in_output_list_ready, *_param_list_ready, *_func_args, **_func_kwargs
+                *_input_list_ready,
+                *_in_output_list_ready,
+                *_param_list_ready,
+                *_func_args,
+                **_func_kwargs,
             )
 
         if per_column:
@@ -1842,19 +1853,28 @@ def run_pipeline(
                 if pass_col:
                     _func_kwargs["col"] = col
                 col_output = _call_custom_func(
-                    _input_list_ready, _in_output_list_ready, _param_list_ready, *_func_args, **_func_kwargs
+                    _input_list_ready,
+                    _in_output_list_ready,
+                    _param_list_ready,
+                    *_func_args,
+                    **_func_kwargs,
                 )
                 output.append(col_output)
         else:
             output = _call_custom_func(
-                input_list_ready, in_output_list_ready, param_list_ready, *func_args, **func_kwargs
+                input_list_ready,
+                in_output_list_ready,
+                param_list_ready,
+                *func_args,
+                **func_kwargs,
             )
 
         # Return cache
         if kwargs.get("return_cache", False):
             if use_run_unique and not silence_warnings:
                 warnings.warn(
-                    "Cache is produced by unique parameter " "combinations when run_unique=True", stacklevel=2
+                    "Cache is produced by unique parameter " "combinations when run_unique=True",
+                    stacklevel=2,
                 )
             return output
 
@@ -1922,7 +1942,8 @@ def run_pipeline(
         if return_raw:
             if use_run_unique and not silence_warnings:
                 warnings.warn(
-                    "Raw output is produced by unique parameter " "combinations when run_unique=True", stacklevel=2
+                    "Raw output is produced by unique parameter " "combinations when run_unique=True",
+                    stacklevel=2,
                 )
             return raw
         if use_run_unique:
@@ -2335,7 +2356,8 @@ class IndicatorFactory:
 
         # Set up class
         ParamIndexer = build_param_indexer(
-            param_names + (["tuple"] if len(param_names) > 1 else []), module_name=module_name
+            param_names + (["tuple"] if len(param_names) > 1 else []),
+            module_name=module_name,
         )
         Indicator = type(self.class_name, (IndicatorBase, ParamIndexer), {})
         Indicator.__doc__ = self.class_docstring
@@ -2438,7 +2460,11 @@ class IndicatorFactory:
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
         def assign_combine_method(
-            func_name: str, combine_func: tp.Callable, def_kwargs: tp.Kwargs, attr_name: str, docstring: str
+            func_name: str,
+            combine_func: tp.Callable,
+            def_kwargs: tp.Kwargs,
+            attr_name: str,
+            docstring: str,
         ) -> None:
             def combine_method(
                 self: IndicatorBaseT,
@@ -2486,7 +2512,9 @@ class IndicatorFactory:
             if checks.is_mapping_like(dtype):
 
                 def attr_readable(
-                    self, _attr_name: str = attr_name, _mapping: tp.MappingLike = dtype
+                    self,
+                    _attr_name: str = attr_name,
+                    _mapping: tp.MappingLike = dtype,
                 ) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping()
 
@@ -2501,7 +2529,11 @@ class IndicatorFactory:
                 setattr(Indicator, f"{attr_name}_readable", property(attr_readable))
 
                 def attr_stats(
-                    self, *args, _attr_name: str = attr_name, _mapping: tp.MappingLike = dtype, **kwargs
+                    self,
+                    *args,
+                    _attr_name: str = attr_name,
+                    _mapping: tp.MappingLike = dtype,
+                    **kwargs,
                 ) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
@@ -2809,7 +2841,10 @@ class IndicatorFactory:
 
         # Add private run method
         def_run_kwargs = dict(
-            short_name=short_name, hide_params=hide_params, hide_default=hide_default, **default_kwargs
+            short_name=short_name,
+            hide_params=hide_params,
+            hide_default=hide_default,
+            **default_kwargs,
         )
 
         def _run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
@@ -2818,7 +2853,9 @@ class IndicatorFactory:
             _hide_default = kwargs.pop("hide_default", def_run_kwargs["hide_default"])
             _param_settings = _merge_settings(param_settings, kwargs.pop("param_settings", {}), [param_names])
             _in_output_settings = _merge_settings(
-                in_output_settings, kwargs.pop("in_output_settings", {}), [in_output_names]
+                in_output_settings,
+                kwargs.pop("in_output_settings", {}),
+                [in_output_names],
             )
 
             if _hide_params is None:
@@ -2955,7 +2992,8 @@ Pass a list of parameter names as `hide_params` to hide their column levels.
 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
 Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.""".format(
-            _0, _1
+            _0,
+            _1,
         )
         run = compile_run_function("run", run_docstring, def_run_kwargs)
         setattr(Indicator, "run", run)
@@ -3019,7 +3057,13 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 # Speed up by pre-calculating raw outputs
                 if _run_unique:
                     raw_results = cls._run(
-                        *input_list, *param_list, *in_output_list, *args, return_raw=True, run_unique=False, **kwargs
+                        *input_list,
+                        *param_list,
+                        *in_output_list,
+                        *args,
+                        return_raw=True,
+                        run_unique=False,
+                        **kwargs,
                     )
                     kwargs["use_raw"] = raw_results  # use them next time
 
@@ -3069,7 +3113,8 @@ Set `run_unique` to True to first compute raw outputs for all parameters,
 and then use them to build each indicator (faster).
 
 Other keyword arguments are passed to `{0}.run`.""".format(
-                _0, _1
+                _0,
+                _1,
             )
             run_combs = compile_run_function("run_combs", run_combs_docstring, def_run_combs_kwargs)
             setattr(Indicator, "run_combs", run_combs)
@@ -3318,7 +3363,13 @@ Other keyword arguments are passed to `{0}.run`.""".format(
                     if len(param_list) > 0:
                         _param_list = [to_typed_list(params) for params in param_list]
                 cache = cache_func(
-                    *args_before, *input_tuple, *_in_output_list, *_param_list, *args, *more_args, **_kwargs
+                    *args_before,
+                    *input_tuple,
+                    *_in_output_list,
+                    *_param_list,
+                    *args,
+                    *more_args,
+                    **_kwargs,
                 )
             if return_cache:
                 return cache
@@ -3466,7 +3517,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
     @classmethod
     def parse_pandas_ta_config(
-        cls, func: tp.Callable, test_input_names: tp.Optional[tp.Sequence[str]] = None, test_index_len: int = 100
+        cls,
+        func: tp.Callable,
+        test_input_names: tp.Optional[tp.Sequence[str]] = None,
+        test_index_len: int = 100,
     ) -> tp.Kwargs:
         """Get the config of a pandas-ta indicator."""
         if test_input_names is None:
@@ -3576,7 +3630,11 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
     @classmethod
     def from_pandas_ta(
-        cls, func_name: str, parse_kwargs: tp.KwargsLike = None, init_kwargs: tp.KwargsLike = None, **kwargs
+        cls,
+        func_name: str,
+        parse_kwargs: tp.KwargsLike = None,
+        init_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.Type[IndicatorBase]:
         """Build an indicator class around a pandas-ta function.
 
@@ -3708,7 +3766,12 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
         defaults = config.pop("defaults")
         PTAIndicator = cls(**merge_dicts(config, init_kwargs)).from_apply_func(
-            apply_func, pass_packed=True, keep_pd=True, to_2d=False, **defaults, **kwargs
+            apply_func,
+            pass_packed=True,
+            keep_pd=True,
+            to_2d=False,
+            **defaults,
+            **kwargs,
         )
         return PTAIndicator
 
@@ -3878,6 +3941,11 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
         defaults = config.pop("defaults")
         TAIndicator = cls(**merge_dicts(config, init_kwargs)).from_apply_func(
-            apply_func, pass_packed=True, keep_pd=True, to_2d=False, **defaults, **kwargs
+            apply_func,
+            pass_packed=True,
+            keep_pd=True,
+            to_2d=False,
+            **defaults,
+            **kwargs,
         )
         return TAIndicator

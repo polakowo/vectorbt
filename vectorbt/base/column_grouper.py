@@ -284,7 +284,7 @@ class ColumnGrouper(Configured):
         """See get_group_lens_nb."""
         if not self.is_sorted(group_by=group_by):
             raise ValueError(
-                "group_by must lead to groups that are coherent and sorted " "(such as [0, 0, 1, 2, 2, ...])"
+                "group_by must lead to groups that are coherent and sorted " "(such as [0, 0, 1, 2, 2, ...])",
             )
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping

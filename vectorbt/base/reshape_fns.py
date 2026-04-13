@@ -124,14 +124,16 @@ def repeat(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False) -> tp.An
     if axis == 0:
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.repeat(arg.values, n, axis=0), index=index_fns.repeat_index(arg.index, n)
+                np.repeat(arg.values, n, axis=0),
+                index=index_fns.repeat_index(arg.index, n),
             )
         return np.repeat(arg, n, axis=0)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.repeat(arg.values, n, axis=1), columns=index_fns.repeat_index(arg.columns, n)
+                np.repeat(arg.values, n, axis=1),
+                columns=index_fns.repeat_index(arg.columns, n),
             )
         return np.repeat(arg, n, axis=1)
     else:
@@ -145,19 +147,22 @@ def tile(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False) -> tp.AnyA
         if arg.ndim == 2:
             if checks.is_pandas(arg):
                 return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                    np.tile(arg.values, (n, 1)), index=index_fns.tile_index(arg.index, n)
+                    np.tile(arg.values, (n, 1)),
+                    index=index_fns.tile_index(arg.index, n),
                 )
             return np.tile(arg, (n, 1))
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.tile(arg.values, n), index=index_fns.tile_index(arg.index, n)
+                np.tile(arg.values, n),
+                index=index_fns.tile_index(arg.index, n),
             )
         return np.tile(arg, n)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return array_wrapper.ArrayWrapper.from_obj(arg).wrap(
-                np.tile(arg.values, (1, n)), columns=index_fns.tile_index(arg.columns, n)
+                np.tile(arg.values, (1, n)),
+                columns=index_fns.tile_index(arg.columns, n),
             )
         return np.tile(arg, (1, n))
     else:
@@ -630,7 +635,11 @@ def broadcast(
         else:
             _is_pd = is_pd
         new_args[i] = wrap_broadcasted(
-            arr_args[i], new_args[i], is_pd=_is_pd, new_index=new_index, new_columns=new_columns
+            arr_args[i],
+            new_args[i],
+            is_pd=_is_pd,
+            new_index=new_index,
+            new_columns=new_columns,
         )
 
     if len(new_args) > 1:
@@ -724,7 +733,10 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
 
 
 def broadcast_to_axis_of(
-    arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: int, require_kwargs: tp.KwargsLike = None
+    arg1: tp.ArrayLike,
+    arg2: tp.ArrayLike,
+    axis: int,
+    require_kwargs: tp.KwargsLike = None,
 ) -> tp.Array:
     """Broadcast `arg1` to an axis of `arg2`.
 

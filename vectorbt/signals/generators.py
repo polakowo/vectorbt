@@ -23,7 +23,11 @@ from vectorbt.utils.figure import make_figure
 # ############# RAND ############# #
 
 RAND = SignalFactory(
-    class_name="RAND", module_name=__name__, short_name="rand", mode="entries", param_names=["n"]
+    class_name="RAND",
+    module_name=__name__,
+    short_name="rand",
+    mode="entries",
+    param_names=["n"],
 ).from_choice_func(
     entry_choice_func=rand_choice_nb,
     entry_settings=dict(pass_params=["n"]),
@@ -86,7 +90,9 @@ class _RAND(RAND):
 setattr(RAND, "__doc__", _RAND.__doc__)
 
 RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").from_choice_func(
-    exit_choice_func=rand_choice_nb, exit_settings=dict(pass_kwargs=dict(n=1)), seed=None
+    exit_choice_func=rand_choice_nb,
+    exit_settings=dict(pass_kwargs=dict(n=1)),
+    seed=None,
 )
 
 
@@ -124,7 +130,11 @@ class _RANDX(RANDX):
 setattr(RANDX, "__doc__", _RANDX.__doc__)
 
 RANDNX = SignalFactory(
-    class_name="RANDNX", module_name=__name__, short_name="randnx", mode="both", param_names=["n"]
+    class_name="RANDNX",
+    module_name=__name__,
+    short_name="randnx",
+    mode="both",
+    param_names=["n"],
 ).from_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
     require_input_shape=True,
@@ -182,7 +192,11 @@ setattr(RANDNX, "__doc__", _RANDNX.__doc__)
 # ############# RPROB ############# #
 
 RPROB = SignalFactory(
-    class_name="RPROB", module_name=__name__, short_name="rprob", mode="entries", param_names=["prob"]
+    class_name="RPROB",
+    module_name=__name__,
+    short_name="rprob",
+    mode="entries",
+    param_names=["prob"],
 ).from_choice_func(
     entry_choice_func=rand_by_prob_choice_nb,
     entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
@@ -243,7 +257,7 @@ class _RPROB(RPROB):
 setattr(RPROB, "__doc__", _RPROB.__doc__)
 
 rprobx_config = Config(
-    dict(class_name="RPROBX", module_name=__name__, short_name="rprobx", mode="exits", param_names=["prob"])
+    dict(class_name="RPROBX", module_name=__name__, short_name="rprobx", mode="exits", param_names=["prob"]),
 )
 """Factory config for `RPROBX`."""
 
@@ -274,7 +288,7 @@ class _RPROBX(RPROBX):
 setattr(RPROBX, "__doc__", _RPROBX.__doc__)
 
 RPROBCX = SignalFactory(
-    **rprobx_config.merge_with(dict(class_name="RPROBCX", short_name="rprobcx", mode="chain"))
+    **rprobx_config.merge_with(dict(class_name="RPROBCX", short_name="rprobcx", mode="chain")),
 ).from_choice_func(**rprobx_func_config)
 
 
@@ -432,7 +446,7 @@ class _STX(STX):
 setattr(STX, "__doc__", _STX.__doc__)
 
 STCX = SignalFactory(
-    **stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain"))
+    **stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain")),
 ).from_choice_func(**stx_func_config)
 
 
@@ -526,7 +540,10 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         if fig is None:
             fig = make_figure()
             fig.update_layout(
-                showlegend=True, xaxis_rangeslider_visible=False, xaxis_showgrid=True, yaxis_showgrid=True
+                showlegend=True,
+                xaxis_rangeslider_visible=False,
+                xaxis_showgrid=True,
+                yaxis_showgrid=True,
             )
         fig.update_layout(**layout_kwargs)
 
@@ -580,7 +597,8 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
         fig (Figure or FigureWidget): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.""".format(
-        base_cls.__name__, entries_attr
+        base_cls.__name__,
+        entries_attr,
     )
 
     if entries_attr == "entries":
@@ -679,7 +697,7 @@ setattr(OHLCSTX, "__doc__", _OHLCSTX.__doc__)
 setattr(OHLCSTX, "plot", _OHLCSTX.plot)
 
 OHLCSTCX = SignalFactory(
-    **ohlcstx_config.merge_with(dict(class_name="OHLCSTCX", short_name="ohlcstcx", mode="chain"))
+    **ohlcstx_config.merge_with(dict(class_name="OHLCSTCX", short_name="ohlcstcx", mode="chain")),
 ).from_choice_func(**ohlcstx_func_config)
 
 

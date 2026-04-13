@@ -78,7 +78,7 @@ BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
 
 @attach_binary_magic_methods(
-    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func)
+    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func),
 )
 @attach_unary_magic_methods(lambda self, np_func: self.apply(apply_func=np_func))
 class BaseAccessor(Wrapping):
@@ -164,7 +164,12 @@ class BaseAccessor(Wrapping):
     # ############# Index and columns ############# #
 
     def apply_on_index(
-        self, apply_func: tp.Callable, *args, axis: int = 1, inplace: bool = False, **kwargs
+        self,
+        apply_func: tp.Callable,
+        *args,
+        axis: int = 1,
+        inplace: bool = False,
+        **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
         """Apply function `apply_func` on index of the pandas object.
 
@@ -192,7 +197,12 @@ class BaseAccessor(Wrapping):
             return obj
 
     def stack_index(
-        self, index: tp.Index, on_top: bool = True, axis: int = 1, inplace: bool = False, **kwargs
+        self,
+        index: tp.Index,
+        on_top: bool = True,
+        axis: int = 1,
+        inplace: bool = False,
+        **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.stack_indexes`.
 
@@ -208,7 +218,11 @@ class BaseAccessor(Wrapping):
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_levels(
-        self, levels: tp.MaybeLevelSequence, axis: int = 1, inplace: bool = False, strict: bool = True
+        self,
+        levels: tp.MaybeLevelSequence,
+        axis: int = 1,
+        inplace: bool = False,
+        strict: bool = True,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.drop_levels`.
 
@@ -220,7 +234,11 @@ class BaseAccessor(Wrapping):
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def rename_levels(
-        self, name_dict: tp.Dict[str, tp.Any], axis: int = 1, inplace: bool = False, strict: bool = True
+        self,
+        name_dict: tp.Dict[str, tp.Any],
+        axis: int = 1,
+        inplace: bool = False,
+        strict: bool = True,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.rename_levels`.
 
@@ -232,7 +250,10 @@ class BaseAccessor(Wrapping):
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def select_levels(
-        self, level_names: tp.MaybeLevelSequence, axis: int = 1, inplace: bool = False
+        self,
+        level_names: tp.MaybeLevelSequence,
+        axis: int = 1,
+        inplace: bool = False,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.select_levels`.
 
@@ -254,7 +275,10 @@ class BaseAccessor(Wrapping):
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_duplicate_levels(
-        self, keep: tp.Optional[str] = None, axis: int = 1, inplace: bool = False
+        self,
+        keep: tp.Optional[str] = None,
+        axis: int = 1,
+        inplace: bool = False,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
@@ -280,7 +304,11 @@ class BaseAccessor(Wrapping):
         return reshape_fns.to_2d_array(self.obj)
 
     def tile(
-        self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1, wrap_kwargs: tp.KwargsLike = None
+        self,
+        n: int,
+        keys: tp.Optional[tp.IndexLike] = None,
+        axis: int = 1,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.tile`.
 
@@ -291,17 +319,23 @@ class BaseAccessor(Wrapping):
             if axis == 1:
                 new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
                 return ArrayWrapper.from_obj(tiled).wrap(
-                    tiled.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs)
+                    tiled.values,
+                    **merge_dicts(dict(columns=new_columns), wrap_kwargs),
                 )
             else:
                 new_index = index_fns.combine_indexes([keys, self.wrapper.index])
                 return ArrayWrapper.from_obj(tiled).wrap(
-                    tiled.values, **merge_dicts(dict(index=new_index), wrap_kwargs)
+                    tiled.values,
+                    **merge_dicts(dict(index=new_index), wrap_kwargs),
                 )
         return tiled
 
     def repeat(
-        self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1, wrap_kwargs: tp.KwargsLike = None
+        self,
+        n: int,
+        keys: tp.Optional[tp.IndexLike] = None,
+        axis: int = 1,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.repeat`.
 
@@ -312,12 +346,14 @@ class BaseAccessor(Wrapping):
             if axis == 1:
                 new_columns = index_fns.combine_indexes([self.wrapper.columns, keys])
                 return ArrayWrapper.from_obj(repeated).wrap(
-                    repeated.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs)
+                    repeated.values,
+                    **merge_dicts(dict(columns=new_columns), wrap_kwargs),
                 )
             else:
                 new_index = index_fns.combine_indexes([self.wrapper.index, keys])
                 return ArrayWrapper.from_obj(repeated).wrap(
-                    repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs)
+                    repeated.values,
+                    **merge_dicts(dict(index=new_index), wrap_kwargs),
                 )
         return repeated
 
@@ -358,7 +394,9 @@ class BaseAccessor(Wrapping):
         aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
         return self.wrapper.wrap(
-            obj.values, group_by=False, **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs)
+            obj.values,
+            group_by=False,
+            **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs),
         )
 
     @class_or_instancemethod

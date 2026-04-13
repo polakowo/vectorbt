@@ -193,7 +193,10 @@ def is_col_idx_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
 
 @njit
 def mapped_to_mask_nb(
-    mapped_arr: tp.Array1d, col_map: tp.ColMap, inout_map_func_nb: tp.MaskInOutMapFunc, *args
+    mapped_arr: tp.Array1d,
+    col_map: tp.ColMap,
+    inout_map_func_nb: tp.MaskInOutMapFunc,
+    *args,
 ) -> tp.Array1d:
     """Map mapped array to a mask per column.
 
@@ -230,7 +233,10 @@ def bottom_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_
 
 @njit
 def apply_on_mapped_nb(
-    mapped_arr: tp.Array1d, col_map: tp.ColMap, apply_func_nb: tp.MappedApplyFunc, *args
+    mapped_arr: tp.Array1d,
+    col_map: tp.ColMap,
+    apply_func_nb: tp.MappedApplyFunc,
+    *args,
 ) -> tp.Array1d:
     """Apply function on mapped array per column.
 
@@ -254,7 +260,10 @@ def apply_on_mapped_nb(
 
 @njit
 def apply_on_records_nb(
-    records: tp.RecordArray, col_map: tp.ColMap, apply_func_nb: tp.RecordApplyFunc, *args
+    records: tp.RecordArray,
+    col_map: tp.ColMap,
+    apply_func_nb: tp.RecordApplyFunc,
+    *args,
 ) -> tp.Array1d:
     """Apply function on records per column.
 
@@ -391,7 +400,11 @@ def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_valu
 
 @njit
 def reduce_mapped_nb(
-    mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float, reduce_func_nb: tp.ReduceFunc, *args
+    mapped_arr: tp.Array1d,
+    col_map: tp.ColMap,
+    fill_value: float,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
 ) -> tp.Array1d:
     """Reduce mapped array by column to a single value.
 
@@ -446,7 +459,11 @@ def reduce_mapped_to_idx_nb(
 
 @njit
 def reduce_mapped_to_array_nb(
-    mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float, reduce_func_nb: tp.ReduceFunc, *args
+    mapped_arr: tp.Array1d,
+    col_map: tp.ColMap,
+    fill_value: float,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
 ) -> tp.Array2d:
     """Reduce mapped array by column to an array.
 

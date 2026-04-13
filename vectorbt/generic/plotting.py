@@ -458,7 +458,9 @@ class Histogram(Configured, TraceUpdater):
             if trace_name is not None:
                 trace_name = str(trace_name)
             hist = go.Histogram(
-                opacity=0.75 if len(trace_names) > 1 else 1, name=trace_name, showlegend=trace_name is not None
+                opacity=0.75 if len(trace_names) > 1 else 1,
+                name=trace_name,
+                showlegend=trace_name is not None,
             )
             hist.update(**_trace_kwargs)
             fig.add_trace(hist, **add_trace_kwargs)

@@ -341,7 +341,11 @@ def rand_by_prob_choice_nb(
 
 @njit
 def generate_rand_by_prob_nb(
-    shape: tp.Shape, prob: tp.MaybeArray[float], pick_first: bool, flex_2d: bool, seed: tp.Optional[int] = None
+    shape: tp.Shape,
+    prob: tp.MaybeArray[float],
+    pick_first: bool,
+    flex_2d: bool,
+    seed: tp.Optional[int] = None,
 ) -> tp.Array2d:
     """Create a boolean matrix of `shape` and pick signals randomly by probability `prob`.
 
@@ -360,7 +364,11 @@ def generate_rand_by_prob_nb(
 
 @njit
 def generate_rand_ex_nb(
-    entries: tp.Array2d, wait: int, until_next: bool, skip_until_exit: bool, seed: tp.Optional[int] = None
+    entries: tp.Array2d,
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    seed: tp.Optional[int] = None,
 ) -> tp.Array2d:
     """Pick an exit after each entry in `entries`.
 
@@ -388,13 +396,26 @@ def generate_rand_ex_by_prob_nb(
         np.random.seed(seed)
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
     return generate_ex_nb(
-        entries, wait, until_next, skip_until_exit, True, rand_by_prob_choice_nb, prob, True, temp_idx_arr, flex_2d
+        entries,
+        wait,
+        until_next,
+        skip_until_exit,
+        True,
+        rand_by_prob_choice_nb,
+        prob,
+        True,
+        temp_idx_arr,
+        flex_2d,
     )
 
 
 @njit
 def generate_rand_enex_nb(
-    shape: tp.Shape, n: tp.MaybeArray[int], entry_wait: int, exit_wait: int, seed: tp.Optional[int] = None
+    shape: tp.Shape,
+    n: tp.MaybeArray[int],
+    entry_wait: int,
+    exit_wait: int,
+    seed: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick a number of entries and the same number of exits one after another.
 
@@ -491,7 +512,10 @@ def generate_rand_enex_nb(
 
 
 def rand_enex_apply_nb(
-    input_shape: tp.Shape, n: tp.MaybeArray[int], entry_wait: int, exit_wait: int
+    input_shape: tp.Shape,
+    n: tp.MaybeArray[int],
+    entry_wait: int,
+    exit_wait: int,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """`apply_func_nb` that calls `generate_rand_enex_nb`."""
     return generate_rand_enex_nb(input_shape, n, entry_wait, exit_wait)
@@ -1160,7 +1184,11 @@ def between_partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
 
 @njit
 def rank_nb(
-    a: tp.Array2d, reset_by: tp.Optional[tp.Array1d], after_false: bool, rank_func_nb: tp.RankFunc, *args
+    a: tp.Array2d,
+    reset_by: tp.Optional[tp.Array1d],
+    after_false: bool,
+    rank_func_nb: tp.RankFunc,
+    *args,
 ) -> tp.Array2d:
     """Rank each signal using `rank_func_nb`.
 
@@ -1197,7 +1225,13 @@ def rank_nb(
 
 @njit(cache=True)
 def sig_pos_rank_nb(
-    i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int, sig_pos_temp: tp.Array1d, allow_gaps: bool
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    sig_pos_temp: tp.Array1d,
+    allow_gaps: bool,
 ) -> int:
     """`rank_func_nb` that returns the rank of each signal by its position in the partition."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
@@ -1210,7 +1244,12 @@ def sig_pos_rank_nb(
 
 @njit(cache=True)
 def part_pos_rank_nb(
-    i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int, part_pos_temp: tp.Array1d
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    part_pos_temp: tp.Array1d,
 ) -> int:
     """`rank_func_nb` that returns the rank of each partition by its position in the series."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:

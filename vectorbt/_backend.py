@@ -155,7 +155,8 @@ def col_map_compatible_with_rust(col_map: tp.Any) -> RustSupport:
     except (TypeError, ValueError):
         return RustSupport(False, "Rust backend requires `col_map` to be a pair of NumPy arrays.")
     return combine_rust_support(
-        array_compatible_with_rust(col_idxs, dtype=np.int64), non_neg_array_compatible_with_rust("col_lens", col_lens)
+        array_compatible_with_rust(col_idxs, dtype=np.int64),
+        non_neg_array_compatible_with_rust("col_lens", col_lens),
     )
 
 

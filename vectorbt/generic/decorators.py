@@ -65,7 +65,7 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                 self_arg = new_method_params[0]
                 wrap_kwargs_arg = new_method_params[-2]
                 source_sig = source_sig.replace(
-                    parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,)
+                    parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,),
                 )
                 new_method.__signature__ = source_sig
 
@@ -121,7 +121,7 @@ def attach_transform_methods(config: Config) -> WrapperFuncT:
                 if inspect.isclass(transformer):
                     transformer_params = tuple(source_sig.parameters.values())
                     source_sig = inspect.Signature(
-                        (new_method_params[0],) + transformer_params[1:] + (new_method_params[-1],)
+                        (new_method_params[0],) + transformer_params[1:] + (new_method_params[-1],),
                     )
                     new_method.__signature__ = source_sig
                 else:

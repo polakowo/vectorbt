@@ -241,7 +241,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             idx_mapper = pd_indexing_func(
                 i_wrapper.wrap(
-                    np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)), index=index, columns=columns
+                    np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
+                    index=index,
+                    columns=columns,
                 )
             )
             if i_wrapper.ndim == 1:
@@ -251,7 +253,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 col_idxs = 0
             else:
                 col_mapper = pd_indexing_func(
-                    i_wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), index=index, columns=columns)
+                    i_wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), index=index, columns=columns),
                 )
                 if checks.is_frame(idx_mapper):
                     idx_idxs = idx_mapper.values[:, 0]
@@ -450,7 +452,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         return freq
 
     def to_timedelta(
-        self, a: tp.MaybeArray[float], to_pd: bool = False, silence_warnings: tp.Optional[bool] = None
+        self,
+        a: tp.MaybeArray[float],
+        to_pd: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbt._settings import settings
@@ -517,7 +522,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.regroup(group_by=group_by, **kwargs)
         if _self.grouper.is_grouped():
             return _self.replace(
-                columns=_self.grouper.get_columns(), ndim=_self.grouped_ndim, grouped_ndim=None, group_by=None
+                columns=_self.grouper.get_columns(),
+                ndim=_self.grouped_ndim,
+                grouped_ndim=None,
+                group_by=None,
             )
         return _self  # important for keeping cache
 

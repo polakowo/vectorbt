@@ -174,7 +174,10 @@ def has_templates(obj: tp.Any) -> tp.Any:
 
 
 def deep_substitute(
-    obj: tp.Any, mapping: tp.Optional[tp.Mapping] = None, safe: bool = False, make_copy: bool = True
+    obj: tp.Any,
+    mapping: tp.Optional[tp.Mapping] = None,
+    safe: bool = False,
+    make_copy: bool = True,
 ) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a mapping.
 

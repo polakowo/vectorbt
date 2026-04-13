@@ -74,7 +74,9 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
 
 
 def renormalize(
-    a: tp.MaybeArray[float], from_range: tp.Tuple[float, float], to_range: tp.Tuple[float, float]
+    a: tp.MaybeArray[float],
+    from_range: tp.Tuple[float, float],
+    to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
     """Renormalize `a` from one range to another."""
     from_delta = from_range[1] - from_range[0]

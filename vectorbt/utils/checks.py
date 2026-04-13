@@ -157,7 +157,9 @@ def func_accepts_arg(func: tp.Callable, arg_name: str, arg_kind: tp.Optional[tp.
 
 
 def is_equal(
-    arg1: tp.Any, arg2: tp.Any, equality_func: tp.Callable[[tp.Any, tp.Any], bool] = lambda x, y: x == y
+    arg1: tp.Any,
+    arg2: tp.Any,
+    equality_func: tp.Callable[[tp.Any, tp.Any], bool] = lambda x, y: x == y,
 ) -> bool:
     """Check whether two objects are equal."""
     try:
@@ -455,7 +457,9 @@ def assert_len_equal(arg1: tp.Sized, arg2: tp.Sized) -> None:
 
 
 def assert_shape_equal(
-    arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: tp.Optional[tp.Union[int, tp.Tuple[int, int]]] = None
+    arg1: tp.ArrayLike,
+    arg2: tp.ArrayLike,
+    axis: tp.Optional[tp.Union[int, tp.Tuple[int, int]]] = None,
 ) -> None:
     """Raise exception if the first argument and the second argument have different shapes along `axis`."""
     arg1 = _to_any_array(arg1)

@@ -535,7 +535,9 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                 return out
 
                             plot_func = custom_reself.deep_getattr(
-                                plot_func, getattr_func=_getattr_func, call_last_attr=False
+                                plot_func,
+                                getattr_func=_getattr_func,
+                                call_last_attr=False,
                             )
 
                             if "group_by" in passed_kwargs_out:
@@ -665,7 +667,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         if source_cls is None:
             source_cls = PlotsBuilderMixin
         return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "subplots").__doc__)).substitute(
-            {"subplots": cls.subplots.to_doc(), "cls_name": cls.__name__}
+            {"subplots": cls.subplots.to_doc(), "cls_name": cls.__name__},
         )
 
     @classmethod

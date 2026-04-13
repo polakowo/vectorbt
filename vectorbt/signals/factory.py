@@ -74,7 +74,12 @@ class SignalFactory(IndicatorFactory):
             attr_settings[output_name] = dict(dtype=np.bool_)
 
         IndicatorFactory.__init__(
-            self, *args, input_names=input_names, output_names=output_names, attr_settings=attr_settings, **kwargs
+            self,
+            *args,
+            input_names=input_names,
+            output_names=output_names,
+            attr_settings=attr_settings,
+            **kwargs,
         )
         self.mode = mode
 
@@ -97,7 +102,8 @@ class SignalFactory(IndicatorFactory):
             if exit_trace_kwargs is None:
                 exit_trace_kwargs = {}
             entry_trace_kwargs = merge_dicts(
-                dict(name="New Entry" if mode == FactoryMode.Chain else "Entry"), entry_trace_kwargs
+                dict(name="New Entry" if mode == FactoryMode.Chain else "Entry"),
+                entry_trace_kwargs,
             )
             exit_trace_kwargs = merge_dicts(dict(name="Exit"), exit_trace_kwargs)
             if entry_types is not None:
@@ -109,32 +115,54 @@ class SignalFactory(IndicatorFactory):
             if exit_types is not None:
                 exit_types = np.asarray(exit_types)
                 exit_trace_kwargs = merge_dicts(
-                    dict(customdata=exit_types, hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"), exit_trace_kwargs
+                    dict(customdata=exit_types, hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"),
+                    exit_trace_kwargs,
                 )
             if mode == FactoryMode.Entries:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
             elif mode == FactoryMode.Exits:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
             elif mode == FactoryMode.Both:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
             else:
                 fig = _self.new_entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
                 )
 
             return fig
@@ -153,7 +181,8 @@ class SignalFactory(IndicatorFactory):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_markers`.
         """.format(
-            self.class_name, "new_entries" if mode == FactoryMode.Chain else "entries"
+            self.class_name,
+            "new_entries" if mode == FactoryMode.Chain else "entries",
         )
 
         setattr(self.Indicator, "plot", plot)
@@ -801,7 +830,11 @@ class SignalFactory(IndicatorFactory):
                         _cache_param_list = [to_typed_list(params) for params in _cache_param_list]
 
                 cache = cache_func(
-                    *cache_input_tuple, *_cache_in_output_list, *_cache_param_list, *cache_args, *cache_more_args
+                    *cache_input_tuple,
+                    *_cache_in_output_list,
+                    *_cache_param_list,
+                    *cache_args,
+                    *cache_more_args,
                 )
             if return_cache:
                 return cache

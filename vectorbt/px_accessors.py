@@ -28,7 +28,11 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         if checks.func_accepts_arg(px_func, "data_frame") or px_func_name == "imshow":
 
             def plot_func(
-                self, *args, _px_func_name: str = px_func_name, _px_func: tp.Callable = px_func, **kwargs
+                self,
+                *args,
+                _px_func_name: str = px_func_name,
+                _px_func: tp.Callable = px_func,
+                **kwargs,
             ) -> tp.BaseFigure:
                 from vectorbt._settings import settings
 
@@ -59,7 +63,8 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
                 if _px_func_name == "imshow":
                     return make_figure(
-                        _px_func(to_2d_array(obj), *args, **layout_kwargs, **kwargs), layout=layout_kwargs
+                        _px_func(to_2d_array(obj), *args, **layout_kwargs, **kwargs),
+                        layout=layout_kwargs,
                     )
                 return make_figure(_px_func(obj, *args, **layout_kwargs, **kwargs), layout=layout_kwargs)
 

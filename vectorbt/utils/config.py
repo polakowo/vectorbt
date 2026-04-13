@@ -133,7 +133,11 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = Tru
 
 
 def update_dict(
-    x: InConfigLikeT, y: InConfigLikeT, nested: bool = True, force: bool = False, same_keys: bool = False
+    x: InConfigLikeT,
+    y: InConfigLikeT,
+    nested: bool = True,
+    force: bool = False,
+    same_keys: bool = False,
 ) -> None:
     """Update dict with keys and values from other dict.
 
@@ -370,7 +374,10 @@ class Config(PickleableDict, Documented):
         as_attrs = _resolve_param("as_attrs", as_attrs, frozen_keys or readonly)
         reset_dct_copy_kwargs = merge_dicts(copy_kwargs, reset_dct_copy_kwargs)
         copy_kwargs = _resolve_param(
-            "copy_kwargs", copy_kwargs, dict(copy_mode="shallow" if readonly else "hybrid", nested=nested), merge=True
+            "copy_kwargs",
+            copy_kwargs,
+            dict(copy_mode="shallow" if readonly else "hybrid", nested=nested),
+            merge=True,
         )
         reset_dct_copy_kwargs = _resolve_param(
             "reset_dct_copy_kwargs",

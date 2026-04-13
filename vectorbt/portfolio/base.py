@@ -1578,7 +1578,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func, column_only_select=True, **kwargs
+            pd_indexing_func,
+            column_only_select=True,
+            **kwargs,
         )
         new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
@@ -3721,7 +3723,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             keep_raw = [True] * len(broadcastable_args)
             keep_raw[close_idx] = False
             broadcast_kwargs = merge_dicts(
-                dict(keep_raw=keep_raw, require_kwargs=dict(requirements="W")), broadcast_kwargs
+                dict(keep_raw=keep_raw, require_kwargs=dict(requirements="W")),
+                broadcast_kwargs,
             )
             broadcasted_args = broadcast(*broadcastable_args.values(), **broadcast_kwargs)
             broadcasted_args = dict(zip(broadcastable_args.keys(), broadcasted_args))
@@ -3742,7 +3745,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             segment_mask = _segment_mask
         else:
             segment_mask = broadcast(
-                segment_mask, to_shape=(target_shape_2d[0], len(group_lens)), to_pd=False, **require_kwargs
+                segment_mask,
+                to_shape=(target_shape_2d[0], len(group_lens)),
+                to_pd=False,
+                **require_kwargs,
             )
         if not flexible:
             if checks.is_any_array(call_seq):
@@ -4149,7 +4155,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         Returns the total transacted amount of assets at each time step."""
         direction = map_enum_fields(direction, Direction)
         asset_flow = nb.asset_flow_nb(
-            self.wrapper.shape_2d, self.orders.values, self.orders.col_mapper.col_map, direction
+            self.wrapper.shape_2d,
+            self.orders.values,
+            self.orders.col_mapper.col_map,
+            direction,
         )
         return self.wrapper.wrap(asset_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -4169,7 +4178,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def position_mask(
-        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+        self,
+        direction: str = "both",
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get position mask per column/group.
 
@@ -4186,7 +4198,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def position_coverage(
-        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+        self,
+        direction: str = "both",
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
         direction = map_enum_fields(direction, Direction)
@@ -4204,7 +4219,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def cash_flow(
-        self, group_by: tp.GroupByLike = None, free: bool = False, wrap_kwargs: tp.KwargsLike = None
+        self,
+        group_by: tp.GroupByLike = None,
+        free: bool = False,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
@@ -4289,7 +4307,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def asset_value(
-        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+        self,
+        direction: str = "both",
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
         direction = map_enum_fields(direction, Direction)
@@ -4309,7 +4330,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def gross_exposure(
-        self, direction: str = "both", group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+        self,
+        direction: str = "both",
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get gross exposure.
 
@@ -4338,7 +4362,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def value(
-        self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, wrap_kwargs: tp.KwargsLike = None
+        self,
+        group_by: tp.GroupByLike = None,
+        in_sim_order: bool = False,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get portfolio value series per column/group.
 
@@ -4382,7 +4409,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             else:
                 close = to_2d_array(self.close)
             total_profit = nb.total_profit_nb(
-                self.wrapper.shape_2d, close, self.orders.values, self.orders.col_mapper.col_map
+                self.wrapper.shape_2d,
+                close,
+                self.orders.values,
+                self.orders.col_mapper.col_map,
             )
         wrap_kwargs = merge_dicts(dict(name_or_index="total_profit"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
@@ -4407,7 +4437,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def returns(
-        self, group_by: tp.GroupByLike = None, in_sim_order=False, wrap_kwargs: tp.KwargsLike = None
+        self,
+        group_by: tp.GroupByLike = None,
+        in_sim_order=False,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get return series per column/group based on portfolio value."""
         value = to_2d_array(self.value(group_by=group_by, in_sim_order=in_sim_order))
@@ -4469,7 +4502,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_returns(group_by=group_by)
         return returns.vbt.returns(
-            benchmark_rets=benchmark_rets, freq=freq, year_freq=year_freq, defaults=defaults, **kwargs
+            benchmark_rets=benchmark_rets,
+            freq=freq,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
         )
 
     @cached_property
@@ -4534,7 +4571,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     @cached_method
     def total_benchmark_return(
-        self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """Get total benchmark return."""
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
@@ -4648,10 +4687,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 tags=["portfolio", "drawdowns", "duration"],
             ),
             total_trades=dict(
-                title="Total Trades", calc_func="trades.count", incl_open=True, tags=["portfolio", "trades"]
+                title="Total Trades",
+                calc_func="trades.count",
+                incl_open=True,
+                tags=["portfolio", "trades"],
             ),
             total_closed_trades=dict(
-                title="Total Closed Trades", calc_func="trades.closed.count", tags=["portfolio", "trades", "closed"]
+                title="Total Closed Trades",
+                calc_func="trades.closed.count",
+                tags=["portfolio", "trades", "closed"],
             ),
             total_open_trades=dict(
                 title="Total Open Trades",
@@ -4828,7 +4872,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         plotting_cfg = settings["plotting"]
 
         kwargs = merge_dicts(
-            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets")), kwargs
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets")),
+            kwargs,
         )
         asset_flow = self.asset_flow(direction=direction)
         asset_flow = self.select_one_from_obj(asset_flow, self.wrapper.regroup(False), column=column)
@@ -4880,7 +4925,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         plotting_cfg = settings["plotting"]
 
         kwargs = merge_dicts(
-            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash")), kwargs
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash")),
+            kwargs,
         )
         cash_flow = self.cash_flow(group_by=group_by, free=free)
         cash_flow = self.select_one_from_obj(cash_flow, self.wrapper.regroup(group_by), column=column)
@@ -5169,7 +5215,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             dict(
                 benchmark_rets=benchmark_rets,
                 main_kwargs=dict(
-                    trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")
+                    trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value"),
                 ),
                 hline_shape_kwargs=dict(
                     type="line",
@@ -5189,7 +5235,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return returns.vbt.returns.plot_cumulative(**kwargs)
 
     def plot_drawdowns(
-        self, column: tp.Optional[tp.Label] = None, group_by: tp.GroupByLike = None, **kwargs
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
     ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of drawdowns.
 
@@ -5203,7 +5252,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         plotting_cfg = settings["plotting"]
 
         kwargs = merge_dicts(
-            dict(ts_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")), kwargs
+            dict(ts_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")),
+            kwargs,
         )
         return self.get_drawdowns(group_by=group_by).plot(column=column, **kwargs)
 

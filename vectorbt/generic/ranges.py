@@ -486,7 +486,7 @@ class Ranges(Records):
                 end_val = np.full(len(end_idx), 0)
 
             duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True),
             )
 
             status = self_col.get_field_arr("status")

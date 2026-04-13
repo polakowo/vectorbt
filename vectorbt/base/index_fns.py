@@ -294,7 +294,9 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
     factorized = []
     for k, v in mapper.items():
         factorized.append(
-            pd.factorize(pd.concat((index1.get_level_values(k).to_series(), index2.get_level_values(v).to_series())))[0]
+            pd.factorize(pd.concat((index1.get_level_values(k).to_series(), index2.get_level_values(v).to_series())))[
+                0
+            ],
         )
     stacked = np.transpose(np.stack(factorized))
     indices1 = stacked[: len(index1)]
@@ -342,7 +344,9 @@ OptionalLevelSequence = tp.Optional[tp.Sequence[tp.Union[None, tp.Level]]]
 
 
 def pick_levels(
-    index: tp.Index, required_levels: OptionalLevelSequence = None, optional_levels: OptionalLevelSequence = None
+    index: tp.Index,
+    required_levels: OptionalLevelSequence = None,
+    optional_levels: OptionalLevelSequence = None,
 ) -> tp.Tuple[tp.List[int], tp.List[int]]:
     """Pick optional and required levels and return their indices.
 

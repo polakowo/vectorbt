@@ -388,7 +388,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 if len(index.intersection(v.index)) != len(index.union(v.index)):
                     if missing == "nan":
                         warnings.warn(
-                            "Symbols have mismatching index. " "Setting missing data points to NaN.", stacklevel=2
+                            "Symbols have mismatching index. " "Setting missing data points to NaN.",
+                            stacklevel=2,
                         )
                         index = index.union(v.index)
                     elif missing == "drop":
@@ -427,12 +428,14 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 if len(columns.intersection(v.columns)) != len(columns.union(v.columns)):
                     if missing == "nan":
                         warnings.warn(
-                            "Symbols have mismatching columns. " "Setting missing data points to NaN.", stacklevel=2
+                            "Symbols have mismatching columns. " "Setting missing data points to NaN.",
+                            stacklevel=2,
                         )
                         columns = columns.union(v.columns)
                     elif missing == "drop":
                         warnings.warn(
-                            "Symbols have mismatching columns. " "Dropping missing data points.", stacklevel=2
+                            "Symbols have mismatching columns. " "Dropping missing data points.",
+                            stacklevel=2,
                         )
                         columns = columns.intersection(v.columns)
                     elif missing == "raise":
@@ -736,7 +739,10 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 tags="wrapper",
             ),
             total_symbols=dict(
-                title="Total Symbols", calc_func=lambda self: len(self.symbols), agg_func=None, tags="data"
+                title="Total Symbols",
+                calc_func=lambda self: len(self.symbols),
+                agg_func=None,
+                tags="data",
             ),
             null_counts=dict(
                 title="Null Counts",
@@ -756,7 +762,10 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
     # ############# Plotting ############# #
 
     def plot(
-        self, column: tp.Optional[tp.Label] = None, base: tp.Optional[float] = None, **kwargs
+        self,
+        column: tp.Optional[tp.Label] = None,
+        base: tp.Optional[float] = None,
+        **kwargs,
     ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot orders.
 

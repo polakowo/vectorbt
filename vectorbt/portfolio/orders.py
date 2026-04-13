@@ -170,7 +170,11 @@ class Orders(Records):
         return self._field_config
 
     def __init__(
-        self, wrapper: ArrayWrapper, records_arr: tp.RecordArray, close: tp.Optional[tp.ArrayLike] = None, **kwargs
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        close: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
     ) -> None:
         Records.__init__(self, wrapper, records_arr, close=close, **kwargs)
         self._close = close
@@ -178,7 +182,9 @@ class Orders(Records):
     def indexing_func(self: OrdersT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> OrdersT:
         """Perform indexing on `Orders`."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = Records.indexing_func_meta(
-            self, pd_indexing_func, **kwargs
+            self,
+            pd_indexing_func,
+            **kwargs,
         )
         if self.close is not None:
             new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
@@ -288,7 +294,8 @@ class Orders(Records):
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
-            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"), close_trace_kwargs
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
         )
         if buy_trace_kwargs is None:
             buy_trace_kwargs = {}

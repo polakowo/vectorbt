@@ -1060,7 +1060,8 @@ class Trades(Ranges):
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
-            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"), close_trace_kwargs
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
         )
         if entry_trace_kwargs is None:
             entry_trace_kwargs = {}
@@ -1125,7 +1126,7 @@ class Trades(Ranges):
             status = self_col.get_field_arr("status")
 
             duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True),
             )
 
             # Plot Entry markers
@@ -1229,7 +1230,10 @@ class Trades(Ranges):
                         y=exit_price[mask],
                         mode="markers",
                         marker=dict(
-                            symbol="square", color=color, size=7, line=dict(width=1, color=adjust_lightness(color))
+                            symbol="square",
+                            color=color,
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(color)),
                         ),
                         name=name,
                         customdata=exit_customdata,
@@ -1363,7 +1367,9 @@ Trades.override_subplots_doc(__pdoc__)
 # ############# EntryTrades ############# #
 
 entry_trades_field_config = Config(
-    dict(settings={"id": dict(title="Entry Trade Id"), "idx": dict(name="entry_idx")}), readonly=True, as_attrs=False
+    dict(settings={"id": dict(title="Entry Trade Id"), "idx": dict(name="entry_idx")}),
+    readonly=True,
+    as_attrs=False,
 )
 """_"""
 

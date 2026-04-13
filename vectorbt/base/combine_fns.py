@@ -17,7 +17,12 @@ from vectorbt.base import reshape_fns
 
 
 def apply_and_concat_none(
-    n: int, apply_func: tp.Callable, *args, show_progress: bool = False, tqdm_kwargs: tp.KwargsLike = None, **kwargs
+    n: int,
+    apply_func: tp.Callable,
+    *args,
+    show_progress: bool = False,
+    tqdm_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> None:
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
     and output nothing. Meant for in-place outputs.
@@ -43,7 +48,12 @@ def apply_and_concat_none_nb(n: int, apply_func_nb: tp.Callable, *args) -> None:
 
 
 def apply_and_concat_one(
-    n: int, apply_func: tp.Callable, *args, show_progress: bool = False, tqdm_kwargs: tp.KwargsLike = None, **kwargs
+    n: int,
+    apply_func: tp.Callable,
+    *args,
+    show_progress: bool = False,
+    tqdm_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> tp.Array2d:
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
     and concat the results along axis 1.
@@ -91,7 +101,12 @@ def apply_and_concat_one_nb(n: int, apply_func_nb: tp.Callable, *args) -> tp.Arr
 
 
 def apply_and_concat_multiple(
-    n: int, apply_func: tp.Callable, *args, show_progress: bool = False, tqdm_kwargs: tp.KwargsLike = None, **kwargs
+    n: int,
+    apply_func: tp.Callable,
+    *args,
+    show_progress: bool = False,
+    tqdm_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> tp.List[tp.Array2d]:
     """Identical to `apply_and_concat_one`, except that the result of `apply_func` must be
     multiple 1-dim or 2-dim arrays. Each of these arrays at `i` will be concatenated with the
@@ -142,7 +157,12 @@ def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Callable, *args) -> t
 
 
 def select_and_combine(
-    i: int, obj: tp.Any, others: tp.Sequence, combine_func: tp.Callable, *args, **kwargs
+    i: int,
+    obj: tp.Any,
+    others: tp.Sequence,
+    combine_func: tp.Callable,
+    *args,
+    **kwargs,
 ) -> tp.AnyArray:
     """Combine `obj` and an element from `others` at `i` using `combine_func`."""
     return combine_func(obj, others[i], *args, **kwargs)

@@ -71,7 +71,13 @@ class SyntheticData(Data):
 
 
 def generate_gbm_paths(
-    S0: float, mu: float, sigma: float, T: int, M: int, I: int, seed: tp.Optional[int] = None
+    S0: float,
+    mu: float,
+    sigma: float,
+    T: int,
+    M: int,
+    I: int,
+    seed: tp.Optional[int] = None,
 ) -> tp.Array2d:
     """Generate using Geometric Brownian Motion (GBM).
 
@@ -402,7 +408,10 @@ class BinanceData(Data):
 
     @classmethod
     def download(
-        cls: tp.Type[BinanceDataT], symbols: tp.Labels, client: tp.Optional["ClientT"] = None, **kwargs
+        cls: tp.Type[BinanceDataT],
+        symbols: tp.Labels,
+        client: tp.Optional["ClientT"] = None,
+        **kwargs,
     ) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
         from binance.client import Client
@@ -478,7 +487,11 @@ class BinanceData(Data):
             while True:
                 # Fetch the klines for the next interval
                 next_data = client.get_klines(
-                    symbol=symbol, interval=interval, limit=limit, startTime=next_start_ts, endTime=end_ts
+                    symbol=symbol,
+                    interval=interval,
+                    limit=limit,
+                    startTime=next_start_ts,
+                    endTime=end_ts,
                 )
                 if len(data) > 0:
                     next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))

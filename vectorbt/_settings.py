@@ -311,7 +311,7 @@ settings = SettingsConfig(
                 dict(
                     filters=dict(
                         silent_has_other=dict(
-                            filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None
+                            filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
                         ),
                     ),
                     settings=dict(other=None, other_name="Other", from_other=False),
@@ -342,7 +342,8 @@ settings = SettingsConfig(
                         ),
                         has_benchmark_rets=dict(
                             filter_func=lambda self, metric_settings: metric_settings.get(
-                                "benchmark_rets", self.benchmark_rets
+                                "benchmark_rets",
+                                self.benchmark_rets,
                             )
                             is not None,
                             warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set"),

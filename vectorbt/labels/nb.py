@@ -36,7 +36,12 @@ def future_mean_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 
 
 @njit(cache=True)
 def future_std_apply_nb(
-    close: tp.Array2d, window: int, ewm: bool, wait: int = 1, adjust: bool = False, ddof: int = 0
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    wait: int = 1,
+    adjust: bool = False,
+    ddof: int = 0,
 ) -> tp.Array2d:
     """Get the standard deviation of the next period."""
     if ewm:
@@ -94,7 +99,10 @@ def get_symmetric_neg_th_nb(pos_th: tp.MaybeArray[float]) -> tp.MaybeArray[float
 
 @njit(cache=True)
 def local_extrema_apply_nb(
-    close: tp.Array2d, pos_th: tp.MaybeArray[float], neg_th: tp.MaybeArray[float], flex_2d: bool = True
+    close: tp.Array2d,
+    pos_th: tp.MaybeArray[float],
+    neg_th: tp.MaybeArray[float],
+    flex_2d: bool = True,
 ) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
@@ -273,7 +281,11 @@ def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize:
 
 @njit(cache=True)
 def trend_labels_apply_nb(
-    close: tp.Array2d, pos_th: tp.MaybeArray[float], neg_th: tp.MaybeArray[float], mode: int, flex_2d: bool = True
+    close: tp.Array2d,
+    pos_th: tp.MaybeArray[float],
+    neg_th: tp.MaybeArray[float],
+    mode: int,
+    flex_2d: bool = True,
 ) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendMode`."""
     local_extrema = local_extrema_apply_nb(close, pos_th, neg_th, flex_2d)

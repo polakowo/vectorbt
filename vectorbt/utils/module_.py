@@ -19,7 +19,9 @@ def is_from_module(obj: tp.Any, module: ModuleType) -> bool:
 
 
 def list_module_keys(
-    module_name: str, whitelist: tp.Optional[tp.List[str]] = None, blacklist: tp.Optional[tp.List[str]] = None
+    module_name: str,
+    whitelist: tp.Optional[tp.List[str]] = None,
+    blacklist: tp.Optional[tp.List[str]] = None,
 ):
     """List the names of all public functions and classes defined in the module `module_name`.
 

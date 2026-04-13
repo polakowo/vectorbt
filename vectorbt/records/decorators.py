@@ -145,7 +145,9 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.Union[WrapperFuncT, t
                     _check_attr_name(target_name, _on_conflict)
 
                     def new_prop(
-                        self, _field_name: str = field_name, _defaults: tp.KwargsLike = defaults
+                        self,
+                        _field_name: str = field_name,
+                        _defaults: tp.KwargsLike = defaults,
                     ) -> MappedArray:
                         return self.get_map_field(_field_name, **_defaults)
 

@@ -488,7 +488,11 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         return self._field_config
 
     def __init__(
-        self, wrapper: ArrayWrapper, records_arr: tp.RecordArray, col_mapper: tp.Optional[ColumnMapper] = None, **kwargs
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        **kwargs,
     ) -> None:
         Wrapping.__init__(self, wrapper, records_arr=records_arr, col_mapper=col_mapper, **kwargs)
         StatsBuilderMixin.__init__(self)
@@ -528,7 +532,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         Returns new records array."""
         if self.col_mapper.is_sorted():
             new_records_arr = nb.record_col_range_select_nb(
-                self.values, self.col_mapper.col_range, to_1d_array(col_idxs)
+                self.values,
+                self.col_mapper.col_range,
+                to_1d_array(col_idxs),
             )  # faster
         else:
             new_records_arr = nb.record_col_map_select_nb(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))
@@ -537,7 +543,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func, column_only_select=True, **kwargs
+            pd_indexing_func,
+            column_only_select=True,
+            **kwargs,
         )
         new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
@@ -712,7 +720,11 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         return self.map_array(mapped_arr, **kwargs)
 
     def map(
-        self, map_func_nb: tp.RecordMapFunc, *args, dtype: tp.Optional[tp.DTypeLike] = None, **kwargs
+        self,
+        map_func_nb: tp.RecordMapFunc,
+        *args,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        **kwargs,
     ) -> MappedArray:
         """Map each record to a scalar value. Returns mapped array.
 
@@ -754,7 +766,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """Return count by column."""
         wrap_kwargs = merge_dicts(dict(name_or_index="count"), wrap_kwargs)
         return self.wrapper.wrap_reduced(
-            self.col_mapper.get_col_map(group_by=group_by)[1], group_by=group_by, **wrap_kwargs
+            self.col_mapper.get_col_map(group_by=group_by)[1],
+            group_by=group_by,
+            **wrap_kwargs,
         )
 
     # ############# Stats ############# #
@@ -817,7 +831,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         if source_cls is None:
             source_cls = Records
         return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "field_config").__doc__)).substitute(
-            {"field_config": cls.field_config.to_doc(), "cls_name": cls.__name__}
+            {"field_config": cls.field_config.to_doc(), "cls_name": cls.__name__},
         )
 
     @classmethod

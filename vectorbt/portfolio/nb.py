@@ -859,7 +859,9 @@ def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.Array1d) -> None:
 
 @njit(cache=True)
 def build_call_seq_nb(
-    target_shape: tp.Shape, group_lens: tp.Array1d, call_seq_type: int = CallSeqType.Default
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq_type: int = CallSeqType.Default,
 ) -> tp.Array2d:
     """Build a new call sequence array."""
     if call_seq_type == CallSeqType.Reversed:
@@ -883,7 +885,9 @@ def require_call_seq(call_seq: tp.Array2d) -> tp.Array2d:
 
 
 def build_call_seq(
-    target_shape: tp.Shape, group_lens: tp.Array1d, call_seq_type: int = CallSeqType.Default
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq_type: int = CallSeqType.Default,
 ) -> tp.Array2d:
     """Not compiled but faster version of `build_call_seq_nb`."""
     call_seq = np.full(target_shape[1], 1, dtype=np.int64)
@@ -905,7 +909,9 @@ def build_call_seq(
 
 @njit(cache=True)
 def get_col_elem_nb(
-    ctx: tp.Union[RowContext, SegmentContext, FlexOrderContext], col: int, a: tp.ArrayLike
+    ctx: tp.Union[RowContext, SegmentContext, FlexOrderContext],
+    col: int,
+    a: tp.ArrayLike,
 ) -> tp.Scalar:
     """Get the current element using flexible indexing given the context and the column."""
     return flex_select_auto_nb(a, ctx.i, col, ctx.flex_2d)
@@ -919,7 +925,11 @@ def get_elem_nb(ctx: tp.Union[OrderContext, PostOrderContext, SignalContext], a:
 
 @njit(cache=True)
 def get_group_value_nb(
-    from_col: int, to_col: int, cash_now: float, last_position: tp.Array1d, last_val_price: tp.Array1d
+    from_col: int,
+    to_col: int,
+    cash_now: float,
+    last_position: tp.Array1d,
+    last_val_price: tp.Array1d,
 ) -> float:
     """Get group value."""
     group_value = cash_now
@@ -1132,7 +1142,9 @@ def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState,
 
 @njit(cache=True)
 def init_records_nb(
-    target_shape: tp.Shape, max_orders: tp.Optional[int] = None, max_logs: int = 0
+    target_shape: tp.Shape,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Initialize order and log records."""
     if max_orders is None:
@@ -1171,7 +1183,12 @@ def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: floa
 
 @njit(cache=True)
 def update_pos_record_nb(
-    record: tp.Record, i: int, col: int, position_before: float, position_now: float, order_result: OrderResult
+    record: tp.Record,
+    i: int,
+    col: int,
+    position_before: float,
+    position_now: float,
+    order_result: OrderResult,
 ) -> None:
     """Update position record after filling an order."""
     if order_result.status == OrderStatus.Filled:
@@ -1456,7 +1473,14 @@ def simulate_from_orders_nb(
                 )
 
                 order_result, new_state = process_order_nb(
-                    i, col, group, state, update_value, order, order_records, log_records
+                    i,
+                    col,
+                    group,
+                    state,
+                    update_value,
+                    order,
+                    order_records,
+                    log_records,
                 )
 
                 # Update state
@@ -1482,7 +1506,9 @@ def simulate_from_orders_nb(
 
 @njit(cache=True)
 def generate_stop_signal_nb(
-    position_now: float, upon_stop_exit: int, accumulate: int
+    position_now: float,
+    upon_stop_exit: int,
+    accumulate: int,
 ) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Generate stop signal and change accumulation if needed."""
     is_long_entry = False
@@ -1516,7 +1542,11 @@ def generate_stop_signal_nb(
 
 @njit(cache=True)
 def resolve_stop_price_and_slippage_nb(
-    stop_price: float, price: float, close: float, slippage: float, stop_exit_price: int
+    stop_price: float,
+    price: float,
+    close: float,
+    slippage: float,
+    stop_exit_price: int,
 ) -> tp.Tuple[float, float]:
     """Resolve price and slippage of a stop order."""
     if stop_exit_price == StopExitPrice.StopMarket:
@@ -1530,7 +1560,11 @@ def resolve_stop_price_and_slippage_nb(
 
 @njit(cache=True)
 def resolve_signal_conflict_nb(
-    position_now: float, is_entry: bool, is_exit: bool, direction: int, conflict_mode: int
+    position_now: float,
+    is_entry: bool,
+    is_exit: bool,
+    direction: int,
+    conflict_mode: int,
 ) -> tp.Tuple[bool, bool]:
     """Resolve any conflict between an entry and an exit."""
     if is_entry and is_exit:
@@ -1577,7 +1611,10 @@ def resolve_signal_conflict_nb(
 
 @njit(cache=True)
 def resolve_dir_conflict_nb(
-    position_now: float, is_long_entry: bool, is_short_entry: bool, upon_dir_conflict: int
+    position_now: float,
+    is_long_entry: bool,
+    is_short_entry: bool,
+    upon_dir_conflict: int,
 ) -> tp.Tuple[bool, bool]:
     """Resolve any direction conflict between a long entry and a short entry."""
     if is_long_entry and is_short_entry:
@@ -1750,7 +1787,13 @@ def should_update_stop_nb(stop: float, upon_stop_update: int) -> bool:
 
 @njit(cache=True)
 def get_stop_price_nb(
-    position_now: float, stop_price: float, stop: float, open: float, low: float, high: float, hit_below: bool
+    position_now: float,
+    stop_price: float,
+    stop: float,
+    open: float,
+    low: float,
+    high: float,
+    hit_below: bool,
 ) -> float:
     """Get stop price.
 
@@ -2023,11 +2066,23 @@ def simulate_from_signal_func_nb(
                         # Get stop price
                         if not np.isnan(sl_curr_stop[col]):
                             stop_price = get_stop_price_nb(
-                                position_now, sl_curr_price[col], sl_curr_stop[col], _open, _low, _high, True
+                                position_now,
+                                sl_curr_price[col],
+                                sl_curr_stop[col],
+                                _open,
+                                _low,
+                                _high,
+                                True,
                             )
                         if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                             stop_price = get_stop_price_nb(
-                                position_now, tp_init_price[col], tp_curr_stop[col], _open, _low, _high, False
+                                position_now,
+                                tp_init_price[col],
+                                tp_curr_stop[col],
+                                _open,
+                                _low,
+                                _high,
+                                False,
                             )
 
                         if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
@@ -2047,38 +2102,60 @@ def simulate_from_signal_func_nb(
                     # Stop signal comes first
                     _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
                     is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = generate_stop_signal_nb(
-                        position_now, _upon_stop_exit, _accumulate
+                        position_now,
+                        _upon_stop_exit,
+                        _accumulate,
                     )
 
                     _close = flex_select_auto_nb(close, i, col, flex_2d)
                     _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                     _price, _slippage = resolve_stop_price_and_slippage_nb(
-                        stop_price, _price, _close, _slippage, _stop_exit_price
+                        stop_price,
+                        _price,
+                        _close,
+                        _slippage,
+                        _stop_exit_price,
                     )
                 else:
                     # User-defined signal comes first
                     signal_ctx = SignalContext(
-                        i=i, col=col, position_now=position_now, val_price_now=last_val_price[col], flex_2d=flex_2d
+                        i=i,
+                        col=col,
+                        position_now=position_now,
+                        val_price_now=last_val_price[col],
+                        flex_2d=flex_2d,
                     )
                     is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(
-                        signal_ctx, *signal_args
+                        signal_ctx,
+                        *signal_args,
                     )
 
                     # Resolve signal conflicts
                     if is_long_entry or is_short_entry:
                         _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
                         is_long_entry, is_long_exit = resolve_signal_conflict_nb(
-                            position_now, is_long_entry, is_long_exit, Direction.LongOnly, _upon_long_conflict
+                            position_now,
+                            is_long_entry,
+                            is_long_exit,
+                            Direction.LongOnly,
+                            _upon_long_conflict,
                         )
                         _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
                         is_short_entry, is_short_exit = resolve_signal_conflict_nb(
-                            position_now, is_short_entry, is_short_exit, Direction.ShortOnly, _upon_short_conflict
+                            position_now,
+                            is_short_entry,
+                            is_short_exit,
+                            Direction.ShortOnly,
+                            _upon_short_conflict,
                         )
 
                         # Resolve direction conflicts
                         _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
                         is_long_entry, is_short_entry = resolve_dir_conflict_nb(
-                            position_now, is_long_entry, is_short_entry, _upon_dir_conflict
+                            position_now,
+                            is_long_entry,
+                            is_short_entry,
+                            _upon_dir_conflict,
                         )
 
                         # Resolve opposite entry
@@ -2208,7 +2285,14 @@ def simulate_from_signal_func_nb(
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group, state, update_value, order, order_records, log_records
+                        i,
+                        col,
+                        group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records,
                     )
 
                     # Update state
@@ -2282,7 +2366,10 @@ def simulate_from_signal_func_nb(
 
 @njit
 def dir_enex_signal_func_nb(
-    c: SignalContext, entries: tp.ArrayLike, exits: tp.ArrayLike, direction: tp.ArrayLike
+    c: SignalContext,
+    entries: tp.ArrayLike,
+    exits: tp.ArrayLike,
+    direction: tp.ArrayLike,
 ) -> tp.Tuple[bool, bool, bool, bool]:
     """Resolve direction-aware signals out of entries, exits, and direction."""
     is_entry = flex_select_auto_nb(entries, c.i, c.col, c.flex_2d)
@@ -2854,7 +2941,11 @@ def simulate_nb(
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -2957,7 +3048,14 @@ def simulate_nb(
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group, state, update_value, order, order_records, log_records
+                        i,
+                        col,
+                        group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records,
                     )
 
                     # Update state
@@ -3062,7 +3160,11 @@ def simulate_nb(
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -3459,7 +3561,11 @@ def simulate_row_wise_nb(
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -3562,7 +3668,14 @@ def simulate_row_wise_nb(
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group, state, update_value, order, order_records, log_records
+                        i,
+                        col,
+                        group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records,
                     )
 
                     # Update state
@@ -3667,7 +3780,11 @@ def simulate_row_wise_nb(
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -4142,7 +4259,11 @@ def flex_simulate_nb(
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -4240,7 +4361,14 @@ def flex_simulate_nb(
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group, state, update_value, order, order_records, log_records
+                        i,
+                        col,
+                        group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records,
                     )
 
                     # Update state
@@ -4345,7 +4473,11 @@ def flex_simulate_nb(
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -4649,7 +4781,11 @@ def flex_simulate_row_wise_nb(
             # Update value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
@@ -4747,7 +4883,14 @@ def flex_simulate_row_wise_nb(
                     )
 
                     order_result, new_state = process_order_nb(
-                        i, col, group, state, update_value, order, order_records, log_records
+                        i,
+                        col,
+                        group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records,
                     )
 
                     # Update state
@@ -4852,7 +4995,11 @@ def flex_simulate_row_wise_nb(
             # Update previous value, current value and return
             if cash_sharing:
                 last_value[group] = get_group_value_nb(
-                    from_col, to_col, last_cash[group], last_position, last_val_price
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
@@ -4987,7 +5134,12 @@ price_zero_neg_err = "Found order with price 0 or less"
 
 @njit(cache=True)
 def get_trade_stats_nb(
-    size: float, entry_price: float, entry_fees: float, exit_price: float, exit_fees: float, direction: int
+    size: float,
+    entry_price: float,
+    entry_fees: float,
+    exit_price: float,
+    exit_fees: float,
+    direction: int,
 ) -> tp.Tuple[float, float]:
     """Get trade statistics."""
     entry_val = size * entry_price
@@ -5784,7 +5936,10 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
 
 @njit(cache=True)
 def asset_flow_nb(
-    target_shape: tp.Shape, order_records: tp.RecordArray, col_map: tp.ColMap, direction: int
+    target_shape: tp.Shape,
+    order_records: tp.RecordArray,
+    col_map: tp.ColMap,
+    direction: int,
 ) -> tp.Array2d:
     """Get asset flow series per column.
 
@@ -5870,7 +6025,11 @@ def position_coverage_grouped_nb(position_mask: tp.Array2d, group_lens: tp.Array
 
 @njit(cache=True)
 def get_free_cash_diff_nb(
-    position_before: float, position_now: float, debt_now: float, price: float, fees: float
+    position_before: float,
+    position_now: float,
+    debt_now: float,
+    price: float,
+    fees: float,
 ) -> tp.Tuple[float, float]:
     """Get updated debt and free cash flow."""
     size = add_nb(position_now, -position_before)
@@ -6009,7 +6168,10 @@ def cash_nb(cash_flow: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
 
 @njit(cache=True)
 def cash_in_sim_order_nb(
-    cash_flow: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d, call_seq: tp.Array2d
+    cash_flow: tp.Array2d,
+    group_lens: tp.Array1d,
+    init_cash_grouped: tp.Array1d,
+    call_seq: tp.Array2d,
 ) -> tp.Array2d:
     """Get cash series in simulation order."""
     check_group_lens_nb(group_lens, cash_flow.shape[1])
@@ -6031,7 +6193,10 @@ def cash_in_sim_order_nb(
 
 @njit(cache=True)
 def cash_grouped_nb(
-    target_shape: tp.Shape, cash_flow_grouped: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d
+    target_shape: tp.Shape,
+    cash_flow_grouped: tp.Array2d,
+    group_lens: tp.Array1d,
+    init_cash_grouped: tp.Array1d,
 ) -> tp.Array2d:
     """Get cash series per group."""
     check_group_lens_nb(group_lens, target_shape[1])
@@ -6066,7 +6231,10 @@ def asset_value_grouped_nb(asset_value: tp.Array2d, group_lens: tp.Array1d) -> t
 
 @njit(cache=True)
 def value_in_sim_order_nb(
-    cash: tp.Array2d, asset_value: tp.Array2d, group_lens: tp.Array1d, call_seq: tp.Array2d
+    cash: tp.Array2d,
+    asset_value: tp.Array2d,
+    group_lens: tp.Array1d,
+    call_seq: tp.Array2d,
 ) -> tp.Array2d:
     """Get portfolio value series in simulation order."""
     check_group_lens_nb(group_lens, cash.shape[1])
@@ -6110,7 +6278,10 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 
 @njit(cache=True)
 def total_profit_nb(
-    target_shape: tp.Shape, close: tp.Array2d, order_records: tp.RecordArray, col_map: tp.ColMap
+    target_shape: tp.Shape,
+    close: tp.Array2d,
+    order_records: tp.RecordArray,
+    col_map: tp.ColMap,
 ) -> tp.Array1d:
     """Get total profit per column.
 
@@ -6185,7 +6356,10 @@ def total_return_nb(total_profit: tp.Array1d, init_cash: tp.Array1d) -> tp.Array
 
 @njit(cache=True)
 def returns_in_sim_order_nb(
-    value_iso: tp.Array2d, group_lens: tp.Array1d, init_cash_grouped: tp.Array1d, call_seq: tp.Array2d
+    value_iso: tp.Array2d,
+    group_lens: tp.Array1d,
+    init_cash_grouped: tp.Array1d,
+    call_seq: tp.Array2d,
 ) -> tp.Array2d:
     """Get portfolio return series in simulation order."""
     check_group_lens_nb(group_lens, value_iso.shape[1])
