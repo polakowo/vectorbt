@@ -8,11 +8,12 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt._settings import settings
 
-_rust_status: tp.Optional[bool] = None  # None = unchecked, True/False = cached
+_rust_status: tp.Optional[bool] = None
+"""Status of Rust availability."""
 
 
 def is_rust_available() -> bool:
-    """Whether vectorbt-rust is installed and version-compatible."""
+    """Return whether `vectorbt-rust` is installed and version-compatible."""
     global _rust_status
     if _rust_status is None:
         try:
@@ -37,12 +38,8 @@ def is_rust_available() -> bool:
     return _rust_status
 
 
-def supports_rust(a: tp.Any) -> bool:
-    """Whether array `a` is compatible with the Rust backend.
-
-    The Rust bindings require contiguous float64 arrays. Integer arrays,
-    non-contiguous slices (e.g. `a[::2]`), and other dtypes must fall
-    back to numba so that auto mode never breaks inputs that numba handles."""
+def array_compatible_with_rust(a: tp.Any) -> bool:
+    """Return whether the array is compatible with the Rust backend."""
     return isinstance(a, np.ndarray) and a.dtype == np.float64 and a.flags["C_CONTIGUOUS"]
 
 
@@ -53,16 +50,11 @@ def resolve_backend(backend: tp.Optional[str] = None, supports_rust: bool = True
     Set `supports_rust` to False for callback-accepting functions, unsupported
     dtypes, or any other condition that prevents Rust dispatch.
 
-    Returns `'numba'` or `'rust'`.
-
-    Raises `ImportError` if `backend='rust'` and vectorbt-rust is not installed.
-    Raises `ValueError` if `backend='rust'` and the function doesn't support Rust."""
+    Returns `'numba'` or `'rust'`."""
     if backend is None:
         backend = settings["backend"]
-
     if backend == "numba":
         return "numba"
-
     if backend == "rust":
         if not is_rust_available():
             raise ImportError(
@@ -71,12 +63,8 @@ def resolve_backend(backend: tp.Optional[str] = None, supports_rust: bool = True
                 "(or pip install vectorbt[rust])"
             )
         if not supports_rust:
-            raise ValueError(
-                "This function does not support backend='rust' " "(e.g. it accepts callbacks). Use backend='numba'."
-            )
+            raise ValueError("This function does not support backend='rust'. Use backend='numba'.")
         return "rust"
-
-    # backend == 'auto'
     if supports_rust and is_rust_available():
         return "rust"
     return "numba"

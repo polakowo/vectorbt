@@ -1,22 +1,10 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for generic numba functions.
-
-Functions in this module have no suffix and dispatch to either the numba
-(`_nb`) or Rust (`_rs`) implementation based on `settings['backend']`
-or a per-call `backend` kwarg.
-
-Naming convention:
-- `_nb` suffix = always numba (in `nb.py`)
-- `_rs` suffix = always Rust (in `vectorbt_rust.generic`)
-- no suffix = dispatched (this module)
-"""
-
-import numpy as np
+"""Backend-neutral dispatch wrappers for generic functions."""
 
 from vectorbt import _typing as tp
-from vectorbt._backend import resolve_backend, supports_rust as _supports_rust
+from vectorbt._backend import resolve_backend, array_compatible_with_rust
 
 
 # ======================== Rolling functions ========================
@@ -29,7 +17,7 @@ def rolling_mean_1d(
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.rolling_mean_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_mean_1d_rs
 
@@ -46,7 +34,7 @@ def rolling_mean(
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.rolling_mean_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_mean_rs
 
@@ -64,7 +52,7 @@ def rolling_std_1d(
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.rolling_std_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_std_1d_rs
 
@@ -82,7 +70,7 @@ def rolling_std(
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.rolling_std_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_std_rs
 
@@ -99,7 +87,7 @@ def rolling_min_1d(
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.rolling_min_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_min_1d_rs
 
@@ -116,7 +104,7 @@ def rolling_min(
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.rolling_min_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_min_rs
 
@@ -133,7 +121,7 @@ def rolling_max_1d(
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.rolling_max_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_max_1d_rs
 
@@ -150,7 +138,7 @@ def rolling_max(
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.rolling_max_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import rolling_max_rs
 
@@ -165,7 +153,7 @@ def rolling_max(
 
 def diff_1d(a: tp.Array1d, n: int = 1, backend: tp.Optional[str] = None) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.diff_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import diff_1d_rs
 
@@ -177,7 +165,7 @@ def diff_1d(a: tp.Array1d, n: int = 1, backend: tp.Optional[str] = None) -> tp.A
 
 def diff(a: tp.Array2d, n: int = 1, backend: tp.Optional[str] = None) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.diff_nb`."""
-    eng = resolve_backend(backend, supports_rust=_supports_rust(a))
+    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.generic import diff_rs
 
