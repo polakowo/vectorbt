@@ -70,6 +70,9 @@ full-no-talib = [
     "python-telegram-bot>=13.4,<20.0",
     "quantstats>=0.0.37",
 ]
+rust = [
+    "vectorbt-rust==0.28.5",
+]
 cov = [
     "pytest",
     "pytest-cov",

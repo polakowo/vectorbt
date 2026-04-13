@@ -116,6 +116,7 @@ class SettingsConfig(Config):
 
 settings = SettingsConfig(
     dict(
+        backend='auto',  # 'auto', 'numba', 'rust'
         numba=dict(
             check_func_type=True,
             check_func_suffix=False

@@ -1,0 +1,21 @@
+[package]
+name = "vectorbt-rust"
+version = "0.28.5"
+edition = "2021"
+description = "Rust-accelerated kernels for vectorbt"
+license = "Apache-2.0 WITH Commons-Clause-1.0"
+
+[lib]
+name = "vectorbt_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
+ndarray = "0.16"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
