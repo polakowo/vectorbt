@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "vectorbt-rust"
-version = "0.28.5"
+version = "1.0.0"
 description = "Rust-accelerated kernels for vectorbt"
 readme = "README.md"
 license-files = ["../LICENSE.md"]

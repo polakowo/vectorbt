@@ -71,7 +71,7 @@ full-no-talib = [
     "quantstats>=0.0.37",
 ]
 rust = [
-    "vectorbt-rust==0.28.5",
+    "vectorbt-rust==1.0.0",
 ]
 cov = [
     "pytest",

@@ -1,6 +1,6 @@
 [package]
 name = "vectorbt-rust"
-version = "0.28.5"
+version = "1.0.0"
 edition = "2021"
 description = "Rust-accelerated kernels for vectorbt"
 license = "Apache-2.0 WITH Commons-Clause-1.0"
