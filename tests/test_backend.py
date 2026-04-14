@@ -241,6 +241,55 @@ class TestGenericRustParity:
         for dispatch_func, nb_func, args in reducers:
             np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
 
+    def test_dispatch_optimized_kernels_match_numba_by_layout(self):
+        base = np.array(
+            [
+                [1.0, np.nan, 1.0],
+                [2.0, 4.0, 2.0],
+                [np.nan, 3.0, np.nan],
+                [4.0, 2.0, 2.0],
+                [np.nan, 1.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+
+        for a in (np.ascontiguousarray(base), np.asfortranarray(base)):
+            cases = [
+                (dispatch.fillna, nb.fillna_nb, (a, -1.0)),
+                (dispatch.bshift, nb.bshift_nb, (a, 2, -1.0)),
+                (dispatch.fshift, nb.fshift_nb, (a, 2, -1.0)),
+                (dispatch.diff, nb.diff_nb, (a, 1)),
+                (dispatch.pct_change, nb.pct_change_nb, (a, 1)),
+                (dispatch.bfill, nb.bfill_nb, (a,)),
+                (dispatch.ffill, nb.ffill_nb, (a,)),
+                (dispatch.nanprod, nb.nanprod_nb, (a,)),
+                (dispatch.nancumsum, nb.nancumsum_nb, (a,)),
+                (dispatch.nancumprod, nb.nancumprod_nb, (a,)),
+                (dispatch.nansum, nb.nansum_nb, (a,)),
+                (dispatch.nancnt, nb.nancnt_nb, (a,)),
+                (dispatch.nanmean, nb.nanmean_nb, (a,)),
+                (dispatch.nanstd, nb.nanstd_nb, (a, 0)),
+                (dispatch.rolling_mean, nb.rolling_mean_nb, (a, 2, None)),
+                (dispatch.rolling_std, nb.rolling_std_nb, (a, 2, None, 0)),
+                (dispatch.expanding_mean, nb.expanding_mean_nb, (a, 1)),
+                (dispatch.expanding_std, nb.expanding_std_nb, (a, 1, 0)),
+            ]
+            for dispatch_func, nb_func, args in cases:
+                np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+
+        empty_cols = np.empty((3, 0), dtype=np.float64)
+        empty_col_cases = [
+            (dispatch.nansum, nb.nansum_nb, (empty_cols,)),
+            (dispatch.nanprod, nb.nanprod_nb, (empty_cols,)),
+            (dispatch.nancnt, nb.nancnt_nb, (empty_cols,)),
+            (dispatch.nanmean, nb.nanmean_nb, (empty_cols,)),
+            (dispatch.nanstd, nb.nanstd_nb, (empty_cols, 0)),
+            (dispatch.rolling_mean, nb.rolling_mean_nb, (empty_cols, 2, None)),
+            (dispatch.expanding_mean, nb.expanding_mean_nb, (empty_cols, 1)),
+        ]
+        for dispatch_func, nb_func, args in empty_col_cases:
+            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+
     def test_dispatch_matches_numba_for_record_outputs(self):
         ts = np.array(
             [

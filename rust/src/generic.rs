@@ -212,6 +212,436 @@ where
     out
 }
 
+fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
+    let shape = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::zeros(shape);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    for (out_v, &v) in dst.iter_mut().zip(src.iter()) {
+        *out_v = if v.is_nan() { value } else { v };
+    }
+    out
+}
+
+fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::zeros((nrows, ncols));
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    for row in 0..nrows {
+        let dst_start = row * ncols;
+        let dst_end = dst_start + ncols;
+        if row + n < nrows {
+            let src_start = (row + n) * ncols;
+            dst[dst_start..dst_end].copy_from_slice(&src[src_start..src_start + ncols]);
+        } else {
+            dst[dst_start..dst_end].fill(fill_value);
+        }
+    }
+    out
+}
+
+fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::zeros((nrows, ncols));
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    for row in 0..nrows {
+        let dst_start = row * ncols;
+        let dst_end = dst_start + ncols;
+        if row < n {
+            dst[dst_start..dst_end].fill(fill_value);
+        } else {
+            let src_start = (row - n) * ncols;
+            dst[dst_start..dst_end].copy_from_slice(&src[src_start..src_start + ncols]);
+        }
+    }
+    out
+}
+
+fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    for row in n..nrows {
+        let row_start = row * ncols;
+        let prev_start = (row - n) * ncols;
+        for col in 0..ncols {
+            dst[row_start + col] = src[row_start + col] - src[prev_start + col];
+        }
+    }
+    out
+}
+
+fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    for row in n..nrows {
+        let row_start = row * ncols;
+        let prev_start = (row - n) * ncols;
+        for col in 0..ncols {
+            dst[row_start + col] = src[row_start + col] / src[prev_start + col] - 1.0;
+        }
+    }
+    out
+}
+
+fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    if nrows == 0 {
+        return out;
+    }
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut last = vec![f64::NAN; ncols];
+    last.copy_from_slice(&src[..ncols]);
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let v = src[row_start + col];
+            if v.is_nan() {
+                dst[row_start + col] = last[col];
+            } else {
+                last[col] = v;
+                dst[row_start + col] = v;
+            }
+        }
+    }
+    out
+}
+
+fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    if nrows == 0 {
+        return out;
+    }
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut last = vec![f64::NAN; ncols];
+    let last_start = (nrows - 1) * ncols;
+    last.copy_from_slice(&src[last_start..last_start + ncols]);
+    for row in (0..nrows).rev() {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let v = src[row_start + col];
+            if v.is_nan() {
+                dst[row_start + col] = last[col];
+            } else {
+                last[col] = v;
+                dst[row_start + col] = v;
+            }
+        }
+    }
+    out
+}
+
+fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::zeros((nrows, ncols));
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let v = src[row_start + col];
+            if !v.is_nan() {
+                sums[col] += v;
+            }
+            dst[row_start + col] = sums[col];
+        }
+    }
+    out
+}
+
+fn nancumprod_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::zeros((nrows, ncols));
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut prods = vec![1.0f64; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let v = src[row_start + col];
+            if !v.is_nan() {
+                prods[col] *= v;
+            }
+            dst[row_start + col] = prods[col];
+        }
+    }
+    out
+}
+
+fn nansum_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+    let (_, ncols) = a.dim();
+    if ncols == 0 {
+        return Vec::new();
+    }
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = vec![0.0f64; ncols];
+    for row in src.chunks_exact(ncols) {
+        for (col, &v) in row.iter().enumerate() {
+            if !v.is_nan() {
+                out[col] += v;
+            }
+        }
+    }
+    out
+}
+
+fn nanprod_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+    let (_, ncols) = a.dim();
+    if ncols == 0 {
+        return Vec::new();
+    }
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = vec![1.0f64; ncols];
+    for row in src.chunks_exact(ncols) {
+        for (col, &v) in row.iter().enumerate() {
+            if !v.is_nan() {
+                out[col] *= v;
+            }
+        }
+    }
+    out
+}
+
+fn nancnt_2d_c(a: ArrayView2<'_, f64>) -> Vec<i64> {
+    let (_, ncols) = a.dim();
+    if ncols == 0 {
+        return Vec::new();
+    }
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = vec![0i64; ncols];
+    for row in src.chunks_exact(ncols) {
+        for (col, &v) in row.iter().enumerate() {
+            if !v.is_nan() {
+                out[col] += 1;
+            }
+        }
+    }
+    out
+}
+
+fn nanmean_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+    let (_, ncols) = a.dim();
+    if ncols == 0 {
+        return Vec::new();
+    }
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in src.chunks_exact(ncols) {
+        for (col, &v) in row.iter().enumerate() {
+            if !v.is_nan() {
+                sums[col] += v;
+                counts[col] += 1;
+            }
+        }
+    }
+    sums.iter()
+        .zip(counts.iter())
+        .map(|(&sum, &cnt)| if cnt == 0 { f64::NAN } else { sum / cnt as f64 })
+        .collect()
+}
+
+fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
+    let (_, ncols) = a.dim();
+    if ncols == 0 {
+        return Vec::new();
+    }
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut sums_sq = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in src.chunks_exact(ncols) {
+        for (col, &v) in row.iter().enumerate() {
+            if !v.is_nan() {
+                sums[col] += v;
+                sums_sq[col] += v * v;
+                counts[col] += 1;
+            }
+        }
+    }
+    let mut out = vec![f64::NAN; ncols];
+    for col in 0..ncols {
+        let cnt = counts[col];
+        if cnt > ddof {
+            let mean = sums[col] / cnt as f64;
+            let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
+                / (cnt - ddof) as f64;
+            out[col] = variance.abs().sqrt();
+        }
+    }
+    out
+}
+
+fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur = src[row_start + col];
+            if !cur.is_nan() {
+                sums[col] += cur;
+                counts[col] += 1;
+            }
+            if row >= window {
+                let old = src[(row - window) * ncols + col];
+                if !old.is_nan() {
+                    sums[col] -= old;
+                    counts[col] -= 1;
+                }
+            }
+            if counts[col] >= minp && counts[col] > 0 {
+                dst[row_start + col] = sums[col] / counts[col] as f64;
+            }
+        }
+    }
+    out
+}
+
+fn rolling_std_2d_c(
+    a: ArrayView2<'_, f64>,
+    window: usize,
+    minp: usize,
+    ddof: usize,
+) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut sums_sq = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur = src[row_start + col];
+            if !cur.is_nan() {
+                sums[col] += cur;
+                sums_sq[col] += cur * cur;
+                counts[col] += 1;
+            }
+            if row >= window {
+                let old = src[(row - window) * ncols + col];
+                if !old.is_nan() {
+                    sums[col] -= old;
+                    sums_sq[col] -= old * old;
+                    counts[col] -= 1;
+                }
+            }
+            let cnt = counts[col];
+            if cnt >= minp && cnt > ddof {
+                let mean = sums[col] / cnt as f64;
+                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
+                    / (cnt - ddof) as f64;
+                dst[row_start + col] = variance.abs().sqrt();
+            }
+        }
+    }
+    out
+}
+
+fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur = src[row_start + col];
+            if !cur.is_nan() {
+                sums[col] += cur;
+                counts[col] += 1;
+            }
+            if counts[col] >= minp && counts[col] > 0 {
+                dst[row_start + col] = sums[col] / counts[col] as f64;
+            }
+        }
+    }
+    out
+}
+
+fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usize) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let mut sums = vec![0.0f64; ncols];
+    let mut sums_sq = vec![0.0f64; ncols];
+    let mut counts = vec![0usize; ncols];
+    for row in 0..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur = src[row_start + col];
+            if !cur.is_nan() {
+                sums[col] += cur;
+                sums_sq[col] += cur * cur;
+                counts[col] += 1;
+            }
+            let cnt = counts[col];
+            if cnt >= minp && cnt > ddof {
+                let mean = sums[col] / cnt as f64;
+                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
+                    / (cnt - ddof) as f64;
+                dst[row_start + col] = variance.abs().sqrt();
+            }
+        }
+    }
+    out
+}
+
 fn set_by_mask_1d(a: &[f64], mask: &[bool], value: f64) -> Vec<f64> {
     a.iter()
         .zip(mask.iter())
@@ -531,28 +961,23 @@ fn rolling_max_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
 fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
-    let mut cumsum = 0.0f64;
-    let mut nancnt = 0usize;
-    let mut cumsum_arr = vec![0.0f64; n];
-    let mut nancnt_arr = vec![0usize; n];
+    let mut sum = 0.0f64;
+    let mut cnt = 0usize;
     for i in 0..n {
-        if a[i].is_nan() {
-            nancnt += 1;
-        } else {
-            cumsum += a[i];
+        let cur = a[i];
+        if !cur.is_nan() {
+            sum += cur;
+            cnt += 1;
         }
-        nancnt_arr[i] = nancnt;
-        cumsum_arr[i] = cumsum;
-        let (window_len, window_cumsum) = if i < window {
-            (i + 1 - nancnt, cumsum)
-        } else {
-            (
-                window - (nancnt - nancnt_arr[i - window]),
-                cumsum - cumsum_arr[i - window],
-            )
-        };
-        if window_len >= minp {
-            out[i] = window_cumsum / window_len as f64;
+        if i >= window {
+            let old = a[i - window];
+            if !old.is_nan() {
+                sum -= old;
+                cnt -= 1;
+            }
+        }
+        if cnt >= minp && cnt > 0 {
+            out[i] = sum / cnt as f64;
         }
     }
     out
@@ -561,36 +986,69 @@ fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
 fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
-    let mut cumsum = 0.0f64;
-    let mut cumsum_sq = 0.0f64;
-    let mut nancnt = 0usize;
-    let mut cumsum_arr = vec![0.0f64; n];
-    let mut cumsum_sq_arr = vec![0.0f64; n];
-    let mut nancnt_arr = vec![0usize; n];
+    let mut sum = 0.0f64;
+    let mut sum_sq = 0.0f64;
+    let mut cnt = 0usize;
     for i in 0..n {
-        if a[i].is_nan() {
-            nancnt += 1;
-        } else {
-            cumsum += a[i];
-            cumsum_sq += a[i] * a[i];
+        let cur = a[i];
+        if !cur.is_nan() {
+            sum += cur;
+            sum_sq += cur * cur;
+            cnt += 1;
         }
-        nancnt_arr[i] = nancnt;
-        cumsum_arr[i] = cumsum;
-        cumsum_sq_arr[i] = cumsum_sq;
-        let (window_len, window_cumsum, window_cumsum_sq) = if i < window {
-            (i + 1 - nancnt, cumsum, cumsum_sq)
-        } else {
-            (
-                window - (nancnt - nancnt_arr[i - window]),
-                cumsum - cumsum_arr[i - window],
-                cumsum_sq - cumsum_sq_arr[i - window],
-            )
-        };
-        if window_len >= minp && window_len > ddof {
-            let mean = window_cumsum / window_len as f64;
-            let variance = (window_cumsum_sq - 2.0 * window_cumsum * mean
-                + window_len as f64 * mean * mean)
-                / (window_len - ddof) as f64;
+        if i >= window {
+            let old = a[i - window];
+            if !old.is_nan() {
+                sum -= old;
+                sum_sq -= old * old;
+                cnt -= 1;
+            }
+        }
+        if cnt >= minp && cnt > ddof {
+            let mean = sum / cnt as f64;
+            let variance =
+                (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
+            out[i] = variance.abs().sqrt();
+        }
+    }
+    out
+}
+
+fn expanding_mean_1d(a: &[f64], minp: usize) -> Vec<f64> {
+    let n = a.len();
+    let mut out = vec![f64::NAN; n];
+    let mut sum = 0.0f64;
+    let mut cnt = 0usize;
+    for i in 0..n {
+        let cur = a[i];
+        if !cur.is_nan() {
+            sum += cur;
+            cnt += 1;
+        }
+        if cnt >= minp && cnt > 0 {
+            out[i] = sum / cnt as f64;
+        }
+    }
+    out
+}
+
+fn expanding_std_1d(a: &[f64], minp: usize, ddof: usize) -> Vec<f64> {
+    let n = a.len();
+    let mut out = vec![f64::NAN; n];
+    let mut sum = 0.0f64;
+    let mut sum_sq = 0.0f64;
+    let mut cnt = 0usize;
+    for i in 0..n {
+        let cur = a[i];
+        if !cur.is_nan() {
+            sum += cur;
+            sum_sq += cur * cur;
+            cnt += 1;
+        }
+        if cnt >= minp && cnt > ddof {
+            let mean = sum / cnt as f64;
+            let variance =
+                (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
             out[i] = variance.abs().sqrt();
         }
     }
@@ -1280,7 +1738,11 @@ pub fn fillna_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
-        apply_2d_by_col_inplace(a_arr, |col, out| fillna_1d_into(col, out, value))
+        if a_arr.is_standard_layout() {
+            fillna_2d_c(a_arr, value)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| fillna_1d_into(col, out, value))
+        }
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -1296,7 +1758,11 @@ pub fn bshift_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
-        apply_2d_by_col_inplace(a_arr, |col, out| bshift_1d_into(col, out, n, fill_value))
+        if a_arr.is_standard_layout() {
+            bshift_2d_c(a_arr, n, fill_value)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| bshift_1d_into(col, out, n, fill_value))
+        }
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -1312,7 +1778,11 @@ pub fn fshift_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
-        apply_2d_by_col_inplace(a_arr, |col, out| fshift_1d_into(col, out, n, fill_value))
+        if a_arr.is_standard_layout() {
+            fshift_2d_c(a_arr, n, fill_value)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| fshift_1d_into(col, out, n, fill_value))
+        }
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -1326,8 +1796,13 @@ pub fn diff_rs<'py>(
     n: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| diff_1d_into(col, out, n)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            diff_2d_c(a_arr, n)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| diff_1d_into(col, out, n))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1341,7 +1816,11 @@ pub fn pct_change_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
-        apply_2d_by_col_inplace(a_arr, |col, out| pct_change_1d_into(col, out, n))
+        if a_arr.is_standard_layout() {
+            pct_change_2d_c(a_arr, n)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| pct_change_1d_into(col, out, n))
+        }
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -1354,8 +1833,13 @@ pub fn bfill_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| bfill_1d_into(col, out)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            bfill_2d_c(a_arr)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| bfill_1d_into(col, out))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1367,8 +1851,13 @@ pub fn ffill_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| ffill_1d_into(col, out)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            ffill_2d_c(a_arr)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| ffill_1d_into(col, out))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1378,7 +1867,13 @@ pub fn nanprod_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanprod_1d));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nanprod_2d_c(a_arr)
+        } else {
+            reduce_2d_by_col(a_arr, nanprod_1d)
+        }
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1388,8 +1883,13 @@ pub fn nancumsum_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumsum_1d_into(col, out)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nancumsum_2d_c(a_arr)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| nancumsum_1d_into(col, out))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1399,8 +1899,13 @@ pub fn nancumprod_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py
-        .allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumprod_1d_into(col, out)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nancumprod_2d_c(a_arr)
+        } else {
+            apply_2d_by_col_inplace(a_arr, |col, out| nancumprod_1d_into(col, out))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1410,7 +1915,13 @@ pub fn nansum_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nansum_1d));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nansum_2d_c(a_arr)
+        } else {
+            reduce_2d_by_col(a_arr, nansum_1d)
+        }
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1420,17 +1931,21 @@ pub fn nancnt_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let a_arr = a.as_array();
-    let (nrows, ncols) = a_arr.dim();
     let result = py.allow_threads(|| {
-        let mut out = vec![0i64; ncols];
-        let mut col_buf = vec![0.0f64; nrows];
-        for col in 0..ncols {
-            for (i, &v) in a_arr.column(col).iter().enumerate() {
-                col_buf[i] = v;
+        if a_arr.is_standard_layout() {
+            nancnt_2d_c(a_arr)
+        } else {
+            let (nrows, ncols) = a_arr.dim();
+            let mut out = vec![0i64; ncols];
+            let mut col_buf = vec![0.0f64; nrows];
+            for col in 0..ncols {
+                for (i, &v) in a_arr.column(col).iter().enumerate() {
+                    col_buf[i] = v;
+                }
+                out[col] = nancnt_1d(&col_buf);
             }
-            out[col] = nancnt_1d(&col_buf);
+            out
         }
-        out
     });
     Ok(PyArray1::from_vec_bound(py, result))
 }
@@ -1461,7 +1976,13 @@ pub fn nanmean_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmean_1d));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nanmean_2d_c(a_arr)
+        } else {
+            reduce_2d_by_col(a_arr, nanmean_1d)
+        }
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1487,7 +2008,13 @@ pub fn nanstd_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, |col| nanstd_1d(col, ddof)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            nanstd_2d_c(a_arr, ddof)
+        } else {
+            reduce_2d_by_col(a_arr, |col| nanstd_1d(col, ddof))
+        }
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1579,8 +2106,13 @@ pub fn rolling_mean_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_mean_1d(col, window, minp)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            rolling_mean_2d_c(a_arr, window, minp)
+        } else {
+            apply_2d_by_col(a_arr, |col| rolling_mean_1d(col, window, minp))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1612,8 +2144,13 @@ pub fn rolling_std_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_std_1d(col, window, minp, ddof)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            rolling_std_2d_c(a_arr, window, minp, ddof)
+        } else {
+            apply_2d_by_col(a_arr, |col| rolling_std_1d(col, window, minp, ddof))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1714,7 +2251,7 @@ pub fn expanding_mean_1d_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_mean_1d(a_slice, a_slice.len(), minp));
+    let result = py.allow_threads(|| expanding_mean_1d(a_slice, minp));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1725,8 +2262,13 @@ pub fn expanding_mean_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_mean_1d(col, col.len(), minp)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            expanding_mean_2d_c(a_arr, minp)
+        } else {
+            apply_2d_by_col(a_arr, |col| expanding_mean_1d(col, minp))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1738,7 +2280,7 @@ pub fn expanding_std_1d_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_std_1d(a_slice, a_slice.len(), minp, ddof));
+    let result = py.allow_threads(|| expanding_std_1d(a_slice, minp, ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1750,8 +2292,13 @@ pub fn expanding_std_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py
-        .allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_std_1d(col, col.len(), minp, ddof)));
+    let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() {
+            expanding_std_2d_c(a_arr, minp, ddof)
+        } else {
+            apply_2d_by_col(a_arr, |col| expanding_std_1d(col, minp, ddof))
+        }
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1786,9 +2333,9 @@ pub fn shuffle_rs<'py>(
                     for (i, &v) in a_arr.column(col).iter().enumerate() {
                         col_buf[i] = v;
                     }
-                    let col_result = shuffle_1d_with_rng(&col_buf, &mut rng);
+                    col_buf.shuffle(&mut rng);
                     let mut out_col = out.column_mut(col);
-                    for (i, &v) in col_result.iter().enumerate() {
+                    for (i, &v) in col_buf.iter().enumerate() {
                         out_col[i] = v;
                     }
                 }
@@ -1799,9 +2346,9 @@ pub fn shuffle_rs<'py>(
                     for (i, &v) in a_arr.column(col).iter().enumerate() {
                         col_buf[i] = v;
                     }
-                    let col_result = shuffle_1d_with_rng(&col_buf, &mut rng);
+                    col_buf.shuffle(&mut rng);
                     let mut out_col = out.column_mut(col);
-                    for (i, &v) in col_result.iter().enumerate() {
+                    for (i, &v) in col_buf.iter().enumerate() {
                         out_col[i] = v;
                     }
                 }
