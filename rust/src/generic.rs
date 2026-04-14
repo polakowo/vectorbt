@@ -6,6 +6,7 @@ use numpy::{Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReado
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -108,6 +109,50 @@ fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
         out.push(group_len as usize);
     }
     Ok(out)
+}
+
+fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
+    if len1 == len2 || len2 == 1 {
+        Ok(len1)
+    } else if len1 == 1 {
+        Ok(len2)
+    } else {
+        Err(PyValueError::new_err(
+            "operands could not be broadcast together",
+        ))
+    }
+}
+
+fn broadcast_len3(len1: usize, len2: usize, len3: usize) -> PyResult<usize> {
+    if len1 == 0 || len2 == 0 || len3 == 0 {
+        if (len1 == 0 || len1 == 1) && (len2 == 0 || len2 == 1) && (len3 == 0 || len3 == 1) {
+            Ok(0)
+        } else {
+            Err(PyValueError::new_err(
+                "operands could not be broadcast together",
+            ))
+        }
+    } else {
+        let out_len = len1.max(len2).max(len3);
+        if (len1 == out_len || len1 == 1)
+            && (len2 == out_len || len2 == 1)
+            && (len3 == out_len || len3 == 1)
+        {
+            Ok(out_len)
+        } else {
+            Err(PyValueError::new_err(
+                "operands could not be broadcast together",
+            ))
+        }
+    }
+}
+
+fn broadcast_get<T: Copy>(values: &[T], i: usize) -> T {
+    if values.len() == 1 {
+        values[0]
+    } else {
+        values[i]
+    }
 }
 
 fn apply_2d_by_col<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Array2<f64>
@@ -406,7 +451,10 @@ fn nanmedian_1d(a: &[f64]) -> f64 {
     let mid = n / 2;
     vals.select_nth_unstable_by(mid, |x, y| x.partial_cmp(y).unwrap());
     if n % 2 == 0 {
-        let lower_max = vals[..mid].iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let lower_max = vals[..mid]
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
         (lower_max + vals[mid]) / 2.0
     } else {
         vals[mid]
@@ -538,7 +586,7 @@ fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64
                 cumsum_sq - cumsum_sq_arr[i - window],
             )
         };
-        if window_len >= minp && window_len != ddof {
+        if window_len >= minp && window_len > ddof {
             let mean = window_cumsum / window_len as f64;
             let variance = (window_cumsum_sq - 2.0 * window_cumsum * mean
                 + window_len as f64 * mean * mean)
@@ -710,19 +758,23 @@ fn expanding_max_1d(a: &[f64], minp: usize) -> Vec<f64> {
     out
 }
 
-fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
+fn shuffle_1d_with_rng<R: Rng + ?Sized>(a: &[f64], rng: &mut R) -> Vec<f64> {
     let mut out = a.to_vec();
+    out.shuffle(rng);
+    out
+}
+
+fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
     match seed {
         Some(seed) => {
             let mut rng = ChaCha8Rng::seed_from_u64(seed);
-            out.shuffle(&mut rng);
+            shuffle_1d_with_rng(a, &mut rng)
         }
         None => {
             let mut rng = rand::thread_rng();
-            out.shuffle(&mut rng);
+            shuffle_1d_with_rng(a, &mut rng)
         }
     }
-    out
 }
 
 fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
@@ -1035,6 +1087,9 @@ fn ranges_to_mask(
 fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
     let (nrows, ncols) = a.dim();
     let mut out = Vec::<DrawdownRecord>::with_capacity(nrows * ncols);
+    if nrows == 0 {
+        return out;
+    }
     let mut ddidx = 0i64;
     for col in 0..ncols {
         let col_view = a.column(col);
@@ -1224,7 +1279,9 @@ pub fn fillna_rs<'py>(
     value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| fillna_1d_into(col, out, value)));
+    let result = py.allow_threads(|| {
+        apply_2d_by_col_inplace(a_arr, |col, out| fillna_1d_into(col, out, value))
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1238,7 +1295,9 @@ pub fn bshift_rs<'py>(
     fill_value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| bshift_1d_into(col, out, n, fill_value)));
+    let result = py.allow_threads(|| {
+        apply_2d_by_col_inplace(a_arr, |col, out| bshift_1d_into(col, out, n, fill_value))
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1252,7 +1311,9 @@ pub fn fshift_rs<'py>(
     fill_value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| fshift_1d_into(col, out, n, fill_value)));
+    let result = py.allow_threads(|| {
+        apply_2d_by_col_inplace(a_arr, |col, out| fshift_1d_into(col, out, n, fill_value))
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1265,7 +1326,8 @@ pub fn diff_rs<'py>(
     n: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| diff_1d_into(col, out, n)));
+    let result =
+        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| diff_1d_into(col, out, n)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1278,7 +1340,9 @@ pub fn pct_change_rs<'py>(
     n: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| pct_change_1d_into(col, out, n)));
+    let result = py.allow_threads(|| {
+        apply_2d_by_col_inplace(a_arr, |col, out| pct_change_1d_into(col, out, n))
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1290,7 +1354,8 @@ pub fn bfill_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| bfill_1d_into(col, out)));
+    let result =
+        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| bfill_1d_into(col, out)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1302,7 +1367,8 @@ pub fn ffill_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| ffill_1d_into(col, out)));
+    let result =
+        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| ffill_1d_into(col, out)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1322,7 +1388,8 @@ pub fn nancumsum_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumsum_1d_into(col, out)));
+    let result =
+        py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumsum_1d_into(col, out)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1332,7 +1399,8 @@ pub fn nancumprod_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumprod_1d_into(col, out)));
+    let result = py
+        .allow_threads(|| apply_2d_by_col_inplace(a_arr, |col, out| nancumprod_1d_into(col, out)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1707,7 +1775,40 @@ pub fn shuffle_rs<'py>(
     seed: Option<u64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| shuffle_1d(col, seed)));
+    let result = py.allow_threads(|| {
+        let (nrows, ncols) = a_arr.dim();
+        let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+        let mut col_buf = vec![0.0f64; nrows];
+        match seed {
+            Some(seed) => {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                for col in 0..ncols {
+                    for (i, &v) in a_arr.column(col).iter().enumerate() {
+                        col_buf[i] = v;
+                    }
+                    let col_result = shuffle_1d_with_rng(&col_buf, &mut rng);
+                    let mut out_col = out.column_mut(col);
+                    for (i, &v) in col_result.iter().enumerate() {
+                        out_col[i] = v;
+                    }
+                }
+            }
+            None => {
+                let mut rng = rand::thread_rng();
+                for col in 0..ncols {
+                    for (i, &v) in a_arr.column(col).iter().enumerate() {
+                        col_buf[i] = v;
+                    }
+                    let col_result = shuffle_1d_with_rng(&col_buf, &mut rng);
+                    let mut out_col = out.column_mut(col);
+                    for (i, &v) in col_result.iter().enumerate() {
+                        out_col[i] = v;
+                    }
+                }
+            }
+        }
+        out
+    });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1954,11 +2055,14 @@ pub fn dd_drawdown_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let peak_val_slice = peak_val.as_slice()?;
     let valley_val_slice = valley_val.as_slice()?;
+    let out_len = broadcast_len2(peak_val_slice.len(), valley_val_slice.len())?;
     let result = py.allow_threads(|| {
-        peak_val_slice
-            .iter()
-            .zip(valley_val_slice.iter())
-            .map(|(&peak, &valley)| (valley - peak) / peak)
+        (0..out_len)
+            .map(|i| {
+                let peak = broadcast_get(peak_val_slice, i);
+                let valley = broadcast_get(valley_val_slice, i);
+                (valley - peak) / peak
+            })
             .collect::<Vec<f64>>()
     });
     Ok(PyArray1::from_vec_bound(py, result))
@@ -1972,11 +2076,14 @@ pub fn dd_decline_duration_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let start_idx_slice = start_idx.as_slice()?;
     let valley_idx_slice = valley_idx.as_slice()?;
+    let out_len = broadcast_len2(start_idx_slice.len(), valley_idx_slice.len())?;
     let result = py.allow_threads(|| {
-        start_idx_slice
-            .iter()
-            .zip(valley_idx_slice.iter())
-            .map(|(&start, &valley)| valley - start + 1)
+        (0..out_len)
+            .map(|i| {
+                let start = broadcast_get(start_idx_slice, i);
+                let valley = broadcast_get(valley_idx_slice, i);
+                valley - start + 1
+            })
             .collect::<Vec<i64>>()
     });
     Ok(PyArray1::from_vec_bound(py, result))
@@ -1990,11 +2097,14 @@ pub fn dd_recovery_duration_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let valley_idx_slice = valley_idx.as_slice()?;
     let end_idx_slice = end_idx.as_slice()?;
+    let out_len = broadcast_len2(valley_idx_slice.len(), end_idx_slice.len())?;
     let result = py.allow_threads(|| {
-        valley_idx_slice
-            .iter()
-            .zip(end_idx_slice.iter())
-            .map(|(&valley, &end)| end - valley)
+        (0..out_len)
+            .map(|i| {
+                let valley = broadcast_get(valley_idx_slice, i);
+                let end = broadcast_get(end_idx_slice, i);
+                end - valley
+            })
             .collect::<Vec<i64>>()
     });
     Ok(PyArray1::from_vec_bound(py, result))
@@ -2010,12 +2120,19 @@ pub fn dd_recovery_duration_ratio_rs<'py>(
     let start_idx_slice = start_idx.as_slice()?;
     let valley_idx_slice = valley_idx.as_slice()?;
     let end_idx_slice = end_idx.as_slice()?;
+    let out_len = broadcast_len3(
+        start_idx_slice.len(),
+        valley_idx_slice.len(),
+        end_idx_slice.len(),
+    )?;
     let result = py.allow_threads(|| {
-        start_idx_slice
-            .iter()
-            .zip(valley_idx_slice.iter())
-            .zip(end_idx_slice.iter())
-            .map(|((&start, &valley), &end)| (end - valley) as f64 / (valley - start + 1) as f64)
+        (0..out_len)
+            .map(|i| {
+                let start = broadcast_get(start_idx_slice, i);
+                let valley = broadcast_get(valley_idx_slice, i);
+                let end = broadcast_get(end_idx_slice, i);
+                (end - valley) as f64 / (valley - start + 1) as f64
+            })
             .collect::<Vec<f64>>()
     });
     Ok(PyArray1::from_vec_bound(py, result))
@@ -2029,11 +2146,14 @@ pub fn dd_recovery_return_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let valley_val_slice = valley_val.as_slice()?;
     let end_val_slice = end_val.as_slice()?;
+    let out_len = broadcast_len2(valley_val_slice.len(), end_val_slice.len())?;
     let result = py.allow_threads(|| {
-        valley_val_slice
-            .iter()
-            .zip(end_val_slice.iter())
-            .map(|(&valley, &end)| (end - valley) / valley)
+        (0..out_len)
+            .map(|i| {
+                let valley = broadcast_get(valley_val_slice, i);
+                let end = broadcast_get(end_val_slice, i);
+                (end - valley) / valley
+            })
             .collect::<Vec<f64>>()
     });
     Ok(PyArray1::from_vec_bound(py, result))

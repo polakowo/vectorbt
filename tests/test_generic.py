@@ -8,7 +8,7 @@ from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
 
 import vectorbt as vbt
-from vectorbt.generic import nb
+from vectorbt.generic import dispatch, nb
 
 seed = 42
 
@@ -628,6 +628,14 @@ class TestAccessors:
             df.iloc[::2].sum().rename('apply_and_reduce') + 3
         )
         pd.testing.assert_series_equal(
+            df.vbt.apply_and_reduce(apply_func=every_nth_nb, reduce_func=sum_nb, apply_args=(2,), reduce_args=(3,)),
+            df.iloc[::2].sum().rename('apply_and_reduce') + 3
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.apply_and_reduce(every_nth_nb, dispatch.sum_reduce, apply_args=(2,), backend="numba"),
+            df.iloc[::2].sum().rename('apply_and_reduce')
+        )
+        pd.testing.assert_series_equal(
             df.vbt.apply_and_reduce(
                 every_nth_nb, sum_nb, apply_args=(2,),
                 reduce_args=(3,), wrap_kwargs=dict(to_timedelta=True)),
@@ -640,8 +648,13 @@ class TestAccessors:
             return np.nansum(a)
 
         assert df['a'].vbt.reduce(sum_nb) == df['a'].sum()
+        assert df['a'].vbt.reduce(reduce_func=sum_nb) == df['a'].sum()
         pd.testing.assert_series_equal(
             df.vbt.reduce(sum_nb),
+            df.sum().rename('reduce')
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.reduce(dispatch.sum_reduce, backend="numba"),
             df.sum().rename('reduce')
         )
         pd.testing.assert_series_equal(
@@ -742,6 +755,16 @@ class TestAccessors:
                 [3.0, 2.0],
                 [3.0, np.nan],
                 [3.0, 2.0],
+                [1.0, 1.0]
+            ], index=df.index, columns=['g1', 'g2'])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.squeeze_grouped(squeeze_func=dispatch.sum_squeeze, group_by=group_by, backend="numba"),
+            pd.DataFrame([
+                [1.0, 1.0],
+                [6.0, 2.0],
+                [6.0, 0.0],
+                [6.0, 2.0],
                 [1.0, 1.0]
             ], index=df.index, columns=['g1', 'g2'])
         )

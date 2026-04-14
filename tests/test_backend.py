@@ -265,6 +265,63 @@ class TestGenericRustParity:
         assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
         np.testing.assert_array_equal(drawdowns, expected_drawdowns)
 
+    def test_dispatch_get_drawdowns_empty_rows(self):
+        ts = np.empty((0, 3), dtype=np.float64)
+
+        drawdowns = dispatch.get_drawdowns(ts, backend="rust")
+        expected_drawdowns = nb.get_drawdowns_nb(ts)
+        assert drawdowns.dtype == drawdown_dt
+        assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
+        np.testing.assert_array_equal(drawdowns, expected_drawdowns)
+
+    def test_dispatch_std_ddof_larger_than_window_len(self):
+        a_1d = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        a = np.column_stack((a_1d, a_1d + 1.0))
+
+        np.testing.assert_allclose(
+            dispatch.rolling_std_1d(a_1d, 2, 1, 3, backend="rust"),
+            np.full(a_1d.shape, np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            dispatch.rolling_std(a, 2, 1, 3, backend="rust"),
+            np.full(a.shape, np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            dispatch.expanding_std_1d(a_1d, 1, 5, backend="rust"),
+            np.full(a_1d.shape, np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            dispatch.expanding_std(a, 1, 5, backend="rust"),
+            np.full(a.shape, np.nan),
+            equal_nan=True,
+        )
+
+    def test_dispatch_drawdown_helpers_broadcast(self):
+        peak = np.array([10.0, 8.0, 12.0])
+        valley = np.array([5.0])
+        np.testing.assert_allclose(
+            dispatch.dd_drawdown(peak, valley, backend="rust"),
+            nb.dd_drawdown_nb(peak, valley),
+        )
+
+        start = np.array([1, 2, 3], dtype=np.int64)
+        end = np.array([5], dtype=np.int64)
+        valley_idx = np.array([3, 4, 5], dtype=np.int64)
+        np.testing.assert_allclose(
+            dispatch.dd_recovery_duration(valley_idx, end, backend="rust"),
+            nb.dd_recovery_duration_nb(valley_idx, end),
+        )
+        np.testing.assert_allclose(
+            dispatch.dd_recovery_duration_ratio(start, valley_idx, end, backend="rust"),
+            nb.dd_recovery_duration_ratio_nb(start, valley_idx, end),
+        )
+
+        with pytest.raises(ValueError, match="broadcast"):
+            dispatch.dd_drawdown(peak, np.array([5.0, 4.0]), backend="rust")
+
     def test_dispatch_rust_shuffle_is_seeded(self):
         a = np.arange(12, dtype=np.float64).reshape(4, 3)
 
@@ -273,6 +330,10 @@ class TestGenericRustParity:
         np.testing.assert_array_equal(out1, out2)
         for col in range(a.shape[1]):
             np.testing.assert_array_equal(np.sort(out1[:, col]), np.sort(a[:, col]))
+
+        identical = np.tile(np.arange(20, dtype=np.float64).reshape(-1, 1), (1, 4))
+        shuffled = dispatch.shuffle(identical, seed=42, backend="rust")
+        assert any(not np.array_equal(shuffled[:, 0], shuffled[:, col]) for col in range(1, identical.shape[1]))
 
     def test_dispatch_auto_falls_back_for_unsupported_array(self):
         a = np.array([[1, 2], [3, 4]], dtype=np.int64)

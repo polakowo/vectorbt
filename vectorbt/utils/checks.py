@@ -77,7 +77,7 @@ def is_iterable(arg: tp.Any) -> bool:
         return False
 
 
-def is_numba_func(arg: tp.Any) -> bool:
+def is_numba_func(arg: tp.Any, func_suffix: str = "_nb") -> bool:
     """Check whether the argument is a Numba-compiled function."""
     from vectorbt._settings import settings
 
@@ -89,9 +89,52 @@ def is_numba_func(arg: tp.Any) -> bool:
         if os.environ["NUMBA_DISABLE_JIT"] == "1":
             if not numba_cfg["check_func_suffix"]:
                 return True
-            if arg.__name__.endswith("_nb"):
+            if arg.__name__.endswith(func_suffix):
                 return True
     return isinstance(arg, CPUDispatcher)
+
+
+def is_rust_func(arg: tp.Any, func_suffix: str = "_rs") -> bool:
+    """Check whether the argument is a Rust-backed function."""
+    from vectorbt._settings import settings
+
+    numba_cfg = settings["numba"]
+
+    if not numba_cfg["check_func_type"]:
+        return True
+    if not callable(arg):
+        return False
+    if numba_cfg["check_func_suffix"] and not getattr(arg, "__name__", "").endswith(func_suffix):
+        return False
+    return getattr(arg, "__module__", "").startswith("vectorbt_rust") or getattr(arg, "__name__", "").endswith(func_suffix)
+
+
+def is_backend_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) -> bool:
+    """Check whether the argument is a backend-neutral dispatch function."""
+    if not callable(arg):
+        return False
+    if func_suffix is not None and not getattr(arg, "__name__", "").endswith(func_suffix):
+        return False
+    return func_accepts_arg(arg, "backend")
+
+
+def is_backend_func(func: tp.Callable, backend: tp.Optional[str] = None, func_suffix: tp.Optional[str] = None) -> bool:
+    """Check whether `func` can be used with the requested backend."""
+    from vectorbt._settings import settings
+
+    if backend is None:
+        backend = settings["backend"]
+    if backend == "auto":
+        return (
+            is_numba_func(func)
+            or is_rust_func(func)
+            or is_backend_dispatch_func(func, func_suffix=func_suffix)
+        )
+    if backend == "numba":
+        return is_numba_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
+    if backend == "rust":
+        return is_rust_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
+    raise ValueError("Invalid backend. Expected 'auto', 'numba', or 'rust'.")
 
 
 def is_hashable(arg: tp.Any) -> bool:
@@ -360,6 +403,22 @@ def assert_numba_func(func: tp.Callable) -> None:
     """Raise exception if `func` is not Numba-compiled."""
     if not is_numba_func(func):
         raise AssertionError(f"Function {func} must be Numba compiled")
+
+
+def assert_rust_func(func: tp.Callable) -> None:
+    """Raise exception if `func` is not Rust-backed."""
+    if not is_rust_func(func):
+        raise AssertionError(f"Function {func} must be Rust backed")
+
+
+def assert_backend_func(
+    func: tp.Callable,
+    backend: tp.Optional[str] = None,
+    func_suffix: tp.Optional[str] = None,
+) -> None:
+    """Raise exception if `func` cannot be used with the requested backend."""
+    if not is_backend_func(func, backend=backend, func_suffix=func_suffix):
+        raise AssertionError(f"Function {func} must be compatible with backend '{backend}'")
 
 
 def assert_not_none(arg: tp.Any) -> None:

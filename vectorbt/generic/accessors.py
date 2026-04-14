@@ -465,19 +465,19 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     def apply_along_axis(
         self,
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.RowApplyFunc],
+        apply_func: tp.Union[tp.ApplyFunc, tp.RowApplyFunc],
         *args,
         axis: int = 0,
         backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Apply a function `apply_func_nb` along an axis."""
-        checks.assert_numba_func(apply_func_nb)
+        """Apply a function `apply_func` along an axis."""
+        checks.assert_backend_func(apply_func, backend=backend)
 
         if axis == 0:
-            out = dispatch.apply(self.to_2d_array(), apply_func_nb, *args, backend=backend)
+            out = dispatch.apply(self.to_2d_array(), apply_func, *args, backend=backend)
         elif axis == 1:
-            out = dispatch.row_apply(self.to_2d_array(), apply_func_nb, *args, backend=backend)
+            out = dispatch.row_apply(self.to_2d_array(), apply_func, *args, backend=backend)
         else:
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
@@ -485,7 +485,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
     def rolling_apply(
         self,
         window: int,
-        apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
+        apply_func: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
         *args,
         minp: tp.Optional[int] = None,
         on_matrix: bool = False,
@@ -516,17 +516,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.666667  2.666667  2.666667
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
 
         if on_matrix:
-            out = dispatch.rolling_matrix_apply(self.to_2d_array(), window, minp, apply_func_nb, *args, backend=backend)
+            out = dispatch.rolling_matrix_apply(self.to_2d_array(), window, minp, apply_func, *args, backend=backend)
         else:
-            out = dispatch.rolling_apply(self.to_2d_array(), window, minp, apply_func_nb, *args, backend=backend)
+            out = dispatch.rolling_apply(self.to_2d_array(), window, minp, apply_func, *args, backend=backend)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def expanding_apply(
         self,
-        apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
+        apply_func: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
         *args,
         minp: tp.Optional[int] = 1,
         on_matrix: bool = False,
@@ -557,18 +557,18 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.600000  2.600000  2.600000
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
 
         if on_matrix:
-            out = dispatch.expanding_matrix_apply(self.to_2d_array(), minp, apply_func_nb, *args, backend=backend)
+            out = dispatch.expanding_matrix_apply(self.to_2d_array(), minp, apply_func, *args, backend=backend)
         else:
-            out = dispatch.expanding_apply(self.to_2d_array(), minp, apply_func_nb, *args, backend=backend)
+            out = dispatch.expanding_apply(self.to_2d_array(), minp, apply_func, *args, backend=backend)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def groupby_apply(
         self,
         by: tp.PandasGroupByLike,
-        apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
+        apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
         *args,
         on_matrix: bool = False,
         backend: tp.Optional[str] = None,
@@ -597,23 +597,23 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             3  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
 
         regrouped = self.obj.groupby(by, axis=0, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func_nb, *args, backend=backend)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
         else:
-            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func_nb, *args, backend=backend)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
         wrap_kwargs = merge_dicts(dict(name_or_index=list(regrouped.indices.keys())), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def resample_apply(
         self,
         freq: tp.PandasFrequencyLike,
-        apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
+        apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
         *args,
         on_matrix: bool = False,
         backend: tp.Optional[str] = None,
@@ -642,16 +642,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
 
         resampled = self.obj.resample(freq, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func_nb, *args, backend=backend)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
         else:
-            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func_nb, *args, backend=backend)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
         out_obj = self.wrapper.wrap(out, group_by=False, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrapper.wrap(
@@ -665,7 +665,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     def applymap(
         self,
-        apply_func_nb: tp.ApplyMapFunc,
+        apply_func: tp.ApplyMapFunc,
         *args,
         backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -684,14 +684,14 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  25.0   1.0  1.0
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
 
-        out = dispatch.applymap(self.to_2d_array(), apply_func_nb, *args, backend=backend)
+        out = dispatch.applymap(self.to_2d_array(), apply_func, *args, backend=backend)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def filter(
         self,
-        filter_func_nb: tp.FilterFunc,
+        filter_func: tp.FilterFunc,
         *args,
         backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -710,15 +710,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  5.0  NaN  NaN
             ```
         """
-        checks.assert_numba_func(filter_func_nb)
+        checks.assert_backend_func(filter_func, backend=backend)
 
-        out = dispatch.filter(self.to_2d_array(), filter_func_nb, *args, backend=backend)
+        out = dispatch.filter(self.to_2d_array(), filter_func, *args, backend=backend)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def apply_and_reduce(
         self,
-        apply_func_nb: tp.ApplyFunc,
-        reduce_func_nb: tp.ReduceFunc,
+        apply_func: tp.ApplyFunc,
+        reduce_func: tp.ReduceFunc,
         apply_args: tp.Optional[tuple] = None,
         reduce_args: tp.Optional[tuple] = None,
         backend: tp.Optional[str] = None,
@@ -737,8 +737,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: float64
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
-        checks.assert_numba_func(reduce_func_nb)
+        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_backend_func(reduce_func, backend=backend, func_suffix="_reduce")
         if apply_args is None:
             apply_args = ()
         if reduce_args is None:
@@ -746,9 +746,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         out = dispatch.apply_and_reduce(
             self.to_2d_array(),
-            apply_func_nb,
+            apply_func,
             apply_args,
-            reduce_func_nb,
+            reduce_func,
             reduce_args,
             backend=backend,
         )
@@ -757,7 +757,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     def reduce(
         self,
-        reduce_func_nb: tp.Union[
+        reduce_func: tp.Union[
             tp.FlatGroupReduceFunc,
             tp.FlatGroupReduceArrayFunc,
             tp.GroupReduceFunc,
@@ -771,6 +771,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         flatten: bool = False,
         order: str = "C",
         to_index: bool = True,
+        backend: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeriesFrame[float]:
@@ -783,7 +784,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         See `vectorbt.generic.dispatch.reduce_to_array` if not grouped and `returns_array` is True.
         See `vectorbt.generic.dispatch.reduce` if not grouped and `returns_array` is False.
 
-        Set `returns_idx` to True if values returned by `reduce_func_nb` are indices/positions.
+        Set `returns_idx` to True if values returned by `reduce_func` are indices/positions.
         Set `to_index` to False to return raw positions instead of labels.
 
         Usage:
@@ -829,7 +830,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             max      5.0     3.0
             ```
         """
-        checks.assert_numba_func(reduce_func_nb)
+        checks.assert_backend_func(reduce_func, backend=backend, func_suffix="_reduce")
 
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -841,16 +842,18 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         self.to_2d_array(),
                         group_lens,
                         in_c_order,
-                        reduce_func_nb,
+                        reduce_func,
                         *args,
+                        backend=backend,
                     )
                 else:
                     out = dispatch.flat_reduce_grouped(
                         self.to_2d_array(),
                         group_lens,
                         in_c_order,
-                        reduce_func_nb,
+                        reduce_func,
                         *args,
+                        backend=backend,
                     )
                 if returns_idx:
                     if in_c_order:
@@ -859,14 +862,26 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         out %= self.wrapper.shape[0]  # flattened in F order
             else:
                 if returns_array:
-                    out = dispatch.reduce_grouped_to_array(self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                    out = dispatch.reduce_grouped_to_array(
+                        self.to_2d_array(),
+                        group_lens,
+                        reduce_func,
+                        *args,
+                        backend=backend,
+                    )
                 else:
-                    out = dispatch.reduce_grouped(self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                    out = dispatch.reduce_grouped(
+                        self.to_2d_array(),
+                        group_lens,
+                        reduce_func,
+                        *args,
+                        backend=backend,
+                    )
         else:
             if returns_array:
-                out = dispatch.reduce_to_array(self.to_2d_array(), reduce_func_nb, *args)
+                out = dispatch.reduce_to_array(self.to_2d_array(), reduce_func, *args, backend=backend)
             else:
-                out = dispatch.reduce(self.to_2d_array(), reduce_func_nb, *args)
+                out = dispatch.reduce(self.to_2d_array(), reduce_func, *args, backend=backend)
 
         # Perform post-processing
         wrap_kwargs = merge_dicts(
@@ -2008,8 +2023,9 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     def squeeze_grouped(
         self,
-        squeeze_func_nb: tp.GroupSqueezeFunc,
+        squeeze_func: tp.GroupSqueezeFunc,
         *args,
+        backend: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
@@ -2017,7 +2033,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.squeeze_grouped`."""
         obj_frame = self.obj.to_frame().transpose()
-        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func_nb, *args, group_by=group_by).iloc[0]
+        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func, *args, backend=backend, group_by=group_by).iloc[0]
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
         return ArrayWrapper.from_obj(obj_frame).wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
 
@@ -2628,8 +2644,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
     def squeeze_grouped(
         self,
-        squeeze_func_nb: tp.GroupSqueezeFunc,
+        squeeze_func: tp.GroupSqueezeFunc,
         *args,
+        backend: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
@@ -2652,10 +2669,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
-        checks.assert_numba_func(squeeze_func_nb)
+        checks.assert_backend_func(squeeze_func, backend=backend, func_suffix="_squeeze")
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        out = dispatch.squeeze_grouped(self.to_2d_array(), group_lens, squeeze_func_nb, *args)
+        out = dispatch.squeeze_grouped(self.to_2d_array(), group_lens, squeeze_func, *args, backend=backend)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def flatten_grouped(

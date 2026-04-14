@@ -6,6 +6,7 @@
 import numpy as np
 
 from vectorbt import _typing as tp
+from vectorbt.utils import checks
 from vectorbt._backend import (
     array_and_non_neg_int_compatible_with_rust,
     array_compatible_with_rust,
@@ -25,6 +26,10 @@ from vectorbt._backend import (
 
 def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, backend: tp.Optional[str] = None) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.shuffle_1d_nb`."""
+    if backend is None or backend == "auto":
+        from vectorbt.generic.nb import shuffle_1d_nb
+
+        return shuffle_1d_nb(a, seed)
     eng = resolve_backend(
         backend,
         supports_rust=combine_rust_support(
@@ -43,6 +48,10 @@ def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, backend: tp.Optiona
 
 def shuffle(a: tp.Array2d, seed: tp.Optional[int] = None, backend: tp.Optional[str] = None) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.shuffle_nb`."""
+    if backend is None or backend == "auto":
+        from vectorbt.generic.nb import shuffle_nb
+
+        return shuffle_nb(a, seed)
     eng = resolve_backend(
         backend,
         supports_rust=combine_rust_support(
@@ -934,17 +943,17 @@ def expanding_std(
 # ############# Apply functions ############# #
 
 
-def apply(a: tp.Array2d, apply_func_nb: tp.ApplyFunc, *args: tp.Any, backend: tp.Optional[str] = None) -> tp.Array2d:
+def apply(a: tp.Array2d, apply_func: tp.ApplyFunc, *args: tp.Any, backend: tp.Optional[str] = None) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.apply_nb`."""
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import apply_nb
 
-    return apply_nb(a, apply_func_nb, *args)
+    return apply_nb(a, apply_func, *args)
 
 
 def row_apply(
     a: tp.Array2d,
-    apply_func_nb: tp.RowApplyFunc,
+    apply_func: tp.RowApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -952,14 +961,14 @@ def row_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import row_apply_nb
 
-    return row_apply_nb(a, apply_func_nb, *args)
+    return row_apply_nb(a, apply_func, *args)
 
 
 def rolling_apply(
     a: tp.Array2d,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollApplyFunc,
+    apply_func: tp.RollApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -967,14 +976,14 @@ def rolling_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import rolling_apply_nb
 
-    return rolling_apply_nb(a, window, minp, apply_func_nb, *args)
+    return rolling_apply_nb(a, window, minp, apply_func, *args)
 
 
 def rolling_matrix_apply(
     a: tp.Array2d,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollMatrixApplyFunc,
+    apply_func: tp.RollMatrixApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -982,13 +991,13 @@ def rolling_matrix_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import rolling_matrix_apply_nb
 
-    return rolling_matrix_apply_nb(a, window, minp, apply_func_nb, *args)
+    return rolling_matrix_apply_nb(a, window, minp, apply_func, *args)
 
 
 def expanding_apply(
     a: tp.Array2d,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollApplyFunc,
+    apply_func: tp.RollApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -996,13 +1005,13 @@ def expanding_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import expanding_apply_nb
 
-    return expanding_apply_nb(a, minp, apply_func_nb, *args)
+    return expanding_apply_nb(a, minp, apply_func, *args)
 
 
 def expanding_matrix_apply(
     a: tp.Array2d,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollMatrixApplyFunc,
+    apply_func: tp.RollMatrixApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1010,13 +1019,13 @@ def expanding_matrix_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import expanding_matrix_apply_nb
 
-    return expanding_matrix_apply_nb(a, minp, apply_func_nb, *args)
+    return expanding_matrix_apply_nb(a, minp, apply_func, *args)
 
 
 def groupby_apply(
     a: tp.Array2d,
     groups: tp.Any,
-    apply_func_nb: tp.GroupByApplyFunc,
+    apply_func: tp.GroupByApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1024,13 +1033,13 @@ def groupby_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import groupby_apply_nb
 
-    return groupby_apply_nb(a, groups, apply_func_nb, *args)
+    return groupby_apply_nb(a, groups, apply_func, *args)
 
 
 def groupby_matrix_apply(
     a: tp.Array2d,
     groups: tp.Any,
-    apply_func_nb: tp.GroupByMatrixApplyFunc,
+    apply_func: tp.GroupByMatrixApplyFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1038,7 +1047,7 @@ def groupby_matrix_apply(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import groupby_matrix_apply_nb
 
-    return groupby_matrix_apply_nb(a, groups, apply_func_nb, *args)
+    return groupby_matrix_apply_nb(a, groups, apply_func, *args)
 
 
 # ############# Map, filter and reduce ############# #
@@ -1046,7 +1055,7 @@ def groupby_matrix_apply(
 
 def applymap(
     a: tp.Array2d,
-    map_func_nb: tp.ApplyMapFunc,
+    map_func: tp.ApplyMapFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1054,12 +1063,12 @@ def applymap(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import applymap_nb
 
-    return applymap_nb(a, map_func_nb, *args)
+    return applymap_nb(a, map_func, *args)
 
 
 def filter(
     a: tp.Array2d,
-    filter_func_nb: tp.FilterFunc,
+    filter_func: tp.FilterFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1067,7 +1076,7 @@ def filter(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import filter_nb
 
-    return filter_nb(a, filter_func_nb, *args)
+    return filter_nb(a, filter_func, *args)
 
 
 filter_ = filter
@@ -1075,49 +1084,77 @@ filter_ = filter
 
 def apply_and_reduce(
     a: tp.Array2d,
-    apply_func_nb: tp.ApplyFunc,
+    apply_func: tp.ApplyFunc,
     apply_args: tuple,
-    reduce_func_nb: tp.ReduceFunc,
+    reduce_func: tp.ReduceFunc,
     reduce_args: tuple,
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.apply_and_reduce_nb`."""
+    if checks.is_backend_dispatch_func(reduce_func, func_suffix="_reduce"):
+        out = None
+        apply_is_dispatch = checks.is_backend_dispatch_func(apply_func)
+        for col in range(a.shape[1]):
+            if apply_is_dispatch:
+                temp = apply_func(col, a[:, col], *apply_args, backend=backend)
+            else:
+                temp = apply_func(col, a[:, col], *apply_args)
+            _out = reduce_func(col, temp, *reduce_args, backend=backend)
+            if out is None:
+                out = np.empty(a.shape[1], dtype=np.asarray(_out).dtype)
+            out[col] = _out
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import apply_and_reduce_nb
 
-    return apply_and_reduce_nb(a, apply_func_nb, apply_args, reduce_func_nb, reduce_args)
+    return apply_and_reduce_nb(a, apply_func, apply_args, reduce_func, reduce_args)
 
 
 def reduce(
     a: tp.Array2d,
-    reduce_func_nb: tp.ReduceFunc,
+    reduce_func: tp.ReduceFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.reduce_nb`."""
+    if checks.is_backend_dispatch_func(reduce_func, func_suffix="_reduce"):
+        first_out = reduce_func(0, a[:, 0], *args, backend=backend)
+        out = np.empty(a.shape[1], dtype=np.asarray(first_out).dtype)
+        out[0] = first_out
+        for col in range(1, a.shape[1]):
+            out[col] = reduce_func(col, a[:, col], *args, backend=backend)
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import reduce_nb
 
-    return reduce_nb(a, reduce_func_nb, *args)
+    return reduce_nb(a, reduce_func, *args)
 
 
 def reduce_to_array(
     a: tp.Array2d,
-    reduce_func_nb: tp.ReduceArrayFunc,
+    reduce_func: tp.ReduceArrayFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.reduce_to_array_nb`."""
+    if checks.is_backend_dispatch_func(reduce_func, func_suffix="_reduce"):
+        out = None
+        for col in range(a.shape[1]):
+            _out = np.asarray(reduce_func(col, a[:, col], *args, backend=backend))
+            if out is None:
+                out = np.empty((_out.shape[0], a.shape[1]), dtype=_out.dtype)
+            out[:, col] = _out
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import reduce_to_array_nb
 
-    return reduce_to_array_nb(a, reduce_func_nb, *args)
+    return reduce_to_array_nb(a, reduce_func, *args)
 
 
 def reduce_grouped(
     a: tp.Array2d,
     group_lens: tp.Array1d,
-    reduce_func_nb: tp.GroupReduceFunc,
+    reduce_func: tp.GroupReduceFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
@@ -1125,7 +1162,7 @@ def reduce_grouped(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import reduce_grouped_nb
 
-    return reduce_grouped_nb(a, group_lens, reduce_func_nb, *args)
+    return reduce_grouped_nb(a, group_lens, reduce_func, *args)
 
 
 def flatten_forder(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array1d:
@@ -1144,21 +1181,34 @@ def flat_reduce_grouped(
     a: tp.Array2d,
     group_lens: tp.Array1d,
     in_c_order: bool,
-    reduce_func_nb: tp.FlatGroupReduceFunc,
+    reduce_func: tp.FlatGroupReduceFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.flat_reduce_grouped_nb`."""
+    if checks.is_backend_dispatch_func(reduce_func, func_suffix="_reduce"):
+        from_col = 0
+        out = None
+        for group, group_len in enumerate(group_lens):
+            to_col = from_col + group_len
+            group_arr = a[:, from_col:to_col]
+            flat_arr = group_arr.ravel(order="C" if in_c_order else "F")
+            _out = reduce_func(group, flat_arr, *args, backend=backend)
+            if out is None:
+                out = np.empty(len(group_lens), dtype=np.asarray(_out).dtype)
+            out[group] = _out
+            from_col = to_col
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import flat_reduce_grouped_nb
 
-    return flat_reduce_grouped_nb(a, group_lens, in_c_order, reduce_func_nb, *args)
+    return flat_reduce_grouped_nb(a, group_lens, in_c_order, reduce_func, *args)
 
 
 def reduce_grouped_to_array(
     a: tp.Array2d,
     group_lens: tp.Array1d,
-    reduce_func_nb: tp.GroupReduceArrayFunc,
+    reduce_func: tp.GroupReduceArrayFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
@@ -1166,36 +1216,61 @@ def reduce_grouped_to_array(
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import reduce_grouped_to_array_nb
 
-    return reduce_grouped_to_array_nb(a, group_lens, reduce_func_nb, *args)
+    return reduce_grouped_to_array_nb(a, group_lens, reduce_func, *args)
 
 
 def flat_reduce_grouped_to_array(
     a: tp.Array2d,
     group_lens: tp.Array1d,
     in_c_order: bool,
-    reduce_func_nb: tp.FlatGroupReduceArrayFunc,
+    reduce_func: tp.FlatGroupReduceArrayFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.flat_reduce_grouped_to_array_nb`."""
+    if checks.is_backend_dispatch_func(reduce_func, func_suffix="_reduce"):
+        from_col = 0
+        out = None
+        for group, group_len in enumerate(group_lens):
+            to_col = from_col + group_len
+            group_arr = a[:, from_col:to_col]
+            flat_arr = group_arr.ravel(order="C" if in_c_order else "F")
+            _out = np.asarray(reduce_func(group, flat_arr, *args, backend=backend))
+            if out is None:
+                out = np.full((_out.shape[0], len(group_lens)), np.nan, dtype=_out.dtype)
+            out[:, group] = _out
+            from_col = to_col
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import flat_reduce_grouped_to_array_nb
 
-    return flat_reduce_grouped_to_array_nb(a, group_lens, in_c_order, reduce_func_nb, *args)
+    return flat_reduce_grouped_to_array_nb(a, group_lens, in_c_order, reduce_func, *args)
 
 
 def squeeze_grouped(
     a: tp.Array2d,
     group_lens: tp.Array1d,
-    squeeze_func_nb: tp.GroupSqueezeFunc,
+    squeeze_func: tp.GroupSqueezeFunc,
     *args: tp.Any,
     backend: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.squeeze_grouped_nb`."""
+    if checks.is_backend_dispatch_func(squeeze_func, func_suffix="_squeeze"):
+        from_col = 0
+        out = None
+        for group, group_len in enumerate(group_lens):
+            to_col = from_col + group_len
+            for i in range(a.shape[0]):
+                _out = squeeze_func(i, group, a[i, from_col:to_col], *args, backend=backend)
+                if out is None:
+                    out = np.empty((a.shape[0], len(group_lens)), dtype=np.asarray(_out).dtype)
+                out[i, group] = _out
+            from_col = to_col
+        return out
     resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
     from vectorbt.generic.nb import squeeze_grouped_nb
 
-    return squeeze_grouped_nb(a, group_lens, squeeze_func_nb, *args)
+    return squeeze_grouped_nb(a, group_lens, squeeze_func, *args)
 
 
 # ############# Reshaping ############# #
