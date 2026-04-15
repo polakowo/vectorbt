@@ -615,7 +615,9 @@ class Class(Doc):
                 public_objs.append((_name, obj_))
 
         def definition_order_index(
-            name, _annot_index=list(annotations).index, _dict_index=list(self.obj.__dict__).index,
+            name,
+            _annot_index=list(annotations).index,
+            _dict_index=list(self.obj.__dict__).index,
         ):
             try:
                 return _dict_index(name)

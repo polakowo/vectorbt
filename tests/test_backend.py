@@ -167,56 +167,100 @@ class TestGenericRustParity:
             (dispatch.flatten_forder, nb.flatten_forder_nb, (a,)),
             (dispatch.flatten_grouped, nb.flatten_grouped_nb, (a, np.array([1, 2], dtype=np.int64), False)),
             (dispatch.flatten_grouped, nb.flatten_grouped_nb, (a, np.array([1, 2], dtype=np.int64), True)),
-            (dispatch.flatten_uniform_grouped, nb.flatten_uniform_grouped_nb, (a, np.array([1, 1, 1], dtype=np.int64), False)),
-            (dispatch.flatten_uniform_grouped, nb.flatten_uniform_grouped_nb, (a, np.array([1, 1, 1], dtype=np.int64), True)),
+            (
+                dispatch.flatten_uniform_grouped,
+                nb.flatten_uniform_grouped_nb,
+                (a, np.array([1, 1, 1], dtype=np.int64), False),
+            ),
+            (
+                dispatch.flatten_uniform_grouped,
+                nb.flatten_uniform_grouped_nb,
+                (a, np.array([1, 1, 1], dtype=np.int64), True),
+            ),
             (dispatch.describe_reduce, nb.describe_reduce_nb, (0, a_1d, np.array([0.25, 0.5, 0.75]), 0)),
-            (dispatch.value_counts, nb.value_counts_nb, (
-                np.array([[0, 1, 2], [1, 1, 0]], dtype=np.int64),
-                3,
-                np.array([1, 2], dtype=np.int64),
-            )),
-            (dispatch.range_duration, nb.range_duration_nb, (
-                np.array([0, 1, 3], dtype=np.int64),
-                np.array([2, 4, 5], dtype=np.int64),
-                np.array([0, 1, 0], dtype=np.int64),
-            )),
-            (dispatch.range_coverage, nb.range_coverage_nb, (
-                np.array([0, 1, 3], dtype=np.int64),
-                np.array([2, 4, 5], dtype=np.int64),
-                np.array([0, 1, 0], dtype=np.int64),
-                (np.array([0, 1, 2], dtype=np.int64), np.array([2, 1], dtype=np.int64)),
-                np.array([5, 6], dtype=np.int64),
-                False,
-                False,
-            )),
-            (dispatch.ranges_to_mask, nb.ranges_to_mask_nb, (
-                np.array([0, 1, 3], dtype=np.int64),
-                np.array([2, 4, 5], dtype=np.int64),
-                np.array([0, 1, 0], dtype=np.int64),
-                (np.array([0, 1, 2], dtype=np.int64), np.array([2, 1], dtype=np.int64)),
-                6,
-            )),
-            (dispatch.dd_drawdown, nb.dd_drawdown_nb, (
-                np.array([10.0, 8.0]),
-                np.array([5.0, 4.0]),
-            )),
-            (dispatch.dd_decline_duration, nb.dd_decline_duration_nb, (
-                np.array([1, 2], dtype=np.int64),
-                np.array([3, 4], dtype=np.int64),
-            )),
-            (dispatch.dd_recovery_duration, nb.dd_recovery_duration_nb, (
-                np.array([3, 4], dtype=np.int64),
-                np.array([5, 8], dtype=np.int64),
-            )),
-            (dispatch.dd_recovery_duration_ratio, nb.dd_recovery_duration_ratio_nb, (
-                np.array([1, 2], dtype=np.int64),
-                np.array([3, 4], dtype=np.int64),
-                np.array([5, 8], dtype=np.int64),
-            )),
-            (dispatch.dd_recovery_return, nb.dd_recovery_return_nb, (
-                np.array([5.0, 4.0]),
-                np.array([8.0, 6.0]),
-            )),
+            (
+                dispatch.value_counts,
+                nb.value_counts_nb,
+                (
+                    np.array([[0, 1, 2], [1, 1, 0]], dtype=np.int64),
+                    3,
+                    np.array([1, 2], dtype=np.int64),
+                ),
+            ),
+            (
+                dispatch.range_duration,
+                nb.range_duration_nb,
+                (
+                    np.array([0, 1, 3], dtype=np.int64),
+                    np.array([2, 4, 5], dtype=np.int64),
+                    np.array([0, 1, 0], dtype=np.int64),
+                ),
+            ),
+            (
+                dispatch.range_coverage,
+                nb.range_coverage_nb,
+                (
+                    np.array([0, 1, 3], dtype=np.int64),
+                    np.array([2, 4, 5], dtype=np.int64),
+                    np.array([0, 1, 0], dtype=np.int64),
+                    (np.array([0, 1, 2], dtype=np.int64), np.array([2, 1], dtype=np.int64)),
+                    np.array([5, 6], dtype=np.int64),
+                    False,
+                    False,
+                ),
+            ),
+            (
+                dispatch.ranges_to_mask,
+                nb.ranges_to_mask_nb,
+                (
+                    np.array([0, 1, 3], dtype=np.int64),
+                    np.array([2, 4, 5], dtype=np.int64),
+                    np.array([0, 1, 0], dtype=np.int64),
+                    (np.array([0, 1, 2], dtype=np.int64), np.array([2, 1], dtype=np.int64)),
+                    6,
+                ),
+            ),
+            (
+                dispatch.dd_drawdown,
+                nb.dd_drawdown_nb,
+                (
+                    np.array([10.0, 8.0]),
+                    np.array([5.0, 4.0]),
+                ),
+            ),
+            (
+                dispatch.dd_decline_duration,
+                nb.dd_decline_duration_nb,
+                (
+                    np.array([1, 2], dtype=np.int64),
+                    np.array([3, 4], dtype=np.int64),
+                ),
+            ),
+            (
+                dispatch.dd_recovery_duration,
+                nb.dd_recovery_duration_nb,
+                (
+                    np.array([3, 4], dtype=np.int64),
+                    np.array([5, 8], dtype=np.int64),
+                ),
+            ),
+            (
+                dispatch.dd_recovery_duration_ratio,
+                nb.dd_recovery_duration_ratio_nb,
+                (
+                    np.array([1, 2], dtype=np.int64),
+                    np.array([3, 4], dtype=np.int64),
+                    np.array([5, 8], dtype=np.int64),
+                ),
+            ),
+            (
+                dispatch.dd_recovery_return,
+                nb.dd_recovery_return_nb,
+                (
+                    np.array([5.0, 4.0]),
+                    np.array([8.0, 6.0]),
+                ),
+            ),
             (dispatch.crossed_above_1d, nb.crossed_above_1d_nb, (a_1d, np.array([0.0, 2.0, 2.0, 5.0, 1.0]), 0)),
             (dispatch.crossed_above, nb.crossed_above_nb, (a, np.full(a.shape, 2.0), 0)),
         ]
@@ -470,10 +514,22 @@ class TestIndicatorRustParity:
             dtype=np.float64,
         )
 
-        np.testing.assert_allclose(indicator_dispatch.ma(close, 2, False, backend="rust"), indicator_nb.ma_nb(close, 2, False), equal_nan=True)
-        np.testing.assert_allclose(indicator_dispatch.ma(close, 2, True, backend="rust"), indicator_nb.ma_nb(close, 2, True), equal_nan=True)
-        np.testing.assert_allclose(indicator_dispatch.mstd(close, 2, False, backend="rust"), indicator_nb.mstd_nb(close, 2, False), equal_nan=True)
-        np.testing.assert_allclose(indicator_dispatch.mstd(close, 2, True, backend="rust"), indicator_nb.mstd_nb(close, 2, True), equal_nan=True)
+        np.testing.assert_allclose(
+            indicator_dispatch.ma(close, 2, False, backend="rust"), indicator_nb.ma_nb(close, 2, False), equal_nan=True
+        )
+        np.testing.assert_allclose(
+            indicator_dispatch.ma(close, 2, True, backend="rust"), indicator_nb.ma_nb(close, 2, True), equal_nan=True
+        )
+        np.testing.assert_allclose(
+            indicator_dispatch.mstd(close, 2, False, backend="rust"),
+            indicator_nb.mstd_nb(close, 2, False),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            indicator_dispatch.mstd(close, 2, True, backend="rust"),
+            indicator_nb.mstd_nb(close, 2, True),
+            equal_nan=True,
+        )
 
         ma_cache = indicator_dispatch.ma_cache(close, [2, 2, 3], [False, False, True], False, backend="rust")
         ma_cache_nb = indicator_nb.ma_cache_nb(close, [2, 2, 3], [False, False, True], False)
@@ -507,7 +563,9 @@ class TestIndicatorRustParity:
             equal_nan=True,
         )
 
-        stoch_cache = indicator_dispatch.stoch_cache(high, low, close, [2, 3], [2, 3], [False, True], False, backend="rust")
+        stoch_cache = indicator_dispatch.stoch_cache(
+            high, low, close, [2, 3], [2, 3], [False, True], False, backend="rust"
+        )
         stoch_cache_nb = indicator_nb.stoch_cache_nb(high, low, close, [2, 3], [2, 3], [False, True], False)
         for actual, expected in zip(
             indicator_dispatch.stoch_apply(high, low, close, 3, 2, True, False, stoch_cache, backend="rust"),
@@ -515,7 +573,9 @@ class TestIndicatorRustParity:
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
 
-        macd_cache = indicator_dispatch.macd_cache(close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False, backend="rust")
+        macd_cache = indicator_dispatch.macd_cache(
+            close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False, backend="rust"
+        )
         macd_cache_nb = indicator_nb.macd_cache_nb(close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False)
         for actual, expected in zip(
             indicator_dispatch.macd_apply(close, 2, 3, 2, False, True, False, macd_cache, backend="rust"),
@@ -523,7 +583,11 @@ class TestIndicatorRustParity:
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
 
-        np.testing.assert_allclose(indicator_dispatch.true_range(high, low, close, backend="rust"), indicator_nb.true_range_nb(high, low, close), equal_nan=True)
+        np.testing.assert_allclose(
+            indicator_dispatch.true_range(high, low, close, backend="rust"),
+            indicator_nb.true_range_nb(high, low, close),
+            equal_nan=True,
+        )
         atr_cache = indicator_dispatch.atr_cache(high, low, close, [2, 3], [False, True], False, backend="rust")
         atr_cache_nb = indicator_nb.atr_cache_nb(high, low, close, [2, 3], [False, True], False)
         for actual, expected in zip(
@@ -531,7 +595,11 @@ class TestIndicatorRustParity:
             indicator_nb.atr_apply_nb(high, low, close, 3, True, False, *atr_cache_nb),
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
-        np.testing.assert_allclose(indicator_dispatch.obv_custom(close, volume, backend="rust"), indicator_nb.obv_custom_nb(close, volume), equal_nan=True)
+        np.testing.assert_allclose(
+            indicator_dispatch.obv_custom(close, volume, backend="rust"),
+            indicator_nb.obv_custom_nb(close, volume),
+            equal_nan=True,
+        )
 
     def test_basic_indicators_match_numba(self):
         close = pd.Series([1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0])
@@ -549,8 +617,12 @@ class TestIndicatorRustParity:
         )
         for attr in ("middle", "upper", "lower"):
             pd.testing.assert_frame_equal(
-                getattr(vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr),
-                getattr(vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr),
+                getattr(
+                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr
+                ),
+                getattr(
+                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr
+                ),
             )
         pd.testing.assert_frame_equal(
             vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").rsi,
@@ -558,18 +630,74 @@ class TestIndicatorRustParity:
         )
         for attr in ("percent_k", "percent_d"):
             pd.testing.assert_frame_equal(
-                getattr(vbt.STOCH.run(high, low, close, k_window=(2, 3), d_window=2, d_ewm=(False, True), param_product=True, backend="rust"), attr),
-                getattr(vbt.STOCH.run(high, low, close, k_window=(2, 3), d_window=2, d_ewm=(False, True), param_product=True, backend="numba"), attr),
+                getattr(
+                    vbt.STOCH.run(
+                        high,
+                        low,
+                        close,
+                        k_window=(2, 3),
+                        d_window=2,
+                        d_ewm=(False, True),
+                        param_product=True,
+                        backend="rust",
+                    ),
+                    attr,
+                ),
+                getattr(
+                    vbt.STOCH.run(
+                        high,
+                        low,
+                        close,
+                        k_window=(2, 3),
+                        d_window=2,
+                        d_ewm=(False, True),
+                        param_product=True,
+                        backend="numba",
+                    ),
+                    attr,
+                ),
             )
         for attr in ("macd", "signal"):
             pd.testing.assert_frame_equal(
-                getattr(vbt.MACD.run(close, fast_window=(2, 3), slow_window=4, signal_window=2, macd_ewm=(False, True), signal_ewm=True, param_product=True, backend="rust"), attr),
-                getattr(vbt.MACD.run(close, fast_window=(2, 3), slow_window=4, signal_window=2, macd_ewm=(False, True), signal_ewm=True, param_product=True, backend="numba"), attr),
+                getattr(
+                    vbt.MACD.run(
+                        close,
+                        fast_window=(2, 3),
+                        slow_window=4,
+                        signal_window=2,
+                        macd_ewm=(False, True),
+                        signal_ewm=True,
+                        param_product=True,
+                        backend="rust",
+                    ),
+                    attr,
+                ),
+                getattr(
+                    vbt.MACD.run(
+                        close,
+                        fast_window=(2, 3),
+                        slow_window=4,
+                        signal_window=2,
+                        macd_ewm=(False, True),
+                        signal_ewm=True,
+                        param_product=True,
+                        backend="numba",
+                    ),
+                    attr,
+                ),
             )
         for attr in ("tr", "atr"):
             pd.testing.assert_frame_equal(
-                getattr(vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr),
-                getattr(vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr),
+                getattr(
+                    vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"),
+                    attr,
+                ),
+                getattr(
+                    vbt.ATR.run(
+                        high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"
+                    ),
+                    attr,
+                ),
             )
         pd.testing.assert_series_equal(
             vbt.OBV.run(close, volume, backend="rust").obv,

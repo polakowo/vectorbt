@@ -34,13 +34,20 @@ SEED = 42
 def run_config(rows: int, cols: int) -> dict[str, float]:
     """Run benchmark for one configuration, return {func_name: speedup}."""
     cmd = [
-        sys.executable, BENCH_SCRIPT,
-        "--rows", str(rows),
-        "--cols", str(cols),
-        "--window", str(WINDOW),
-        "--repeat", str(REPEAT),
-        "--warmup", str(WARMUP),
-        "--seed", str(SEED),
+        sys.executable,
+        BENCH_SCRIPT,
+        "--rows",
+        str(rows),
+        "--cols",
+        str(cols),
+        "--window",
+        str(WINDOW),
+        "--repeat",
+        str(REPEAT),
+        "--warmup",
+        str(WARMUP),
+        "--seed",
+        str(SEED),
         "--check",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -72,12 +79,10 @@ def main() -> None:
     func_width = max((len(fn) for fn in all_funcs), default=20)
 
     lines = []
-    header = f"| {'Function':<{func_width}} |" + "|".join(
-        f" {label:>{w}} " for label, w in zip(labels, col_widths)
-    ) + "|"
-    sep = f"|{'-' * (func_width + 2)}|" + "|".join(
-        f"{'-' * (w + 2)}" for w in col_widths
-    ) + "|"
+    header = (
+        f"| {'Function':<{func_width}} |" + "|".join(f" {label:>{w}} " for label, w in zip(labels, col_widths)) + "|"
+    )
+    sep = f"|{'-' * (func_width + 2)}|" + "|".join(f"{'-' * (w + 2)}" for w in col_widths) + "|"
     lines.append(header)
     lines.append(sep)
 

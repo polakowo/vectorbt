@@ -106,7 +106,9 @@ def is_rust_func(arg: tp.Any, func_suffix: str = "_rs") -> bool:
         return False
     if numba_cfg["check_func_suffix"] and not getattr(arg, "__name__", "").endswith(func_suffix):
         return False
-    return getattr(arg, "__module__", "").startswith("vectorbt_rust") or getattr(arg, "__name__", "").endswith(func_suffix)
+    return getattr(arg, "__module__", "").startswith("vectorbt_rust") or getattr(arg, "__name__", "").endswith(
+        func_suffix
+    )
 
 
 def is_backend_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) -> bool:
@@ -132,11 +134,7 @@ def is_backend_compatible_func(
     if backend is None:
         backend = settings["backend"]
     if backend == "auto":
-        return (
-            is_numba_func(func)
-            or is_rust_func(func)
-            or is_backend_dispatch_func(func, func_suffix=func_suffix)
-        )
+        return is_numba_func(func) or is_rust_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
     if backend == "numba":
         return is_numba_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
     if backend == "rust":
