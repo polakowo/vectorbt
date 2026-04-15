@@ -115,10 +115,17 @@ def is_backend_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) 
         return False
     if func_suffix is not None and not getattr(arg, "__name__", "").endswith(func_suffix):
         return False
+    module = getattr(arg, "__module__", "")
+    if not module.startswith("vectorbt.") or not module.endswith(".dispatch"):
+        return False
     return func_accepts_arg(arg, "backend")
 
 
-def is_backend_func(func: tp.Callable, backend: tp.Optional[str] = None, func_suffix: tp.Optional[str] = None) -> bool:
+def is_backend_compatible_func(
+    func: tp.Callable,
+    backend: tp.Optional[str] = None,
+    func_suffix: tp.Optional[str] = None,
+) -> bool:
     """Check whether `func` can be used with the requested backend."""
     from vectorbt._settings import settings
 
@@ -417,7 +424,7 @@ def assert_backend_func(
     func_suffix: tp.Optional[str] = None,
 ) -> None:
     """Raise exception if `func` cannot be used with the requested backend."""
-    if not is_backend_func(func, backend=backend, func_suffix=func_suffix):
+    if not is_backend_compatible_func(func, backend=backend, func_suffix=func_suffix):
         raise AssertionError(f"Function {func} must be compatible with backend '{backend}'")
 
 

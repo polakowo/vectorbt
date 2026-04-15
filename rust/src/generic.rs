@@ -78,21 +78,21 @@ unsafe impl Element for DrawdownRecord {
     }
 }
 
-fn validate_window(minp: usize, window: usize, name: &str) -> PyResult<()> {
+pub(crate) fn validate_window(minp: usize, window: usize, name: &str) -> PyResult<()> {
     if minp > window {
         return Err(PyValueError::new_err(format!("minp must be <= {name}")));
     }
     Ok(())
 }
 
-fn check_bounds(n: isize, len: usize) -> PyResult<()> {
+pub(crate) fn check_bounds(n: isize, len: usize) -> PyResult<()> {
     if (n < 0 && n.unsigned_abs() > len) || (n >= 0 && n as usize >= len) {
         return Err(PyValueError::new_err("index is out of bounds"));
     }
     Ok(())
 }
 
-fn normalize_index(n: isize, len: usize) -> usize {
+pub(crate) fn normalize_index(n: isize, len: usize) -> usize {
     if n >= 0 {
         n as usize
     } else {
@@ -100,7 +100,7 @@ fn normalize_index(n: isize, len: usize) -> usize {
     }
 }
 
-fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
+pub(crate) fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
     let mut out = Vec::with_capacity(group_lens.len());
     for &group_len in group_lens {
         if group_len < 0 {
@@ -111,7 +111,7 @@ fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
     Ok(out)
 }
 
-fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
+pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
     if len1 == len2 || len2 == 1 {
         Ok(len1)
     } else if len1 == 1 {
@@ -123,7 +123,7 @@ fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
     }
 }
 
-fn broadcast_len3(len1: usize, len2: usize, len3: usize) -> PyResult<usize> {
+pub(crate) fn broadcast_len3(len1: usize, len2: usize, len3: usize) -> PyResult<usize> {
     if len1 == 0 || len2 == 0 || len3 == 0 {
         if (len1 == 0 || len1 == 1) && (len2 == 0 || len2 == 1) && (len3 == 0 || len3 == 1) {
             Ok(0)
@@ -147,7 +147,7 @@ fn broadcast_len3(len1: usize, len2: usize, len3: usize) -> PyResult<usize> {
     }
 }
 
-fn broadcast_get<T: Copy>(values: &[T], i: usize) -> T {
+pub(crate) fn broadcast_get<T: Copy>(values: &[T], i: usize) -> T {
     if values.len() == 1 {
         values[0]
     } else {
@@ -155,7 +155,7 @@ fn broadcast_get<T: Copy>(values: &[T], i: usize) -> T {
     }
 }
 
-fn apply_2d_by_col<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Array2<f64>
+pub(crate) fn apply_2d_by_col<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Array2<f64>
 where
     F: FnMut(&[f64]) -> Vec<f64>,
 {
@@ -175,7 +175,7 @@ where
     out
 }
 
-fn apply_2d_by_col_inplace<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Array2<f64>
+pub(crate) fn apply_2d_by_col_inplace<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Array2<f64>
 where
     F: FnMut(&[f64], &mut [f64]),
 {
@@ -196,7 +196,7 @@ where
     out
 }
 
-fn reduce_2d_by_col<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Vec<f64>
+pub(crate) fn reduce_2d_by_col<F>(a: ArrayView2<'_, f64>, mut kernel: F) -> Vec<f64>
 where
     F: FnMut(&[f64]) -> f64,
 {
@@ -212,7 +212,7 @@ where
     out
 }
 
-fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
+pub(crate) fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
     let shape = a.dim();
     let src = a
         .as_slice()
@@ -225,7 +225,7 @@ fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
     out
 }
 
-fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
+pub(crate) fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -245,7 +245,7 @@ fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64>
     out
 }
 
-fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
+pub(crate) fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -265,7 +265,7 @@ fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64>
     out
 }
 
-fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
+pub(crate) fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -282,7 +282,7 @@ fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     out
 }
 
-fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
+pub(crate) fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -299,7 +299,7 @@ fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     out
 }
 
-fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+pub(crate) fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -310,7 +310,6 @@ fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     }
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut last = vec![f64::NAN; ncols];
-    last.copy_from_slice(&src[..ncols]);
     for row in 0..nrows {
         let row_start = row * ncols;
         for col in 0..ncols {
@@ -326,7 +325,7 @@ fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     out
 }
 
-fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+pub(crate) fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -337,8 +336,6 @@ fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     }
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut last = vec![f64::NAN; ncols];
-    let last_start = (nrows - 1) * ncols;
-    last.copy_from_slice(&src[last_start..last_start + ncols]);
     for row in (0..nrows).rev() {
         let row_start = row * ncols;
         for col in 0..ncols {
@@ -354,7 +351,7 @@ fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     out
 }
 
-fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+pub(crate) fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -375,7 +372,7 @@ fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     out
 }
 
-fn nancumprod_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
+pub(crate) fn nancumprod_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -396,7 +393,7 @@ fn nancumprod_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     out
 }
 
-fn nansum_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+pub(crate) fn nansum_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     let (_, ncols) = a.dim();
     if ncols == 0 {
         return Vec::new();
@@ -415,7 +412,7 @@ fn nansum_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     out
 }
 
-fn nanprod_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+pub(crate) fn nanprod_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     let (_, ncols) = a.dim();
     if ncols == 0 {
         return Vec::new();
@@ -434,7 +431,7 @@ fn nanprod_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     out
 }
 
-fn nancnt_2d_c(a: ArrayView2<'_, f64>) -> Vec<i64> {
+pub(crate) fn nancnt_2d_c(a: ArrayView2<'_, f64>) -> Vec<i64> {
     let (_, ncols) = a.dim();
     if ncols == 0 {
         return Vec::new();
@@ -453,7 +450,7 @@ fn nancnt_2d_c(a: ArrayView2<'_, f64>) -> Vec<i64> {
     out
 }
 
-fn nanmean_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
+pub(crate) fn nanmean_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     let (_, ncols) = a.dim();
     if ncols == 0 {
         return Vec::new();
@@ -477,7 +474,7 @@ fn nanmean_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
         .collect()
 }
 
-fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
+pub(crate) fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
     let (_, ncols) = a.dim();
     if ncols == 0 {
         return Vec::new();
@@ -510,7 +507,7 @@ fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
     out
 }
 
-fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize) -> Array2<f64> {
+pub(crate) fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -542,7 +539,7 @@ fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize) -> Arra
     out
 }
 
-fn rolling_std_2d_c(
+pub(crate) fn rolling_std_2d_c(
     a: ArrayView2<'_, f64>,
     window: usize,
     minp: usize,
@@ -586,7 +583,7 @@ fn rolling_std_2d_c(
     out
 }
 
-fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2<f64> {
+pub(crate) fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -611,7 +608,7 @@ fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2<f64> {
     out
 }
 
-fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usize) -> Array2<f64> {
+pub(crate) fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a
         .as_slice()
@@ -642,14 +639,14 @@ fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usize) -> Array
     out
 }
 
-fn set_by_mask_1d(a: &[f64], mask: &[bool], value: f64) -> Vec<f64> {
+pub(crate) fn set_by_mask_1d(a: &[f64], mask: &[bool], value: f64) -> Vec<f64> {
     a.iter()
         .zip(mask.iter())
         .map(|(&v, &m)| if m { value } else { v })
         .collect()
 }
 
-fn set_by_mask_mult_1d(a: &[f64], mask: &[bool], values: &[f64]) -> Vec<f64> {
+pub(crate) fn set_by_mask_mult_1d(a: &[f64], mask: &[bool], values: &[f64]) -> Vec<f64> {
     a.iter()
         .zip(mask.iter())
         .zip(values.iter())
@@ -657,26 +654,26 @@ fn set_by_mask_mult_1d(a: &[f64], mask: &[bool], values: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-fn fillna_1d(a: &[f64], value: f64) -> Vec<f64> {
+pub(crate) fn fillna_1d(a: &[f64], value: f64) -> Vec<f64> {
     a.iter()
         .map(|&v| if v.is_nan() { value } else { v })
         .collect()
 }
 
-fn fillna_1d_into(a: &[f64], out: &mut [f64], value: f64) {
+pub(crate) fn fillna_1d_into(a: &[f64], out: &mut [f64], value: f64) {
     for (i, &v) in a.iter().enumerate() {
         out[i] = if v.is_nan() { value } else { v };
     }
 }
 
-fn bshift_1d(a: &[f64], n: usize, fill_value: f64) -> Vec<f64> {
+pub(crate) fn bshift_1d(a: &[f64], n: usize, fill_value: f64) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![fill_value; len];
     bshift_1d_into(a, &mut out, n, fill_value);
     out
 }
 
-fn bshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
+pub(crate) fn bshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
     let len = a.len();
     for i in 0..len {
         if i + n < len {
@@ -687,14 +684,14 @@ fn bshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
     }
 }
 
-fn fshift_1d(a: &[f64], n: usize, fill_value: f64) -> Vec<f64> {
+pub(crate) fn fshift_1d(a: &[f64], n: usize, fill_value: f64) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![fill_value; len];
     fshift_1d_into(a, &mut out, n, fill_value);
     out
 }
 
-fn fshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
+pub(crate) fn fshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
     let len = a.len();
     for i in 0..n.min(len) {
         out[i] = fill_value;
@@ -704,14 +701,14 @@ fn fshift_1d_into(a: &[f64], out: &mut [f64], n: usize, fill_value: f64) {
     }
 }
 
-fn diff_1d(a: &[f64], n: usize) -> Vec<f64> {
+pub(crate) fn diff_1d(a: &[f64], n: usize) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![f64::NAN; len];
     diff_1d_into(a, &mut out, n);
     out
 }
 
-fn diff_1d_into(a: &[f64], out: &mut [f64], n: usize) {
+pub(crate) fn diff_1d_into(a: &[f64], out: &mut [f64], n: usize) {
     let len = a.len();
     for i in 0..n.min(len) {
         out[i] = f64::NAN;
@@ -721,14 +718,14 @@ fn diff_1d_into(a: &[f64], out: &mut [f64], n: usize) {
     }
 }
 
-fn pct_change_1d(a: &[f64], n: usize) -> Vec<f64> {
+pub(crate) fn pct_change_1d(a: &[f64], n: usize) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![f64::NAN; len];
     pct_change_1d_into(a, &mut out, n);
     out
 }
 
-fn pct_change_1d_into(a: &[f64], out: &mut [f64], n: usize) {
+pub(crate) fn pct_change_1d_into(a: &[f64], out: &mut [f64], n: usize) {
     let len = a.len();
     for i in 0..n.min(len) {
         out[i] = f64::NAN;
@@ -738,14 +735,14 @@ fn pct_change_1d_into(a: &[f64], out: &mut [f64], n: usize) {
     }
 }
 
-fn bfill_1d(a: &[f64]) -> Vec<f64> {
+pub(crate) fn bfill_1d(a: &[f64]) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![f64::NAN; len];
     bfill_1d_into(a, &mut out);
     out
 }
 
-fn bfill_1d_into(a: &[f64], out: &mut [f64]) {
+pub(crate) fn bfill_1d_into(a: &[f64], out: &mut [f64]) {
     let len = a.len();
     if len == 0 {
         return;
@@ -761,14 +758,14 @@ fn bfill_1d_into(a: &[f64], out: &mut [f64]) {
     }
 }
 
-fn ffill_1d(a: &[f64]) -> Vec<f64> {
+pub(crate) fn ffill_1d(a: &[f64]) -> Vec<f64> {
     let len = a.len();
     let mut out = vec![f64::NAN; len];
     ffill_1d_into(a, &mut out);
     out
 }
 
-fn ffill_1d_into(a: &[f64], out: &mut [f64]) {
+pub(crate) fn ffill_1d_into(a: &[f64], out: &mut [f64]) {
     let len = a.len();
     if len == 0 {
         return;
@@ -784,7 +781,7 @@ fn ffill_1d_into(a: &[f64], out: &mut [f64]) {
     }
 }
 
-fn nancumsum_1d_into(a: &[f64], out: &mut [f64]) {
+pub(crate) fn nancumsum_1d_into(a: &[f64], out: &mut [f64]) {
     let mut sum = 0.0;
     for (i, &v) in a.iter().enumerate() {
         if !v.is_nan() {
@@ -794,7 +791,7 @@ fn nancumsum_1d_into(a: &[f64], out: &mut [f64]) {
     }
 }
 
-fn nancumprod_1d_into(a: &[f64], out: &mut [f64]) {
+pub(crate) fn nancumprod_1d_into(a: &[f64], out: &mut [f64]) {
     let mut prod = 1.0;
     for (i, &v) in a.iter().enumerate() {
         if !v.is_nan() {
@@ -804,7 +801,7 @@ fn nancumprod_1d_into(a: &[f64], out: &mut [f64]) {
     }
 }
 
-fn nanprod_1d(a: &[f64]) -> f64 {
+pub(crate) fn nanprod_1d(a: &[f64]) -> f64 {
     let mut out = 1.0;
     for &v in a {
         if !v.is_nan() {
@@ -814,15 +811,15 @@ fn nanprod_1d(a: &[f64]) -> f64 {
     out
 }
 
-fn nansum_1d(a: &[f64]) -> f64 {
+pub(crate) fn nansum_1d(a: &[f64]) -> f64 {
     a.iter().filter(|v| !v.is_nan()).sum()
 }
 
-fn nancnt_1d(a: &[f64]) -> i64 {
+pub(crate) fn nancnt_1d(a: &[f64]) -> i64 {
     a.iter().filter(|v| !v.is_nan()).count() as i64
 }
 
-fn nanmin_1d(a: &[f64]) -> f64 {
+pub(crate) fn nanmin_1d(a: &[f64]) -> f64 {
     let mut iter = a.iter().copied();
     let mut out = loop {
         match iter.next() {
@@ -839,7 +836,7 @@ fn nanmin_1d(a: &[f64]) -> f64 {
     out
 }
 
-fn nanmax_1d(a: &[f64]) -> f64 {
+pub(crate) fn nanmax_1d(a: &[f64]) -> f64 {
     let mut iter = a.iter().copied();
     let mut out = loop {
         match iter.next() {
@@ -856,7 +853,7 @@ fn nanmax_1d(a: &[f64]) -> f64 {
     out
 }
 
-fn nanmean_1d(a: &[f64]) -> f64 {
+pub(crate) fn nanmean_1d(a: &[f64]) -> f64 {
     let mut sum = 0.0;
     let mut cnt = 0usize;
     for &v in a {
@@ -872,7 +869,7 @@ fn nanmean_1d(a: &[f64]) -> f64 {
     }
 }
 
-fn nanmedian_1d(a: &[f64]) -> f64 {
+pub(crate) fn nanmedian_1d(a: &[f64]) -> f64 {
     let mut vals: Vec<f64> = a.iter().copied().filter(|v| !v.is_nan()).collect();
     if vals.is_empty() {
         return f64::NAN;
@@ -891,7 +888,7 @@ fn nanmedian_1d(a: &[f64]) -> f64 {
     }
 }
 
-fn nanstd_1d(a: &[f64], ddof: usize) -> f64 {
+pub(crate) fn nanstd_1d(a: &[f64], ddof: usize) -> f64 {
     let mean = nanmean_1d(a);
     if mean.is_nan() {
         return f64::NAN;
@@ -912,7 +909,7 @@ fn nanstd_1d(a: &[f64], ddof: usize) -> f64 {
     }
 }
 
-fn rolling_min_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
+pub(crate) fn rolling_min_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     for i in 0..n {
@@ -935,7 +932,7 @@ fn rolling_min_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     out
 }
 
-fn rolling_max_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
+pub(crate) fn rolling_max_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     for i in 0..n {
@@ -958,7 +955,7 @@ fn rolling_max_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     out
 }
 
-fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
+pub(crate) fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     let mut sum = 0.0f64;
@@ -983,7 +980,7 @@ fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     out
 }
 
-fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64> {
+pub(crate) fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     let mut sum = 0.0f64;
@@ -1014,7 +1011,7 @@ fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64
     out
 }
 
-fn expanding_mean_1d(a: &[f64], minp: usize) -> Vec<f64> {
+pub(crate) fn expanding_mean_1d(a: &[f64], minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     let mut sum = 0.0f64;
@@ -1032,7 +1029,7 @@ fn expanding_mean_1d(a: &[f64], minp: usize) -> Vec<f64> {
     out
 }
 
-fn expanding_std_1d(a: &[f64], minp: usize, ddof: usize) -> Vec<f64> {
+pub(crate) fn expanding_std_1d(a: &[f64], minp: usize, ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     let mut sum = 0.0f64;
@@ -1055,7 +1052,7 @@ fn expanding_std_1d(a: &[f64], minp: usize, ddof: usize) -> Vec<f64> {
     out
 }
 
-fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> Vec<f64> {
+pub(crate) fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1103,7 +1100,75 @@ fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> Vec<f64> {
     out
 }
 
-fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddof: usize) -> Vec<f64> {
+pub(crate) fn ewm_mean_2d_c(
+    a: ArrayView2<'_, f64>,
+    span: usize,
+    minp: usize,
+    adjust: bool,
+) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    if nrows == 0 {
+        return out;
+    }
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let com = (span as f64 - 1.0) / 2.0;
+    let alpha = 1.0 / (1.0 + com);
+    let old_wt_factor = 1.0 - alpha;
+    let new_wt = if adjust { 1.0 } else { alpha };
+    let mut weighted_avg = src[..ncols].to_vec();
+    let mut nobs = vec![0usize; ncols];
+    let mut old_wt = vec![1.0f64; ncols];
+    for col in 0..ncols {
+        if weighted_avg[col] == weighted_avg[col] {
+            nobs[col] = 1;
+        }
+        if nobs[col] >= minp {
+            dst[col] = weighted_avg[col];
+        }
+    }
+    for row in 1..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur = src[row_start + col];
+            let is_observation = cur == cur;
+            if is_observation {
+                nobs[col] += 1;
+            }
+            if weighted_avg[col] == weighted_avg[col] {
+                old_wt[col] *= old_wt_factor;
+                if is_observation {
+                    if weighted_avg[col] != cur {
+                        weighted_avg[col] = ((old_wt[col] * weighted_avg[col]) + (new_wt * cur))
+                            / (old_wt[col] + new_wt);
+                    }
+                    if adjust {
+                        old_wt[col] += new_wt;
+                    } else {
+                        old_wt[col] = 1.0;
+                    }
+                }
+            } else if is_observation {
+                weighted_avg[col] = cur;
+            }
+            if nobs[col] >= minp {
+                dst[row_start + col] = weighted_avg[col];
+            }
+        }
+    }
+    out
+}
+
+pub(crate) fn ewm_std_1d(
+    a: &[f64],
+    span: usize,
+    minp: usize,
+    adjust: bool,
+    _ddof: usize,
+) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1172,7 +1237,96 @@ fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddof: usize) -
     out
 }
 
-fn expanding_min_1d(a: &[f64], minp: usize) -> Vec<f64> {
+pub(crate) fn ewm_std_2d_c(
+    a: ArrayView2<'_, f64>,
+    span: usize,
+    minp: usize,
+    adjust: bool,
+    _ddof: usize,
+) -> Array2<f64> {
+    let (nrows, ncols) = a.dim();
+    let src = a
+        .as_slice()
+        .expect("standard-layout array must be sliceable");
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    if nrows == 0 {
+        return out;
+    }
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+    let com = (span as f64 - 1.0) / 2.0;
+    let alpha = 1.0 / (1.0 + com);
+    let old_wt_factor = 1.0 - alpha;
+    let new_wt = if adjust { 1.0 } else { alpha };
+    let mut mean_x = src[..ncols].to_vec();
+    let mut mean_y = src[..ncols].to_vec();
+    let mut nobs = vec![0usize; ncols];
+    for col in 0..ncols {
+        let is_observation = mean_x[col] == mean_x[col] && mean_y[col] == mean_y[col];
+        if is_observation {
+            nobs[col] = 1;
+        } else {
+            mean_x[col] = f64::NAN;
+            mean_y[col] = f64::NAN;
+        }
+    }
+    let mut cov = vec![0.0f64; ncols];
+    let mut sum_wt = vec![1.0f64; ncols];
+    let mut sum_wt2 = vec![1.0f64; ncols];
+    let mut old_wt = vec![1.0f64; ncols];
+    for row in 1..nrows {
+        let row_start = row * ncols;
+        for col in 0..ncols {
+            let cur_x = src[row_start + col];
+            let cur_y = cur_x;
+            let is_observation = cur_x == cur_x && cur_y == cur_y;
+            if is_observation {
+                nobs[col] += 1;
+            }
+            if mean_x[col] == mean_x[col] {
+                sum_wt[col] *= old_wt_factor;
+                sum_wt2[col] *= old_wt_factor * old_wt_factor;
+                old_wt[col] *= old_wt_factor;
+                if is_observation {
+                    let old_mean_x = mean_x[col];
+                    let old_mean_y = mean_y[col];
+                    if mean_x[col] != cur_x {
+                        mean_x[col] = ((old_wt[col] * old_mean_x) + (new_wt * cur_x))
+                            / (old_wt[col] + new_wt);
+                    }
+                    if mean_y[col] != cur_y {
+                        mean_y[col] = ((old_wt[col] * old_mean_y) + (new_wt * cur_y))
+                            / (old_wt[col] + new_wt);
+                    }
+                    cov[col] = ((old_wt[col]
+                        * (cov[col] + ((old_mean_x - mean_x[col]) * (old_mean_y - mean_y[col]))))
+                        + (new_wt * ((cur_x - mean_x[col]) * (cur_y - mean_y[col]))))
+                        / (old_wt[col] + new_wt);
+                    sum_wt[col] += new_wt;
+                    sum_wt2[col] += new_wt * new_wt;
+                    old_wt[col] += new_wt;
+                    if !adjust {
+                        sum_wt[col] /= old_wt[col];
+                        sum_wt2[col] /= old_wt[col] * old_wt[col];
+                        old_wt[col] = 1.0;
+                    }
+                }
+            } else if is_observation {
+                mean_x[col] = cur_x;
+                mean_y[col] = cur_y;
+            }
+            if nobs[col] >= minp {
+                let numerator = sum_wt[col] * sum_wt[col];
+                let denominator = numerator - sum_wt2[col];
+                if denominator > 0.0 {
+                    dst[row_start + col] = ((numerator / denominator) * cov[col]).sqrt();
+                }
+            }
+        }
+    }
+    out
+}
+
+pub(crate) fn expanding_min_1d(a: &[f64], minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1194,7 +1348,7 @@ fn expanding_min_1d(a: &[f64], minp: usize) -> Vec<f64> {
     out
 }
 
-fn expanding_max_1d(a: &[f64], minp: usize) -> Vec<f64> {
+pub(crate) fn expanding_max_1d(a: &[f64], minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1216,13 +1370,13 @@ fn expanding_max_1d(a: &[f64], minp: usize) -> Vec<f64> {
     out
 }
 
-fn shuffle_1d_with_rng<R: Rng + ?Sized>(a: &[f64], rng: &mut R) -> Vec<f64> {
+pub(crate) fn shuffle_1d_with_rng<R: Rng + ?Sized>(a: &[f64], rng: &mut R) -> Vec<f64> {
     let mut out = a.to_vec();
     out.shuffle(rng);
     out
 }
 
-fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
+pub(crate) fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
     match seed {
         Some(seed) => {
             let mut rng = ChaCha8Rng::seed_from_u64(seed);
@@ -1235,7 +1389,7 @@ fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
     }
 }
 
-fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
+pub(crate) fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
     let (nrows, ncols) = a.dim();
     let mut out = Vec::with_capacity(nrows * ncols);
     for col in 0..ncols {
@@ -1244,7 +1398,11 @@ fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
     out
 }
 
-fn flatten_grouped(a: ArrayView2<'_, f64>, group_lens: &[usize], in_c_order: bool) -> Array2<f64> {
+pub(crate) fn flatten_grouped(
+    a: ArrayView2<'_, f64>,
+    group_lens: &[usize],
+    in_c_order: bool,
+) -> Array2<f64> {
     let (nrows, _) = a.dim();
     let max_group_len = group_lens.iter().copied().max().unwrap_or(0);
     let mut out = Array2::<f64>::from_elem((nrows * max_group_len, group_lens.len()), f64::NAN);
@@ -1266,7 +1424,7 @@ fn flatten_grouped(a: ArrayView2<'_, f64>, group_lens: &[usize], in_c_order: boo
     out
 }
 
-fn flatten_uniform_grouped(
+pub(crate) fn flatten_uniform_grouped(
     a: ArrayView2<'_, f64>,
     group_lens: &[usize],
     in_c_order: bool,
@@ -1274,23 +1432,23 @@ fn flatten_uniform_grouped(
     flatten_grouped(a, group_lens, in_c_order)
 }
 
-fn min_squeeze_1d(a: &[f64]) -> f64 {
+pub(crate) fn min_squeeze_1d(a: &[f64]) -> f64 {
     nanmin_1d(a)
 }
 
-fn max_squeeze_1d(a: &[f64]) -> f64 {
+pub(crate) fn max_squeeze_1d(a: &[f64]) -> f64 {
     nanmax_1d(a)
 }
 
-fn sum_squeeze_1d(a: &[f64]) -> f64 {
+pub(crate) fn sum_squeeze_1d(a: &[f64]) -> f64 {
     nansum_1d(a)
 }
 
-fn any_squeeze_1d(a: &[f64]) -> bool {
+pub(crate) fn any_squeeze_1d(a: &[f64]) -> bool {
     a.iter().any(|&v| v != 0.0)
 }
 
-fn argmin_reduce_1d(a: &[f64]) -> PyResult<i64> {
+pub(crate) fn argmin_reduce_1d(a: &[f64]) -> PyResult<i64> {
     let mut best_idx = 0usize;
     let mut best_val = f64::NAN;
     for (i, &v) in a.iter().enumerate() {
@@ -1312,7 +1470,7 @@ fn argmin_reduce_1d(a: &[f64]) -> PyResult<i64> {
     Ok(best_idx as i64)
 }
 
-fn argmax_reduce_1d(a: &[f64]) -> PyResult<i64> {
+pub(crate) fn argmax_reduce_1d(a: &[f64]) -> PyResult<i64> {
     let mut best_idx = 0usize;
     let mut best_val = f64::NAN;
     for (i, &v) in a.iter().enumerate() {
@@ -1334,7 +1492,7 @@ fn argmax_reduce_1d(a: &[f64]) -> PyResult<i64> {
     Ok(best_idx as i64)
 }
 
-fn percentile_sorted(vals: &[f64], q: f64) -> f64 {
+pub(crate) fn percentile_sorted(vals: &[f64], q: f64) -> f64 {
     if vals.is_empty() {
         return f64::NAN;
     }
@@ -1351,7 +1509,7 @@ fn percentile_sorted(vals: &[f64], q: f64) -> f64 {
     }
 }
 
-fn describe_reduce_1d(a: &[f64], perc: &[f64], ddof: usize) -> Vec<f64> {
+pub(crate) fn describe_reduce_1d(a: &[f64], perc: &[f64], ddof: usize) -> Vec<f64> {
     let mut vals: Vec<f64> = a.iter().copied().filter(|v| !v.is_nan()).collect();
     vals.sort_by(|x, y| x.partial_cmp(y).unwrap());
     let mut out = vec![f64::NAN; 5 + perc.len()];
@@ -1369,7 +1527,7 @@ fn describe_reduce_1d(a: &[f64], perc: &[f64], ddof: usize) -> Vec<f64> {
     out
 }
 
-fn value_counts(
+pub(crate) fn value_counts(
     codes: ArrayView2<'_, i64>,
     n_uniques: usize,
     group_lens: &[usize],
@@ -1397,7 +1555,7 @@ fn value_counts(
     Ok(out)
 }
 
-fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRecord> {
+pub(crate) fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRecord> {
     let (nrows, ncols) = a.dim();
     let mut out = Vec::<RangeRecord>::with_capacity(nrows * ncols);
     let mut ridx = 0i64;
@@ -1443,7 +1601,7 @@ fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRecord> {
     out
 }
 
-fn range_duration(start_idx: &[i64], end_idx: &[i64], status: &[i64]) -> Vec<i64> {
+pub(crate) fn range_duration(start_idx: &[i64], end_idx: &[i64], status: &[i64]) -> Vec<i64> {
     let mut out = vec![0i64; start_idx.len()];
     for i in 0..out.len() {
         if status[i] == RANGE_OPEN {
@@ -1455,7 +1613,7 @@ fn range_duration(start_idx: &[i64], end_idx: &[i64], status: &[i64]) -> Vec<i64
     out
 }
 
-fn range_coverage(
+pub(crate) fn range_coverage(
     start_idx: &[i64],
     end_idx: &[i64],
     status: &[i64],
@@ -1511,7 +1669,7 @@ fn range_coverage(
     Ok(out)
 }
 
-fn ranges_to_mask(
+pub(crate) fn ranges_to_mask(
     start_idx: &[i64],
     end_idx: &[i64],
     status: &[i64],
@@ -1542,7 +1700,7 @@ fn ranges_to_mask(
     Ok(out)
 }
 
-fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
+pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
     let (nrows, ncols) = a.dim();
     let mut out = Vec::<DrawdownRecord>::with_capacity(nrows * ncols);
     if nrows == 0 {
@@ -1610,7 +1768,7 @@ fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
     out
 }
 
-fn crossed_above_1d(arr1: &[f64], arr2: &[f64], wait: usize) -> Vec<bool> {
+pub(crate) fn crossed_above_1d(arr1: &[f64], arr2: &[f64], wait: usize) -> Vec<bool> {
     let mut out = vec![false; arr1.len()];
     let mut was_below = false;
     let mut crossed_ago = -1i64;

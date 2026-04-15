@@ -6,6 +6,8 @@ import vectorbt as vbt
 from vectorbt import _backend
 from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
+from vectorbt.indicators import dispatch as indicator_dispatch
+from vectorbt.indicators import nb as indicator_nb
 
 
 def teardown_module():
@@ -415,3 +417,161 @@ class TestGenericRustParity:
             pd.testing.assert_frame_equal(df.vbt.rolling_mean(2), df.vbt.rolling_mean(2, backend="rust"))
         finally:
             vbt.settings.reset()
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+class TestIndicatorRustParity:
+    def test_indicator_exports_match_nb_inventory(self):
+        import vectorbt_rust.indicators as rust_indicators
+
+        expected = [
+            "ma_rs",
+            "mstd_rs",
+            "ma_cache_rs",
+            "ma_apply_rs",
+            "mstd_cache_rs",
+            "mstd_apply_rs",
+            "bb_cache_rs",
+            "bb_apply_rs",
+            "rsi_cache_rs",
+            "rsi_apply_rs",
+            "stoch_cache_rs",
+            "stoch_apply_rs",
+            "macd_cache_rs",
+            "macd_apply_rs",
+            "true_range_rs",
+            "atr_cache_rs",
+            "atr_apply_rs",
+            "obv_custom_rs",
+        ]
+        assert [name for name in expected if hasattr(rust_indicators, name)] == expected
+
+    def test_dispatch_matches_numba(self):
+        close = np.array(
+            [
+                [1.0, np.nan, 1.0],
+                [2.0, 4.0, 2.0],
+                [np.nan, 3.0, np.nan],
+                [4.0, 2.0, 2.0],
+                [np.nan, 1.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+        high = close * 1.1
+        low = close * 0.9
+        volume = np.array(
+            [
+                [4.0, 1.0, np.nan],
+                [3.0, np.nan, 2.0],
+                [2.0, 3.0, 3.0],
+                [1.0, 4.0, 4.0],
+                [2.0, 5.0, 5.0],
+            ],
+            dtype=np.float64,
+        )
+
+        np.testing.assert_allclose(indicator_dispatch.ma(close, 2, False, backend="rust"), indicator_nb.ma_nb(close, 2, False), equal_nan=True)
+        np.testing.assert_allclose(indicator_dispatch.ma(close, 2, True, backend="rust"), indicator_nb.ma_nb(close, 2, True), equal_nan=True)
+        np.testing.assert_allclose(indicator_dispatch.mstd(close, 2, False, backend="rust"), indicator_nb.mstd_nb(close, 2, False), equal_nan=True)
+        np.testing.assert_allclose(indicator_dispatch.mstd(close, 2, True, backend="rust"), indicator_nb.mstd_nb(close, 2, True), equal_nan=True)
+
+        ma_cache = indicator_dispatch.ma_cache(close, [2, 2, 3], [False, False, True], False, backend="rust")
+        ma_cache_nb = indicator_nb.ma_cache_nb(close, [2, 2, 3], [False, False, True], False)
+        np.testing.assert_allclose(
+            indicator_dispatch.ma_apply(close, 3, True, False, ma_cache, backend="rust"),
+            indicator_nb.ma_apply_nb(close, 3, True, False, ma_cache_nb),
+            equal_nan=True,
+        )
+
+        mstd_cache = indicator_dispatch.mstd_cache(close, [2, 3], [False, True], False, 0, backend="rust")
+        mstd_cache_nb = indicator_nb.mstd_cache_nb(close, [2, 3], [False, True], False, 0)
+        np.testing.assert_allclose(
+            indicator_dispatch.mstd_apply(close, 3, True, False, 0, mstd_cache, backend="rust"),
+            indicator_nb.mstd_apply_nb(close, 3, True, False, 0, mstd_cache_nb),
+            equal_nan=True,
+        )
+
+        bb_cache = indicator_dispatch.bb_cache(close, [2, 3], [False, True], [2.0, 3.0], False, 0, backend="rust")
+        bb_cache_nb = indicator_nb.bb_cache_nb(close, [2, 3], [False, True], [2.0, 3.0], False, 0)
+        for actual, expected in zip(
+            indicator_dispatch.bb_apply(close, 3, True, 2.0, False, 0, *bb_cache, backend="rust"),
+            indicator_nb.bb_apply_nb(close, 3, True, 2.0, False, 0, *bb_cache_nb),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+
+        rsi_cache = indicator_dispatch.rsi_cache(close, [2, 3], [False, True], False, backend="rust")
+        rsi_cache_nb = indicator_nb.rsi_cache_nb(close, [2, 3], [False, True], False)
+        np.testing.assert_allclose(
+            indicator_dispatch.rsi_apply(close, 3, True, False, rsi_cache, backend="rust"),
+            indicator_nb.rsi_apply_nb(close, 3, True, False, rsi_cache_nb),
+            equal_nan=True,
+        )
+
+        stoch_cache = indicator_dispatch.stoch_cache(high, low, close, [2, 3], [2, 3], [False, True], False, backend="rust")
+        stoch_cache_nb = indicator_nb.stoch_cache_nb(high, low, close, [2, 3], [2, 3], [False, True], False)
+        for actual, expected in zip(
+            indicator_dispatch.stoch_apply(high, low, close, 3, 2, True, False, stoch_cache, backend="rust"),
+            indicator_nb.stoch_apply_nb(high, low, close, 3, 2, True, False, stoch_cache_nb),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+
+        macd_cache = indicator_dispatch.macd_cache(close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False, backend="rust")
+        macd_cache_nb = indicator_nb.macd_cache_nb(close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False)
+        for actual, expected in zip(
+            indicator_dispatch.macd_apply(close, 2, 3, 2, False, True, False, macd_cache, backend="rust"),
+            indicator_nb.macd_apply_nb(close, 2, 3, 2, False, True, False, macd_cache_nb),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+
+        np.testing.assert_allclose(indicator_dispatch.true_range(high, low, close, backend="rust"), indicator_nb.true_range_nb(high, low, close), equal_nan=True)
+        atr_cache = indicator_dispatch.atr_cache(high, low, close, [2, 3], [False, True], False, backend="rust")
+        atr_cache_nb = indicator_nb.atr_cache_nb(high, low, close, [2, 3], [False, True], False)
+        for actual, expected in zip(
+            indicator_dispatch.atr_apply(high, low, close, 3, True, False, *atr_cache, backend="rust"),
+            indicator_nb.atr_apply_nb(high, low, close, 3, True, False, *atr_cache_nb),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+        np.testing.assert_allclose(indicator_dispatch.obv_custom(close, volume, backend="rust"), indicator_nb.obv_custom_nb(close, volume), equal_nan=True)
+
+    def test_basic_indicators_match_numba(self):
+        close = pd.Series([1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0])
+        high = close * 1.1
+        low = close * 0.9
+        volume = pd.Series([4.0, 3.0, 2.0, 1.0, 2.0, 3.0, 4.0])
+
+        pd.testing.assert_frame_equal(
+            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").ma,
+            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").ma,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").mstd,
+            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").mstd,
+        )
+        for attr in ("middle", "upper", "lower"):
+            pd.testing.assert_frame_equal(
+                getattr(vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr),
+                getattr(vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr),
+            )
+        pd.testing.assert_frame_equal(
+            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").rsi,
+            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").rsi,
+        )
+        for attr in ("percent_k", "percent_d"):
+            pd.testing.assert_frame_equal(
+                getattr(vbt.STOCH.run(high, low, close, k_window=(2, 3), d_window=2, d_ewm=(False, True), param_product=True, backend="rust"), attr),
+                getattr(vbt.STOCH.run(high, low, close, k_window=(2, 3), d_window=2, d_ewm=(False, True), param_product=True, backend="numba"), attr),
+            )
+        for attr in ("macd", "signal"):
+            pd.testing.assert_frame_equal(
+                getattr(vbt.MACD.run(close, fast_window=(2, 3), slow_window=4, signal_window=2, macd_ewm=(False, True), signal_ewm=True, param_product=True, backend="rust"), attr),
+                getattr(vbt.MACD.run(close, fast_window=(2, 3), slow_window=4, signal_window=2, macd_ewm=(False, True), signal_ewm=True, param_product=True, backend="numba"), attr),
+            )
+        for attr in ("tr", "atr"):
+            pd.testing.assert_frame_equal(
+                getattr(vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr),
+                getattr(vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr),
+            )
+        pd.testing.assert_series_equal(
+            vbt.OBV.run(close, volume, backend="rust").obv,
+            vbt.OBV.run(close, volume, backend="numba").obv,
+        )

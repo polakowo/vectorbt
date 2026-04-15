@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModuleMethods;
 
 mod generic;
+mod indicators;
 
 #[pymodule]
 fn vectorbt_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -14,10 +15,15 @@ fn vectorbt_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     generic::register(&generic)?;
     m.add_submodule(&generic)?;
 
-    // Register submodules in sys.modules so `from vectorbt_rust.generic import ...` works
+    let indicators = PyModule::new_bound(m.py(), "indicators")?;
+    indicators::register(&indicators)?;
+    m.add_submodule(&indicators)?;
+
+    // Register submodules in sys.modules so `from vectorbt_rust.<mod> import ...` works
     let sys = m.py().import_bound("sys")?;
     let modules = sys.getattr("modules")?;
     modules.set_item("vectorbt_rust.generic", generic)?;
+    modules.set_item("vectorbt_rust.indicators", indicators)?;
 
     Ok(())
 }

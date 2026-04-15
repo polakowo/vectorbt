@@ -64,7 +64,7 @@ import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
 from vectorbt.generic import nb as generic_nb
-from vectorbt.indicators import nb
+from vectorbt.indicators import dispatch
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.config import merge_dicts
@@ -80,7 +80,7 @@ MA = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["ma"],
-).from_apply_func(nb.ma_apply_nb, cache_func=nb.ma_cache_nb, kwargs_to_args=["adjust"], ewm=False, adjust=False)
+).from_apply_func(dispatch.ma_apply, cache_func=dispatch.ma_cache, kwargs_to_args=["adjust"], ewm=False, adjust=False)
 
 
 class _MA(MA):
@@ -160,8 +160,8 @@ MSTD = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["mstd"],
 ).from_apply_func(
-    nb.mstd_apply_nb,
-    cache_func=nb.mstd_cache_nb,
+    dispatch.mstd_apply,
+    cache_func=dispatch.mstd_cache,
     kwargs_to_args=["adjust", "ddof"],
     ewm=False,
     adjust=False,
@@ -234,8 +234,8 @@ BBANDS = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap((self.upper.values - self.lower.values) / self.middle.values),
     ),
 ).from_apply_func(
-    nb.bb_apply_nb,
-    cache_func=nb.bb_cache_nb,
+    dispatch.bb_apply,
+    cache_func=dispatch.bb_cache,
     kwargs_to_args=["adjust", "ddof"],
     window=20,
     ewm=False,
@@ -350,8 +350,8 @@ RSI = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["rsi"],
 ).from_apply_func(
-    nb.rsi_apply_nb,
-    cache_func=nb.rsi_cache_nb,
+    dispatch.rsi_apply,
+    cache_func=dispatch.rsi_cache,
     kwargs_to_args=["adjust"],
     window=14,
     ewm=False,
@@ -446,8 +446,8 @@ STOCH = IndicatorFactory(
     param_names=["k_window", "d_window", "d_ewm"],
     output_names=["percent_k", "percent_d"],
 ).from_apply_func(
-    nb.stoch_apply_nb,
-    cache_func=nb.stoch_cache_nb,
+    dispatch.stoch_apply,
+    cache_func=dispatch.stoch_cache,
     kwargs_to_args=["adjust"],
     k_window=14,
     d_window=3,
@@ -568,8 +568,8 @@ MACD = IndicatorFactory(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     ),
 ).from_apply_func(
-    nb.macd_apply_nb,
-    cache_func=nb.macd_cache_nb,
+    dispatch.macd_apply,
+    cache_func=dispatch.macd_cache,
     kwargs_to_args=["adjust"],
     fast_window=12,
     slow_window=26,
@@ -673,8 +673,8 @@ ATR = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["tr", "atr"],
 ).from_apply_func(
-    nb.atr_apply_nb,
-    cache_func=nb.atr_cache_nb,
+    dispatch.atr_apply,
+    cache_func=dispatch.atr_cache,
     kwargs_to_args=["adjust"],
     window=14,
     ewm=True,
@@ -753,7 +753,7 @@ OBV = IndicatorFactory(
     input_names=["close", "volume"],
     param_names=[],
     output_names=["obv"],
-).from_custom_func(nb.obv_custom_nb)
+).from_custom_func(dispatch.obv_custom)
 
 
 class _OBV(OBV):

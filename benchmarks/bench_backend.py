@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Benchmark Numba generic kernels against available Rust counterparts."""
+"""Benchmark Numba kernels against available Rust counterparts."""
 
 import argparse
 from dataclasses import dataclass
@@ -21,11 +21,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from vectorbt import _backend
 from vectorbt.generic import nb
+from vectorbt.indicators import nb as indicator_nb
 
 try:
     from vectorbt_rust import generic as rust_generic
 except ImportError:
     rust_generic = None
+
+try:
+    from vectorbt_rust import indicators as rust_indicators
+except ImportError:
+    rust_indicators = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,73 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     start_idx = np.array([1, 2, 3], dtype=np.int64)
     valley_idx = np.array([3, 4, 5], dtype=np.int64)
     end_idx = np.array([5, 8, 9], dtype=np.int64)
+    high = a + np.abs(a) * 0.1 + 0.1
+    low = a - np.abs(a) * 0.1 - 0.1
+    close = a
+    volume = np.nan_to_num(np.abs(a) * 100.0 + 1.0, nan=1.0).astype(np.float64)
+
+    indicator_cases = []
+    if rust_indicators is not None:
+        windows = [max(2, window // 2), window]
+        ewms = [False, True]
+        alphas = [2.0, 3.0]
+        fast_windows = [max(2, window // 3), max(3, window // 2)]
+        slow_windows = [max(3, window), max(4, window + 1)]
+        signal_windows = [max(2, window // 3), max(3, window // 2)]
+        d_windows = [max(2, window // 3), max(3, window // 2)]
+        d_ewms = [False, True]
+
+        nb_ma_cache = indicator_nb.ma_cache_nb(close, windows, ewms, False)
+        rs_ma_cache = rust_indicators.ma_cache_rs(close, windows, ewms, False)
+        nb_mstd_cache = indicator_nb.mstd_cache_nb(close, windows, ewms, False, 0)
+        rs_mstd_cache = rust_indicators.mstd_cache_rs(close, windows, ewms, False, 0)
+        nb_bb_cache = indicator_nb.bb_cache_nb(close, windows, ewms, alphas, False, 0)
+        rs_bb_cache = rust_indicators.bb_cache_rs(close, windows, ewms, alphas, False, 0)
+        nb_rsi_cache = indicator_nb.rsi_cache_nb(close, windows, ewms, False)
+        rs_rsi_cache = rust_indicators.rsi_cache_rs(close, windows, ewms, False)
+        nb_stoch_cache = indicator_nb.stoch_cache_nb(high, low, close, windows, d_windows, d_ewms, False)
+        rs_stoch_cache = rust_indicators.stoch_cache_rs(high, low, close, windows, d_windows, d_ewms, False)
+        nb_macd_cache = indicator_nb.macd_cache_nb(
+            close,
+            fast_windows,
+            slow_windows,
+            signal_windows,
+            ewms,
+            d_ewms,
+            False,
+        )
+        rs_macd_cache = rust_indicators.macd_cache_rs(
+            close,
+            fast_windows,
+            slow_windows,
+            signal_windows,
+            ewms,
+            d_ewms,
+            False,
+        )
+        nb_atr_cache = indicator_nb.atr_cache_nb(high, low, close, windows, ewms, False)
+        rs_atr_cache = rust_indicators.atr_cache_rs(high, low, close, windows, ewms, False)
+
+        indicator_cases = [
+            BenchmarkCase("indicator.ma", indicator_nb.ma_nb, (close, window, False, False), rust_indicators.ma_rs, (close, window, False, False)),
+            BenchmarkCase("indicator.mstd", indicator_nb.mstd_nb, (close, window, False, False, 0), rust_indicators.mstd_rs, (close, window, False, False, 0)),
+            BenchmarkCase("indicator.ma_cache", indicator_nb.ma_cache_nb, (close, windows, ewms, False), rust_indicators.ma_cache_rs, (close, windows, ewms, False)),
+            BenchmarkCase("indicator.ma_apply", indicator_nb.ma_apply_nb, (close, window, True, False, nb_ma_cache), rust_indicators.ma_apply_rs, (close, window, True, False, rs_ma_cache)),
+            BenchmarkCase("indicator.mstd_cache", indicator_nb.mstd_cache_nb, (close, windows, ewms, False, 0), rust_indicators.mstd_cache_rs, (close, windows, ewms, False, 0)),
+            BenchmarkCase("indicator.mstd_apply", indicator_nb.mstd_apply_nb, (close, window, True, False, 0, nb_mstd_cache), rust_indicators.mstd_apply_rs, (close, window, True, False, 0, rs_mstd_cache)),
+            BenchmarkCase("indicator.bb_cache", indicator_nb.bb_cache_nb, (close, windows, ewms, alphas, False, 0), rust_indicators.bb_cache_rs, (close, windows, ewms, alphas, False, 0)),
+            BenchmarkCase("indicator.bb_apply", indicator_nb.bb_apply_nb, (close, window, True, 2.0, False, 0, *nb_bb_cache), rust_indicators.bb_apply_rs, (close, window, True, 2.0, False, 0, *rs_bb_cache)),
+            BenchmarkCase("indicator.rsi_cache", indicator_nb.rsi_cache_nb, (close, windows, ewms, False), rust_indicators.rsi_cache_rs, (close, windows, ewms, False)),
+            BenchmarkCase("indicator.rsi_apply", indicator_nb.rsi_apply_nb, (close, window, True, False, nb_rsi_cache), rust_indicators.rsi_apply_rs, (close, window, True, False, rs_rsi_cache)),
+            BenchmarkCase("indicator.stoch_cache", indicator_nb.stoch_cache_nb, (high, low, close, windows, d_windows, d_ewms, False), rust_indicators.stoch_cache_rs, (high, low, close, windows, d_windows, d_ewms, False)),
+            BenchmarkCase("indicator.stoch_apply", indicator_nb.stoch_apply_nb, (high, low, close, window, d_windows[-1], True, False, nb_stoch_cache), rust_indicators.stoch_apply_rs, (high, low, close, window, d_windows[-1], True, False, rs_stoch_cache)),
+            BenchmarkCase("indicator.macd_cache", indicator_nb.macd_cache_nb, (close, fast_windows, slow_windows, signal_windows, ewms, d_ewms, False), rust_indicators.macd_cache_rs, (close, fast_windows, slow_windows, signal_windows, ewms, d_ewms, False)),
+            BenchmarkCase("indicator.macd_apply", indicator_nb.macd_apply_nb, (close, fast_windows[0], slow_windows[0], signal_windows[0], ewms[0], d_ewms[1], False, nb_macd_cache), rust_indicators.macd_apply_rs, (close, fast_windows[0], slow_windows[0], signal_windows[0], ewms[0], d_ewms[1], False, rs_macd_cache)),
+            BenchmarkCase("indicator.true_range", indicator_nb.true_range_nb, (high, low, close), rust_indicators.true_range_rs, (high, low, close)),
+            BenchmarkCase("indicator.atr_cache", indicator_nb.atr_cache_nb, (high, low, close, windows, ewms, False), rust_indicators.atr_cache_rs, (high, low, close, windows, ewms, False)),
+            BenchmarkCase("indicator.atr_apply", indicator_nb.atr_apply_nb, (high, low, close, window, True, False, *nb_atr_cache), rust_indicators.atr_apply_rs, (high, low, close, window, True, False, *rs_atr_cache)),
+            BenchmarkCase("indicator.obv_custom", indicator_nb.obv_custom_nb, (close, volume), rust_indicators.obv_custom_rs, (close, volume)),
+        ]
 
     cases = [
         BenchmarkCase("shuffle_1d", nb.shuffle_1d_nb, (a_1d, seed), rust_generic.shuffle_1d_rs, (a_1d, seed), False),
@@ -164,7 +237,8 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         BenchmarkCase("crossed_above_1d", nb.crossed_above_1d_nb, (a_1d, other_1d, 0), rust_generic.crossed_above_1d_rs, (a_1d, other_1d, 0)),
         BenchmarkCase("crossed_above", nb.crossed_above_nb, (a, other, 0), rust_generic.crossed_above_rs, (a, other, 0)),
     ]
-    return [case for case in cases if hasattr(rust_generic, case.rs_func.__name__)]
+    cases.extend(indicator_cases)
+    return cases
 
 
 def time_call(func: Callable, args: tuple, repeat: int, warmup: int) -> float:
@@ -185,13 +259,30 @@ def assert_same(case: BenchmarkCase) -> None:
         return
     nb_out = case.nb_func(*case.nb_args)
     rs_out = case.rs_func(*case.rs_args)
-    if isinstance(nb_out, np.ndarray) or isinstance(rs_out, np.ndarray):
-        if getattr(nb_out.dtype, "fields", None) is not None or getattr(rs_out.dtype, "fields", None) is not None:
-            np.testing.assert_array_equal(rs_out, nb_out)
+    assert_nested_same(rs_out, nb_out)
+
+
+def assert_nested_same(actual, expected) -> None:
+    """Compare arrays, scalars, tuples, and cache dictionaries recursively."""
+    if isinstance(actual, dict) or hasattr(actual, "keys"):
+        actual_keys = set(actual.keys())
+        expected_keys = set(expected.keys())
+        assert actual_keys == expected_keys
+        for key in actual_keys:
+            assert_nested_same(actual[key], expected[key])
+        return
+    if isinstance(actual, tuple) or isinstance(expected, tuple):
+        assert len(actual) == len(expected)
+        for actual_item, expected_item in zip(actual, expected):
+            assert_nested_same(actual_item, expected_item)
+        return
+    if isinstance(actual, np.ndarray) or isinstance(expected, np.ndarray):
+        if getattr(actual.dtype, "fields", None) is not None or getattr(expected.dtype, "fields", None) is not None:
+            np.testing.assert_array_equal(actual, expected)
         else:
-            np.testing.assert_allclose(rs_out, nb_out, equal_nan=True)
-    else:
-        np.testing.assert_allclose(rs_out, nb_out, equal_nan=True)
+            np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-12, equal_nan=True)
+        return
+    np.testing.assert_allclose(actual, expected, equal_nan=True)
 
 
 def main() -> None:

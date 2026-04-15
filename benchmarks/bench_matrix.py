@@ -98,8 +98,9 @@ def main() -> None:
     out_path = Path(__file__).with_name("BENCHMARKS.md")
     with open(out_path, "w") as f:
         f.write("# Rust vs Numba Speedup Matrix\n\n")
-        f.write(f"Each cell shows **Rust speedup** over Numba (higher = Rust is faster).\n\n")
+        f.write("Each cell shows **Rust speedup** over Numba (higher = Rust is faster).\n\n")
         f.write(f"- Window: {WINDOW}, NaN ratio: 5%, Repeat: {REPEAT}, Seed: {SEED}\n")
+        f.write("- Includes generic kernels and indicator-level `indicator.*` ports\n")
         f.write(f"- Values >1.00x mean Rust is faster; <1.00x mean Numba is faster\n\n")
         f.write(table + "\n")
 

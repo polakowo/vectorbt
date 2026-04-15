@@ -1594,8 +1594,8 @@ def run_pipeline(
         stacking_kwargs = {}
     if wrapper_kwargs is None:
         wrapper_kwargs = {}
-    if keep_pd and checks.is_numba_func(custom_func):
-        raise ValueError("Cannot pass pandas objects to a Numba-compiled custom_func. Set keep_pd to False.")
+    if keep_pd and checks.is_backend_compatible_func(custom_func, backend="auto"):
+        raise ValueError("Cannot pass pandas objects to a backend-compatible custom_func. Set keep_pd to False.")
 
     in_output_idxs = [i for i, x in enumerate(in_output_list) if x is not None]
     if len(in_output_idxs) > 0:
