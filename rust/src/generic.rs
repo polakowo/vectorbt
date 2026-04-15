@@ -9,9 +9,10 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::borrow::Cow;
 
-const RANGE_OPEN: i64 = 0;
-const RANGE_CLOSED: i64 = 1;
+pub(crate) const RANGE_OPEN: i64 = 0;
+pub(crate) const RANGE_CLOSED: i64 = 1;
 const DRAWDOWN_ACTIVE: i64 = 0;
 const DRAWDOWN_RECOVERED: i64 = 1;
 
@@ -23,6 +24,18 @@ pub struct RangeRecord {
     start_idx: i64,
     end_idx: i64,
     status: i64,
+}
+
+impl RangeRecord {
+    pub(crate) fn new(id: i64, col: i64, start_idx: i64, end_idx: i64, status: i64) -> Self {
+        Self {
+            id,
+            col,
+            start_idx,
+            end_idx,
+            status,
+        }
+    }
 }
 
 unsafe impl Element for RangeRecord {
@@ -109,6 +122,16 @@ pub(crate) fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
         out.push(group_len as usize);
     }
     Ok(out)
+}
+
+#[inline(always)]
+pub(crate) fn array1_as_slice_cow<'py, T: Copy + Element>(
+    a: &'py PyReadonlyArray1<'py, T>,
+) -> Cow<'py, [T]> {
+    match a.as_slice() {
+        Ok(slice) => Cow::Borrowed(slice),
+        Err(_) => Cow::Owned(a.as_array().iter().copied().collect()),
+    }
 }
 
 pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
@@ -1799,8 +1822,13 @@ macro_rules! export_1d_array {
             a: PyReadonlyArray1<'py, f64>,
             $($arg: $argty,)*
         ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-            let a_slice = a.as_slice()?;
-            let result = py.allow_threads(|| $kernel(a_slice, $($arg),*));
+            let result = match a.as_slice() {
+                Ok(a_slice) => py.allow_threads(|| $kernel(a_slice, $($arg),*)),
+                Err(_) => {
+                    let a_vec = a.as_array().iter().copied().collect::<Vec<_>>();
+                    py.allow_threads(|| $kernel(&a_vec, $($arg),*))
+                }
+            };
             Ok(PyArray1::from_vec_bound(py, result))
         }
     };
@@ -1813,9 +1841,9 @@ pub fn set_by_mask_1d_rs<'py>(
     mask: PyReadonlyArray1<'py, bool>,
     value: f64,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let mask_slice = mask.as_slice()?;
-    let result = py.allow_threads(|| set_by_mask_1d(a_slice, mask_slice, value));
+    let a_cow = array1_as_slice_cow(&a);
+    let mask_cow = array1_as_slice_cow(&mask);
+    let result = py.allow_threads(|| set_by_mask_1d(a_cow.as_ref(), mask_cow.as_ref(), value));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -1852,10 +1880,12 @@ pub fn set_by_mask_mult_1d_rs<'py>(
     mask: PyReadonlyArray1<'py, bool>,
     values: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let mask_slice = mask.as_slice()?;
-    let values_slice = values.as_slice()?;
-    let result = py.allow_threads(|| set_by_mask_mult_1d(a_slice, mask_slice, values_slice));
+    let a_cow = array1_as_slice_cow(&a);
+    let mask_cow = array1_as_slice_cow(&mask);
+    let values_cow = array1_as_slice_cow(&values);
+    let result = py.allow_threads(|| {
+        set_by_mask_mult_1d(a_cow.as_ref(), mask_cow.as_ref(), values_cow.as_ref())
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2156,7 +2186,8 @@ pub fn nanmedian_rs<'py>(
 
 #[pyfunction]
 pub fn nanstd_1d_rs(a: PyReadonlyArray1<'_, f64>, ddof: usize) -> PyResult<f64> {
-    Ok(nanstd_1d(a.as_slice()?, ddof))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanstd_1d(a_cow.as_ref(), ddof))
 }
 
 #[pyfunction]
@@ -2186,8 +2217,8 @@ pub fn rolling_min_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_min_1d(a_slice, window, minp));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| rolling_min_1d(a_cow.as_ref(), window, minp));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2217,8 +2248,8 @@ pub fn rolling_max_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_max_1d(a_slice, window, minp));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| rolling_max_1d(a_cow.as_ref(), window, minp));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2248,8 +2279,8 @@ pub fn rolling_mean_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_mean_1d(a_slice, window, minp));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| rolling_mean_1d(a_cow.as_ref(), window, minp));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2285,8 +2316,8 @@ pub fn rolling_std_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| rolling_std_1d(a_slice, window, minp, ddof));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| rolling_std_1d(a_cow.as_ref(), window, minp, ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2322,8 +2353,8 @@ pub fn ewm_mean_1d_rs<'py>(
     adjust: bool,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     validate_window(minp, span, "span")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| ewm_mean_1d(a_slice, span, minp, adjust));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| ewm_mean_1d(a_cow.as_ref(), span, minp, adjust));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2354,8 +2385,8 @@ pub fn ewm_std_1d_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     validate_window(minp, span, "span")?;
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| ewm_std_1d(a_slice, span, minp, adjust, ddof));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| ewm_std_1d(a_cow.as_ref(), span, minp, adjust, ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2408,8 +2439,8 @@ pub fn expanding_mean_1d_rs<'py>(
     a: PyReadonlyArray1<'py, f64>,
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| expanding_mean_1d(a_slice, minp));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| expanding_mean_1d(a_cow.as_ref(), minp));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2437,8 +2468,8 @@ pub fn expanding_std_1d_rs<'py>(
     minp: usize,
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| expanding_std_1d(a_slice, minp, ddof));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| expanding_std_1d(a_cow.as_ref(), minp, ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2467,8 +2498,8 @@ pub fn shuffle_1d_rs<'py>(
     a: PyReadonlyArray1<'py, f64>,
     seed: Option<u64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let result = py.allow_threads(|| shuffle_1d(a_slice, seed));
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| shuffle_1d(a_cow.as_ref(), seed));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2535,7 +2566,8 @@ pub fn flatten_grouped_rs<'py>(
     in_c_order: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let group_lens_vec = validate_group_lens(group_lens.as_slice()?)?;
+    let group_lens_cow = array1_as_slice_cow(&group_lens);
+    let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
     let result = py.allow_threads(|| flatten_grouped(a_arr, &group_lens_vec, in_c_order));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -2548,68 +2580,80 @@ pub fn flatten_uniform_grouped_rs<'py>(
     in_c_order: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let group_lens_vec = validate_group_lens(group_lens.as_slice()?)?;
+    let group_lens_cow = array1_as_slice_cow(&group_lens);
+    let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
     let result = py.allow_threads(|| flatten_uniform_grouped(a_arr, &group_lens_vec, in_c_order));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
 #[pyfunction]
 pub fn nth_reduce_rs(a: PyReadonlyArray1<'_, f64>, n: isize) -> PyResult<f64> {
-    let a_slice = a.as_slice()?;
+    let a_cow = array1_as_slice_cow(&a);
+    let a_slice = a_cow.as_ref();
     check_bounds(n, a_slice.len())?;
     Ok(a_slice[normalize_index(n, a_slice.len())])
 }
 
 #[pyfunction]
 pub fn nth_index_reduce_rs(a: PyReadonlyArray1<'_, f64>, n: isize) -> PyResult<i64> {
-    let a_slice = a.as_slice()?;
+    let a_cow = array1_as_slice_cow(&a);
+    let a_slice = a_cow.as_ref();
     check_bounds(n, a_slice.len())?;
     Ok(normalize_index(n, a_slice.len()) as i64)
 }
 
 #[pyfunction]
 pub fn min_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(nanmin_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanmin_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn max_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(nanmax_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanmax_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn mean_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(nanmean_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanmean_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn median_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(nanmedian_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanmedian_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn std_reduce_rs(a: PyReadonlyArray1<'_, f64>, ddof: usize) -> PyResult<f64> {
-    Ok(nanstd_1d(a.as_slice()?, ddof))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nanstd_1d(a_cow.as_ref(), ddof))
 }
 
 #[pyfunction]
 pub fn sum_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(nansum_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nansum_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn count_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<i64> {
-    Ok(nancnt_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(nancnt_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn argmin_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<i64> {
-    argmin_reduce_1d(a.as_slice()?)
+    let a_cow = array1_as_slice_cow(&a);
+    argmin_reduce_1d(a_cow.as_ref())
 }
 
 #[pyfunction]
 pub fn argmax_reduce_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<i64> {
-    argmax_reduce_1d(a.as_slice()?)
+    let a_cow = array1_as_slice_cow(&a);
+    argmax_reduce_1d(a_cow.as_ref())
 }
 
 #[pyfunction]
@@ -2619,9 +2663,9 @@ pub fn describe_reduce_rs<'py>(
     perc: PyReadonlyArray1<'py, f64>,
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_slice = a.as_slice()?;
-    let perc_slice = perc.as_slice()?;
-    let result = py.allow_threads(|| describe_reduce_1d(a_slice, perc_slice, ddof));
+    let a_cow = array1_as_slice_cow(&a);
+    let perc_cow = array1_as_slice_cow(&perc);
+    let result = py.allow_threads(|| describe_reduce_1d(a_cow.as_ref(), perc_cow.as_ref(), ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2633,29 +2677,34 @@ pub fn value_counts_rs<'py>(
     group_lens: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray2<i64>>> {
     let codes_arr = codes.as_array();
-    let group_lens_vec = validate_group_lens(group_lens.as_slice()?)?;
+    let group_lens_cow = array1_as_slice_cow(&group_lens);
+    let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
     let result = py.allow_threads(|| value_counts(codes_arr, n_uniques, &group_lens_vec))?;
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
 #[pyfunction]
 pub fn min_squeeze_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(min_squeeze_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(min_squeeze_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn max_squeeze_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(max_squeeze_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(max_squeeze_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn sum_squeeze_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<f64> {
-    Ok(sum_squeeze_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(sum_squeeze_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
 pub fn any_squeeze_rs(a: PyReadonlyArray1<'_, f64>) -> PyResult<bool> {
-    Ok(any_squeeze_1d(a.as_slice()?))
+    let a_cow = array1_as_slice_cow(&a);
+    Ok(any_squeeze_1d(a_cow.as_ref()))
 }
 
 #[pyfunction]
@@ -2676,10 +2725,16 @@ pub fn range_duration_rs<'py>(
     end_idx: PyReadonlyArray1<'py, i64>,
     status: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
-    let start_idx_slice = start_idx.as_slice()?;
-    let end_idx_slice = end_idx.as_slice()?;
-    let status_slice = status.as_slice()?;
-    let result = py.allow_threads(|| range_duration(start_idx_slice, end_idx_slice, status_slice));
+    let start_idx_cow = array1_as_slice_cow(&start_idx);
+    let end_idx_cow = array1_as_slice_cow(&end_idx);
+    let status_cow = array1_as_slice_cow(&status);
+    let result = py.allow_threads(|| {
+        range_duration(
+            start_idx_cow.as_ref(),
+            end_idx_cow.as_ref(),
+            status_cow.as_ref(),
+        )
+    });
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2694,20 +2749,20 @@ pub fn range_coverage_rs<'py>(
     overlapping: bool,
     normalize: bool,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let start_idx_slice = start_idx.as_slice()?;
-    let end_idx_slice = end_idx.as_slice()?;
-    let status_slice = status.as_slice()?;
-    let col_idxs_slice = col_map.0.as_slice()?;
-    let col_lens_slice = col_map.1.as_slice()?;
-    let index_lens_slice = index_lens.as_slice()?;
+    let start_idx_cow = array1_as_slice_cow(&start_idx);
+    let end_idx_cow = array1_as_slice_cow(&end_idx);
+    let status_cow = array1_as_slice_cow(&status);
+    let col_idxs_cow = array1_as_slice_cow(&col_map.0);
+    let col_lens_cow = array1_as_slice_cow(&col_map.1);
+    let index_lens_cow = array1_as_slice_cow(&index_lens);
     let result = py.allow_threads(|| {
         range_coverage(
-            start_idx_slice,
-            end_idx_slice,
-            status_slice,
-            col_idxs_slice,
-            col_lens_slice,
-            index_lens_slice,
+            start_idx_cow.as_ref(),
+            end_idx_cow.as_ref(),
+            status_cow.as_ref(),
+            col_idxs_cow.as_ref(),
+            col_lens_cow.as_ref(),
+            index_lens_cow.as_ref(),
             overlapping,
             normalize,
         )
@@ -2724,18 +2779,18 @@ pub fn ranges_to_mask_rs<'py>(
     col_map: (PyReadonlyArray1<'py, i64>, PyReadonlyArray1<'py, i64>),
     index_len: usize,
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
-    let start_idx_slice = start_idx.as_slice()?;
-    let end_idx_slice = end_idx.as_slice()?;
-    let status_slice = status.as_slice()?;
-    let col_idxs_slice = col_map.0.as_slice()?;
-    let col_lens_slice = col_map.1.as_slice()?;
+    let start_idx_cow = array1_as_slice_cow(&start_idx);
+    let end_idx_cow = array1_as_slice_cow(&end_idx);
+    let status_cow = array1_as_slice_cow(&status);
+    let col_idxs_cow = array1_as_slice_cow(&col_map.0);
+    let col_lens_cow = array1_as_slice_cow(&col_map.1);
     let result = py.allow_threads(|| {
         ranges_to_mask(
-            start_idx_slice,
-            end_idx_slice,
-            status_slice,
-            col_idxs_slice,
-            col_lens_slice,
+            start_idx_cow.as_ref(),
+            end_idx_cow.as_ref(),
+            status_cow.as_ref(),
+            col_idxs_cow.as_ref(),
+            col_lens_cow.as_ref(),
             index_len,
         )
     })?;
@@ -2758,8 +2813,10 @@ pub fn dd_drawdown_rs<'py>(
     peak_val: PyReadonlyArray1<'py, f64>,
     valley_val: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let peak_val_slice = peak_val.as_slice()?;
-    let valley_val_slice = valley_val.as_slice()?;
+    let peak_val_cow = array1_as_slice_cow(&peak_val);
+    let valley_val_cow = array1_as_slice_cow(&valley_val);
+    let peak_val_slice = peak_val_cow.as_ref();
+    let valley_val_slice = valley_val_cow.as_ref();
     let out_len = broadcast_len2(peak_val_slice.len(), valley_val_slice.len())?;
     let result = py.allow_threads(|| {
         (0..out_len)
@@ -2779,8 +2836,10 @@ pub fn dd_decline_duration_rs<'py>(
     start_idx: PyReadonlyArray1<'py, i64>,
     valley_idx: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
-    let start_idx_slice = start_idx.as_slice()?;
-    let valley_idx_slice = valley_idx.as_slice()?;
+    let start_idx_cow = array1_as_slice_cow(&start_idx);
+    let valley_idx_cow = array1_as_slice_cow(&valley_idx);
+    let start_idx_slice = start_idx_cow.as_ref();
+    let valley_idx_slice = valley_idx_cow.as_ref();
     let out_len = broadcast_len2(start_idx_slice.len(), valley_idx_slice.len())?;
     let result = py.allow_threads(|| {
         (0..out_len)
@@ -2800,8 +2859,10 @@ pub fn dd_recovery_duration_rs<'py>(
     valley_idx: PyReadonlyArray1<'py, i64>,
     end_idx: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
-    let valley_idx_slice = valley_idx.as_slice()?;
-    let end_idx_slice = end_idx.as_slice()?;
+    let valley_idx_cow = array1_as_slice_cow(&valley_idx);
+    let end_idx_cow = array1_as_slice_cow(&end_idx);
+    let valley_idx_slice = valley_idx_cow.as_ref();
+    let end_idx_slice = end_idx_cow.as_ref();
     let out_len = broadcast_len2(valley_idx_slice.len(), end_idx_slice.len())?;
     let result = py.allow_threads(|| {
         (0..out_len)
@@ -2822,9 +2883,12 @@ pub fn dd_recovery_duration_ratio_rs<'py>(
     valley_idx: PyReadonlyArray1<'py, i64>,
     end_idx: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let start_idx_slice = start_idx.as_slice()?;
-    let valley_idx_slice = valley_idx.as_slice()?;
-    let end_idx_slice = end_idx.as_slice()?;
+    let start_idx_cow = array1_as_slice_cow(&start_idx);
+    let valley_idx_cow = array1_as_slice_cow(&valley_idx);
+    let end_idx_cow = array1_as_slice_cow(&end_idx);
+    let start_idx_slice = start_idx_cow.as_ref();
+    let valley_idx_slice = valley_idx_cow.as_ref();
+    let end_idx_slice = end_idx_cow.as_ref();
     let out_len = broadcast_len3(
         start_idx_slice.len(),
         valley_idx_slice.len(),
@@ -2849,8 +2913,10 @@ pub fn dd_recovery_return_rs<'py>(
     valley_val: PyReadonlyArray1<'py, f64>,
     end_val: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let valley_val_slice = valley_val.as_slice()?;
-    let end_val_slice = end_val.as_slice()?;
+    let valley_val_cow = array1_as_slice_cow(&valley_val);
+    let end_val_cow = array1_as_slice_cow(&end_val);
+    let valley_val_slice = valley_val_cow.as_ref();
+    let end_val_slice = end_val_cow.as_ref();
     let out_len = broadcast_len2(valley_val_slice.len(), end_val_slice.len())?;
     let result = py.allow_threads(|| {
         (0..out_len)
@@ -2871,9 +2937,9 @@ pub fn crossed_above_1d_rs<'py>(
     arr2: PyReadonlyArray1<'py, f64>,
     wait: usize,
 ) -> PyResult<Bound<'py, PyArray1<bool>>> {
-    let arr1_slice = arr1.as_slice()?;
-    let arr2_slice = arr2.as_slice()?;
-    let result = py.allow_threads(|| crossed_above_1d(arr1_slice, arr2_slice, wait));
+    let arr1_cow = array1_as_slice_cow(&arr1);
+    let arr2_cow = array1_as_slice_cow(&arr2);
+    let result = py.allow_threads(|| crossed_above_1d(arr1_cow.as_ref(), arr2_cow.as_ref(), wait));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 

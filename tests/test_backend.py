@@ -8,6 +8,8 @@ from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
 from vectorbt.indicators import dispatch as indicator_dispatch
 from vectorbt.indicators import nb as indicator_nb
+from vectorbt.signals import dispatch as signal_dispatch
+from vectorbt.signals import nb as signal_nb
 
 
 def teardown_module():
@@ -25,8 +27,7 @@ class TestBackendResolution:
         assert "float64" in int_support.reason
 
         strided_support = _backend.array_compatible_with_rust(np.array([1.0, 2.0, 3.0])[::2])
-        assert not strided_support.supported
-        assert "contiguous 1D" in strided_support.reason
+        assert strided_support.supported
 
     def test_global_rust_support_helpers(self):
         assert _backend.combine_rust_support(_backend.RustSupport(True), _backend.RustSupport(True)).supported
@@ -437,6 +438,24 @@ class TestGenericRustParity:
         with pytest.raises(ValueError, match="float64"):
             dispatch.diff(a, backend="rust")
 
+    def test_dispatch_supports_strided_1d_arrays(self):
+        a = np.array([1.0, np.nan, 2.0, 3.0, np.nan, 4.0], dtype=np.float64)[::2]
+        mask = np.array([True, False, True, False, True, False], dtype=np.bool_)[::2]
+        values = np.arange(6, dtype=np.float64)[::2]
+
+        np.testing.assert_allclose(dispatch.fillna_1d(a, -1.0, backend="rust"), nb.fillna_1d_nb(a, -1.0), equal_nan=True)
+        np.testing.assert_allclose(dispatch.diff_1d(a, 1, backend="rust"), nb.diff_1d_nb(a, 1), equal_nan=True)
+        np.testing.assert_allclose(
+            dispatch.set_by_mask_1d(a, mask, -1.0, backend="rust"),
+            nb.set_by_mask_1d_nb(a, mask, -1.0),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            dispatch.set_by_mask_mult_1d(a, mask, values, backend="rust"),
+            nb.set_by_mask_mult_1d_nb(a, mask, values),
+            equal_nan=True,
+        )
+
     def test_generic_accessors_accept_backend(self):
         df = pd.DataFrame(
             {
@@ -461,6 +480,242 @@ class TestGenericRustParity:
             pd.testing.assert_frame_equal(df.vbt.rolling_mean(2), df.vbt.rolling_mean(2, backend="rust"))
         finally:
             vbt.settings.reset()
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+class TestSignalsRustParity:
+    def test_dispatch_matches_numba_for_masks(self):
+        entries = np.array(
+            [
+                [True, False, True],
+                [True, False, False],
+                [True, True, True],
+                [False, True, False],
+                [False, True, True],
+            ],
+            dtype=np.bool_,
+        )
+        exits = np.array(
+            [
+                [True, True, False],
+                [False, False, False],
+                [True, False, True],
+                [False, False, False],
+                [True, True, True],
+            ],
+            dtype=np.bool_,
+        )
+
+        for entry_first in (True, False):
+            result = signal_dispatch.clean_enex(entries, exits, entry_first, backend="rust")
+            expected = signal_nb.clean_enex_nb(entries, exits, entry_first)
+            np.testing.assert_array_equal(result[0], expected[0])
+            np.testing.assert_array_equal(result[1], expected[1])
+
+            entries_1d = entries[:, 0]
+            exits_1d = exits[:, 0]
+            result_1d = signal_dispatch.clean_enex_1d(entries_1d, exits_1d, entry_first, backend="rust")
+            expected_1d = signal_nb.clean_enex_1d_nb(entries_1d, exits_1d, entry_first)
+            np.testing.assert_array_equal(result_1d[0], expected_1d[0])
+            np.testing.assert_array_equal(result_1d[1], expected_1d[1])
+
+    def test_dispatch_matches_numba_for_mask_layouts(self):
+        a_c = np.array(
+            [
+                [True, False, False],
+                [False, True, False],
+                [True, True, True],
+                [False, False, True],
+                [True, False, True],
+            ],
+            dtype=np.bool_,
+        )
+        a_f = np.asfortranarray(a_c)
+        reset_by = np.array(
+            [
+                [False, False, False],
+                [True, False, False],
+                [False, False, True],
+                [False, True, False],
+                [False, False, False],
+            ],
+            dtype=np.bool_,
+        )
+
+        for a in (a_c, a_f):
+            np.testing.assert_array_equal(
+                signal_dispatch.sig_pos_rank(a, None, False, False, backend="rust"),
+                signal_nb.rank_nb(a, None, False, signal_nb.sig_pos_rank_nb, np.full(a.shape[1], -1), False),
+            )
+            np.testing.assert_array_equal(
+                signal_dispatch.sig_pos_rank(a, reset_by, False, True, backend="rust"),
+                signal_nb.rank_nb(
+                    a,
+                    reset_by,
+                    False,
+                    signal_nb.sig_pos_rank_nb,
+                    np.full(a.shape[1], -1),
+                    True,
+                ),
+            )
+            np.testing.assert_array_equal(
+                signal_dispatch.part_pos_rank(a, reset_by, True, backend="rust"),
+                signal_nb.rank_nb(
+                    a,
+                    reset_by,
+                    True,
+                    signal_nb.part_pos_rank_nb,
+                    np.full(a.shape[1], -1),
+                ),
+            )
+            np.testing.assert_array_equal(
+                signal_dispatch.nth_index(a, -1, backend="rust"),
+                signal_nb.nth_index_nb(a, -1),
+            )
+            np.testing.assert_allclose(
+                signal_dispatch.norm_avg_index(a, backend="rust"),
+                signal_nb.norm_avg_index_nb(a),
+                equal_nan=True,
+            )
+
+    def test_dispatch_matches_numba_for_record_outputs(self):
+        a = np.array(
+            [
+                [True, False, False],
+                [False, True, False],
+                [True, True, True],
+                [False, False, False],
+                [True, False, True],
+            ],
+            dtype=np.bool_,
+        )
+        b = np.array(
+            [
+                [False, True, False],
+                [True, False, False],
+                [False, False, True],
+                [True, True, False],
+                [False, False, True],
+            ],
+            dtype=np.bool_,
+        )
+
+        cases = [
+            (signal_dispatch.between_ranges, signal_nb.between_ranges_nb, (a,)),
+            (signal_dispatch.between_two_ranges, signal_nb.between_two_ranges_nb, (a, b, False)),
+            (signal_dispatch.between_two_ranges, signal_nb.between_two_ranges_nb, (a, b, True)),
+            (signal_dispatch.partition_ranges, signal_nb.partition_ranges_nb, (a,)),
+            (signal_dispatch.between_partition_ranges, signal_nb.between_partition_ranges_nb, (a,)),
+        ]
+        for dispatch_func, nb_func, args in cases:
+            result = dispatch_func(*args, backend="rust")
+            expected = nb_func(*args)
+            assert result.dtype == range_dt
+            assert result.dtype.itemsize == range_dt.itemsize
+            np.testing.assert_array_equal(result, expected)
+
+    def test_dispatch_index_edge_cases(self):
+        a = np.array(
+            [
+                [False, False, True],
+                [False, False, False],
+                [False, True, False],
+            ],
+            dtype=np.bool_,
+        )
+        no_signal_cols = np.zeros((3, 2), dtype=np.bool_)
+        empty_rows = np.empty((0, 2), dtype=np.bool_)
+        single_row = np.array([[True, False]], dtype=np.bool_)
+        single_signal = np.array([True], dtype=np.bool_)
+
+        a_1d = a[:, 1]
+        assert signal_dispatch.nth_index_1d(a_1d, 0, backend="rust") == signal_nb.nth_index_1d_nb(a_1d, 0)
+        assert signal_dispatch.nth_index_1d(a_1d, -1, backend="rust") == signal_nb.nth_index_1d_nb(a_1d, -1)
+        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 1, backend="rust"), signal_nb.nth_index_nb(a, 1))
+        with pytest.raises(ZeroDivisionError):
+            signal_dispatch.norm_avg_index_1d(single_signal, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            signal_nb.norm_avg_index_1d_nb(single_signal)
+        with pytest.raises(ZeroDivisionError):
+            signal_dispatch.norm_avg_index(no_signal_cols, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            signal_nb.norm_avg_index_nb(no_signal_cols)
+        with pytest.raises(ZeroDivisionError):
+            signal_dispatch.norm_avg_index(empty_rows, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            signal_nb.norm_avg_index_nb(empty_rows)
+        with pytest.raises(ZeroDivisionError):
+            signal_dispatch.norm_avg_index(single_row, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            signal_nb.norm_avg_index_nb(single_row)
+
+    def test_dispatch_auto_falls_back_for_unsupported_array(self):
+        a = np.array([[1, 0], [0, 1]], dtype=np.int64)
+
+        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 0, backend="auto"), signal_nb.nth_index_nb(a, 0))
+        with pytest.raises(ValueError, match="bool"):
+            signal_dispatch.nth_index(a, 0, backend="rust")
+        with pytest.raises(ValueError, match="same shape"):
+            signal_dispatch.clean_enex(
+                np.ones((2, 2), dtype=np.bool_),
+                np.ones((2, 1), dtype=np.bool_),
+                True,
+                backend="rust",
+            )
+
+    def test_signal_accessors_accept_backend(self):
+        mask = pd.DataFrame(
+            {
+                "a": [True, False, True, False, True],
+                "b": [False, True, True, False, False],
+                "c": [True, False, False, True, True],
+            }
+        )
+        exits = pd.Series([False, True, False, True, False])
+
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.clean(exits, backend="rust")[0],
+            mask.vbt.signals.clean(exits, backend="numba")[0],
+        )
+        pd.testing.assert_frame_equal(mask.vbt.signals.pos_rank(backend="rust"), mask.vbt.signals.pos_rank(backend="numba"))
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="rust"),
+            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.partition_pos_rank(after_false=True, backend="rust"),
+            mask.vbt.signals.partition_pos_rank(after_false=True, backend="numba"),
+        )
+        pd.testing.assert_frame_equal(mask.vbt.signals.first(backend="rust"), mask.vbt.signals.first(backend="numba"))
+        pd.testing.assert_frame_equal(mask.vbt.signals.nth(1, backend="rust"), mask.vbt.signals.nth(1, backend="numba"))
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.from_nth(1, backend="rust"),
+            mask.vbt.signals.from_nth(1, backend="numba"),
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.nth_index(-1, backend="rust"),
+            mask.vbt.signals.nth_index(-1, backend="numba"),
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.norm_avg_index(backend="rust"),
+            mask.vbt.signals.norm_avg_index(backend="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.between_ranges(backend="rust").records_readable,
+            mask.vbt.signals.between_ranges(backend="numba").records_readable,
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.between_ranges(other=~mask, backend="rust").records_readable,
+            mask.vbt.signals.between_ranges(other=~mask, backend="numba").records_readable,
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.partition_ranges(backend="rust").records_readable,
+            mask.vbt.signals.partition_ranges(backend="numba").records_readable,
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.between_partition_ranges(backend="rust").records_readable,
+            mask.vbt.signals.between_partition_ranges(backend="numba").records_readable,
+        )
 
 
 @pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")

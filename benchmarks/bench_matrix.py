@@ -6,6 +6,7 @@ Usage:
 
 import csv
 import io
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -29,6 +30,8 @@ REPEAT = 5
 WARMUP = 2
 WINDOW = 20
 SEED = 42
+
+STAT_NAMES = ("count", "min", "median", "mean", "max")
 
 
 def run_config(rows: int, cols: int) -> dict[str, float]:
@@ -61,6 +64,41 @@ def run_config(rows: int, cols: int) -> dict[str, float]:
     return speedups
 
 
+def calc_stats(values: list[float]) -> dict[str, float]:
+    """Calculate descriptive statistics for benchmark speedups."""
+    if len(values) == 0:
+        return {}
+    return {
+        "count": float(len(values)),
+        "min": min(values),
+        "median": statistics.median(values),
+        "mean": statistics.fmean(values),
+        "max": max(values),
+    }
+
+
+def format_stat(name: str, value: float) -> str:
+    """Format one statistic value."""
+    if name == "count":
+        return str(int(value))
+    return f"{value:.2f}x"
+
+
+def make_overall_table(stats: dict[str, float]) -> str:
+    """Create a compact markdown table for overall statistics."""
+    stat_width = max(len("Statistic"), *(len(name) for name in STAT_NAMES))
+    value_width = max(len("Value"), *(len(format_stat(name, stats[name])) for name in STAT_NAMES if name in stats))
+    lines = [
+        f"| {'Statistic':<{stat_width}} | {'Value':>{value_width}} |",
+        f"|{'-' * (stat_width + 2)}|{'-' * (value_width + 2)}|",
+    ]
+    for name in STAT_NAMES:
+        value = stats.get(name)
+        if value is not None:
+            lines.append(f"| {name:<{stat_width}} | {format_stat(name, value):>{value_width}} |")
+    return "\n".join(lines)
+
+
 def main() -> None:
     all_results: dict[str, dict[str, float]] = {}  # {label: {func: speedup}}
     all_funcs: list[str] = []
@@ -76,7 +114,13 @@ def main() -> None:
 
     labels = [cfg["label"] for cfg in CONFIGS]
     col_widths = [max(len(label), 6) for label in labels]
-    func_width = max((len(fn) for fn in all_funcs), default=20)
+    stat_labels = [f"stats.{name}" for name in STAT_NAMES]
+    func_width = max([*(len(fn) for fn in all_funcs), *(len(label) for label in stat_labels)], default=20)
+    per_config_stats = {
+        label: calc_stats(list(all_results[label].values()))
+        for label in labels
+    }
+    overall_stats = calc_stats([value for label in labels for value in all_results[label].values()])
 
     lines = []
     header = (
@@ -97,17 +141,32 @@ def main() -> None:
             row += f" {cell:>{w}} |"
         lines.append(row)
 
+    lines.append(sep)
+    for name, stat_label in zip(STAT_NAMES, stat_labels):
+        row = f"| {stat_label:<{func_width}} |"
+        for label, w in zip(labels, col_widths):
+            value = per_config_stats[label].get(name)
+            cell = "-" if value is None else format_stat(name, value)
+            row += f" {cell:>{w}} |"
+        lines.append(row)
+
     table = "\n".join(lines)
+    overall_table = make_overall_table(overall_stats)
     print(table)
+    print()
+    print(overall_table)
 
     out_path = Path(__file__).with_name("BENCHMARKS.md")
     with open(out_path, "w") as f:
         f.write("# Rust vs Numba Speedup Matrix\n\n")
         f.write("Each cell shows **Rust speedup** over Numba (higher = Rust is faster).\n\n")
         f.write(f"- Window: {WINDOW}, NaN ratio: 5%, Repeat: {REPEAT}, Seed: {SEED}\n")
-        f.write("- Includes generic kernels and indicator-level `indicator.*` ports\n")
-        f.write(f"- Values >1.00x mean Rust is faster; <1.00x mean Numba is faster\n\n")
+        f.write("- Includes `generic.*` kernels and indicator-level `indicators.*` ports\n")
+        f.write("- Values >1.00x mean Rust is faster; <1.00x mean Numba is faster\n")
+        f.write("- Statistics are computed from the speedup scores in this matrix\n\n")
         f.write(table + "\n")
+        f.write("\n## Overall Statistics\n\n")
+        f.write(overall_table + "\n")
 
     print(f"\nWritten to {out_path}", file=sys.stderr)
 

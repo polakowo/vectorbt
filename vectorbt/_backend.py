@@ -90,8 +90,6 @@ def array_compatible_with_rust(a: tp.Any, dtype: tp.Any = np.float64) -> RustSup
         return RustSupport(False, f"Rust backend requires {np.dtype(dtype).name} arrays.")
     if a.ndim not in (1, 2):
         return RustSupport(False, "Rust backend requires 1D or 2D arrays.")
-    if a.ndim == 1 and not (a.flags["C_CONTIGUOUS"] or a.flags["F_CONTIGUOUS"]):
-        return RustSupport(False, "Rust backend requires contiguous 1D arrays.")
     return RustSupport(True)
 
 

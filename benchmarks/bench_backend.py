@@ -4,7 +4,7 @@
 """Benchmark Numba kernels against available Rust counterparts."""
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 import sys
@@ -133,126 +133,126 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
 
         indicator_cases = [
             BenchmarkCase(
-                "indicator.ma",
+                "indicators.ma",
                 indicator_nb.ma_nb,
                 (close, window, False, False),
                 rust_indicators.ma_rs,
                 (close, window, False, False),
             ),
             BenchmarkCase(
-                "indicator.mstd",
+                "indicators.mstd",
                 indicator_nb.mstd_nb,
                 (close, window, False, False, 0),
                 rust_indicators.mstd_rs,
                 (close, window, False, False, 0),
             ),
             BenchmarkCase(
-                "indicator.ma_cache",
+                "indicators.ma_cache",
                 indicator_nb.ma_cache_nb,
                 (close, windows, ewms, False),
                 rust_indicators.ma_cache_rs,
                 (close, windows, ewms, False),
             ),
             BenchmarkCase(
-                "indicator.ma_apply",
+                "indicators.ma_apply",
                 indicator_nb.ma_apply_nb,
                 (close, window, True, False, nb_ma_cache),
                 rust_indicators.ma_apply_rs,
                 (close, window, True, False, rs_ma_cache),
             ),
             BenchmarkCase(
-                "indicator.mstd_cache",
+                "indicators.mstd_cache",
                 indicator_nb.mstd_cache_nb,
                 (close, windows, ewms, False, 0),
                 rust_indicators.mstd_cache_rs,
                 (close, windows, ewms, False, 0),
             ),
             BenchmarkCase(
-                "indicator.mstd_apply",
+                "indicators.mstd_apply",
                 indicator_nb.mstd_apply_nb,
                 (close, window, True, False, 0, nb_mstd_cache),
                 rust_indicators.mstd_apply_rs,
                 (close, window, True, False, 0, rs_mstd_cache),
             ),
             BenchmarkCase(
-                "indicator.bb_cache",
+                "indicators.bb_cache",
                 indicator_nb.bb_cache_nb,
                 (close, windows, ewms, alphas, False, 0),
                 rust_indicators.bb_cache_rs,
                 (close, windows, ewms, alphas, False, 0),
             ),
             BenchmarkCase(
-                "indicator.bb_apply",
+                "indicators.bb_apply",
                 indicator_nb.bb_apply_nb,
                 (close, window, True, 2.0, False, 0, *nb_bb_cache),
                 rust_indicators.bb_apply_rs,
                 (close, window, True, 2.0, False, 0, *rs_bb_cache),
             ),
             BenchmarkCase(
-                "indicator.rsi_cache",
+                "indicators.rsi_cache",
                 indicator_nb.rsi_cache_nb,
                 (close, windows, ewms, False),
                 rust_indicators.rsi_cache_rs,
                 (close, windows, ewms, False),
             ),
             BenchmarkCase(
-                "indicator.rsi_apply",
+                "indicators.rsi_apply",
                 indicator_nb.rsi_apply_nb,
                 (close, window, True, False, nb_rsi_cache),
                 rust_indicators.rsi_apply_rs,
                 (close, window, True, False, rs_rsi_cache),
             ),
             BenchmarkCase(
-                "indicator.stoch_cache",
+                "indicators.stoch_cache",
                 indicator_nb.stoch_cache_nb,
                 (high, low, close, windows, d_windows, d_ewms, False),
                 rust_indicators.stoch_cache_rs,
                 (high, low, close, windows, d_windows, d_ewms, False),
             ),
             BenchmarkCase(
-                "indicator.stoch_apply",
+                "indicators.stoch_apply",
                 indicator_nb.stoch_apply_nb,
                 (high, low, close, window, d_windows[-1], True, False, nb_stoch_cache),
                 rust_indicators.stoch_apply_rs,
                 (high, low, close, window, d_windows[-1], True, False, rs_stoch_cache),
             ),
             BenchmarkCase(
-                "indicator.macd_cache",
+                "indicators.macd_cache",
                 indicator_nb.macd_cache_nb,
                 (close, fast_windows, slow_windows, signal_windows, ewms, d_ewms, False),
                 rust_indicators.macd_cache_rs,
                 (close, fast_windows, slow_windows, signal_windows, ewms, d_ewms, False),
             ),
             BenchmarkCase(
-                "indicator.macd_apply",
+                "indicators.macd_apply",
                 indicator_nb.macd_apply_nb,
                 (close, fast_windows[0], slow_windows[0], signal_windows[0], ewms[0], d_ewms[1], False, nb_macd_cache),
                 rust_indicators.macd_apply_rs,
                 (close, fast_windows[0], slow_windows[0], signal_windows[0], ewms[0], d_ewms[1], False, rs_macd_cache),
             ),
             BenchmarkCase(
-                "indicator.true_range",
+                "indicators.true_range",
                 indicator_nb.true_range_nb,
                 (high, low, close),
                 rust_indicators.true_range_rs,
                 (high, low, close),
             ),
             BenchmarkCase(
-                "indicator.atr_cache",
+                "indicators.atr_cache",
                 indicator_nb.atr_cache_nb,
                 (high, low, close, windows, ewms, False),
                 rust_indicators.atr_cache_rs,
                 (high, low, close, windows, ewms, False),
             ),
             BenchmarkCase(
-                "indicator.atr_apply",
+                "indicators.atr_apply",
                 indicator_nb.atr_apply_nb,
                 (high, low, close, window, True, False, *nb_atr_cache),
                 rust_indicators.atr_apply_rs,
                 (high, low, close, window, True, False, *rs_atr_cache),
             ),
             BenchmarkCase(
-                "indicator.obv_custom",
+                "indicators.obv_custom",
                 indicator_nb.obv_custom_nb,
                 (close, volume),
                 rust_indicators.obv_custom_rs,
@@ -501,6 +501,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             "crossed_above", nb.crossed_above_nb, (a, other, 0), rust_generic.crossed_above_rs, (a, other, 0)
         ),
     ]
+    cases = [replace(case, name=f"generic.{case.name}") for case in cases]
     cases.extend(indicator_cases)
     return cases
 

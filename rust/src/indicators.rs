@@ -2,9 +2,9 @@
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 use crate::generic::{
-    apply_2d_by_col, apply_2d_by_col_inplace, diff_1d_into, ewm_mean_1d, ewm_mean_2d_c, ewm_std_1d,
-    ewm_std_2d_c, nancumsum_1d_into, rolling_max_1d, rolling_mean_1d, rolling_min_1d,
-    rolling_std_1d,
+    apply_2d_by_col, apply_2d_by_col_inplace, array1_as_slice_cow, diff_1d_into, ewm_mean_1d,
+    ewm_mean_2d_c, ewm_std_1d, ewm_std_2d_c, nancumsum_1d_into, rolling_max_1d, rolling_mean_1d,
+    rolling_min_1d, rolling_std_1d,
 };
 use ndarray::{Array2, ArrayView2, Zip};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
@@ -505,9 +505,12 @@ pub fn true_range_1d_rs<'py>(
     low: PyReadonlyArray1<'py, f64>,
     close: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let h = high.as_slice()?;
-    let l = low.as_slice()?;
-    let c = close.as_slice()?;
+    let h_cow = array1_as_slice_cow(&high);
+    let l_cow = array1_as_slice_cow(&low);
+    let c_cow = array1_as_slice_cow(&close);
+    let h = h_cow.as_ref();
+    let l = l_cow.as_ref();
+    let c = c_cow.as_ref();
     if h.len() != l.len() || h.len() != c.len() {
         return Err(PyValueError::new_err(
             "high, low, and close must have the same length",

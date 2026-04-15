@@ -205,6 +205,7 @@ from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, Gener
 from vectorbt.generic.ranges import Ranges
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
+from vectorbt.signals import dispatch
 from vectorbt.signals import nb
 from vectorbt.utils import checks
 from vectorbt.utils.colors import adjust_lightness
@@ -442,6 +443,7 @@ class SignalsAccessor(GenericAccessor):
         cls_or_self,
         *args,
         entry_first: bool = True,
+        backend: tp.Optional[str] = None,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
@@ -456,15 +458,16 @@ class SignalsAccessor(GenericAccessor):
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
                 wrapper = ArrayWrapper.from_shape(np.asarray(obj).shape)
                 obj = wrapper.wrap(obj)
-            return obj.vbt.signals.first(wrap_kwargs=wrap_kwargs)
+            return obj.vbt.signals.first(backend=backend, wrap_kwargs=wrap_kwargs)
         elif len(args) == 2:
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}
             entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
-            entries_out, exits_out = nb.clean_enex_nb(
+            entries_out, exits_out = dispatch.clean_enex(
                 reshape_fns.to_2d_array(entries),
                 reshape_fns.to_2d_array(exits),
                 entry_first,
+                backend=backend,
             )
             return (
                 ArrayWrapper.from_obj(entries).wrap(entries_out, group_by=False, **merge_dicts({}, wrap_kwargs)),
@@ -1098,6 +1101,7 @@ class SignalsAccessor(GenericAccessor):
         self,
         other: tp.Optional[tp.ArrayLike] = None,
         from_other: bool = False,
+        backend: tp.Optional[str] = None,
         broadcast_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
         attach_ts: bool = True,
@@ -1169,22 +1173,29 @@ class SignalsAccessor(GenericAccessor):
 
         if other is None:
             # One input array
-            range_records = nb.between_ranges_nb(self.to_2d_array())
+            range_records = dispatch.between_ranges(self.to_2d_array(), backend=backend)
             wrapper = self.wrapper
             to_attach = self.obj
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
-            range_records = nb.between_two_ranges_nb(
+            range_records = dispatch.between_two_ranges(
                 reshape_fns.to_2d_array(obj),
                 reshape_fns.to_2d_array(other),
                 from_other=from_other,
+                backend=backend,
             )
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
         return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
 
-    def partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+    def partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        backend: tp.Optional[str] = None,
+        **kwargs,
+    ) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.partition_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
@@ -1200,10 +1211,16 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                4              5    Open
             ```
         """
-        range_records = nb.partition_ranges_nb(self.to_2d_array())
+        range_records = dispatch.partition_ranges(self.to_2d_array(), backend=backend)
         return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
-    def between_partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+    def between_partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        backend: tp.Optional[str] = None,
+        **kwargs,
+    ) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.between_partition_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
@@ -1216,7 +1233,7 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                3              5  Closed
             ```
         """
-        range_records = nb.between_partition_ranges_nb(self.to_2d_array())
+        range_records = dispatch.between_partition_ranges(self.to_2d_array(), backend=backend)
         return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
     # ############# Ranking ############# #
@@ -1263,7 +1280,17 @@ class SignalsAccessor(GenericAccessor):
             return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
         return rank_wrapped
 
-    def pos_rank(self, allow_gaps: bool = False, **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+    def pos_rank(
+        self,
+        allow_gaps: bool = False,
+        reset_by: tp.Optional[tp.ArrayLike] = None,
+        after_false: bool = False,
+        backend: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        as_mapped: bool = False,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """Get signal position ranks.
 
         Uses `SignalsAccessor.rank` with `vectorbt.signals.nb.sig_pos_rank_nb`.
@@ -1305,10 +1332,37 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
-        return self.rank(nb.sig_pos_rank_nb, allow_gaps, prepare_func=prepare_func, **kwargs)
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
 
-    def partition_pos_rank(self, **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+        if reset_by is not None:
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
+            reset_by = reshape_fns.to_2d_array(reset_by)
+        else:
+            obj = self.obj
+        rank = dispatch.sig_pos_rank(
+            reshape_fns.to_2d_array(obj),
+            reset_by,
+            after_false,
+            allow_gaps,
+            backend=backend,
+        )
+        rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
+        if as_mapped:
+            rank_wrapped = rank_wrapped.replace(-1, np.nan)
+            return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
+        return rank_wrapped
+
+    def partition_pos_rank(
+        self,
+        reset_by: tp.Optional[tp.ArrayLike] = None,
+        after_false: bool = False,
+        backend: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        as_mapped: bool = False,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """Get partition position ranks.
 
         Uses `SignalsAccessor.rank` with `vectorbt.signals.nb.part_pos_rank_nb`.
@@ -1342,22 +1396,56 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
-        return self.rank(nb.part_pos_rank_nb, prepare_func=prepare_func, **kwargs)
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
 
-    def first(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        if reset_by is not None:
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
+            reset_by = reshape_fns.to_2d_array(reset_by)
+        else:
+            obj = self.obj
+        rank = dispatch.part_pos_rank(
+            reshape_fns.to_2d_array(obj),
+            reset_by,
+            after_false,
+            backend=backend,
+        )
+        rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
+        if as_mapped:
+            rank_wrapped = rank_wrapped.replace(-1, np.nan)
+            return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
+        return rank_wrapped
+
+    def first(
+        self,
+        backend: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == 0`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        pos_rank = self.pos_rank(backend=backend, **kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def nth(
+        self,
+        n: int,
+        backend: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == n`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        pos_rank = self.pos_rank(backend=backend, **kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def from_nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def from_nth(
+        self,
+        n: int,
+        backend: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank >= n`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        pos_rank = self.pos_rank(backend=backend, **kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
@@ -1379,6 +1467,7 @@ class SignalsAccessor(GenericAccessor):
         n: int,
         return_labels: bool = True,
         group_by: tp.GroupByLike = None,
+        backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.nth_index_nb`.
@@ -1412,7 +1501,7 @@ class SignalsAccessor(GenericAccessor):
             arr = reshape_fns.to_2d_array(squeezed)
         else:
             arr = self.to_2d_array()
-        nth_index = nb.nth_index_nb(arr, n)
+        nth_index = dispatch.nth_index(arr, n, backend=backend)
         if return_labels:
             minus_one_mask = nth_index == -1
             nth_index = nth_index.astype(object)
@@ -1421,7 +1510,12 @@ class SignalsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts(dict(name_or_index="nth_index"), wrap_kwargs)
         return self.wrapper.wrap_reduced(nth_index, group_by=group_by, **wrap_kwargs)
 
-    def norm_avg_index(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def norm_avg_index(
+        self,
+        group_by: tp.GroupByLike = None,
+        backend: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.norm_avg_index_nb`.
 
         Normalized average index measures the average signal location relative to the middle of the column.
@@ -1447,7 +1541,7 @@ class SignalsAccessor(GenericAccessor):
             0.0
             ```
         """
-        norm_avg_index = nb.norm_avg_index_nb(self.to_2d_array())
+        norm_avg_index = dispatch.norm_avg_index(self.to_2d_array(), backend=backend)
         wrap_kwargs = merge_dicts(dict(name_or_index="norm_avg_index"), wrap_kwargs)
         norm_avg_index = self.wrapper.wrap_reduced(norm_avg_index, group_by=False, **wrap_kwargs)
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
