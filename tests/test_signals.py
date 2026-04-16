@@ -667,7 +667,7 @@ class TestAccessors:
                 seed=seed,
                 index=mask.index,
                 columns=mask.columns,
-                backend="numba"
+                backend="numba",
             ),
             pd.DataFrame(
                 np.array(
@@ -734,7 +734,7 @@ class TestAccessors:
                 seed=seed,
                 index=mask.index,
                 columns=mask.columns,
-                backend="rust"
+                backend="rust",
             ),
             pd.DataFrame(
                 np.array(
@@ -1104,7 +1104,7 @@ class TestAccessors:
             seed=seed,
             index=mask.index,
             columns=mask.columns,
-            backend="numba"
+            backend="numba",
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1190,7 +1190,7 @@ class TestAccessors:
             seed=seed,
             index=mask.index,
             columns=mask.columns,
-            backend="rust"
+            backend="rust",
         )
         pd.testing.assert_frame_equal(
             en,
@@ -3197,9 +3197,7 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="rand_n"),
             ),
         )
-        rand = vbt.RAND.run(
-            n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba"
-        )
+        rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3313,9 +3311,7 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
             ),
         )
-        randnx = vbt.RANDNX.run(
-            n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba"
-        )
+        randnx = vbt.RANDNX.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(

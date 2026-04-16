@@ -8,7 +8,7 @@ You can access all the indicators either by `vbt.*` or `vbt.labels.*`."""
 from vectorbt import _typing as tp
 from vectorbt.indicators.configs import flex_elem_param_config
 from vectorbt.indicators.factory import IndicatorFactory
-from vectorbt.labels import nb
+from vectorbt.labels import dispatch
 from vectorbt.labels.enums import TrendMode
 
 # ############# Look-ahead indicators ############# #
@@ -19,7 +19,7 @@ FMEAN = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["fmean"],
-).from_apply_func(nb.future_mean_apply_nb, kwargs_to_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
+).from_apply_func(dispatch.future_mean_apply, kwargs_to_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
 
 FMEAN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_mean_apply_nb`."""
 
@@ -30,7 +30,7 @@ FSTD = IndicatorFactory(
     param_names=["window", "ewm"],
     output_names=["fstd"],
 ).from_apply_func(
-    nb.future_std_apply_nb,
+    dispatch.future_std_apply,
     kwargs_to_args=["wait", "adjust", "ddof"],
     ewm=False,
     wait=1,
@@ -46,7 +46,7 @@ FMIN = IndicatorFactory(
     input_names=["close"],
     param_names=["window"],
     output_names=["fmin"],
-).from_apply_func(nb.future_min_apply_nb, kwargs_to_args=["wait"], wait=1)
+).from_apply_func(dispatch.future_min_apply, kwargs_to_args=["wait"], wait=1)
 
 FMIN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_min_apply_nb`."""
 
@@ -56,7 +56,7 @@ FMAX = IndicatorFactory(
     input_names=["close"],
     param_names=["window"],
     output_names=["fmax"],
-).from_apply_func(nb.future_max_apply_nb, kwargs_to_args=["wait"], wait=1)
+).from_apply_func(dispatch.future_max_apply, kwargs_to_args=["wait"], wait=1)
 
 FMAX.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_max_apply_nb`."""
 
@@ -79,7 +79,7 @@ FIXLB = IndicatorFactory(
     input_names=["close"],
     param_names=["n"],
     output_names=["labels"],
-).from_apply_func(nb.fixed_labels_apply_nb)
+).from_apply_func(dispatch.fixed_labels_apply)
 
 
 class _FIXLB(FIXLB):
@@ -97,7 +97,7 @@ MEANLB = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["labels"],
-).from_apply_func(nb.mean_labels_apply_nb, kwargs_to_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
+).from_apply_func(dispatch.mean_labels_apply, kwargs_to_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
 
 
 class _MEANLB(MEANLB):
@@ -116,7 +116,7 @@ LEXLB = IndicatorFactory(
     param_names=["pos_th", "neg_th"],
     output_names=["labels"],
 ).from_apply_func(
-    nb.local_extrema_apply_nb,
+    dispatch.local_extrema_apply,
     param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config),
     pass_flex_2d=True,
 )
@@ -138,7 +138,7 @@ TRENDLB = IndicatorFactory(
     param_names=["pos_th", "neg_th", "mode"],
     output_names=["labels"],
 ).from_apply_func(
-    nb.trend_labels_apply_nb,
+    dispatch.trend_labels_apply,
     param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config, mode=dict(dtype=TrendMode)),
     pass_flex_2d=True,
     mode=TrendMode.Binary,
@@ -161,7 +161,7 @@ BOLB = IndicatorFactory(
     param_names=["window", "pos_th", "neg_th"],
     output_names=["labels"],
 ).from_apply_func(
-    nb.breakout_labels_nb,
+    dispatch.breakout_labels,
     param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config),
     pass_flex_2d=True,
     kwargs_to_args=["wait"],

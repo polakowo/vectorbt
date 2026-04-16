@@ -8,6 +8,9 @@ from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
 from vectorbt.indicators import dispatch as indicator_dispatch
 from vectorbt.indicators import nb as indicator_nb
+from vectorbt.labels import dispatch as labels_dispatch
+from vectorbt.labels import nb as labels_nb
+from vectorbt.labels.enums import TrendMode
 from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
 
@@ -443,7 +446,9 @@ class TestGenericRustParity:
         mask = np.array([True, False, True, False, True, False], dtype=np.bool_)[::2]
         values = np.arange(6, dtype=np.float64)[::2]
 
-        np.testing.assert_allclose(dispatch.fillna_1d(a, -1.0, backend="rust"), nb.fillna_1d_nb(a, -1.0), equal_nan=True)
+        np.testing.assert_allclose(
+            dispatch.fillna_1d(a, -1.0, backend="rust"), nb.fillna_1d_nb(a, -1.0), equal_nan=True
+        )
         np.testing.assert_allclose(dispatch.diff_1d(a, 1, backend="rust"), nb.diff_1d_nb(a, 1), equal_nan=True)
         np.testing.assert_allclose(
             dispatch.set_by_mask_1d(a, mask, -1.0, backend="rust"),
@@ -677,7 +682,9 @@ class TestSignalsRustParity:
             mask.vbt.signals.clean(exits, backend="rust")[0],
             mask.vbt.signals.clean(exits, backend="numba")[0],
         )
-        pd.testing.assert_frame_equal(mask.vbt.signals.pos_rank(backend="rust"), mask.vbt.signals.pos_rank(backend="numba"))
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.pos_rank(backend="rust"), mask.vbt.signals.pos_rank(backend="numba")
+        )
         pd.testing.assert_frame_equal(
             mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="rust"),
             mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="numba"),
@@ -957,4 +964,247 @@ class TestIndicatorRustParity:
         pd.testing.assert_series_equal(
             vbt.OBV.run(close, volume, backend="rust").obv,
             vbt.OBV.run(close, volume, backend="numba").obv,
+        )
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+class TestLabelsRustParity:
+    def test_labels_exports_match_nb_inventory(self):
+        import vectorbt_rust.labels as rust_labels
+
+        expected = [
+            "future_mean_apply_rs",
+            "future_std_apply_rs",
+            "future_min_apply_rs",
+            "future_max_apply_rs",
+            "fixed_labels_apply_rs",
+            "mean_labels_apply_rs",
+            "local_extrema_apply_rs",
+            "bn_trend_labels_rs",
+            "bn_cont_trend_labels_rs",
+            "bn_cont_sat_trend_labels_rs",
+            "pct_trend_labels_rs",
+            "trend_labels_apply_rs",
+            "breakout_labels_rs",
+        ]
+        assert [name for name in expected if hasattr(rust_labels, name)] == expected
+
+    def test_dispatch_matches_numba(self):
+        close_c = np.array(
+            [
+                [1.0, 5.0, 1.0],
+                [2.0, 4.0, 2.0],
+                [3.0, 3.0, np.nan],
+                [4.0, 2.0, 2.0],
+                [3.0, 1.0, 1.0],
+                [2.0, 2.0, 3.0],
+                [1.0, 3.0, 4.0],
+                [2.0, 4.0, 5.0],
+            ],
+            dtype=np.float64,
+        )
+        close_f = np.asfortranarray(close_c)
+
+        for close in (close_c, close_f):
+            for ewm in (False, True):
+                for wait in (0, 1, 2):
+                    np.testing.assert_allclose(
+                        labels_dispatch.future_mean_apply(close, 3, ewm, wait, False, backend="rust"),
+                        labels_nb.future_mean_apply_nb(close, 3, ewm, wait, False),
+                        equal_nan=True,
+                    )
+                    np.testing.assert_allclose(
+                        labels_dispatch.future_std_apply(close, 3, ewm, wait, False, 0, backend="rust"),
+                        labels_nb.future_std_apply_nb(close, 3, ewm, wait, False, 0),
+                        equal_nan=True,
+                    )
+                np.testing.assert_allclose(
+                    labels_dispatch.future_min_apply(close, 3, 1, backend="rust"),
+                    labels_nb.future_min_apply_nb(close, 3, 1),
+                    equal_nan=True,
+                )
+                np.testing.assert_allclose(
+                    labels_dispatch.future_max_apply(close, 3, 1, backend="rust"),
+                    labels_nb.future_max_apply_nb(close, 3, 1),
+                    equal_nan=True,
+                )
+
+            for n in (1, 2, 3):
+                np.testing.assert_allclose(
+                    labels_dispatch.fixed_labels_apply(close, n, backend="rust"),
+                    labels_nb.fixed_labels_apply_nb(close, n),
+                    equal_nan=True,
+                )
+
+            np.testing.assert_allclose(
+                labels_dispatch.mean_labels_apply(close, 3, False, 1, False, backend="rust"),
+                labels_nb.mean_labels_apply_nb(close, 3, False, 1, False),
+                equal_nan=True,
+            )
+
+            # Scalar thresholds
+            pos_th = 0.1
+            neg_th = 0.1
+            np.testing.assert_array_equal(
+                labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, backend="rust"),
+                labels_nb.local_extrema_apply_nb(close, pos_th, neg_th, True),
+            )
+
+            # 1D per-column thresholds
+            pos_th_col = np.array([0.05, 0.1, 0.2], dtype=np.float64)
+            neg_th_col = np.array([0.1, 0.1, 0.05], dtype=np.float64)
+            np.testing.assert_array_equal(
+                labels_dispatch.local_extrema_apply(close, pos_th_col, neg_th_col, True, backend="rust"),
+                labels_nb.local_extrema_apply_nb(close, pos_th_col, neg_th_col, True),
+            )
+
+            square_close = np.array(
+                [
+                    [1.02514604, 0.97357903, 1.12808453],
+                    [1.04665363, 0.86927573, 1.20966649],
+                    [1.31962091, 1.03393063, 1.03940950],
+                ],
+                dtype=np.float64,
+            )
+            pos_th_col = np.array([0.01, 0.08, 0.25], dtype=np.float64)
+            neg_th_col = np.array([0.4, 0.25, 0.08], dtype=np.float64)
+            np.testing.assert_array_equal(
+                labels_dispatch.local_extrema_apply(square_close, pos_th_col, neg_th_col, True, backend="rust"),
+                labels_nb.local_extrema_apply_nb(square_close, pos_th_col, neg_th_col, True),
+            )
+            for mode in (
+                TrendMode.Binary,
+                TrendMode.BinaryCont,
+                TrendMode.BinaryContSat,
+                TrendMode.PctChange,
+                TrendMode.PctChangeNorm,
+            ):
+                np.testing.assert_allclose(
+                    labels_dispatch.trend_labels_apply(
+                        square_close, pos_th_col, neg_th_col, mode, True, backend="rust"
+                    ),
+                    labels_nb.trend_labels_apply_nb(square_close, pos_th_col, neg_th_col, mode, True),
+                    equal_nan=True,
+                )
+            for wait in (0, 1, 2):
+                np.testing.assert_allclose(
+                    labels_dispatch.breakout_labels(
+                        square_close, 2, pos_th_col, neg_th_col, wait, True, backend="rust"
+                    ),
+                    labels_nb.breakout_labels_nb(square_close, 2, pos_th_col, neg_th_col, wait, True),
+                    equal_nan=True,
+                )
+
+            for mode in (
+                TrendMode.Binary,
+                TrendMode.BinaryCont,
+                TrendMode.BinaryContSat,
+                TrendMode.PctChange,
+                TrendMode.PctChangeNorm,
+            ):
+                np.testing.assert_allclose(
+                    labels_dispatch.trend_labels_apply(close, pos_th, neg_th, mode, True, backend="rust"),
+                    labels_nb.trend_labels_apply_nb(close, pos_th, neg_th, mode, True),
+                    equal_nan=True,
+                )
+
+            le = labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, backend="numba")
+            np.testing.assert_allclose(
+                labels_dispatch.bn_trend_labels(close, le, backend="rust"),
+                labels_nb.bn_trend_labels_nb(close, le),
+                equal_nan=True,
+            )
+            np.testing.assert_allclose(
+                labels_dispatch.bn_cont_trend_labels(close, le, backend="rust"),
+                labels_nb.bn_cont_trend_labels_nb(close, le),
+                equal_nan=True,
+            )
+            np.testing.assert_allclose(
+                labels_dispatch.bn_cont_sat_trend_labels(close, le, pos_th, neg_th, True, backend="rust"),
+                labels_nb.bn_cont_sat_trend_labels_nb(close, le, pos_th, neg_th, True),
+                equal_nan=True,
+            )
+            np.testing.assert_allclose(
+                labels_dispatch.pct_trend_labels(close, le, False, backend="rust"),
+                labels_nb.pct_trend_labels_nb(close, le, False),
+                equal_nan=True,
+            )
+            np.testing.assert_allclose(
+                labels_dispatch.pct_trend_labels(close, le, True, backend="rust"),
+                labels_nb.pct_trend_labels_nb(close, le, True),
+                equal_nan=True,
+            )
+
+            for wait in (0, 1, 2):
+                np.testing.assert_allclose(
+                    labels_dispatch.breakout_labels(close, 3, pos_th, neg_th, wait, True, backend="rust"),
+                    labels_nb.breakout_labels_nb(close, 3, pos_th, neg_th, wait, True),
+                    equal_nan=True,
+                )
+
+    def test_dispatch_auto_falls_back_for_unsupported_array(self):
+        close_int = np.arange(15, dtype=np.int32).reshape(5, 3)
+        np.testing.assert_array_equal(
+            labels_dispatch.fixed_labels_apply(close_int, 1, backend="auto"),
+            labels_nb.fixed_labels_apply_nb(close_int, 1),
+        )
+        with pytest.raises(ValueError, match="float64"):
+            labels_dispatch.fixed_labels_apply(close_int, 1, backend="rust")
+
+    def test_dispatch_raises_on_shape_mismatch(self):
+        close = np.ones((4, 2), dtype=np.float64)
+        local_extrema = np.zeros((4, 3), dtype=np.int64)
+        with pytest.raises(ValueError, match="same shape"):
+            labels_dispatch.bn_trend_labels(close, local_extrema, backend="rust")
+
+    def test_basic_labels_match_numba(self):
+        close = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0, 2.0, 3.0, 4.0],
+                "b": [4.0, 3.0, 2.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0],
+            }
+        )
+
+        pd.testing.assert_frame_equal(
+            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").fmean,
+            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").fmean,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").fstd,
+            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").fstd,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.FMIN.run(close, window=(2, 3), backend="rust").fmin,
+            vbt.FMIN.run(close, window=(2, 3), backend="numba").fmin,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.FMAX.run(close, window=(2, 3), backend="rust").fmax,
+            vbt.FMAX.run(close, window=(2, 3), backend="numba").fmax,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.FIXLB.run(close, n=(1, 2), backend="rust").labels,
+            vbt.FIXLB.run(close, n=(1, 2), backend="numba").labels,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.MEANLB.run(close, window=2, ewm=False, backend="rust").labels,
+            vbt.MEANLB.run(close, window=2, ewm=False, backend="numba").labels,
+        )
+        pd.testing.assert_frame_equal(
+            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, backend="rust").labels,
+            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, backend="numba").labels,
+        )
+        for mode in (
+            TrendMode.Binary,
+            TrendMode.BinaryCont,
+            TrendMode.BinaryContSat,
+            TrendMode.PctChange,
+            TrendMode.PctChangeNorm,
+        ):
+            pd.testing.assert_frame_equal(
+                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, backend="rust").labels,
+                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, backend="numba").labels,
+            )
+        pd.testing.assert_frame_equal(
+            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="rust").labels,
+            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="numba").labels,
         )

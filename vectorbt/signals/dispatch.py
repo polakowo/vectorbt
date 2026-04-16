@@ -757,14 +757,17 @@ def rand_chain_by_prob_apply(
     if exit_wait is None:
         exit_wait = wait
     prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
-    if resolve_backend(
-        backend,
-        supports_rust=combine_rust_support(
-            array_compatible_with_rust(entries.astype(np.float64), dtype=np.float64),
-            array_compatible_with_rust(prob, dtype=np.float64),
-            matching_shape_compatible_with_rust("exit_prob", entries, prob),
-        ),
-    ) == "numba":
+    if (
+        resolve_backend(
+            backend,
+            supports_rust=combine_rust_support(
+                array_compatible_with_rust(entries.astype(np.float64), dtype=np.float64),
+                array_compatible_with_rust(prob, dtype=np.float64),
+                matching_shape_compatible_with_rust("exit_prob", entries, prob),
+            ),
+        )
+        == "numba"
+    ):
         from vectorbt.signals.nb import first_choice_nb, rand_by_prob_choice_nb
 
         temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)

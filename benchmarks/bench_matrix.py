@@ -115,21 +115,12 @@ def main() -> None:
     labels = [cfg["label"] for cfg in CONFIGS]
     stat_labels = [f"stats.{name}" for name in STAT_NAMES]
     func_width = max([*(len(fn) for fn in all_funcs), *(len(label) for label in stat_labels)], default=20)
-    per_config_stats = {
-        label: calc_stats(list(all_results[label].values()))
-        for label in labels
-    }
+    per_config_stats = {label: calc_stats(list(all_results[label].values())) for label in labels}
     overall_stats = calc_stats([value for label in labels for value in all_results[label].values()])
     col_widths = []
     for label in labels:
-        value_widths = [
-            len(f"{value:.2f}x")
-            for value in all_results[label].values()
-        ]
-        value_widths.extend(
-            len(format_stat(name, value))
-            for name, value in per_config_stats[label].items()
-        )
+        value_widths = [len(f"{value:.2f}x") for value in all_results[label].values()]
+        value_widths.extend(len(format_stat(name, value)) for name, value in per_config_stats[label].items())
         col_widths.append(max(len(label), *value_widths, 6))
 
     lines = []
@@ -171,7 +162,7 @@ def main() -> None:
         f.write("# Rust vs Numba Speedup Matrix\n\n")
         f.write("Each cell shows **Rust speedup** over Numba (higher = Rust is faster).\n\n")
         f.write(f"- Window: {WINDOW}, NaN ratio: 5%, Repeat: {REPEAT}, Seed: {SEED}\n")
-        f.write("- Includes `generic.*`, indicator-level `indicators.*`, and `signals.*` ports\n")
+        f.write("- Includes `generic.*`, `indicators.*`, `signals.*`, and `labels.*` ports\n")
         f.write("- Values >1.00x mean Rust is faster; <1.00x mean Numba is faster\n")
         f.write("- Statistics are computed from the speedup scores in this matrix\n\n")
         f.write(table + "\n")

@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from vectorbt import _backend
 from vectorbt.generic import nb
 from vectorbt.indicators import nb as indicator_nb
+from vectorbt.labels import nb as labels_nb
 from vectorbt.signals import nb as signal_nb
 
 try:
@@ -33,6 +34,11 @@ try:
     from vectorbt_rust import indicators as rust_indicators
 except ImportError:
     rust_indicators = None
+
+try:
+    from vectorbt_rust import labels as rust_labels
+except ImportError:
+    rust_labels = None
 
 try:
     from vectorbt_rust import signals as rust_signals
@@ -426,8 +432,20 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 rust_signals.between_partition_ranges_rs,
                 (signal_mask,),
             ),
-            BenchmarkCase("signals.sig_pos_rank", signal_sig_pos_rank_nb, (), rust_signals.sig_pos_rank_rs, (signal_mask, None, False, False)),
-            BenchmarkCase("signals.part_pos_rank", signal_part_pos_rank_nb, (), rust_signals.part_pos_rank_rs, (signal_mask, None, False)),
+            BenchmarkCase(
+                "signals.sig_pos_rank",
+                signal_sig_pos_rank_nb,
+                (),
+                rust_signals.sig_pos_rank_rs,
+                (signal_mask, None, False, False),
+            ),
+            BenchmarkCase(
+                "signals.part_pos_rank",
+                signal_part_pos_rank_nb,
+                (),
+                rust_signals.part_pos_rank_rs,
+                (signal_mask, None, False),
+            ),
             BenchmarkCase(
                 "signals.nth_index_1d",
                 signal_nb.nth_index_1d_nb,
@@ -519,7 +537,113 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (signal_mask, signal_ts, signal_stop, signal_trailing, 1, 1, True),
             ),
             BenchmarkCase("signals.generate_ohlc_stop_ex", signal_ohlc_stop_ex_nb, (), signal_ohlc_stop_ex_rs, ()),
-            BenchmarkCase("signals.generate_ohlc_stop_enex", signal_ohlc_stop_enex_nb, (), signal_ohlc_stop_enex_rs, ()),
+            BenchmarkCase(
+                "signals.generate_ohlc_stop_enex", signal_ohlc_stop_enex_nb, (), signal_ohlc_stop_enex_rs, ()
+            ),
+        ]
+
+    labels_cases = []
+    if rust_labels is not None:
+        labels_close = signal_ts
+        labels_pos_th = np.full(labels_close.shape, 0.05, dtype=np.float64)
+        labels_neg_th = np.full(labels_close.shape, 0.05, dtype=np.float64)
+        nb_local_extrema = labels_nb.local_extrema_apply_nb(labels_close, labels_pos_th, labels_neg_th, True)
+        rs_local_extrema = rust_labels.local_extrema_apply_rs(labels_close, labels_pos_th, labels_neg_th)
+
+        labels_cases = [
+            BenchmarkCase(
+                "labels.future_mean_apply",
+                labels_nb.future_mean_apply_nb,
+                (labels_close, window, False, 1, False),
+                rust_labels.future_mean_apply_rs,
+                (labels_close, window, False, 1, False),
+            ),
+            BenchmarkCase(
+                "labels.future_std_apply",
+                labels_nb.future_std_apply_nb,
+                (labels_close, window, False, 1, False, 0),
+                rust_labels.future_std_apply_rs,
+                (labels_close, window, False, 1, False, 0),
+                False,
+            ),
+            BenchmarkCase(
+                "labels.future_min_apply",
+                labels_nb.future_min_apply_nb,
+                (labels_close, window, 1),
+                rust_labels.future_min_apply_rs,
+                (labels_close, window, 1),
+            ),
+            BenchmarkCase(
+                "labels.future_max_apply",
+                labels_nb.future_max_apply_nb,
+                (labels_close, window, 1),
+                rust_labels.future_max_apply_rs,
+                (labels_close, window, 1),
+            ),
+            BenchmarkCase(
+                "labels.fixed_labels_apply",
+                labels_nb.fixed_labels_apply_nb,
+                (labels_close, 1),
+                rust_labels.fixed_labels_apply_rs,
+                (labels_close, 1),
+            ),
+            BenchmarkCase(
+                "labels.mean_labels_apply",
+                labels_nb.mean_labels_apply_nb,
+                (labels_close, window, False, 1, False),
+                rust_labels.mean_labels_apply_rs,
+                (labels_close, window, False, 1, False),
+                False,
+            ),
+            BenchmarkCase(
+                "labels.local_extrema_apply",
+                labels_nb.local_extrema_apply_nb,
+                (labels_close, labels_pos_th, labels_neg_th, True),
+                rust_labels.local_extrema_apply_rs,
+                (labels_close, labels_pos_th, labels_neg_th),
+            ),
+            BenchmarkCase(
+                "labels.bn_trend_labels",
+                labels_nb.bn_trend_labels_nb,
+                (labels_close, nb_local_extrema),
+                rust_labels.bn_trend_labels_rs,
+                (labels_close, rs_local_extrema),
+            ),
+            BenchmarkCase(
+                "labels.bn_cont_trend_labels",
+                labels_nb.bn_cont_trend_labels_nb,
+                (labels_close, nb_local_extrema),
+                rust_labels.bn_cont_trend_labels_rs,
+                (labels_close, rs_local_extrema),
+            ),
+            BenchmarkCase(
+                "labels.bn_cont_sat_trend_labels",
+                labels_nb.bn_cont_sat_trend_labels_nb,
+                (labels_close, nb_local_extrema, labels_pos_th, labels_neg_th, True),
+                rust_labels.bn_cont_sat_trend_labels_rs,
+                (labels_close, rs_local_extrema, labels_pos_th, labels_neg_th),
+            ),
+            BenchmarkCase(
+                "labels.pct_trend_labels",
+                labels_nb.pct_trend_labels_nb,
+                (labels_close, nb_local_extrema, False),
+                rust_labels.pct_trend_labels_rs,
+                (labels_close, rs_local_extrema, False),
+            ),
+            BenchmarkCase(
+                "labels.trend_labels_apply",
+                labels_nb.trend_labels_apply_nb,
+                (labels_close, labels_pos_th, labels_neg_th, 0, True),
+                rust_labels.trend_labels_apply_rs,
+                (labels_close, labels_pos_th, labels_neg_th, 0),
+            ),
+            BenchmarkCase(
+                "labels.breakout_labels",
+                labels_nb.breakout_labels_nb,
+                (labels_close, window, labels_pos_th, labels_neg_th, 1, True),
+                rust_labels.breakout_labels_rs,
+                (labels_close, window, labels_pos_th, labels_neg_th, 1),
+            ),
         ]
 
     cases = [
@@ -766,6 +890,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     cases = [replace(case, name=f"generic.{case.name}") for case in cases]
     cases.extend(indicator_cases)
     cases.extend(signal_cases)
+    cases.extend(labels_cases)
     return cases
 
 

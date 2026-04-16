@@ -6,6 +6,7 @@ use pyo3::types::PyModuleMethods;
 
 mod generic;
 mod indicators;
+mod labels;
 mod signals;
 
 #[pymodule]
@@ -20,6 +21,10 @@ fn vectorbt_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     indicators::register(&indicators)?;
     m.add_submodule(&indicators)?;
 
+    let labels = PyModule::new_bound(m.py(), "labels")?;
+    labels::register(&labels)?;
+    m.add_submodule(&labels)?;
+
     let signals = PyModule::new_bound(m.py(), "signals")?;
     signals::register(&signals)?;
     m.add_submodule(&signals)?;
@@ -29,6 +34,7 @@ fn vectorbt_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let modules = sys.getattr("modules")?;
     modules.set_item("vectorbt_rust.generic", generic)?;
     modules.set_item("vectorbt_rust.indicators", indicators)?;
+    modules.set_item("vectorbt_rust.labels", labels)?;
     modules.set_item("vectorbt_rust.signals", signals)?;
 
     Ok(())

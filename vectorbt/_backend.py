@@ -181,15 +181,23 @@ def broadcast_2d_to_shape(a: tp.ArrayLike, shape: tp.Shape, dtype: tp.Optional[t
     return np.broadcast_to(arr, shape)
 
 
-def flex_broadcast_to_shape(a: tp.ArrayLike, shape: tp.Shape, dtype: tp.Optional[tp.DTypeLike] = None) -> tp.Array:
+def flex_broadcast_to_shape(
+    a: tp.ArrayLike,
+    shape: tp.Shape,
+    dtype: tp.Optional[tp.DTypeLike] = None,
+    flex_2d: bool = True,
+) -> tp.Array:
     """Cast array to dtype if provided and broadcast to shape using flexible 2D semantics.
 
-    If `shape` is 2D and a 1D array matches the number of columns but not rows,
-    the array is treated as a single row, which matches `flex_2d=True` selection.
+    If `shape` is 2D, a 1D array is treated as a single row when `flex_2d`
+    is True and as a single column otherwise.
     """
     arr = np.asarray(a, dtype=dtype)
-    if arr.ndim == 1 and len(shape) == 2 and arr.shape[0] == shape[1] and arr.shape[0] != shape[0]:
-        arr = arr.reshape(1, -1)
+    if arr.ndim == 1 and len(shape) == 2:
+        if flex_2d:
+            arr = arr.reshape(1, -1)
+        else:
+            arr = arr.reshape(-1, 1)
     else:
         arr = reshape_fns.to_2d_array(arr)
     return np.broadcast_to(arr, shape)
