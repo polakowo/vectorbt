@@ -19,6 +19,7 @@ from vectorbt._backend import (
     non_neg_array_compatible_with_rust,
     non_neg_int_compatible_with_rust,
     resolve_backend,
+    resolve_random_backend,
     rolling_compatible_with_rust,
     scalar_compatible_with_rust,
 )
@@ -26,7 +27,8 @@ from vectorbt._backend import (
 
 def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, backend: tp.Optional[str] = None) -> tp.Array1d:
     """Backend-neutral `vectorbt.generic.nb.shuffle_1d_nb`."""
-    if backend is None or backend == "auto":
+    backend = resolve_random_backend(backend)
+    if backend == "numba":
         from vectorbt.generic.nb import shuffle_1d_nb
 
         return shuffle_1d_nb(a, seed)
@@ -48,7 +50,8 @@ def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, backend: tp.Optiona
 
 def shuffle(a: tp.Array2d, seed: tp.Optional[int] = None, backend: tp.Optional[str] = None) -> tp.Array2d:
     """Backend-neutral `vectorbt.generic.nb.shuffle_nb`."""
-    if backend is None or backend == "auto":
+    backend = resolve_random_backend(backend)
+    if backend == "numba":
         from vectorbt.generic.nb import shuffle_nb
 
         return shuffle_nb(a, seed)

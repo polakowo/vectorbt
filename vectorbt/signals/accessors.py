@@ -197,6 +197,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
+from vectorbt._backend import broadcast_2d_to_shape, broadcast_to_shape
 from vectorbt.base import reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
@@ -544,7 +545,7 @@ class SignalsAccessor(GenericAccessor):
             n = np.broadcast_to(n, shape[1])
             result = dispatch.generate_rand(shape, n, seed=seed, backend=backend)
         elif prob is not None:
-            prob = np.broadcast_to(np.asarray(prob, dtype=np.float64), shape)
+            prob = broadcast_to_shape(prob, shape, np.float64)
             result = dispatch.generate_rand_by_prob(shape, prob, pick_first, flex_2d, seed=seed, backend=backend)
         else:
             raise ValueError("At least n or prob should be set")
@@ -644,8 +645,8 @@ class SignalsAccessor(GenericAccessor):
                 backend=backend,
             )
         elif entry_prob is not None and exit_prob is not None:
-            entry_prob = np.broadcast_to(np.asarray(entry_prob, dtype=np.float64), shape)
-            exit_prob = np.broadcast_to(np.asarray(exit_prob, dtype=np.float64), shape)
+            entry_prob = broadcast_to_shape(entry_prob, shape, np.float64)
+            exit_prob = broadcast_to_shape(exit_prob, shape, np.float64)
             entries, exits = dispatch.generate_rand_enex_by_prob(
                 shape,
                 entry_prob,
@@ -710,7 +711,7 @@ class SignalsAccessor(GenericAccessor):
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
             entries_2d = reshape_fns.to_2d_array(obj)
-            prob = np.broadcast_to(np.asarray(prob, dtype=np.float64), entries_2d.shape)
+            prob = broadcast_to_shape(prob, entries_2d.shape, np.float64)
             exits = dispatch.generate_rand_ex_by_prob(
                 entries_2d,
                 prob,
@@ -806,9 +807,9 @@ class SignalsAccessor(GenericAccessor):
         )
         flex_2d = entries.ndim == 2
         entries_2d = reshape_fns.to_2d_array(entries)
-        ts_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(ts, dtype=np.float64)), entries_2d.shape)
-        stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(stop, dtype=np.float64)), entries_2d.shape)
-        trailing_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(trailing, dtype=np.bool_)), entries_2d.shape)
+        ts_2d = broadcast_2d_to_shape(ts, entries_2d.shape, np.float64)
+        stop_2d = broadcast_2d_to_shape(stop, entries_2d.shape, np.float64)
+        trailing_2d = broadcast_2d_to_shape(trailing, entries_2d.shape, np.bool_)
 
         # Perform generation
         if chain:
@@ -1050,14 +1051,14 @@ class SignalsAccessor(GenericAccessor):
         flex_2d = entries.ndim == 2
         entries_2d = reshape_fns.to_2d_array(entries)
         shape = entries_2d.shape
-        open_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(open, dtype=np.float64)), shape)
-        high_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(high, dtype=np.float64)), shape)
-        low_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(low, dtype=np.float64)), shape)
-        close_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(close, dtype=np.float64)), shape)
-        sl_stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(sl_stop, dtype=np.float64)), shape)
-        sl_trail_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(sl_trail, dtype=np.bool_)), shape)
-        tp_stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(tp_stop, dtype=np.float64)), shape)
-        reverse_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(reverse, dtype=np.bool_)), shape)
+        open_2d = broadcast_2d_to_shape(open, shape, np.float64)
+        high_2d = broadcast_2d_to_shape(high, shape, np.float64)
+        low_2d = broadcast_2d_to_shape(low, shape, np.float64)
+        close_2d = broadcast_2d_to_shape(close, shape, np.float64)
+        sl_stop_2d = broadcast_2d_to_shape(sl_stop, shape, np.float64)
+        sl_trail_2d = broadcast_2d_to_shape(sl_trail, shape, np.bool_)
+        tp_stop_2d = broadcast_2d_to_shape(tp_stop, shape, np.float64)
+        reverse_2d = broadcast_2d_to_shape(reverse, shape, np.bool_)
         if stop_price_out is None:
             stop_price_out = np.empty(shape, dtype=np.float64)
         else:

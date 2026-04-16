@@ -3176,11 +3176,11 @@ class TestFactory:
 
 class TestGenerators:
     def test_RAND(self):
-        rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed)
+        rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed, backend="numba")
         pd.testing.assert_series_equal(
             rand.entries, pd.Series(np.array([True, False, False, False, False, False]), name=1)
         )
-        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed)
+        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3197,7 +3197,9 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="rand_n"),
             ),
         )
-        rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed)
+        rand = vbt.RAND.run(
+            n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba"
+        )
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3216,9 +3218,26 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(1, 0), (2, 1), (3, 0), (4, 1)], names=["rand_n", None]),
             ),
         )
+        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            rand.entries,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False],
+                        [True, True, False],
+                        [False, False, True],
+                        [False, False, True],
+                        [False, True, False],
+                        [False, False, True],
+                    ]
+                ),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="rand_n"),
+            ),
+        )
 
     def test_RANDX(self):
-        randx = vbt.RANDX.run(mask, seed=seed)
+        randx = vbt.RANDX.run(mask, seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             randx.exits,
             pd.DataFrame(
@@ -3235,16 +3254,33 @@ class TestGenerators:
                 index=mask.index,
             ),
         )
+        randx = vbt.RANDX.run(mask, seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            randx.exits,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False],
+                        [False, False, False],
+                        [True, False, False],
+                        [False, True, True],
+                        [True, False, False],
+                    ]
+                ),
+                columns=mask.columns,
+                index=mask.index,
+            ),
+        )
 
     def test_RANDNX(self):
-        randnx = vbt.RANDNX.run(n=1, input_shape=(6,), seed=seed)
+        randnx = vbt.RANDNX.run(n=1, input_shape=(6,), seed=seed, backend="numba")
         pd.testing.assert_series_equal(
             randnx.entries, pd.Series(np.array([True, False, False, False, False, False]), name=1)
         )
         pd.testing.assert_series_equal(
             randnx.exits, pd.Series(np.array([False, True, False, False, False, False]), name=1)
         )
-        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed)
+        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(
@@ -3277,7 +3313,9 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
             ),
         )
-        randnx = vbt.RANDNX.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed)
+        randnx = vbt.RANDNX.run(
+            n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba"
+        )
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(
@@ -3314,11 +3352,44 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(1, 0), (2, 1), (3, 0), (4, 1)], names=["randnx_n", None]),
             ),
         )
+        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            randnx.entries,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, True, True],
+                        [True, False, False],
+                        [False, False, True],
+                        [False, True, False],
+                        [False, False, True],
+                        [False, False, False],
+                    ]
+                ),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            randnx.exits,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False],
+                        [False, False, True],
+                        [False, True, False],
+                        [False, False, True],
+                        [True, False, False],
+                        [False, True, True],
+                    ]
+                ),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
+            ),
+        )
 
     def test_RPROB(self):
-        rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed)
+        rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed, backend="numba")
         pd.testing.assert_series_equal(rprob.entries, pd.Series(np.array([True, True, True, True, True]), name=1))
-        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed)
+        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3334,7 +3405,9 @@ class TestGenerators:
                 columns=pd.Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
             ),
         )
-        rprob = vbt.RPROB.run(prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed)
+        rprob = vbt.RPROB.run(
+            prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed, backend="numba"
+        )
         pd.testing.assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3352,9 +3425,25 @@ class TestGenerators:
                 ),
             ),
         )
+        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            rprob.entries,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, True],
+                        [False, False, True],
+                        [False, True, True],
+                        [False, False, True],
+                        [False, True, True],
+                    ]
+                ),
+                columns=pd.Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
+            ),
+        )
 
     def test_RPROBX(self):
-        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed)
+        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             rprobx.exits,
             pd.DataFrame(
@@ -3384,9 +3473,39 @@ class TestGenerators:
                 ),
             ),
         )
+        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            rprobx.exits,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False, False, False, False, False, False, False],
+                        [False, False, False, False, False, False, True, False, False],
+                        [False, False, False, False, False, False, False, True, False],
+                        [False, False, False, False, True, True, False, False, True],
+                        [False, False, False, True, False, False, True, False, False],
+                    ]
+                ),
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0.0, "a"),
+                        (0.0, "b"),
+                        (0.0, "c"),
+                        (0.5, "a"),
+                        (0.5, "b"),
+                        (0.5, "c"),
+                        (1.0, "a"),
+                        (1.0, "b"),
+                        (1.0, "c"),
+                    ],
+                    names=["rprobx_prob", None],
+                ),
+            ),
+        )
 
     def test_RPROBCX(self):
-        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed)
+        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="numba")
         pd.testing.assert_frame_equal(
             rprobcx.new_entries,
             pd.DataFrame(
@@ -3445,9 +3564,68 @@ class TestGenerators:
                 ),
             ),
         )
+        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="rust")
+        pd.testing.assert_frame_equal(
+            rprobcx.new_entries,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [True, False, False, True, False, False, True, False, False],
+                        [False, True, False, False, True, False, False, True, False],
+                        [False, False, True, False, False, True, False, False, True],
+                        [False, False, False, True, False, False, True, False, False],
+                        [False, False, False, False, False, False, False, True, False],
+                    ]
+                ),
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0.0, "a"),
+                        (0.0, "b"),
+                        (0.0, "c"),
+                        (0.5, "a"),
+                        (0.5, "b"),
+                        (0.5, "c"),
+                        (1.0, "a"),
+                        (1.0, "b"),
+                        (1.0, "c"),
+                    ],
+                    names=["rprobcx_prob", None],
+                ),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            rprobcx.exits,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False, False, False, False, False, False, False],
+                        [False, False, False, False, False, False, True, False, False],
+                        [False, False, False, True, False, False, False, True, False],
+                        [False, False, False, False, False, False, False, False, True],
+                        [False, False, False, True, True, False, True, False, False],
+                    ]
+                ),
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0.0, "a"),
+                        (0.0, "b"),
+                        (0.0, "c"),
+                        (0.5, "a"),
+                        (0.5, "b"),
+                        (0.5, "c"),
+                        (1.0, "a"),
+                        (1.0, "b"),
+                        (1.0, "c"),
+                    ],
+                    names=["rprobcx_prob", None],
+                ),
+            ),
+        )
 
     def test_RPROBNX(self):
-        rprobnx = vbt.RPROBNX.run(entry_prob=1.0, exit_prob=1.0, input_shape=(5,), seed=seed)
+        rprobnx = vbt.RPROBNX.run(entry_prob=1.0, exit_prob=1.0, input_shape=(5,), seed=seed, backend="numba")
         pd.testing.assert_series_equal(
             rprobnx.entries, pd.Series(np.array([True, False, True, False, True]), name=(1.0, 1.0))
         )
@@ -3459,6 +3637,7 @@ class TestGenerators:
             exit_prob=np.asarray([0.0, 1.0, 0.0, 1.0, 0.0]),
             input_shape=(5,),
             seed=seed,
+            backend="numba",
         )
         pd.testing.assert_series_equal(
             rprobnx.entries, pd.Series(np.array([True, False, True, False, True]), name=("array_0", "array_0"))
@@ -3466,7 +3645,9 @@ class TestGenerators:
         pd.testing.assert_series_equal(
             rprobnx.exits, pd.Series(np.array([False, True, False, True, False]), name=("array_0", "array_0"))
         )
-        rprobnx = vbt.RPROBNX.run(entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed)
+        rprobnx = vbt.RPROBNX.run(
+            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, backend="numba"
+        )
         pd.testing.assert_frame_equal(
             rprobnx.entries,
             pd.DataFrame(
@@ -3480,6 +3661,27 @@ class TestGenerators:
             rprobnx.exits,
             pd.DataFrame(
                 np.array([[False, False], [True, True], [False, False], [False, False], [False, False]]),
+                columns=pd.MultiIndex.from_tuples(
+                    [(0.5, 1.0), (1.0, 0.5)], names=["rprobnx_entry_prob", "rprobnx_exit_prob"]
+                ),
+            ),
+        )
+        rprobnx = vbt.RPROBNX.run(
+            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, backend="rust"
+        )
+        pd.testing.assert_frame_equal(
+            rprobnx.entries,
+            pd.DataFrame(
+                np.array([[False, True], [False, False], [True, False], [False, True], [True, False]]),
+                columns=pd.MultiIndex.from_tuples(
+                    [(0.5, 1.0), (1.0, 0.5)], names=["rprobnx_entry_prob", "rprobnx_exit_prob"]
+                ),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            rprobnx.exits,
+            pd.DataFrame(
+                np.array([[False, False], [False, False], [False, True], [True, False], [False, True]]),
                 columns=pd.MultiIndex.from_tuples(
                     [(0.5, 1.0), (1.0, 0.5)], names=["rprobnx_entry_prob", "rprobnx_exit_prob"]
                 ),

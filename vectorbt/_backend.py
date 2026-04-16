@@ -9,6 +9,7 @@ import numpy as np
 
 from vectorbt import _typing as tp
 from vectorbt._settings import settings
+from vectorbt.base import reshape_fns
 
 _rust_status: tp.Optional[bool] = None
 """Status of Rust availability."""
@@ -165,6 +166,51 @@ def rolling_compatible_with_rust(a: tp.Any, window: int, minp: tp.Optional[int])
         non_neg_int_compatible_with_rust("window", window),
         non_neg_int_compatible_with_rust("minp", minp),
     )
+
+
+def broadcast_to_shape(a: tp.ArrayLike, shape: tp.Shape, dtype: tp.Optional[tp.DTypeLike] = None) -> tp.Array:
+    """Cast array to dtype if provided and broadcast to shape."""
+    arr = np.asarray(a, dtype=dtype)
+    return np.broadcast_to(arr, shape)
+
+
+def broadcast_2d_to_shape(a: tp.ArrayLike, shape: tp.Shape, dtype: tp.Optional[tp.DTypeLike] = None) -> tp.Array:
+    """Cast array to dtype if provided, reshape to 2D, and broadcast to shape."""
+    arr = np.asarray(a, dtype=dtype)
+    arr = reshape_fns.to_2d_array(arr)
+    return np.broadcast_to(arr, shape)
+
+
+def flex_broadcast_to_shape(a: tp.ArrayLike, shape: tp.Shape, dtype: tp.Optional[tp.DTypeLike] = None) -> tp.Array:
+    """Cast array to dtype if provided and broadcast to shape using flexible 2D semantics.
+
+    If `shape` is 2D and a 1D array matches the number of columns but not rows,
+    the array is treated as a single row, which matches `flex_2d=True` selection.
+    """
+    arr = np.asarray(a, dtype=dtype)
+    if arr.ndim == 1 and len(shape) == 2 and arr.shape[0] == shape[1] and arr.shape[0] != shape[0]:
+        arr = arr.reshape(1, -1)
+    else:
+        arr = reshape_fns.to_2d_array(arr)
+    return np.broadcast_to(arr, shape)
+
+
+def resolve_random_backend(backend: tp.Optional[str] = None) -> str:
+    """Resolve backend for randomized functions.
+
+    Randomized functions default to Numba, including `backend='auto'`, to preserve
+    legacy NumPy/Numba random streams unless a backend is requested explicitly.
+    """
+    if backend is None or backend == "auto":
+        return "numba"
+    return backend
+
+
+def seed_for_rust(seed: tp.Optional[int], backend: tp.Optional[str], supports_rust: RustSupport) -> tp.Optional[int]:
+    """Return seed only when the resolved backend is Rust."""
+    if resolve_backend(backend, supports_rust=supports_rust) == "rust":
+        return seed
+    return None
 
 
 def resolve_backend(backend: tp.Optional[str] = None, supports_rust: RustSupport = RustSupport(True)) -> str:

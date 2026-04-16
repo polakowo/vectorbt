@@ -8,17 +8,12 @@ import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
+from vectorbt.signals import dispatch
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
-from vectorbt.signals.nb import (
-    rand_enex_apply_nb,
-    rand_by_prob_choice_nb,
-    stop_choice_nb,
-    ohlc_stop_choice_nb,
-    rand_choice_nb,
-)
 from vectorbt.utils.config import Config
 from vectorbt.utils.figure import make_figure
+
 
 # ############# RAND ############# #
 
@@ -28,10 +23,11 @@ RAND = SignalFactory(
     short_name="rand",
     mode="entries",
     param_names=["n"],
-).from_choice_func(
-    entry_choice_func=rand_choice_nb,
-    entry_settings=dict(pass_params=["n"]),
+).from_apply_func(
+    dispatch.rand_apply,
+    require_input_shape=True,
     param_settings=dict(n=flex_col_param_config),
+    pass_seed=True,
     seed=None,
 )
 
@@ -89,9 +85,12 @@ class _RAND(RAND):
 
 setattr(RAND, "__doc__", _RAND.__doc__)
 
-RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").from_choice_func(
-    exit_choice_func=rand_choice_nb,
-    exit_settings=dict(pass_kwargs=dict(n=1)),
+RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").from_apply_func(
+    dispatch.rand_ex_apply,
+    pass_seed=True,
+    wait=1,
+    until_next=True,
+    skip_until_exit=False,
     seed=None,
 )
 
@@ -136,10 +135,10 @@ RANDNX = SignalFactory(
     mode="both",
     param_names=["n"],
 ).from_apply_func(  # apply_func since function is (almost) vectorized
-    rand_enex_apply_nb,
+    dispatch.rand_enex_apply,
     require_input_shape=True,
     param_settings=dict(n=flex_col_param_config),
-    kwargs_to_args=["entry_wait", "exit_wait"],
+    pass_seed=True,
     entry_wait=1,
     exit_wait=1,
     seed=None,
@@ -197,13 +196,15 @@ RPROB = SignalFactory(
     short_name="rprob",
     mode="entries",
     param_names=["prob"],
-).from_choice_func(
-    entry_choice_func=rand_by_prob_choice_nb,
-    entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
+).from_apply_func(
+    dispatch.rand_by_prob_apply,
+    require_input_shape=True,
     pass_flex_2d=True,
     param_settings=dict(
         prob=flex_elem_param_config,
     ),
+    pass_seed=True,
+    pick_first=False,
     seed=None,
 )
 
@@ -263,16 +264,18 @@ rprobx_config = Config(
 
 rprobx_func_config = Config(
     dict(
-        exit_choice_func=rand_by_prob_choice_nb,
-        exit_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
         pass_flex_2d=True,
         param_settings=dict(prob=flex_elem_param_config),
+        pass_seed=True,
+        wait=1,
+        until_next=True,
+        skip_until_exit=False,
         seed=None,
     )
 )
 """Exit function config for `RPROBX`."""
 
-RPROBX = SignalFactory(**rprobx_config).from_choice_func(**rprobx_func_config)
+RPROBX = SignalFactory(**rprobx_config).from_apply_func(dispatch.rand_ex_by_prob_apply, **rprobx_func_config)
 
 
 class _RPROBX(RPROBX):
@@ -289,7 +292,7 @@ setattr(RPROBX, "__doc__", _RPROBX.__doc__)
 
 RPROBCX = SignalFactory(
     **rprobx_config.merge_with(dict(class_name="RPROBCX", short_name="rprobcx", mode="chain")),
-).from_choice_func(**rprobx_func_config)
+).from_apply_func(dispatch.rand_chain_by_prob_apply, **rprobx_func_config)
 
 
 class _RPROBCX(RPROBCX):
@@ -311,13 +314,16 @@ RPROBNX = SignalFactory(
     short_name="rprobnx",
     mode="both",
     param_names=["entry_prob", "exit_prob"],
-).from_choice_func(
-    entry_choice_func=rand_by_prob_choice_nb,
-    entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
-    exit_choice_func=rand_by_prob_choice_nb,
-    exit_settings=dict(pass_params=["exit_prob"], pass_kwargs=["pick_first", "temp_idx_arr", "flex_2d"]),
+).from_apply_func(
+    dispatch.rand_enex_by_prob_apply,
+    require_input_shape=True,
     pass_flex_2d=True,
     param_settings=dict(entry_prob=flex_elem_param_config, exit_prob=flex_elem_param_config),
+    pass_seed=True,
+    entry_wait=1,
+    exit_wait=1,
+    entry_pick_first=True,
+    exit_pick_first=True,
     seed=None,
 )
 
@@ -415,20 +421,18 @@ stx_config = Config(
 
 stx_func_config = Config(
     dict(
-        exit_choice_func=stop_choice_nb,
-        exit_settings=dict(
-            pass_inputs=["ts"],
-            pass_params=["stop", "trailing"],
-            pass_kwargs=["wait", "pick_first", "temp_idx_arr", "flex_2d"],
-        ),
         pass_flex_2d=True,
         param_settings=dict(stop=flex_elem_param_config, trailing=flex_elem_param_config),
         trailing=False,
+        wait=1,
+        until_next=True,
+        skip_until_exit=False,
+        pick_first=True,
     )
 )
 """Exit function config for `STX`."""
 
-STX = SignalFactory(**stx_config).from_choice_func(**stx_func_config)
+STX = SignalFactory(**stx_config).from_apply_func(dispatch.stop_ex_apply, **stx_func_config)
 
 
 class _STX(STX):
@@ -447,7 +451,7 @@ setattr(STX, "__doc__", _STX.__doc__)
 
 STCX = SignalFactory(
     **stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain")),
-).from_choice_func(**stx_func_config)
+).from_apply_func(dispatch.stop_enex_apply, **stx_func_config)
 
 
 class _STCX(STCX):
@@ -481,13 +485,6 @@ ohlcstx_config = Config(
 
 ohlcstx_func_config = Config(
     dict(
-        exit_choice_func=ohlc_stop_choice_nb,
-        exit_settings=dict(
-            pass_inputs=["open", "high", "low", "close"],  # do not pass entries
-            pass_in_outputs=["stop_price", "stop_type"],
-            pass_params=["sl_stop", "sl_trail", "tp_stop", "reverse"],
-            pass_kwargs=[("is_open_safe", True), "wait", "pick_first", "temp_idx_arr", "flex_2d"],
-        ),
         pass_flex_2d=True,
         in_output_settings=dict(stop_price=dict(dtype=np.float64), stop_type=dict(dtype=np.int64)),
         param_settings=dict(
@@ -502,11 +499,16 @@ ohlcstx_func_config = Config(
         reverse=False,
         stop_price=np.nan,
         stop_type=-1,
+        is_open_safe=True,
+        wait=1,
+        until_next=True,
+        skip_until_exit=False,
+        pick_first=True,
     )
 )
 """Exit function config for `OHLCSTX`."""
 
-OHLCSTX = SignalFactory(**ohlcstx_config).from_choice_func(**ohlcstx_func_config)
+OHLCSTX = SignalFactory(**ohlcstx_config).from_apply_func(dispatch.ohlc_stop_ex_apply, **ohlcstx_func_config)
 
 
 def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
@@ -698,7 +700,7 @@ setattr(OHLCSTX, "plot", _OHLCSTX.plot)
 
 OHLCSTCX = SignalFactory(
     **ohlcstx_config.merge_with(dict(class_name="OHLCSTCX", short_name="ohlcstcx", mode="chain")),
-).from_choice_func(**ohlcstx_func_config)
+).from_apply_func(dispatch.ohlc_stop_enex_apply, **ohlcstx_func_config)
 
 
 class _OHLCSTCX(OHLCSTCX):

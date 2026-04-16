@@ -15,8 +15,10 @@ import numpy as np
 from numba import njit
 
 from vectorbt import _typing as tp
+from vectorbt._backend import callback_unsupported_with_rust, resolve_backend
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
+from vectorbt.signals import dispatch
 from vectorbt.signals.enums import FactoryMode
 from vectorbt.signals.nb import generate_nb, generate_ex_nb, generate_enex_nb, first_choice_nb
 from vectorbt.utils import checks
@@ -191,9 +193,9 @@ class SignalFactory(IndicatorFactory):
         self,
         entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
         exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
-        generate_func: tp.Callable = generate_nb,
-        generate_ex_func: tp.Callable = generate_ex_nb,
-        generate_enex_func: tp.Callable = generate_enex_nb,
+        generate_func: tp.Callable = dispatch.generate,
+        generate_ex_func: tp.Callable = dispatch.generate_ex,
+        generate_enex_func: tp.Callable = dispatch.generate_enex,
         cache_func: tp.Callable = None,
         entry_settings: tp.KwargsLike = None,
         exit_settings: tp.KwargsLike = None,
@@ -490,6 +492,13 @@ class SignalFactory(IndicatorFactory):
         input_names = self.input_names
         param_names = self.param_names
         in_output_names = self.in_output_names
+        if numba_loop:
+            if generate_func is dispatch.generate:
+                generate_func = generate_nb
+            if generate_ex_func is dispatch.generate_ex:
+                generate_ex_func = generate_ex_nb
+            if generate_enex_func is dispatch.generate_enex:
+                generate_enex_func = generate_enex_nb
 
         if mode == FactoryMode.Entries:
             require_input_shape = True
@@ -567,6 +576,8 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _0 += ", entry_param_tuples"
             _0 += ", entry_args"
+            if not numba_loop:
+                _0 += ", backend=None"
             _1 = "shape"
             _1 += ", entry_pick_first"
             _1 += ", entry_choice_func"
@@ -576,6 +587,8 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _1 += ", *entry_param_tuples[i]"
             _1 += ", *entry_args"
+            if not numba_loop:
+                _1 += ", backend=backend"
             func_str = "def apply_func({0}):\n   return generate_func({1})".format(_0, _1)
             scope = {"generate_func": generate_func, "entry_choice_func": entry_choice_func}
             filename = inspect.getfile(lambda: None)
@@ -601,6 +614,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _0 += ", exit_param_tuples"
             _0 += ", exit_args"
+            if not numba_loop:
+                _0 += ", backend=None"
             _1 = "entries"
             _1 += ", exit_wait"
             _1 += ", until_next"
@@ -613,6 +628,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", *exit_param_tuples[i]"
             _1 += ", *exit_args"
+            if not numba_loop:
+                _1 += ", backend=backend"
             func_str = "def apply_func({0}):\n   return generate_ex_func({1})".format(_0, _1)
             scope = {"generate_ex_func": generate_ex_func, "exit_choice_func": exit_choice_func}
             filename = inspect.getfile(lambda: None)
@@ -644,6 +661,8 @@ class SignalFactory(IndicatorFactory):
                 _0 += ", exit_param_tuples"
             _0 += ", entry_args"
             _0 += ", exit_args"
+            if not numba_loop:
+                _0 += ", backend=None"
             _1 = "shape"
             _1 += ", entry_wait"
             _1 += ", exit_wait"
@@ -663,6 +682,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", *exit_param_tuples[i]"
             _1 += ", *exit_args)"
+            if not numba_loop:
+                _1 += ", backend=backend"
             func_str = "def apply_func({0}):\n   return generate_enex_func({1})".format(_0, _1)
             scope = {
                 "generate_enex_func": generate_enex_func,
@@ -694,9 +715,11 @@ class SignalFactory(IndicatorFactory):
             cache_kwargs: tp.KwargsLike = None,
             return_cache: bool = False,
             use_cache: tp.Optional[CacheOutputT] = None,
+            backend: tp.Optional[str] = None,
             **_kwargs,
         ) -> tp.Union[CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             # Get arguments
+            resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
             if len(input_list) == 0:
                 if input_shape is None:
                     raise ValueError("Pass input_shape if no input time series were passed")
@@ -867,7 +890,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _entry_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_shape,
@@ -877,6 +900,9 @@ class SignalFactory(IndicatorFactory):
                     *_entry_param_tuples,
                     entry_args + entry_more_args + entry_cache,
                 )
+                if not numba_loop:
+                    apply_args += (backend,)
+                return apply_and_concat_func(*apply_args)
 
             elif mode == FactoryMode.Exits:
                 if len(exit_in_output_names) > 0:
@@ -894,7 +920,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _exit_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_list[0],
@@ -907,6 +933,9 @@ class SignalFactory(IndicatorFactory):
                     *_exit_param_tuples,
                     exit_args + exit_more_args + exit_cache,
                 )
+                if not numba_loop:
+                    apply_args += (backend,)
+                return apply_and_concat_func(*apply_args)
 
             else:
                 if len(entry_in_output_names) > 0:
@@ -938,7 +967,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _exit_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_shape,
@@ -955,5 +984,8 @@ class SignalFactory(IndicatorFactory):
                     entry_args + entry_more_args + entry_cache,
                     exit_args + exit_more_args + exit_cache,
                 )
+                if not numba_loop:
+                    apply_args += (backend,)
+                return apply_and_concat_func(*apply_args)
 
         return self.from_custom_func(custom_func, as_lists=True, require_input_shape=require_input_shape, **kwargs)

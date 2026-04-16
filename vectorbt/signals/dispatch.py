@@ -8,11 +8,14 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt._backend import (
     array_compatible_with_rust,
+    flex_broadcast_to_shape,
     callback_unsupported_with_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
     non_neg_array_compatible_with_rust,
     resolve_backend,
+    resolve_random_backend,
+    seed_for_rust,
 )
 
 
@@ -582,6 +585,389 @@ def generate_ohlc_stop_enex(
         exit_wait,
         pick_first,
         flex_2d,
+    )
+
+
+def rand_apply(
+    input_shape: tp.Shape,
+    n: tp.Array1d,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RAND`."""
+    backend = resolve_random_backend(backend)
+    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
+    return generate_rand(
+        input_shape,
+        n,
+        seed=seed_for_rust(seed, backend, non_neg_array_compatible_with_rust("n", n)),
+        backend=backend,
+    )
+
+
+def rand_ex_apply(
+    entries: tp.Array2d,
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RANDX`."""
+    backend = resolve_random_backend(backend)
+    return generate_rand_ex(
+        entries,
+        wait,
+        until_next,
+        skip_until_exit,
+        seed=seed_for_rust(seed, backend, array_compatible_with_rust(entries, dtype=np.bool_)),
+        backend=backend,
+    )
+
+
+def rand_enex_apply(
+    input_shape: tp.Shape,
+    n: tp.Array1d,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.RANDNX`."""
+    backend = resolve_random_backend(backend)
+    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
+    return generate_rand_enex(
+        input_shape,
+        n,
+        entry_wait,
+        exit_wait,
+        seed=seed_for_rust(seed, backend, non_neg_array_compatible_with_rust("n", n)),
+        backend=backend,
+    )
+
+
+def rand_by_prob_apply(
+    input_shape: tp.Shape,
+    prob: tp.Array2d,
+    flex_2d: bool,
+    pick_first: bool = False,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RPROB`."""
+    backend = resolve_random_backend(backend)
+    prob = flex_broadcast_to_shape(prob, input_shape, np.float64)
+    return generate_rand_by_prob(
+        input_shape,
+        prob,
+        pick_first,
+        flex_2d,
+        seed=seed_for_rust(seed, backend, array_compatible_with_rust(prob, dtype=np.float64)),
+        backend=backend,
+    )
+
+
+def rand_ex_by_prob_apply(
+    entries: tp.Array2d,
+    prob: tp.Array2d,
+    flex_2d: bool,
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RPROBX`."""
+    backend = resolve_random_backend(backend)
+    prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
+    return generate_rand_ex_by_prob(
+        entries,
+        prob,
+        wait,
+        until_next,
+        skip_until_exit,
+        flex_2d,
+        seed=seed_for_rust(
+            seed,
+            backend,
+            combine_rust_support(
+                array_compatible_with_rust(entries, dtype=np.bool_),
+                array_compatible_with_rust(prob, dtype=np.float64),
+                matching_shape_compatible_with_rust("prob", entries, prob),
+            ),
+        ),
+        backend=backend,
+    )
+
+
+def rand_enex_by_prob_apply(
+    input_shape: tp.Shape,
+    entry_prob: tp.Array2d,
+    exit_prob: tp.Array2d,
+    flex_2d: bool,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
+    entry_pick_first: bool = True,
+    exit_pick_first: bool = True,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.RPROBNX`."""
+    backend = resolve_random_backend(backend)
+    entry_prob = flex_broadcast_to_shape(entry_prob, input_shape, np.float64)
+    exit_prob = flex_broadcast_to_shape(exit_prob, input_shape, np.float64)
+    return generate_rand_enex_by_prob(
+        input_shape,
+        entry_prob,
+        exit_prob,
+        entry_wait,
+        exit_wait,
+        entry_pick_first,
+        exit_pick_first,
+        flex_2d,
+        seed=seed_for_rust(
+            seed,
+            backend,
+            combine_rust_support(
+                array_compatible_with_rust(entry_prob, dtype=np.float64),
+                array_compatible_with_rust(exit_prob, dtype=np.float64),
+                matching_shape_compatible_with_rust("exit_prob", entry_prob, exit_prob),
+            ),
+        ),
+        backend=backend,
+    )
+
+
+def rand_chain_by_prob_apply(
+    entries: tp.Array2d,
+    prob: tp.Array2d,
+    flex_2d: bool,
+    wait: int = 1,
+    entry_wait: int = 1,
+    exit_wait: tp.Optional[int] = None,
+    entry_pick_first: bool = True,
+    exit_pick_first: bool = True,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    seed: tp.Optional[int] = None,
+    backend: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.RPROBCX`."""
+    backend = resolve_random_backend(backend)
+    if exit_wait is None:
+        exit_wait = wait
+    prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
+    if resolve_backend(
+        backend,
+        supports_rust=combine_rust_support(
+            array_compatible_with_rust(entries.astype(np.float64), dtype=np.float64),
+            array_compatible_with_rust(prob, dtype=np.float64),
+            matching_shape_compatible_with_rust("exit_prob", entries, prob),
+        ),
+    ) == "numba":
+        from vectorbt.signals.nb import first_choice_nb, rand_by_prob_choice_nb
+
+        temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int64)
+        return generate_enex(
+            entries.shape,
+            entry_wait,
+            exit_wait,
+            entry_pick_first,
+            exit_pick_first,
+            first_choice_nb,
+            (entries,),
+            rand_by_prob_choice_nb,
+            (prob, exit_pick_first, temp_idx_arr, flex_2d),
+            backend=backend,
+        )
+    entry_prob = entries.astype(np.float64)
+    return generate_rand_enex_by_prob(
+        entries.shape,
+        entry_prob,
+        prob,
+        entry_wait,
+        exit_wait,
+        entry_pick_first,
+        exit_pick_first,
+        flex_2d,
+        seed=seed_for_rust(
+            seed,
+            backend,
+            combine_rust_support(
+                array_compatible_with_rust(entry_prob, dtype=np.float64),
+                array_compatible_with_rust(prob, dtype=np.float64),
+                matching_shape_compatible_with_rust("exit_prob", entry_prob, prob),
+            ),
+        ),
+        backend=backend,
+    )
+
+
+def stop_ex_apply(
+    entries: tp.Array2d,
+    ts: tp.Array2d,
+    stop: tp.Array2d,
+    trailing: tp.Array2d,
+    flex_2d: bool,
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    pick_first: bool = True,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.STX`."""
+    ts = np.asarray(ts, dtype=np.float64)
+    stop = flex_broadcast_to_shape(stop, entries.shape, np.float64)
+    trailing = flex_broadcast_to_shape(trailing, entries.shape, np.bool_)
+    return generate_stop_ex(
+        entries,
+        ts,
+        stop,
+        trailing,
+        wait,
+        until_next,
+        skip_until_exit,
+        pick_first,
+        flex_2d,
+        backend=backend,
+    )
+
+
+def stop_enex_apply(
+    entries: tp.Array2d,
+    ts: tp.Array2d,
+    stop: tp.Array2d,
+    trailing: tp.Array2d,
+    flex_2d: bool,
+    wait: int = 1,
+    entry_wait: int = 1,
+    exit_wait: tp.Optional[int] = None,
+    pick_first: bool = True,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    backend: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.STCX`."""
+    if exit_wait is None:
+        exit_wait = wait
+    ts = np.asarray(ts, dtype=np.float64)
+    stop = flex_broadcast_to_shape(stop, entries.shape, np.float64)
+    trailing = flex_broadcast_to_shape(trailing, entries.shape, np.bool_)
+    return generate_stop_enex(
+        entries,
+        ts,
+        stop,
+        trailing,
+        entry_wait,
+        exit_wait,
+        pick_first,
+        flex_2d,
+        backend=backend,
+    )
+
+
+def ohlc_stop_ex_apply(
+    entries: tp.Array2d,
+    open: tp.Array2d,
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.Array2d,
+    sl_trail: tp.Array2d,
+    tp_stop: tp.Array2d,
+    reverse: tp.Array2d,
+    flex_2d: bool,
+    is_open_safe: bool = True,
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    pick_first: bool = True,
+    backend: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.OHLCSTX`."""
+    open = np.asarray(open, dtype=np.float64)
+    high = np.asarray(high, dtype=np.float64)
+    low = np.asarray(low, dtype=np.float64)
+    close = np.asarray(close, dtype=np.float64)
+    sl_stop = flex_broadcast_to_shape(sl_stop, entries.shape, np.float64)
+    sl_trail = flex_broadcast_to_shape(sl_trail, entries.shape, np.bool_)
+    tp_stop = flex_broadcast_to_shape(tp_stop, entries.shape, np.float64)
+    reverse = flex_broadcast_to_shape(reverse, entries.shape, np.bool_)
+    return generate_ohlc_stop_ex(
+        entries,
+        open,
+        high,
+        low,
+        close,
+        stop_price_out,
+        stop_type_out,
+        sl_stop,
+        sl_trail,
+        tp_stop,
+        reverse,
+        is_open_safe,
+        wait,
+        until_next,
+        skip_until_exit,
+        pick_first,
+        flex_2d,
+        backend=backend,
+    )
+
+
+def ohlc_stop_enex_apply(
+    entries: tp.Array2d,
+    open: tp.Array2d,
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.Array2d,
+    sl_trail: tp.Array2d,
+    tp_stop: tp.Array2d,
+    reverse: tp.Array2d,
+    flex_2d: bool,
+    is_open_safe: bool = True,
+    wait: int = 1,
+    entry_wait: int = 1,
+    exit_wait: tp.Optional[int] = None,
+    pick_first: bool = True,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    backend: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.OHLCSTCX`."""
+    if exit_wait is None:
+        exit_wait = wait
+    open = np.asarray(open, dtype=np.float64)
+    high = np.asarray(high, dtype=np.float64)
+    low = np.asarray(low, dtype=np.float64)
+    close = np.asarray(close, dtype=np.float64)
+    sl_stop = flex_broadcast_to_shape(sl_stop, entries.shape, np.float64)
+    sl_trail = flex_broadcast_to_shape(sl_trail, entries.shape, np.bool_)
+    tp_stop = flex_broadcast_to_shape(tp_stop, entries.shape, np.float64)
+    reverse = flex_broadcast_to_shape(reverse, entries.shape, np.bool_)
+    return generate_ohlc_stop_enex(
+        entries,
+        open,
+        high,
+        low,
+        close,
+        stop_price_out,
+        stop_type_out,
+        sl_stop,
+        sl_trail,
+        tp_stop,
+        reverse,
+        is_open_safe,
+        entry_wait,
+        exit_wait,
+        pick_first,
+        flex_2d,
+        backend=backend,
     )
 
 

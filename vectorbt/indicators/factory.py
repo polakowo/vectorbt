@@ -1364,6 +1364,7 @@ def run_pipeline(
     as_lists: bool = False,
     pass_input_shape: bool = False,
     pass_flex_2d: bool = False,
+    pass_seed: bool = False,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[int]] = None,
     stacking_kwargs: tp.KwargsLike = None,
@@ -1446,6 +1447,7 @@ def run_pipeline(
             If `custom_func` is Numba-compiled, passes tuples.
         pass_input_shape (bool): Whether to pass `input_shape` to `custom_func` as keyword argument.
         pass_flex_2d (bool): Whether to pass `flex_2d` to `custom_func` as keyword argument.
+        pass_seed (bool): Whether to pass `seed` to `custom_func` as keyword argument.
         level_names (list of str): A list of column level names corresponding to each parameter.
 
             Should have the same length as `param_list`.
@@ -1782,6 +1784,8 @@ def run_pipeline(
             if input_shape is None:
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs["flex_2d"] = len(input_shape) == 2
+        if pass_seed:
+            func_kwargs["seed"] = seed
         func_kwargs = merge_dicts(func_kwargs, kwargs)
 
         # Set seed
@@ -3128,6 +3132,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
         pass_packed: bool = False,
         kwargs_to_args: tp.Optional[tp.Sequence[str]] = None,
         numba_loop: bool = False,
+        pass_seed: bool = False,
         **kwargs,
     ) -> tp.Type[IndicatorBase]:
         """Build indicator class around a custom apply function.
@@ -3188,6 +3193,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
                 Set to True when iterating large number of times over small input,
                 but note that Numba doesn't support variable keyword arguments.
+            pass_seed (bool): Whether to pass `seed` to `apply_func` and `cache_func`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
@@ -3406,7 +3412,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
                 **_kwargs,
             )
 
-        return self.from_custom_func(custom_func, as_lists=True, **kwargs)
+        return self.from_custom_func(custom_func, as_lists=True, pass_seed=pass_seed, **kwargs)
 
     @classmethod
     def get_talib_indicators(cls) -> tp.Set[str]:
