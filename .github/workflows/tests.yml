@@ -30,7 +30,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra cov
+        run: uv sync --extra test
 
       - name: Run tests
         run: uv run pytest tests/

@@ -429,7 +429,7 @@ def assert_backend_func(
 def assert_not_none(arg: tp.Any) -> None:
     """Raise exception if the argument is None."""
     if arg is None:
-        raise AssertionError(f"Argument cannot be None")
+        raise AssertionError("Argument cannot be None")
 
 
 def assert_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:

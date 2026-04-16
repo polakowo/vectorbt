@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from vectorbt import _backend
 from vectorbt.generic import nb
 from vectorbt.indicators import nb as indicator_nb
+from vectorbt.signals import nb as signal_nb
 
 try:
     from vectorbt_rust import generic as rust_generic
@@ -32,6 +33,11 @@ try:
     from vectorbt_rust import indicators as rust_indicators
 except ImportError:
     rust_indicators = None
+
+try:
+    from vectorbt_rust import signals as rust_signals
+except ImportError:
+    rust_signals = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +94,121 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     low = a - np.abs(a) * 0.1 - 0.1
     close = a
     volume = np.nan_to_num(np.abs(a) * 100.0 + 1.0, nan=1.0).astype(np.float64)
+    signal_grid = np.arange(a.size, dtype=np.int64).reshape(a.shape)
+    signal_mask = np.ascontiguousarray(signal_grid % 17 == 0)
+    signal_mask_1d = np.ascontiguousarray(signal_mask[:, 0])
+    other_signal_mask = np.ascontiguousarray(signal_grid % 19 == 0)
+    other_signal_mask_1d = np.ascontiguousarray(other_signal_mask[:, 0])
+    signal_n = np.full(a.shape[1], max(1, min(a.shape[0] // 20, a.shape[0] // 2)), dtype=np.int64)
+    signal_prob = np.full(a.shape, 0.05, dtype=np.float64)
+    exit_prob = np.full(a.shape, 0.07, dtype=np.float64)
+    signal_ts = np.nan_to_num(np.cumsum(np.nan_to_num(a, nan=0.0), axis=0) + 100.0, nan=100.0).astype(np.float64)
+    signal_stop = np.full(a.shape, -0.02, dtype=np.float64)
+    signal_trailing = np.ones(a.shape, dtype=np.bool_)
+    signal_open = signal_ts.copy()
+    signal_high = signal_ts + np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 + 0.1
+    signal_low = signal_ts - np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 - 0.1
+    signal_close = signal_ts + np.nan_to_num(a, nan=0.0) * 0.01
+    sl_stop = np.full(a.shape, 0.02, dtype=np.float64)
+    sl_trail = np.ones(a.shape, dtype=np.bool_)
+    tp_stop = np.full(a.shape, 0.03, dtype=np.float64)
+    reverse = np.zeros(a.shape, dtype=np.bool_)
+
+    def signal_sig_pos_rank_nb() -> np.ndarray:
+        sig_pos_temp = np.full(a.shape[1], -1, dtype=np.int64)
+        return signal_nb.rank_nb(signal_mask, None, False, signal_nb.sig_pos_rank_nb, sig_pos_temp, False)
+
+    def signal_part_pos_rank_nb() -> np.ndarray:
+        part_pos_temp = np.full(a.shape[1], -1, dtype=np.int64)
+        return signal_nb.rank_nb(signal_mask, None, False, signal_nb.part_pos_rank_nb, part_pos_temp)
+
+    def signal_ohlc_stop_ex_nb() -> np.ndarray:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return signal_nb.generate_ohlc_stop_ex_nb(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            reverse,
+            True,
+            1,
+            True,
+            False,
+            True,
+            True,
+        )
+
+    def signal_ohlc_stop_ex_rs() -> np.ndarray:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return rust_signals.generate_ohlc_stop_ex_rs(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            reverse,
+            True,
+            1,
+            True,
+            False,
+            True,
+        )
+
+    def signal_ohlc_stop_enex_nb() -> tuple[np.ndarray, np.ndarray]:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return signal_nb.generate_ohlc_stop_enex_nb(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            reverse,
+            True,
+            1,
+            1,
+            True,
+            True,
+        )
+
+    def signal_ohlc_stop_enex_rs() -> tuple[np.ndarray, np.ndarray]:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return rust_signals.generate_ohlc_stop_enex_rs(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            reverse,
+            True,
+            1,
+            1,
+            True,
+        )
 
     indicator_cases = []
     if rust_indicators is not None:
@@ -258,6 +379,147 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 rust_indicators.obv_custom_rs,
                 (close, volume),
             ),
+        ]
+
+    signal_cases = []
+    if rust_signals is not None:
+        signal_cases = [
+            BenchmarkCase(
+                "signals.clean_enex_1d",
+                signal_nb.clean_enex_1d_nb,
+                (signal_mask_1d, other_signal_mask_1d, True),
+                rust_signals.clean_enex_1d_rs,
+                (signal_mask_1d, other_signal_mask_1d, True),
+            ),
+            BenchmarkCase(
+                "signals.clean_enex",
+                signal_nb.clean_enex_nb,
+                (signal_mask, other_signal_mask, True),
+                rust_signals.clean_enex_rs,
+                (signal_mask, other_signal_mask, True),
+            ),
+            BenchmarkCase(
+                "signals.between_ranges",
+                signal_nb.between_ranges_nb,
+                (signal_mask,),
+                rust_signals.between_ranges_rs,
+                (signal_mask,),
+            ),
+            BenchmarkCase(
+                "signals.between_two_ranges",
+                signal_nb.between_two_ranges_nb,
+                (signal_mask, other_signal_mask, False),
+                rust_signals.between_two_ranges_rs,
+                (signal_mask, other_signal_mask, False),
+            ),
+            BenchmarkCase(
+                "signals.partition_ranges",
+                signal_nb.partition_ranges_nb,
+                (signal_mask,),
+                rust_signals.partition_ranges_rs,
+                (signal_mask,),
+            ),
+            BenchmarkCase(
+                "signals.between_partition_ranges",
+                signal_nb.between_partition_ranges_nb,
+                (signal_mask,),
+                rust_signals.between_partition_ranges_rs,
+                (signal_mask,),
+            ),
+            BenchmarkCase("signals.sig_pos_rank", signal_sig_pos_rank_nb, (), rust_signals.sig_pos_rank_rs, (signal_mask, None, False, False)),
+            BenchmarkCase("signals.part_pos_rank", signal_part_pos_rank_nb, (), rust_signals.part_pos_rank_rs, (signal_mask, None, False)),
+            BenchmarkCase(
+                "signals.nth_index_1d",
+                signal_nb.nth_index_1d_nb,
+                (signal_mask_1d, -1),
+                rust_signals.nth_index_1d_rs,
+                (signal_mask_1d, -1),
+            ),
+            BenchmarkCase(
+                "signals.nth_index",
+                signal_nb.nth_index_nb,
+                (signal_mask, -1),
+                rust_signals.nth_index_rs,
+                (signal_mask, -1),
+            ),
+            BenchmarkCase(
+                "signals.norm_avg_index_1d",
+                signal_nb.norm_avg_index_1d_nb,
+                (signal_mask_1d,),
+                rust_signals.norm_avg_index_1d_rs,
+                (signal_mask_1d,),
+            ),
+            BenchmarkCase(
+                "signals.norm_avg_index",
+                signal_nb.norm_avg_index_nb,
+                (signal_mask,),
+                rust_signals.norm_avg_index_rs,
+                (signal_mask,),
+            ),
+            BenchmarkCase(
+                "signals.generate_rand",
+                signal_nb.generate_rand_nb,
+                (a.shape, signal_n, seed),
+                rust_signals.generate_rand_rs,
+                (a.shape[0], a.shape[1], signal_n, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_by_prob",
+                signal_nb.generate_rand_by_prob_nb,
+                (a.shape, signal_prob, False, True, seed),
+                rust_signals.generate_rand_by_prob_rs,
+                (a.shape[0], a.shape[1], signal_prob, False, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_ex",
+                signal_nb.generate_rand_ex_nb,
+                (signal_mask, 1, True, False, seed),
+                rust_signals.generate_rand_ex_rs,
+                (signal_mask, 1, True, False, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_ex_by_prob",
+                signal_nb.generate_rand_ex_by_prob_nb,
+                (signal_mask, exit_prob, 1, True, False, True, seed),
+                rust_signals.generate_rand_ex_by_prob_rs,
+                (signal_mask, exit_prob, 1, True, False, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_enex",
+                signal_nb.generate_rand_enex_nb,
+                (a.shape, signal_n, 1, 1, seed),
+                rust_signals.generate_rand_enex_rs,
+                (a.shape[0], a.shape[1], signal_n, 1, 1, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_enex_by_prob",
+                signal_nb.generate_rand_enex_by_prob_nb,
+                (a.shape, signal_prob, exit_prob, 1, 1, True, True, True, seed),
+                rust_signals.generate_rand_enex_by_prob_rs,
+                (a.shape[0], a.shape[1], signal_prob, exit_prob, 1, 1, True, True, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_stop_ex",
+                signal_nb.generate_stop_ex_nb,
+                (signal_mask, signal_ts, signal_stop, signal_trailing, 1, True, False, True, True),
+                rust_signals.generate_stop_ex_rs,
+                (signal_mask, signal_ts, signal_stop, signal_trailing, 1, True, False, True),
+            ),
+            BenchmarkCase(
+                "signals.generate_stop_enex",
+                signal_nb.generate_stop_enex_nb,
+                (signal_mask, signal_ts, signal_stop, signal_trailing, 1, 1, True, True),
+                rust_signals.generate_stop_enex_rs,
+                (signal_mask, signal_ts, signal_stop, signal_trailing, 1, 1, True),
+            ),
+            BenchmarkCase("signals.generate_ohlc_stop_ex", signal_ohlc_stop_ex_nb, (), signal_ohlc_stop_ex_rs, ()),
+            BenchmarkCase("signals.generate_ohlc_stop_enex", signal_ohlc_stop_enex_nb, (), signal_ohlc_stop_enex_rs, ()),
         ]
 
     cases = [
@@ -503,6 +765,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     ]
     cases = [replace(case, name=f"generic.{case.name}") for case in cases]
     cases.extend(indicator_cases)
+    cases.extend(signal_cases)
     return cases
 
 

@@ -73,11 +73,12 @@ full-no-talib = [
 rust = [
     "vectorbt-rust==1.0.0",
 ]
-cov = [
+test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
     "codecov",
+    "vectorbt-rust==1.0.0",
 ]
 docs = [
     "mkdocs-material",

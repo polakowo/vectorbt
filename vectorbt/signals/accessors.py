@@ -262,9 +262,10 @@ class SignalsAccessor(GenericAccessor):
     def generate(
         cls,
         shape: tp.RelaxedShape,
-        choice_func_nb: tp.ChoiceFunc,
+        choice_func: tp.ChoiceFunc,
         *args,
         pick_first: bool = False,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_nb`.
@@ -276,11 +277,11 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def choice_func_nb(from_i, to_i, col):
+            ... def choice_func(from_i, to_i, col):
             ...     return col + from_i
 
             >>> pd.DataFrame.vbt.signals.generate((5, 3),
-            ...     choice_func_nb, index=mask.index, columns=mask.columns)
+            ...     choice_func, index=mask.index, columns=mask.columns)
                             a      b      c
             2020-01-01   True  False  False
             2020-01-02  False   True  False
@@ -289,14 +290,14 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
-        checks.assert_numba_func(choice_func_nb)
+        checks.assert_backend_func(choice_func, backend=backend)
 
         if not isinstance(shape, tuple):
             shape = (shape, 1)
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        result = nb.generate_nb(shape, pick_first, choice_func_nb, *args)
+        result = dispatch.generate(shape, pick_first, choice_func, *args, backend=backend)
 
         if cls.is_series():
             if shape[1] > 1:
@@ -308,14 +309,15 @@ class SignalsAccessor(GenericAccessor):
     def generate_both(
         cls,
         shape: tp.RelaxedShape,
-        entry_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
+        entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
         entry_args: tp.ArgsLike = None,
-        exit_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
+        exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
         exit_args: tp.ArgsLike = None,
         entry_wait: int = 1,
         exit_wait: int = 1,
         entry_pick_first: bool = True,
         exit_pick_first: bool = True,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbt.signals.nb.generate_enex_nb`.
@@ -328,12 +330,12 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def entry_choice_func_nb(from_i, to_i, col, temp_idx_arr):
+            ... def entry_choice_func(from_i, to_i, col, temp_idx_arr):
             ...     temp_idx_arr[0] = from_i
             ...     return temp_idx_arr[:1]  # array with one signal
 
             >>> @njit
-            ... def exit_choice_func_nb(from_i, to_i, col, temp_idx_arr):
+            ... def exit_choice_func(from_i, to_i, col, temp_idx_arr):
             ...     wait = col
             ...     temp_idx_arr[0] = from_i + wait
             ...     if temp_idx_arr[0] < to_i:
@@ -343,8 +345,8 @@ class SignalsAccessor(GenericAccessor):
             >>> temp_idx_arr = np.empty((1,), dtype=np.int64)  # reuse memory
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3),
-            ...     entry_choice_func_nb, (temp_idx_arr,),
-            ...     exit_choice_func_nb, (temp_idx_arr,),
+            ...     entry_choice_func, (temp_idx_arr,),
+            ...     exit_choice_func, (temp_idx_arr,),
             ...     index=mask.index, columns=mask.columns)
             >>> en
                             a      b      c
@@ -362,10 +364,10 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
-        checks.assert_not_none(entry_choice_func_nb)
-        checks.assert_not_none(exit_choice_func_nb)
-        checks.assert_numba_func(entry_choice_func_nb)
-        checks.assert_numba_func(exit_choice_func_nb)
+        checks.assert_not_none(entry_choice_func)
+        checks.assert_not_none(exit_choice_func)
+        checks.assert_backend_func(entry_choice_func, backend=backend)
+        checks.assert_backend_func(exit_choice_func, backend=backend)
         if entry_args is None:
             entry_args = ()
         if exit_args is None:
@@ -376,16 +378,17 @@ class SignalsAccessor(GenericAccessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        result1, result2 = nb.generate_enex_nb(
+        result1, result2 = dispatch.generate_enex(
             shape,
             entry_wait,
             exit_wait,
             entry_pick_first,
             exit_pick_first,
-            entry_choice_func_nb,
+            entry_choice_func,
             entry_args,
-            exit_choice_func_nb,
+            exit_choice_func,
             exit_args,
+            backend=backend,
         )
         if cls.is_series():
             if shape[1] > 1:
@@ -395,12 +398,13 @@ class SignalsAccessor(GenericAccessor):
 
     def generate_exits(
         self,
-        exit_choice_func_nb: tp.ChoiceFunc,
+        exit_choice_func: tp.ChoiceFunc,
         *args,
         wait: int = 1,
         until_next: bool = True,
         skip_until_exit: bool = False,
         pick_first: bool = False,
+        backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_ex_nb`.
@@ -410,11 +414,11 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def exit_choice_func_nb(from_i, to_i, col, temp_range):
+            ... def exit_choice_func(from_i, to_i, col, temp_range):
             ...     return temp_range[from_i:to_i]
 
             >>> temp_range = np.arange(mask.shape[0])  # reuse memory
-            >>> mask.vbt.signals.generate_exits(exit_choice_func_nb, temp_range)
+            >>> mask.vbt.signals.generate_exits(exit_choice_func, temp_range)
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02   True   True  False
@@ -423,16 +427,17 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   True  False   True
             ```
         """
-        checks.assert_numba_func(exit_choice_func_nb)
+        checks.assert_backend_func(exit_choice_func, backend=backend)
 
-        exits = nb.generate_ex_nb(
+        exits = dispatch.generate_ex(
             self.to_2d_array(),
             wait,
             until_next,
             skip_until_exit,
             pick_first,
-            exit_choice_func_nb,
+            exit_choice_func,
             *args,
+            backend=backend,
         )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -486,6 +491,7 @@ class SignalsAccessor(GenericAccessor):
         prob: tp.Optional[tp.ArrayLike] = None,
         pick_first: bool = False,
         seed: tp.Optional[int] = None,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """Generate signals randomly.
@@ -536,10 +542,10 @@ class SignalsAccessor(GenericAccessor):
             raise ValueError("Either n or prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
-            result = nb.generate_rand_nb(shape, n, seed=seed)
+            result = dispatch.generate_rand(shape, n, seed=seed, backend=backend)
         elif prob is not None:
-            prob = np.broadcast_to(prob, shape)
-            result = nb.generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
+            prob = np.broadcast_to(np.asarray(prob, dtype=np.float64), shape)
+            result = dispatch.generate_rand_by_prob(shape, prob, pick_first, flex_2d, seed=seed, backend=backend)
         else:
             raise ValueError("At least n or prob should be set")
 
@@ -563,6 +569,7 @@ class SignalsAccessor(GenericAccessor):
         exit_wait: int = 1,
         entry_pick_first: bool = True,
         exit_pick_first: bool = True,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """Generate chain of entry and exit signals randomly.
@@ -627,12 +634,19 @@ class SignalsAccessor(GenericAccessor):
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or any of the entry_prob and exit_prob should be set, not both")
         if n is not None:
-            n = np.broadcast_to(n, shape[1])
-            entries, exits = nb.generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
+            n = np.broadcast_to(np.asarray(n, dtype=np.int64), shape[1])
+            entries, exits = dispatch.generate_rand_enex(
+                shape,
+                n,
+                entry_wait,
+                exit_wait,
+                seed=seed,
+                backend=backend,
+            )
         elif entry_prob is not None and exit_prob is not None:
-            entry_prob = np.broadcast_to(entry_prob, shape)
-            exit_prob = np.broadcast_to(exit_prob, shape)
-            entries, exits = nb.generate_rand_enex_by_prob_nb(
+            entry_prob = np.broadcast_to(np.asarray(entry_prob, dtype=np.float64), shape)
+            exit_prob = np.broadcast_to(np.asarray(exit_prob, dtype=np.float64), shape)
+            entries, exits = dispatch.generate_rand_enex_by_prob(
                 shape,
                 entry_prob,
                 exit_prob,
@@ -642,6 +656,7 @@ class SignalsAccessor(GenericAccessor):
                 exit_pick_first,
                 flex_2d,
                 seed=seed,
+                backend=backend,
             )
         else:
             raise ValueError("At least n, or entry_prob and exit_prob should be set")
@@ -659,6 +674,7 @@ class SignalsAccessor(GenericAccessor):
         wait: int = 1,
         until_next: bool = True,
         skip_until_exit: bool = False,
+        backend: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Generate exit signals randomly.
@@ -693,17 +709,27 @@ class SignalsAccessor(GenericAccessor):
         """
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
-            exits = nb.generate_rand_ex_by_prob_nb(
-                reshape_fns.to_2d_array(obj),
+            entries_2d = reshape_fns.to_2d_array(obj)
+            prob = np.broadcast_to(np.asarray(prob, dtype=np.float64), entries_2d.shape)
+            exits = dispatch.generate_rand_ex_by_prob(
+                entries_2d,
                 prob,
                 wait,
                 until_next,
                 skip_until_exit,
                 obj.ndim == 2,
                 seed=seed,
+                backend=backend,
             )
             return ArrayWrapper.from_obj(obj).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
-        exits = nb.generate_rand_ex_nb(self.to_2d_array(), wait, until_next, skip_until_exit, seed=seed)
+        exits = dispatch.generate_rand_ex(
+            self.to_2d_array(),
+            wait,
+            until_next,
+            skip_until_exit,
+            seed=seed,
+            backend=backend,
+        )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def generate_stop_exits(
@@ -719,6 +745,7 @@ class SignalsAccessor(GenericAccessor):
         chain: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when `ts` hits the stop.
 
@@ -768,7 +795,6 @@ class SignalsAccessor(GenericAccessor):
             broadcast_kwargs = {}
         entries = self.obj
 
-        keep_raw = (False, True, True, True)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements="W")), broadcast_kwargs)
         entries, ts, stop, trailing = reshape_fns.broadcast(
             entries,
@@ -776,20 +802,26 @@ class SignalsAccessor(GenericAccessor):
             stop,
             trailing,
             **broadcast_kwargs,
-            keep_raw=keep_raw,
+            keep_raw=False,
         )
+        flex_2d = entries.ndim == 2
+        entries_2d = reshape_fns.to_2d_array(entries)
+        ts_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(ts, dtype=np.float64)), entries_2d.shape)
+        stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(stop, dtype=np.float64)), entries_2d.shape)
+        trailing_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(trailing, dtype=np.bool_)), entries_2d.shape)
 
         # Perform generation
         if chain:
-            new_entries, exits = nb.generate_stop_enex_nb(
-                reshape_fns.to_2d_array(entries),
-                ts,
-                stop,
-                trailing,
+            new_entries, exits = dispatch.generate_stop_enex(
+                entries_2d,
+                ts_2d,
+                stop_2d,
+                trailing_2d,
                 entry_wait,
                 exit_wait,
                 pick_first,
-                entries.ndim == 2,
+                flex_2d,
+                backend=backend,
             )
             return ArrayWrapper.from_obj(entries).wrap(
                 new_entries,
@@ -799,16 +831,17 @@ class SignalsAccessor(GenericAccessor):
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
-            exits = nb.generate_stop_ex_nb(
-                reshape_fns.to_2d_array(entries),
-                ts,
-                stop,
-                trailing,
+            exits = dispatch.generate_stop_ex(
+                entries_2d,
+                ts_2d,
+                stop_2d,
+                trailing_2d,
                 exit_wait,
                 until_next,
                 skip_until_exit,
                 pick_first,
-                entries.ndim == 2,
+                flex_2d,
+                backend=backend,
             )
             return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -832,6 +865,7 @@ class SignalsAccessor(GenericAccessor):
         chain: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
 
@@ -998,7 +1032,6 @@ class SignalsAccessor(GenericAccessor):
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
-        keep_raw = (False, True, True, True, True, True, True, True, True) + (False,) * len(out_args)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements="W")), broadcast_kwargs)
         entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args = reshape_fns.broadcast(
             entries,
@@ -1012,39 +1045,51 @@ class SignalsAccessor(GenericAccessor):
             reverse,
             *out_args,
             **broadcast_kwargs,
-            keep_raw=keep_raw,
+            keep_raw=False,
         )
+        flex_2d = entries.ndim == 2
+        entries_2d = reshape_fns.to_2d_array(entries)
+        shape = entries_2d.shape
+        open_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(open, dtype=np.float64)), shape)
+        high_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(high, dtype=np.float64)), shape)
+        low_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(low, dtype=np.float64)), shape)
+        close_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(close, dtype=np.float64)), shape)
+        sl_stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(sl_stop, dtype=np.float64)), shape)
+        sl_trail_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(sl_trail, dtype=np.bool_)), shape)
+        tp_stop_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(tp_stop, dtype=np.float64)), shape)
+        reverse_2d = np.broadcast_to(reshape_fns.to_2d_array(np.asarray(reverse, dtype=np.bool_)), shape)
         if stop_price_out is None:
-            stop_price_out = np.empty_like(entries, dtype=np.float64)
+            stop_price_out = np.empty(shape, dtype=np.float64)
         else:
             stop_price_out = out_args[0]
             out_args = out_args[1:]
         if stop_type_out is None:
-            stop_type_out = np.empty_like(entries, dtype=np.int64)
+            stop_type_out = np.empty(shape, dtype=np.int64)
         else:
             stop_type_out = out_args[0]
-        stop_price_out = reshape_fns.to_2d_array(stop_price_out)
-        stop_type_out = reshape_fns.to_2d_array(stop_type_out)
+        stop_price_out = np.ascontiguousarray(reshape_fns.to_2d_array(stop_price_out), dtype=np.float64)
+        stop_type_out = np.ascontiguousarray(reshape_fns.to_2d_array(stop_type_out), dtype=np.int64)
 
         # Perform generation
         if chain:
-            new_entries, exits = nb.generate_ohlc_stop_enex_nb(
-                reshape_fns.to_2d_array(entries),
-                open,
-                high,
-                low,
-                close,
+            new_entries, exits = dispatch.generate_ohlc_stop_enex(
+                entries_2d,
+                open_2d,
+                high_2d,
+                low_2d,
+                close_2d,
                 stop_price_out,
                 stop_type_out,
-                sl_stop,
-                sl_trail,
-                tp_stop,
-                reverse,
+                sl_stop_2d,
+                sl_trail_2d,
+                tp_stop_2d,
+                reverse_2d,
                 is_open_safe,
                 entry_wait,
                 exit_wait,
                 pick_first,
-                entries.ndim == 2,
+                flex_2d,
+                backend=backend,
             )
             out_dict["stop_price"] = ArrayWrapper.from_obj(entries).wrap(
                 stop_price_out,
@@ -1064,24 +1109,25 @@ class SignalsAccessor(GenericAccessor):
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
-            exits = nb.generate_ohlc_stop_ex_nb(
-                reshape_fns.to_2d_array(entries),
-                open,
-                high,
-                low,
-                close,
+            exits = dispatch.generate_ohlc_stop_ex(
+                entries_2d,
+                open_2d,
+                high_2d,
+                low_2d,
+                close_2d,
                 stop_price_out,
                 stop_type_out,
-                sl_stop,
-                sl_trail,
-                tp_stop,
-                reverse,
+                sl_stop_2d,
+                sl_trail_2d,
+                tp_stop_2d,
+                reverse_2d,
                 is_open_safe,
                 exit_wait,
                 until_next,
                 skip_until_exit,
                 pick_first,
-                entries.ndim == 2,
+                flex_2d,
+                backend=backend,
             )
             out_dict["stop_price"] = ArrayWrapper.from_obj(entries).wrap(
                 stop_price_out,
@@ -1240,11 +1286,12 @@ class SignalsAccessor(GenericAccessor):
 
     def rank(
         self,
-        rank_func_nb: tp.RankFunc,
+        rank_func: tp.RankFunc,
         *args,
         prepare_func: tp.Optional[tp.Callable] = None,
         reset_by: tp.Optional[tp.ArrayLike] = None,
         after_false: bool = False,
+        backend: tp.Optional[str] = None,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         as_mapped: bool = False,
@@ -1258,8 +1305,8 @@ class SignalsAccessor(GenericAccessor):
         It should take both broadcasted arrays (`reset_by` can be None) and return a tuple.
 
         Set `as_mapped` to True to return an instance of `vectorbt.records.mapped_array.MappedArray`."""
-        checks.assert_not_none(rank_func_nb)
-        checks.assert_numba_func(rank_func_nb)
+        checks.assert_not_none(rank_func)
+        checks.assert_backend_func(rank_func, backend=backend)
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1273,7 +1320,7 @@ class SignalsAccessor(GenericAccessor):
             temp_arrs = prepare_func(obj_arr, reset_by)
         else:
             temp_arrs = ()
-        rank = nb.rank_nb(obj_arr, reset_by, after_false, rank_func_nb, *temp_arrs, *args)
+        rank = dispatch.rank(obj_arr, reset_by, after_false, rank_func, *temp_arrs, *args, backend=backend)
         rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
