@@ -474,6 +474,31 @@ pub(crate) fn true_range_2d(
     close: ArrayView2<'_, f64>,
 ) -> Array2<f64> {
     let (nrows, ncols) = high.dim();
+    if let (Some(high_src), Some(low_src), Some(close_src)) =
+        (high.as_slice(), low.as_slice(), close.as_slice())
+    {
+        let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+        let dst = out.as_slice_mut().expect("owned array must be sliceable");
+        if nrows == 0 {
+            return out;
+        }
+        for col in 0..ncols {
+            dst[col] = high_src[col] - low_src[col];
+        }
+        for row in 1..nrows {
+            let row_start = row * ncols;
+            let prev_start = (row - 1) * ncols;
+            for col in 0..ncols {
+                let idx = row_start + col;
+                let prev_idx = prev_start + col;
+                let hl = high_src[idx] - low_src[idx];
+                let hc = (high_src[idx] - close_src[prev_idx]).abs();
+                let lc = (low_src[idx] - close_src[prev_idx]).abs();
+                dst[idx] = max3_numba(hl, hc, lc);
+            }
+        }
+        return out;
+    }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let mut h_buf = vec![0.0f64; nrows];
     let mut l_buf = vec![0.0f64; nrows];
@@ -617,6 +642,28 @@ pub fn obv_custom_rs<'py>(
     }
     let (nrows, ncols) = c_arr.dim();
     let result = py.allow_threads(|| {
+        if let (Some(close_src), Some(volume_src)) = (c_arr.as_slice(), v_arr.as_slice()) {
+            let mut out = Array2::<f64>::zeros((nrows, ncols));
+            let dst = out.as_slice_mut().expect("owned array must be sliceable");
+            let mut sums = vec![0.0f64; ncols];
+            for row in 0..nrows {
+                let row_start = row * ncols;
+                let prev_start = row.saturating_sub(1) * ncols;
+                for col in 0..ncols {
+                    let idx = row_start + col;
+                    let volume = if row > 0 && close_src[idx] < close_src[prev_start + col] {
+                        -volume_src[idx]
+                    } else {
+                        volume_src[idx]
+                    };
+                    if !volume.is_nan() {
+                        sums[col] += volume;
+                    }
+                    dst[idx] = sums[col];
+                }
+            }
+            return out;
+        }
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         let mut c_buf = vec![0.0f64; nrows];
         let mut v_buf = vec![0.0f64; nrows];

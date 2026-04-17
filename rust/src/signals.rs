@@ -109,6 +109,15 @@ pub(crate) fn generate_rand_by_prob<R: Rng + ?Sized>(
     out
 }
 
+fn next_true_in_col(
+    a: ArrayView2<'_, bool>,
+    col: usize,
+    start: usize,
+    nrows: usize,
+) -> Option<usize> {
+    (start..nrows).find(|&row| a[[row, col]])
+}
+
 pub(crate) fn generate_rand_ex<R: Rng + ?Sized>(
     entries: ArrayView2<'_, bool>,
     wait: usize,
@@ -120,23 +129,24 @@ pub(crate) fn generate_rand_ex<R: Rng + ?Sized>(
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
 
     for col in 0..ncols {
-        let entry_idxs: Vec<usize> = (0..nrows).filter(|&r| entries[[r, col]]).collect();
         let mut last_exit_i: i64 = -1;
-        for i in 0..entry_idxs.len() {
-            if skip_until_exit && (entry_idxs[i] as i64) <= last_exit_i {
-                continue;
+        let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
+        while let Some(entry_i) = entry_i_opt {
+            let next_entry_i = next_true_in_col(entries, col, entry_i + 1, nrows);
+            if !(skip_until_exit && (entry_i as i64) <= last_exit_i) {
+                let from_i = entry_i + wait;
+                let to_i = if until_next {
+                    next_entry_i.unwrap_or(nrows)
+                } else {
+                    nrows
+                };
+                if to_i > from_i {
+                    let exit_i = from_i + rng.gen_range(0..to_i - from_i);
+                    exits[[exit_i, col]] = true;
+                    last_exit_i = exit_i as i64;
+                }
             }
-            let from_i = entry_idxs[i] + wait;
-            let to_i = if i < entry_idxs.len() - 1 && until_next {
-                entry_idxs[i + 1]
-            } else {
-                nrows
-            };
-            if to_i > from_i {
-                let exit_i = from_i + rng.gen_range(0..to_i - from_i);
-                exits[[exit_i, col]] = true;
-                last_exit_i = exit_i as i64;
-            }
+            entry_i_opt = next_entry_i;
         }
     }
     exits
@@ -154,27 +164,28 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
 
     for col in 0..ncols {
-        let entry_idxs: Vec<usize> = (0..nrows).filter(|&r| entries[[r, col]]).collect();
         let mut last_exit_i: i64 = -1;
-        for i in 0..entry_idxs.len() {
-            if skip_until_exit && (entry_idxs[i] as i64) <= last_exit_i {
-                continue;
-            }
-            let from_i = entry_idxs[i] + wait;
-            let to_i = if i < entry_idxs.len() - 1 && until_next {
-                entry_idxs[i + 1]
-            } else {
-                nrows
-            };
-            if to_i > from_i {
-                for idx in from_i..to_i {
-                    if rng.gen::<f64>() < prob[[idx, col]] {
-                        exits[[idx, col]] = true;
-                        last_exit_i = idx as i64;
-                        break;
+        let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
+        while let Some(entry_i) = entry_i_opt {
+            let next_entry_i = next_true_in_col(entries, col, entry_i + 1, nrows);
+            if !(skip_until_exit && (entry_i as i64) <= last_exit_i) {
+                let from_i = entry_i + wait;
+                let to_i = if until_next {
+                    next_entry_i.unwrap_or(nrows)
+                } else {
+                    nrows
+                };
+                if to_i > from_i {
+                    for idx in from_i..to_i {
+                        if rng.gen::<f64>() < prob[[idx, col]] {
+                            exits[[idx, col]] = true;
+                            last_exit_i = idx as i64;
+                            break;
+                        }
                     }
                 }
             }
+            entry_i_opt = next_entry_i;
         }
     }
     exits
@@ -237,12 +248,15 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
         let doubled: Vec<i64> = n.iter().map(|&x| x * 2).collect();
         let both = generate_rand(nrows, ncols, &doubled, rng);
         for col in 0..ncols {
-            let both_idxs: Vec<usize> = (0..nrows).filter(|&r| both[[r, col]]).collect();
-            for (k, &idx) in both_idxs.iter().enumerate() {
-                if k % 2 == 0 {
-                    entries[[idx, col]] = true;
-                } else {
-                    exits[[idx, col]] = true;
+            let mut k = 0usize;
+            for row in 0..nrows {
+                if both[[row, col]] {
+                    if k % 2 == 0 {
+                        entries[[row, col]] = true;
+                    } else {
+                        exits[[row, col]] = true;
+                    }
+                    k += 1;
                 }
             }
         }
@@ -305,16 +319,18 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
         }
         // Generate exits
         for col in 0..ncols {
-            let entry_idxs: Vec<usize> = (0..nrows).filter(|&r| entries[[r, col]]).collect();
-            for j in 0..entry_idxs.len() {
-                let entry_i = entry_idxs[j] + exit_wait;
-                let exit_i = if j < entry_idxs.len() - 1 {
-                    entry_idxs[j + 1] - entry_wait
+            let mut entry_i_opt = next_true_in_col(entries.view(), col, 0, nrows);
+            while let Some(entry_idx) = entry_i_opt {
+                let next_entry_i = next_true_in_col(entries.view(), col, entry_idx + 1, nrows);
+                let entry_i = entry_idx + exit_wait;
+                let exit_i = if let Some(next_idx) = next_entry_i {
+                    next_idx - entry_wait
                 } else {
                     nrows - 1
                 };
                 let i = rng.gen_range(0..(exit_i - entry_i + 1));
                 exits[[entry_i + i, col]] = true;
+                entry_i_opt = next_entry_i;
             }
         }
     }
@@ -534,36 +550,37 @@ pub(crate) fn generate_stop_ex(
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
 
     for col in 0..ncols {
-        let entry_idxs: Vec<usize> = (0..nrows).filter(|&r| entries[[r, col]]).collect();
         let mut last_exit_i: i64 = -1;
-        for i in 0..entry_idxs.len() {
-            if skip_until_exit && (entry_idxs[i] as i64) <= last_exit_i {
-                continue;
-            }
-            let from_i = entry_idxs[i] + wait;
-            let to_i = if i < entry_idxs.len() - 1 && until_next {
-                entry_idxs[i + 1]
-            } else {
-                nrows
-            };
-            if to_i > from_i {
-                if pick_first {
-                    if let Some(idx) =
-                        stop_choice_first(from_i, to_i, col, ts, stop, trailing, wait)
-                    {
-                        exits[[idx, col]] = true;
-                        last_exit_i = idx as i64;
-                    }
+        let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
+        while let Some(entry_i) = entry_i_opt {
+            let next_entry_i = next_true_in_col(entries, col, entry_i + 1, nrows);
+            if !(skip_until_exit && (entry_i as i64) <= last_exit_i) {
+                let from_i = entry_i + wait;
+                let to_i = if until_next {
+                    next_entry_i.unwrap_or(nrows)
                 } else {
-                    let hits = stop_choice_all(from_i, to_i, col, ts, stop, trailing, wait);
-                    if !hits.is_empty() {
-                        for &idx in &hits {
+                    nrows
+                };
+                if to_i > from_i {
+                    if pick_first {
+                        if let Some(idx) =
+                            stop_choice_first(from_i, to_i, col, ts, stop, trailing, wait)
+                        {
                             exits[[idx, col]] = true;
+                            last_exit_i = idx as i64;
                         }
-                        last_exit_i = *hits.last().unwrap() as i64;
+                    } else {
+                        let hits = stop_choice_all(from_i, to_i, col, ts, stop, trailing, wait);
+                        if !hits.is_empty() {
+                            for &idx in &hits {
+                                exits[[idx, col]] = true;
+                            }
+                            last_exit_i = *hits.last().unwrap() as i64;
+                        }
                     }
                 }
             }
+            entry_i_opt = next_entry_i;
         }
     }
     exits
@@ -830,50 +847,52 @@ pub(crate) fn generate_ohlc_stop_ex(
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
 
     for col in 0..ncols {
-        let entry_idxs: Vec<usize> = (0..nrows).filter(|&r| entries[[r, col]]).collect();
         let mut last_exit_i: i64 = -1;
-        for i in 0..entry_idxs.len() {
-            if skip_until_exit && (entry_idxs[i] as i64) <= last_exit_i {
-                continue;
-            }
-            let from_i = entry_idxs[i] + wait;
-            let to_i = if i < entry_idxs.len() - 1 && until_next {
-                entry_idxs[i + 1]
-            } else {
-                nrows
-            };
-            if to_i > from_i {
-                let hits = ohlc_stop_choice(
-                    from_i,
-                    to_i,
-                    col,
-                    open,
-                    high,
-                    low,
-                    close,
-                    stop_price_out,
-                    stop_type_out,
-                    sl_stop,
-                    sl_trail,
-                    tp_stop,
-                    reverse,
-                    is_open_safe,
-                    wait,
-                    pick_first,
-                )?;
-                if hits.is_empty() {
-                    continue;
-                }
-                if pick_first {
-                    exits[[hits[0], col]] = true;
-                    last_exit_i = hits[0] as i64;
+        let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
+        while let Some(entry_i) = entry_i_opt {
+            let next_entry_i = next_true_in_col(entries, col, entry_i + 1, nrows);
+            if !(skip_until_exit && (entry_i as i64) <= last_exit_i) {
+                let from_i = entry_i + wait;
+                let to_i = if until_next {
+                    next_entry_i.unwrap_or(nrows)
                 } else {
-                    for &idx in &hits {
-                        exits[[idx, col]] = true;
+                    nrows
+                };
+                if to_i > from_i {
+                    let hits = ohlc_stop_choice(
+                        from_i,
+                        to_i,
+                        col,
+                        open,
+                        high,
+                        low,
+                        close,
+                        stop_price_out,
+                        stop_type_out,
+                        sl_stop,
+                        sl_trail,
+                        tp_stop,
+                        reverse,
+                        is_open_safe,
+                        wait,
+                        pick_first,
+                    )?;
+                    if hits.is_empty() {
+                        entry_i_opt = next_entry_i;
+                        continue;
                     }
-                    last_exit_i = *hits.last().unwrap() as i64;
+                    if pick_first {
+                        exits[[hits[0], col]] = true;
+                        last_exit_i = hits[0] as i64;
+                    } else {
+                        for &idx in &hits {
+                            exits[[idx, col]] = true;
+                        }
+                        last_exit_i = *hits.last().unwrap() as i64;
+                    }
                 }
             }
+            entry_i_opt = next_entry_i;
         }
     }
     Ok(exits)
@@ -1322,6 +1341,27 @@ pub(crate) fn norm_avg_index_1d(a: &[bool]) -> f64 {
 pub(crate) fn norm_avg_index(a: ArrayView2<'_, bool>) -> Vec<f64> {
     let (nrows, ncols) = a.dim();
     let mut out = vec![f64::NAN; ncols];
+
+    if let Some(slice) = a.as_slice() {
+        let mut sums = vec![0.0f64; ncols];
+        let mut counts = vec![0usize; ncols];
+        for row in 0..nrows {
+            let base = row * ncols;
+            for col in 0..ncols {
+                if slice[base + col] {
+                    sums[col] += row as f64;
+                    counts[col] += 1;
+                }
+            }
+        }
+        for col in 0..ncols {
+            if counts[col] > 0 {
+                let mean_index = sums[col] / counts[col] as f64;
+                out[col] = (2.0 * mean_index / (nrows as f64 - 1.0)) - 1.0;
+            }
+        }
+        return out;
+    }
 
     for col in 0..ncols {
         let mut sum = 0.0f64;

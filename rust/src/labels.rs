@@ -178,6 +178,53 @@ fn mean_labels_apply_rolling_c(
     Some(out)
 }
 
+fn future_min_max_apply_rolling_c(
+    close: ArrayView2<'_, f64>,
+    window: usize,
+    wait: usize,
+    is_min: bool,
+) -> Option<Array2<f64>> {
+    let (nrows, ncols) = close.dim();
+    let src = close.as_slice()?;
+    let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
+
+    for i in 0..nrows {
+        let start = i + wait;
+        let end = start + window;
+        if end > nrows {
+            continue;
+        }
+        let out_start = i * ncols;
+        for col in 0..ncols {
+            let mut value = if is_min {
+                f64::INFINITY
+            } else {
+                f64::NEG_INFINITY
+            };
+            let mut valid = true;
+            for row in start..end {
+                let v = src[row * ncols + col];
+                if v.is_nan() {
+                    valid = false;
+                    break;
+                }
+                if is_min {
+                    if v < value {
+                        value = v;
+                    }
+                } else if v > value {
+                    value = v;
+                }
+            }
+            if valid {
+                dst[out_start + col] = value;
+            }
+        }
+    }
+    Some(out)
+}
+
 pub(crate) fn future_mean_apply(
     close: ArrayView2<'_, f64>,
     window: usize,
@@ -249,6 +296,9 @@ pub(crate) fn future_min_apply(
     window: usize,
     wait: usize,
 ) -> Array2<f64> {
+    if let Some(out) = future_min_max_apply_rolling_c(close, window, wait, true) {
+        return out;
+    }
     let base = apply_2d_by_col(close, |col| {
         let rev: Vec<f64> = col.iter().rev().copied().collect();
         let out = rolling_min_1d(&rev, window, window);
@@ -270,6 +320,9 @@ pub(crate) fn future_max_apply(
     window: usize,
     wait: usize,
 ) -> Array2<f64> {
+    if let Some(out) = future_min_max_apply_rolling_c(close, window, wait, false) {
+        return out;
+    }
     let base = apply_2d_by_col(close, |col| {
         let rev: Vec<f64> = col.iter().rev().copied().collect();
         let out = rolling_max_1d(&rev, window, window);
@@ -337,6 +390,15 @@ pub(crate) fn mean_labels_apply(
     }
     let future = future_mean_apply(close, window, ewm, wait, adjust);
     let (nrows, ncols) = close.dim();
+    if let (Some(close_src), Some(future_src)) = (close.as_slice(), future.as_slice()) {
+        let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+        let dst = out.as_slice_mut().expect("owned array must be sliceable");
+        for i in 0..close_src.len() {
+            let cur = close_src[i];
+            dst[i] = (future_src[i] - cur) / cur;
+        }
+        return out;
+    }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     for col in 0..ncols {
         for i in 0..nrows {
@@ -413,15 +475,15 @@ pub(crate) fn bn_trend_labels(
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
     for col in 0..ncols {
-        let idxs: Vec<usize> = (0..nrows)
-            .filter(|&r| local_extrema[[r, col]] != 0)
-            .collect();
-        if idxs.is_empty() {
-            continue;
-        }
-        for k in 1..idxs.len() {
-            let prev_i = idxs[k - 1];
-            let next_i = idxs[k];
+        let mut prev_i_opt: Option<usize> = None;
+        for next_i in 0..nrows {
+            if local_extrema[[next_i, col]] == 0 {
+                continue;
+            }
+            let Some(prev_i) = prev_i_opt else {
+                prev_i_opt = Some(next_i);
+                continue;
+            };
             let fill = if close[[next_i, col]] > close[[prev_i, col]] {
                 1.0
             } else {
@@ -430,6 +492,7 @@ pub(crate) fn bn_trend_labels(
             for i in prev_i..next_i {
                 out[[i, col]] = fill;
             }
+            prev_i_opt = Some(next_i);
         }
     }
     out
@@ -461,20 +524,21 @@ pub(crate) fn bn_cont_trend_labels(
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
     for col in 0..ncols {
-        let idxs: Vec<usize> = (0..nrows)
-            .filter(|&r| local_extrema[[r, col]] != 0)
-            .collect();
-        if idxs.is_empty() {
-            continue;
-        }
-        for k in 1..idxs.len() {
-            let prev_i = idxs[k - 1];
-            let next_i = idxs[k];
+        let mut prev_i_opt: Option<usize> = None;
+        for next_i in 0..nrows {
+            if local_extrema[[next_i, col]] == 0 {
+                continue;
+            }
+            let Some(prev_i) = prev_i_opt else {
+                prev_i_opt = Some(next_i);
+                continue;
+            };
             let (_min, _max) = slice_min_max(close, col, prev_i, next_i);
             let range = _max - _min;
             for i in prev_i..next_i {
                 out[[i, col]] = 1.0 - (close[[i, col]] - _min) / range;
             }
+            prev_i_opt = Some(next_i);
         }
     }
     out
@@ -490,15 +554,15 @@ pub(crate) fn bn_cont_sat_trend_labels(
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
     for col in 0..ncols {
-        let idxs: Vec<usize> = (0..nrows)
-            .filter(|&r| local_extrema[[r, col]] != 0)
-            .collect();
-        if idxs.is_empty() {
-            continue;
-        }
-        for k in 1..idxs.len() {
-            let prev_i = idxs[k - 1];
-            let next_i = idxs[k];
+        let mut prev_i_opt: Option<usize> = None;
+        for next_i in 0..nrows {
+            if local_extrema[[next_i, col]] == 0 {
+                continue;
+            }
+            let Some(prev_i) = prev_i_opt else {
+                prev_i_opt = Some(next_i);
+                continue;
+            };
 
             let _pos_th = pos_th[[prev_i, col]].abs();
             let _neg_th = neg_th[[prev_i, col]].abs();
@@ -532,6 +596,7 @@ pub(crate) fn bn_cont_sat_trend_labels(
                     }
                 }
             }
+            prev_i_opt = Some(next_i);
         }
     }
     Ok(out)
@@ -546,15 +611,15 @@ pub(crate) fn pct_trend_labels(
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
     for col in 0..ncols {
-        let idxs: Vec<usize> = (0..nrows)
-            .filter(|&r| local_extrema[[r, col]] != 0)
-            .collect();
-        if idxs.is_empty() {
-            continue;
-        }
-        for k in 1..idxs.len() {
-            let prev_i = idxs[k - 1];
-            let next_i = idxs[k];
+        let mut prev_i_opt: Option<usize> = None;
+        for next_i in 0..nrows {
+            if local_extrema[[next_i, col]] == 0 {
+                continue;
+            }
+            let Some(prev_i) = prev_i_opt else {
+                prev_i_opt = Some(next_i);
+                continue;
+            };
             let going_up = close[[next_i, col]] > close[[prev_i, col]];
             for i in prev_i..next_i {
                 let c = close[[i, col]];
@@ -565,6 +630,7 @@ pub(crate) fn pct_trend_labels(
                     (next_c - c) / c
                 };
             }
+            prev_i_opt = Some(next_i);
         }
     }
     out
