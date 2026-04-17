@@ -13,6 +13,8 @@ from vectorbt.labels import nb as labels_nb
 from vectorbt.labels.enums import TrendMode
 from vectorbt.returns import dispatch as returns_dispatch
 from vectorbt.returns import nb as returns_nb
+from vectorbt.records import dispatch as records_dispatch
+from vectorbt.records import nb as records_nb
 from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
 
@@ -533,9 +535,9 @@ class TestReturnsRustParity:
             returns_nb.get_return_nb(0.0, np.nan),
             equal_nan=True,
         )
-        assert returns_dispatch.cum_returns_final_1d(returns[:, 0], 0.0, backend="rust") == returns_nb.cum_returns_final_1d_nb(
-            returns[:, 0], 0.0
-        )
+        assert returns_dispatch.cum_returns_final_1d(
+            returns[:, 0], 0.0, backend="rust"
+        ) == returns_nb.cum_returns_final_1d_nb(returns[:, 0], 0.0)
 
         cases = [
             (returns_dispatch.returns, returns_nb.returns_nb, (values, init_value)),
@@ -597,8 +599,16 @@ class TestReturnsRustParity:
             dtype=np.float64,
         )
         cases = [
-            (returns_dispatch.rolling_cum_returns_final, returns_nb.rolling_cum_returns_final_nb, (returns, 3, None, 0.0)),
-            (returns_dispatch.rolling_annualized_return, returns_nb.rolling_annualized_return_nb, (returns, 3, None, 365.0)),
+            (
+                returns_dispatch.rolling_cum_returns_final,
+                returns_nb.rolling_cum_returns_final_nb,
+                (returns, 3, None, 0.0),
+            ),
+            (
+                returns_dispatch.rolling_annualized_return,
+                returns_nb.rolling_annualized_return_nb,
+                (returns, 3, None, 365.0),
+            ),
             (
                 returns_dispatch.rolling_annualized_volatility,
                 returns_nb.rolling_annualized_volatility_nb,
@@ -606,10 +616,26 @@ class TestReturnsRustParity:
             ),
             (returns_dispatch.rolling_max_drawdown, returns_nb.rolling_max_drawdown_nb, (returns, 3, None)),
             (returns_dispatch.rolling_calmar_ratio, returns_nb.rolling_calmar_ratio_nb, (returns, 3, None, 365.0)),
-            (returns_dispatch.rolling_omega_ratio, returns_nb.rolling_omega_ratio_nb, (returns, 3, None, 365.0, 0.01, 0.1)),
-            (returns_dispatch.rolling_sharpe_ratio, returns_nb.rolling_sharpe_ratio_nb, (returns, 3, None, 365.0, 0.01, 1)),
-            (returns_dispatch.rolling_downside_risk, returns_nb.rolling_downside_risk_nb, (returns, 3, None, 365.0, 0.1)),
-            (returns_dispatch.rolling_sortino_ratio, returns_nb.rolling_sortino_ratio_nb, (returns, 3, None, 365.0, 0.1)),
+            (
+                returns_dispatch.rolling_omega_ratio,
+                returns_nb.rolling_omega_ratio_nb,
+                (returns, 3, None, 365.0, 0.01, 0.1),
+            ),
+            (
+                returns_dispatch.rolling_sharpe_ratio,
+                returns_nb.rolling_sharpe_ratio_nb,
+                (returns, 3, None, 365.0, 0.01, 1),
+            ),
+            (
+                returns_dispatch.rolling_downside_risk,
+                returns_nb.rolling_downside_risk_nb,
+                (returns, 3, None, 365.0, 0.1),
+            ),
+            (
+                returns_dispatch.rolling_sortino_ratio,
+                returns_nb.rolling_sortino_ratio_nb,
+                (returns, 3, None, 365.0, 0.1),
+            ),
             (
                 returns_dispatch.rolling_information_ratio,
                 returns_nb.rolling_information_ratio_nb,
@@ -625,8 +651,16 @@ class TestReturnsRustParity:
                 (returns, 3, None, 0.05),
             ),
             (returns_dispatch.rolling_capture, returns_nb.rolling_capture_nb, (returns, 3, None, benchmark, 365.0)),
-            (returns_dispatch.rolling_up_capture, returns_nb.rolling_up_capture_nb, (returns, 3, None, benchmark, 365.0)),
-            (returns_dispatch.rolling_down_capture, returns_nb.rolling_down_capture_nb, (returns, 3, None, benchmark, 365.0)),
+            (
+                returns_dispatch.rolling_up_capture,
+                returns_nb.rolling_up_capture_nb,
+                (returns, 3, None, benchmark, 365.0),
+            ),
+            (
+                returns_dispatch.rolling_down_capture,
+                returns_nb.rolling_down_capture_nb,
+                (returns, 3, None, benchmark, 365.0),
+            ),
         ]
         for minp in (None, 1, 2):
             for dispatch_func, nb_func, args in cases:
@@ -698,7 +732,9 @@ class TestReturnsRustParity:
             pd.DataFrame.vbt.returns.from_value(price, backend="rust").obj,
             pd.DataFrame.vbt.returns.from_value(price, backend="numba").obj,
         )
-        pd.testing.assert_frame_equal(rets.vbt.returns.cumulative(backend="rust"), rets.vbt.returns.cumulative(backend="numba"))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.cumulative(backend="rust"), rets.vbt.returns.cumulative(backend="numba")
+        )
         pd.testing.assert_series_equal(rets.vbt.returns.total(backend="rust"), rets.vbt.returns.total(backend="numba"))
         pd.testing.assert_series_equal(
             rets.vbt.returns.annualized_volatility(backend="rust"),
@@ -712,7 +748,9 @@ class TestReturnsRustParity:
             rets.vbt.returns.common_sense_ratio(backend="rust"),
             rets.vbt.returns.common_sense_ratio(backend="numba"),
         )
-        pd.testing.assert_frame_equal(rets.vbt.returns.drawdown(backend="rust"), rets.vbt.returns.drawdown(backend="numba"))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.drawdown(backend="rust"), rets.vbt.returns.drawdown(backend="numba")
+        )
         pd.testing.assert_frame_equal(
             rets.vbt.returns.rolling_total(window=3, minp=1, backend="rust"),
             rets.vbt.returns.rolling_total(window=3, minp=1, backend="numba"),
@@ -1462,3 +1500,197 @@ class TestLabelsRustParity:
             vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="rust").labels,
             vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="numba").labels,
         )
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed")
+class TestRecordsRustParity:
+    def test_records_exports_match_nb_inventory(self):
+        import vectorbt_rust.records as rust_records
+
+        expected = [
+            "col_range_rs",
+            "col_range_select_rs",
+            "col_map_rs",
+            "col_map_select_rs",
+            "record_col_range_select_rs",
+            "record_col_map_select_rs",
+            "is_col_sorted_rs",
+            "is_col_idx_sorted_rs",
+            "is_mapped_expandable_rs",
+            "expand_mapped_rs",
+            "stack_expand_mapped_rs",
+            "mapped_value_counts_rs",
+            "top_n_mapped_mask_rs",
+            "bottom_n_mapped_mask_rs",
+        ]
+        assert [name for name in expected if hasattr(rust_records, name)] == expected
+
+    def test_col_range(self):
+        col_arr = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
+        np.testing.assert_array_equal(
+            records_dispatch.col_range(col_arr, 3, backend="rust"),
+            records_nb.col_range_nb(col_arr, 3),
+        )
+
+    def test_col_range_empty_cols(self):
+        col_arr = np.array([0, 0, 2, 2], dtype=np.int64)
+        np.testing.assert_array_equal(
+            records_dispatch.col_range(col_arr, 3, backend="rust"),
+            records_nb.col_range_nb(col_arr, 3),
+        )
+
+    def test_col_range_select(self):
+        col_arr = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
+        cr = records_nb.col_range_nb(col_arr, 3)
+        new_cols = np.array([0, 2], dtype=np.int64)
+        rust_idxs, rust_cols = records_dispatch.col_range_select(cr, new_cols, backend="rust")
+        nb_idxs, nb_cols = records_nb.col_range_select_nb(cr, new_cols)
+        np.testing.assert_array_equal(rust_idxs, nb_idxs)
+        np.testing.assert_array_equal(rust_cols, nb_cols)
+
+    def test_col_map(self):
+        col_arr = np.array([0, 1, 2, 0, 1, 2, 0, 2, 2], dtype=np.int64)
+        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 3, backend="rust")
+        nb_idxs, nb_lens = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(rust_idxs, nb_idxs)
+        np.testing.assert_array_equal(rust_lens, nb_lens)
+
+    def test_col_map_select(self):
+        col_arr = np.array([0, 1, 2, 0, 1, 2, 0, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        new_cols = np.array([0, 2], dtype=np.int64)
+        rust_idxs, rust_cols = records_dispatch.col_map_select(cm, new_cols, backend="rust")
+        nb_idxs, nb_cols = records_nb.col_map_select_nb(cm, new_cols)
+        np.testing.assert_array_equal(rust_idxs, nb_idxs)
+        np.testing.assert_array_equal(rust_cols, nb_cols)
+
+    def test_record_col_range_select(self):
+        rec_dt = np.dtype(
+            [("id", np.int64), ("col", np.int64), ("start_idx", np.int64), ("end_idx", np.int64), ("status", np.int64)],
+            align=True,
+        )
+        records = np.array(
+            [(0, 0, 10, 20, 0), (1, 0, 30, 40, 1), (2, 1, 50, 60, 0), (3, 1, 70, 80, 1), (4, 2, 90, 100, 0)],
+            dtype=rec_dt,
+        )
+        cr = records_nb.col_range_nb(records["col"], 3)
+        new_cols = np.array([0, 2], dtype=np.int64)
+        np.testing.assert_array_equal(
+            records_dispatch.record_col_range_select(records, cr, new_cols, backend="rust"),
+            records_nb.record_col_range_select_nb(records, cr, new_cols),
+        )
+
+    def test_record_col_map_select(self):
+        rec_dt = np.dtype(
+            [("id", np.int64), ("col", np.int64), ("val", np.float64)],
+            align=True,
+        )
+        records = np.array(
+            [(0, 0, 1.1), (1, 2, 2.2), (2, 0, 3.3), (3, 1, 4.4), (4, 2, 5.5)],
+            dtype=rec_dt,
+        )
+        cm = records_nb.col_map_nb(records["col"], 3)
+        new_cols = np.array([0, 2], dtype=np.int64)
+        np.testing.assert_array_equal(
+            records_dispatch.record_col_map_select(records, cm, new_cols, backend="rust"),
+            records_nb.record_col_map_select_nb(records, cm, new_cols),
+        )
+
+    def test_is_col_sorted(self):
+        sorted_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
+        unsorted_arr = np.array([0, 2, 1, 1, 0], dtype=np.int64)
+        assert records_dispatch.is_col_sorted(sorted_arr, backend="rust") is True
+        assert records_dispatch.is_col_sorted(unsorted_arr, backend="rust") is False
+
+    def test_is_col_idx_sorted(self):
+        col_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
+        id_sorted = np.array([0, 1, 0, 1, 0], dtype=np.int64)
+        id_unsorted = np.array([1, 0, 0, 1, 0], dtype=np.int64)
+        assert records_dispatch.is_col_idx_sorted(col_arr, id_sorted, backend="rust") is True
+        assert records_dispatch.is_col_idx_sorted(col_arr, id_unsorted, backend="rust") is False
+
+    def test_is_mapped_expandable(self):
+        col_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
+        idx_arr = np.array([0, 1, 0, 1, 0], dtype=np.int64)
+        assert records_dispatch.is_mapped_expandable(col_arr, idx_arr, (2, 3), backend="rust") is True
+        # Conflicting positions
+        idx_dup = np.array([0, 0, 0, 1, 0], dtype=np.int64)
+        assert records_dispatch.is_mapped_expandable(col_arr, idx_dup, (2, 3), backend="rust") is False
+
+    def test_expand_mapped(self):
+        mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0], dtype=np.float64)
+        col_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
+        idx_arr = np.array([0, 1, 0, 1, 0], dtype=np.int64)
+        target_shape = (2, 3)
+        np.testing.assert_allclose(
+            records_dispatch.expand_mapped(mapped_arr, col_arr, idx_arr, target_shape, np.nan, backend="rust"),
+            records_nb.expand_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, np.nan),
+            equal_nan=True,
+        )
+
+    def test_stack_expand_mapped(self):
+        mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_allclose(
+            records_dispatch.stack_expand_mapped(mapped_arr, cm, np.nan, backend="rust"),
+            records_nb.stack_expand_mapped_nb(mapped_arr, cm, np.nan),
+            equal_nan=True,
+        )
+
+    def test_mapped_value_counts(self):
+        codes = np.array([0, 1, 0, 2, 1, 0, 2, 1, 0], dtype=np.int64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.mapped_value_counts(codes, 3, cm, backend="rust"),
+            records_nb.mapped_value_counts_nb(codes, 3, cm),
+        )
+
+    def test_top_n_mapped_mask(self):
+        mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, backend="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
+        )
+
+    def test_bottom_n_mapped_mask(self):
+        mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, backend="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
+        )
+
+    def test_dispatch_auto_falls_back_for_unsupported_array(self):
+        col_arr_int32 = np.array([0, 0, 1, 1, 2], dtype=np.int32)
+        # auto should fall back to numba
+        np.testing.assert_array_equal(
+            records_dispatch.col_range(col_arr_int32, 3, backend="auto"),
+            records_nb.col_range_nb(col_arr_int32, 3),
+        )
+        # explicit rust should raise
+        with pytest.raises(ValueError, match="int64"):
+            records_dispatch.col_range(col_arr_int32, 3, backend="rust")
+
+    def test_empty_arrays(self):
+        col_arr = np.array([], dtype=np.int64)
+        cr = records_dispatch.col_range(col_arr, 0, backend="rust")
+        assert cr.shape == (0, 2)
+        cm_idxs, cm_lens = records_dispatch.col_map(col_arr, 0, backend="rust")
+        assert cm_idxs.shape == (0,)
+        assert cm_lens.shape == (0,)
+
+    def test_single_column(self):
+        col_arr = np.array([0, 0, 0], dtype=np.int64)
+        np.testing.assert_array_equal(
+            records_dispatch.col_range(col_arr, 1, backend="rust"),
+            records_nb.col_range_nb(col_arr, 1),
+        )
+        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 1, backend="rust")
+        nb_idxs, nb_lens = records_nb.col_map_nb(col_arr, 1)
+        np.testing.assert_array_equal(rust_idxs, nb_idxs)
+        np.testing.assert_array_equal(rust_lens, nb_lens)

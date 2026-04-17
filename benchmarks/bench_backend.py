@@ -23,6 +23,7 @@ from vectorbt import _backend
 from vectorbt.generic import nb
 from vectorbt.indicators import nb as indicator_nb
 from vectorbt.labels import nb as labels_nb
+from vectorbt.records import nb as records_nb
 from vectorbt.returns import nb as returns_nb
 from vectorbt.signals import nb as signal_nb
 
@@ -45,6 +46,11 @@ try:
     from vectorbt_rust import returns as rust_returns
 except ImportError:
     rust_returns = None
+
+try:
+    from vectorbt_rust import records as rust_records
+except ImportError:
+    rust_records = None
 
 try:
     from vectorbt_rust import signals as rust_signals
@@ -963,6 +969,153 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             ),
         ]
 
+    # Records benchmark data
+    n_records = a.shape[0] * a.shape[1]
+    rec_col_arr_sorted = np.repeat(np.arange(a.shape[1], dtype=np.int64), a.shape[0])
+    rec_col_arr_unsorted = np.tile(np.arange(a.shape[1], dtype=np.int64), a.shape[0])
+    rec_rng = np.random.default_rng(seed)
+    rec_mapped_arr = rec_rng.normal(size=n_records).astype(np.float64)
+    rec_idx_arr = np.tile(np.arange(a.shape[0], dtype=np.int64), a.shape[1])
+    rec_col_map = records_nb.col_map_nb(rec_col_arr_sorted, a.shape[1])
+    rec_col_range = records_nb.col_range_nb(rec_col_arr_sorted, a.shape[1])
+    rec_codes = np.mod(np.arange(n_records, dtype=np.int64), 5)
+    rec_new_cols = np.arange(0, a.shape[1], max(1, a.shape[1] // 3), dtype=np.int64)
+    rec_col_idxs, rec_col_lens = rec_col_map
+
+    rec_struct_dt = np.dtype(
+        [("id", np.int64), ("col", np.int64), ("start_idx", np.int64), ("end_idx", np.int64), ("status", np.int64)],
+        align=True,
+    )
+    rec_records = np.empty(n_records, dtype=rec_struct_dt)
+    rec_records["id"] = np.arange(n_records, dtype=np.int64)
+    rec_records["col"] = rec_col_arr_sorted
+    rec_records["start_idx"] = rec_rng.integers(0, 100, size=n_records, dtype=np.int64)
+    rec_records["end_idx"] = rec_records["start_idx"] + rec_rng.integers(1, 50, size=n_records, dtype=np.int64)
+    rec_records["status"] = rec_rng.integers(0, 2, size=n_records, dtype=np.int64)
+
+    records_cases = []
+    if rust_records is not None:
+        records_cases = [
+            BenchmarkCase(
+                "records.col_range",
+                records_nb.col_range_nb,
+                (rec_col_arr_sorted, a.shape[1]),
+                rust_records.col_range_rs,
+                (rec_col_arr_sorted, a.shape[1]),
+            ),
+            BenchmarkCase(
+                "records.col_range_select",
+                records_nb.col_range_select_nb,
+                (rec_col_range, rec_new_cols),
+                rust_records.col_range_select_rs,
+                (rec_col_range, rec_new_cols),
+            ),
+            BenchmarkCase(
+                "records.col_map",
+                records_nb.col_map_nb,
+                (rec_col_arr_unsorted, a.shape[1]),
+                rust_records.col_map_rs,
+                (rec_col_arr_unsorted, a.shape[1]),
+            ),
+            BenchmarkCase(
+                "records.col_map_select",
+                records_nb.col_map_select_nb,
+                (rec_col_map, rec_new_cols),
+                rust_records.col_map_select_rs,
+                (rec_col_idxs, rec_col_lens, rec_new_cols),
+            ),
+            BenchmarkCase(
+                "records.is_col_sorted",
+                records_nb.is_col_sorted_nb,
+                (rec_col_arr_sorted,),
+                rust_records.is_col_sorted_rs,
+                (rec_col_arr_sorted,),
+            ),
+            BenchmarkCase(
+                "records.is_col_idx_sorted",
+                records_nb.is_col_idx_sorted_nb,
+                (rec_col_arr_sorted, rec_idx_arr),
+                rust_records.is_col_idx_sorted_rs,
+                (rec_col_arr_sorted, rec_idx_arr),
+            ),
+            BenchmarkCase(
+                "records.is_mapped_expandable",
+                records_nb.is_mapped_expandable_nb,
+                (
+                    rec_col_arr_sorted[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_idx_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    (a.shape[0], min(a.shape[1], 3)),
+                ),
+                rust_records.is_mapped_expandable_rs,
+                (
+                    rec_col_arr_sorted[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_idx_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    (a.shape[0], min(a.shape[1], 3)),
+                ),
+            ),
+            BenchmarkCase(
+                "records.expand_mapped",
+                records_nb.expand_mapped_nb,
+                (
+                    rec_mapped_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_col_arr_sorted[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_idx_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    (a.shape[0], min(a.shape[1], 3)),
+                    np.nan,
+                ),
+                rust_records.expand_mapped_rs,
+                (
+                    rec_mapped_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_col_arr_sorted[: a.shape[0] * min(a.shape[1], 3)],
+                    rec_idx_arr[: a.shape[0] * min(a.shape[1], 3)],
+                    (a.shape[0], min(a.shape[1], 3)),
+                    np.nan,
+                ),
+            ),
+            BenchmarkCase(
+                "records.stack_expand_mapped",
+                records_nb.stack_expand_mapped_nb,
+                (rec_mapped_arr, rec_col_map, np.nan),
+                rust_records.stack_expand_mapped_rs,
+                (rec_mapped_arr, rec_col_idxs, rec_col_lens, np.nan),
+            ),
+            BenchmarkCase(
+                "records.mapped_value_counts",
+                records_nb.mapped_value_counts_nb,
+                (rec_codes, 5, rec_col_map),
+                rust_records.mapped_value_counts_rs,
+                (rec_codes, 5, rec_col_idxs, rec_col_lens),
+            ),
+            BenchmarkCase(
+                "records.top_n_mapped_mask",
+                lambda arr, cm, n: records_nb.mapped_to_mask_nb(arr, cm, records_nb.top_n_inout_map_nb, n),
+                (rec_mapped_arr, rec_col_map, 3),
+                rust_records.top_n_mapped_mask_rs,
+                (rec_mapped_arr, rec_col_idxs, rec_col_lens, 3),
+            ),
+            BenchmarkCase(
+                "records.bottom_n_mapped_mask",
+                lambda arr, cm, n: records_nb.mapped_to_mask_nb(arr, cm, records_nb.bottom_n_inout_map_nb, n),
+                (rec_mapped_arr, rec_col_map, 3),
+                rust_records.bottom_n_mapped_mask_rs,
+                (rec_mapped_arr, rec_col_idxs, rec_col_lens, 3),
+            ),
+            BenchmarkCase(
+                "records.record_col_range_select",
+                records_nb.record_col_range_select_nb,
+                (rec_records, rec_col_range, rec_new_cols),
+                rust_records.record_col_range_select_rs,
+                (rec_records, rec_col_range, rec_new_cols),
+            ),
+            BenchmarkCase(
+                "records.record_col_map_select",
+                records_nb.record_col_map_select_nb,
+                (rec_records, rec_col_map, rec_new_cols),
+                rust_records.record_col_map_select_rs,
+                (rec_records, rec_col_idxs, rec_col_lens, rec_new_cols),
+            ),
+        ]
+
     cases = [
         BenchmarkCase("shuffle_1d", nb.shuffle_1d_nb, (a_1d, seed), rust_generic.shuffle_1d_rs, (a_1d, seed), False),
         BenchmarkCase("shuffle", nb.shuffle_nb, (a, seed), rust_generic.shuffle_rs, (a, seed), False),
@@ -1208,6 +1361,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     cases.extend(indicator_cases)
     cases.extend(signal_cases)
     cases.extend(labels_cases)
+    cases.extend(records_cases)
     cases.extend(returns_cases)
     return cases
 

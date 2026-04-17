@@ -80,9 +80,6 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.column_grouper import ColumnGrouper
-from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
@@ -125,9 +122,9 @@ settings = SettingsConfig(
         caching=dict(
             enabled=True,
             whitelist=[
-                CacheCondition(base_cls=ArrayWrapper),
-                CacheCondition(base_cls=ColumnGrouper),
-                CacheCondition(base_cls=ColumnMapper),
+                CacheCondition(base_cls="ArrayWrapper"),
+                CacheCondition(base_cls="ColumnGrouper"),
+                CacheCondition(base_cls="ColumnMapper"),
             ],
             blacklist=[],
         ),

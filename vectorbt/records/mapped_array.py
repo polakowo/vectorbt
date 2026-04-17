@@ -364,7 +364,7 @@ from vectorbt.base.reshape_fns import to_1d_array, to_dict
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.records import nb
+from vectorbt.records import dispatch, nb
 from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config, Configured
@@ -567,8 +567,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     def is_sorted(self, incl_id: bool = False) -> bool:
         """Check whether mapped array is sorted."""
         if incl_id:
-            return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
-        return nb.is_col_sorted_nb(self.col_arr)
+            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr)
+        return dispatch.is_col_sorted(self.col_arr)
 
     def sort(
         self: MappedArrayT,
@@ -625,14 +625,16 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         return nb.mapped_to_mask_nb(self.values, col_map, inout_map_func_nb, *args)
 
     @cached_method
-    def top_n_mask(self, n: int, **kwargs) -> tp.Array1d:
+    def top_n_mask(self, n: int, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
         """Return mask of top N elements in each column/group."""
-        return self.map_to_mask(nb.top_n_inout_map_nb, n, **kwargs)
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        return dispatch.top_n_mapped_mask(self.values, col_map, n)
 
     @cached_method
-    def bottom_n_mask(self, n: int, **kwargs) -> tp.Array1d:
+    def bottom_n_mask(self, n: int, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
         """Return mask of bottom N elements in each column/group."""
-        return self.map_to_mask(nb.bottom_n_inout_map_nb, n, **kwargs)
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        return dispatch.bottom_n_mapped_mask(self.values, col_map, n)
 
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
@@ -653,7 +655,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr = self.idx_arr
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        return nb.is_mapped_expandable_nb(col_arr, idx_arr, target_shape)
+        return dispatch.is_mapped_expandable(col_arr, idx_arr, target_shape)
 
     def to_pd(
         self,
@@ -684,7 +686,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     **merge_dicts({}, wrap_kwargs),
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
-            out = nb.stack_expand_mapped_nb(self.values, col_map, fill_value)
+            out = dispatch.stack_expand_mapped(self.values, col_map, fill_value)
             return self.wrapper.wrap(
                 out,
                 index=np.arange(out.shape[0]),
@@ -699,7 +701,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             raise ValueError("Multiple values are pointing to the same position. Use ignore_index.")
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        out = nb.expand_mapped_nb(self.values, col_arr, idx_arr, target_shape, fill_value)
+        out = dispatch.expand_mapped(self.values, col_arr, idx_arr, target_shape, fill_value)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def apply(
@@ -1016,7 +1018,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
+        value_counts = dispatch.mapped_value_counts(mapped_codes, len(mapped_uniques), col_map)
         if incl_all_keys and mapping is not None:
             missing_keys = []
             for x in mapping:

@@ -6,7 +6,7 @@
 from vectorbt import _typing as tp
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array
-from vectorbt.records import nb
+from vectorbt.records import dispatch
 from vectorbt.utils.decorators import cached_property, cached_method
 
 
@@ -25,9 +25,9 @@ class ColumnMapper(Wrapping):
         Returns element indices and new column array.
         Automatically decides whether to use column range or column map."""
         if self.is_sorted():
-            new_indices, new_col_arr = nb.col_range_select_nb(self.col_range, to_1d_array(col_idxs))  # faster
+            new_indices, new_col_arr = dispatch.col_range_select(self.col_range, to_1d_array(col_idxs))  # faster
         else:
-            new_indices, new_col_arr = nb.col_map_select_nb(self.col_map, to_1d_array(col_idxs))
+            new_indices, new_col_arr = dispatch.col_map_select(self.col_map, to_1d_array(col_idxs))
         return new_indices, new_col_arr
 
     @property
@@ -56,7 +56,7 @@ class ColumnMapper(Wrapping):
 
         Faster than `ColumnMapper.col_map` but only compatible with sorted columns.
         More suited for records."""
-        return nb.col_range_nb(self.col_arr, len(self.wrapper.columns))
+        return dispatch.col_range(self.col_arr, len(self.wrapper.columns))
 
     @cached_method
     def get_col_range(self, group_by: tp.GroupByLike = None) -> tp.ColRange:
@@ -65,7 +65,7 @@ class ColumnMapper(Wrapping):
             return self.col_range
         col_arr = self.get_col_arr(group_by=group_by)
         columns = self.wrapper.get_columns(group_by=group_by)
-        return nb.col_range_nb(col_arr, len(columns))
+        return dispatch.col_range(col_arr, len(columns))
 
     @cached_property
     def col_map(self) -> tp.ColMap:
@@ -73,7 +73,7 @@ class ColumnMapper(Wrapping):
 
         More flexible than `ColumnMapper.col_range`.
         More suited for mapped arrays."""
-        return nb.col_map_nb(self.col_arr, len(self.wrapper.columns))
+        return dispatch.col_map(self.col_arr, len(self.wrapper.columns))
 
     @cached_method
     def get_col_map(self, group_by: tp.GroupByLike = None) -> tp.ColMap:
@@ -82,9 +82,9 @@ class ColumnMapper(Wrapping):
             return self.col_map
         col_arr = self.get_col_arr(group_by=group_by)
         columns = self.wrapper.get_columns(group_by=group_by)
-        return nb.col_map_nb(col_arr, len(columns))
+        return dispatch.col_map(col_arr, len(columns))
 
     @cached_method
     def is_sorted(self) -> bool:
         """Check whether column array is sorted."""
-        return nb.is_col_sorted_nb(self.col_arr)
+        return dispatch.is_col_sorted(self.col_arr)

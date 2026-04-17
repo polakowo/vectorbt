@@ -400,7 +400,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.records import nb
+from vectorbt.records import dispatch, nb
 from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.utils import checks
@@ -531,13 +531,15 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
 
         Returns new records array."""
         if self.col_mapper.is_sorted():
-            new_records_arr = nb.record_col_range_select_nb(
+            new_records_arr = dispatch.record_col_range_select(
                 self.values,
                 self.col_mapper.col_range,
                 to_1d_array(col_idxs),
             )  # faster
         else:
-            new_records_arr = nb.record_col_map_select_nb(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))
+            new_records_arr = dispatch.record_col_map_select(
+                self.values, self.col_mapper.col_map, to_1d_array(col_idxs)
+            )
         return new_records_arr
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
@@ -664,8 +666,8 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def is_sorted(self, incl_id: bool = False) -> bool:
         """Check whether records are sorted."""
         if incl_id:
-            return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
-        return nb.is_col_sorted_nb(self.col_arr)
+            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr)
+        return dispatch.is_col_sorted(self.col_arr)
 
     def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).

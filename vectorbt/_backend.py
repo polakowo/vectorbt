@@ -158,6 +158,17 @@ def mask_and_values_compatible_with_rust(a: tp.Any, mask: tp.Any, values: tp.Any
     )
 
 
+def col_range_compatible_with_rust(col_range: tp.Any) -> RustSupport:
+    """Return whether a ColRange (2D int64 array) is compatible with the Rust backend."""
+    if not isinstance(col_range, np.ndarray):
+        return RustSupport(False, "Rust backend requires `col_range` to be a NumPy array.")
+    if col_range.dtype != np.int64:
+        return RustSupport(False, "Rust backend requires `col_range` to be int64.")
+    if col_range.ndim != 2 or col_range.shape[1] != 2:
+        return RustSupport(False, "Rust backend requires `col_range` to have shape (n_cols, 2).")
+    return RustSupport(True)
+
+
 def col_map_compatible_with_rust(col_map: tp.Any) -> RustSupport:
     """Return whether a column map (pair of arrays) is compatible with the Rust backend."""
     try:
