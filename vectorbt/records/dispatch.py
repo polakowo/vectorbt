@@ -97,8 +97,7 @@ def col_map_select(
 def record_array_compatible_with_rust(records: tp.Any) -> "RustSupport":
     """Return whether a structured record array is compatible with the Rust backend.
 
-    Requires a contiguous NumPy structured array whose first two fields are int64
-    (matching the vectorbt convention of id, col as the first two fields)."""
+    Requires a NumPy structured array with int64 `id` and `col` fields."""
     from vectorbt._backend import RustSupport
 
     if not isinstance(records, np.ndarray):
@@ -106,15 +105,12 @@ def record_array_compatible_with_rust(records: tp.Any) -> "RustSupport":
     if records.dtype.names is None:
         return RustSupport(False, "Rust backend requires `records` to be a structured array.")
     names = records.dtype.names
-    if len(names) < 2:
-        return RustSupport(False, "Rust backend requires `records` to have at least 2 fields.")
-    id_dtype = records.dtype.fields[names[0]][0]
-    col_dtype = records.dtype.fields[names[1]][0]
+    if "id" not in names or "col" not in names:
+        return RustSupport(False, "Rust backend requires `records` to have `id` and `col` fields.")
+    id_dtype = records.dtype.fields["id"][0]
+    col_dtype = records.dtype.fields["col"][0]
     if id_dtype != np.dtype(np.int64) or col_dtype != np.dtype(np.int64):
-        return RustSupport(False, "Rust backend requires the first two record fields to be int64.")
-    col_offset = records.dtype.fields[names[1]][1]
-    if col_offset != 8:
-        return RustSupport(False, "Rust backend requires the `col` field at byte offset 8.")
+        return RustSupport(False, "Rust backend requires `id` and `col` record fields to be int64.")
     return RustSupport(True)
 
 

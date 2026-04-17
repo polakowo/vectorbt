@@ -162,7 +162,7 @@ def main() -> None:
         f.write("# Rust vs Numba Speedup Matrix\n\n")
         f.write("Each cell shows **Rust speedup** over Numba (higher = Rust is faster).\n\n")
         f.write(f"- Window: {WINDOW}, NaN ratio: 5%, Repeat: {REPEAT}, Seed: {SEED}\n")
-        f.write("- Includes `generic.*`, `indicators.*`, `signals.*`, `labels.*`, and `returns.*` ports\n")
+        f.write("- Includes `generic.*`, `indicators.*`, `signals.*`, `labels.*`, `records.*`, and `returns.*` ports\n")
         f.write("- Values >1.00x mean Rust is faster; <1.00x mean Numba is faster\n")
         f.write("- Statistics are computed from the speedup scores in this matrix\n\n")
         f.write(table + "\n")

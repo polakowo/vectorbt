@@ -11,26 +11,37 @@ use crate::generic::array1_as_slice_cow;
 
 // ############# Indexing #############
 
+fn normalize_col(col: i64, n_cols: usize) -> usize {
+    let col = col as usize;
+    if col < n_cols {
+        col
+    } else if n_cols == 1 {
+        0
+    } else {
+        col
+    }
+}
+
 fn col_range(col_arr: &[i64], n_cols: usize) -> Result<Vec<i64>, String> {
     let mut out = vec![-1i64; n_cols * 2];
-    let mut last_col: i64 = -1;
+    if col_arr.is_empty() {
+        return Ok(out);
+    }
 
-    for r in 0..col_arr.len() {
-        let col = col_arr[r];
+    let mut last_col = col_arr[0];
+    out[normalize_col(last_col, n_cols) * 2] = 0;
+
+    for (r, &col) in col_arr.iter().enumerate().skip(1) {
         if col < last_col {
             return Err("col_arr must be in ascending order".to_string());
         }
         if col != last_col {
-            if last_col != -1 {
-                out[last_col as usize * 2 + 1] = r as i64;
-            }
-            out[col as usize * 2] = r as i64;
+            out[normalize_col(last_col, n_cols) * 2 + 1] = r as i64;
+            out[normalize_col(col, n_cols) * 2] = r as i64;
             last_col = col;
         }
-        if r == col_arr.len() - 1 {
-            out[col as usize * 2 + 1] = (r + 1) as i64;
-        }
     }
+    out[normalize_col(last_col, n_cols) * 2 + 1] = col_arr.len() as i64;
     Ok(out)
 }
 
@@ -48,10 +59,7 @@ pub fn col_range_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
-fn col_range_select(
-    col_range: &[i64],
-    new_cols: &[i64],
-) -> (Vec<i64>, Vec<i64>) {
+fn col_range_select(col_range: &[i64], new_cols: &[i64]) -> (Vec<i64>, Vec<i64>) {
     // First pass: compute total count
     let mut new_n: usize = 0;
     for &nc in new_cols {
@@ -91,11 +99,16 @@ pub fn col_range_select_rs<'py>(
     new_cols: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<i64>>)> {
     let cr_arr = col_range.as_array();
-    // Flatten to contiguous slice
-    let cr_flat: Vec<i64> = cr_arr.iter().copied().collect();
+    let cr_storage;
+    let cr_slice = match cr_arr.as_slice() {
+        Some(slice) => slice,
+        None => {
+            cr_storage = cr_arr.iter().copied().collect::<Vec<_>>();
+            &cr_storage
+        }
+    };
     let new_cols_cow = array1_as_slice_cow(&new_cols);
-    let (indices, col_arr) =
-        py.allow_threads(|| col_range_select(&cr_flat, new_cols_cow.as_ref()));
+    let (indices, col_arr) = py.allow_threads(|| col_range_select(cr_slice, new_cols_cow.as_ref()));
     Ok((
         PyArray1::from_vec_bound(py, indices),
         PyArray1::from_vec_bound(py, col_arr),
@@ -105,7 +118,7 @@ pub fn col_range_select_rs<'py>(
 fn col_map(col_arr: &[i64], n_cols: usize) -> (Vec<i64>, Vec<i64>) {
     let mut col_lens = vec![0i64; n_cols];
     for &col in col_arr {
-        col_lens[col as usize] += 1;
+        col_lens[normalize_col(col, n_cols)] += 1;
     }
 
     let mut col_start_idxs = vec![0i64; n_cols];
@@ -116,7 +129,7 @@ fn col_map(col_arr: &[i64], n_cols: usize) -> (Vec<i64>, Vec<i64>) {
     let mut col_idxs_out = vec![0i64; col_arr.len()];
     let mut col_i = vec![0i64; n_cols];
     for r in 0..col_arr.len() {
-        let col = col_arr[r] as usize;
+        let col = normalize_col(col_arr[r], n_cols);
         col_idxs_out[(col_start_idxs[col] + col_i[col]) as usize] = r as i64;
         col_i[col] += 1;
     }
@@ -138,11 +151,7 @@ pub fn col_map_rs<'py>(
     ))
 }
 
-fn col_map_select(
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    new_cols: &[i64],
-) -> (Vec<i64>, Vec<i64>) {
+fn col_map_select(col_idxs: &[i64], col_lens: &[i64], new_cols: &[i64]) -> (Vec<i64>, Vec<i64>) {
     let n_cols = col_lens.len();
 
     // Compute col_start_idxs
@@ -167,10 +176,8 @@ fn col_map_select(
             continue;
         }
         let col_start_idx = col_start_idxs[new_col as usize] as usize;
-        for k in 0..col_len {
-            idxs_out[j + k] = col_idxs[col_start_idx + k];
-            col_arr_out[j + k] = new_col_i as i64;
-        }
+        idxs_out[j..j + col_len].copy_from_slice(&col_idxs[col_start_idx..col_start_idx + col_len]);
+        col_arr_out[j..j + col_len].fill(new_col_i as i64);
         j += col_len;
     }
     (idxs_out, col_arr_out)
@@ -199,10 +206,6 @@ pub fn col_map_select_rs<'py>(
     ))
 }
 
-/// Byte offset of the `col` field in all vectorbt record dtypes.
-/// All record dtypes start with (id: i64, col: i64, ...) so col is at offset 8.
-const COL_FIELD_OFFSET: usize = 8;
-
 /// Helper: create an empty numpy array with the given dtype and length.
 fn numpy_empty<'py>(
     py: Python<'py>,
@@ -211,7 +214,11 @@ fn numpy_empty<'py>(
 ) -> PyResult<Bound<'py, pyo3::PyAny>> {
     let np = py.import_bound("numpy")?;
     let args = PyTuple::new_bound(py, &[n.into_py(py)]);
-    np.call_method("empty", (args, ), Some(&[("dtype", dtype)].into_py_dict_bound(py)))
+    np.call_method(
+        "empty",
+        (args,),
+        Some(&[("dtype", dtype)].into_py_dict_bound(py)),
+    )
 }
 
 /// Get the data pointer and itemsize from an untyped numpy array.
@@ -226,6 +233,13 @@ unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, us
     let itemsize: usize = dtype.getattr("itemsize")?.extract()?;
     let n: usize = arr.len()?;
     Ok((data, itemsize, n))
+}
+
+fn record_col_offset(records: &Bound<'_, pyo3::PyAny>) -> PyResult<usize> {
+    let dtype = records.getattr("dtype")?;
+    let fields = dtype.getattr("fields")?;
+    let col_field = fields.get_item("col")?;
+    col_field.get_item(1)?.extract()
 }
 
 trait AsArrayPtr {
@@ -246,17 +260,26 @@ pub fn record_col_range_select_rs<'py>(
     new_cols: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, pyo3::PyAny>> {
     let cr_arr = col_range.as_array();
+    let cr_storage;
+    let cr_slice = match cr_arr.as_slice() {
+        Some(slice) => slice,
+        None => {
+            cr_storage = cr_arr.iter().copied().collect::<Vec<_>>();
+            &cr_storage
+        }
+    };
     let new_cols_cow = array1_as_slice_cow(&new_cols);
 
     // Get raw parts from input records
     let (src_data, itemsize, _src_n) = unsafe { array_raw_parts(&records)? };
+    let col_field_offset = record_col_offset(&records)?;
 
     // Compute total output count
     let mut new_n: usize = 0;
     for &nc in new_cols_cow.as_ref() {
         let c = nc as usize;
-        let from_r = cr_arr[[c, 0]];
-        let to_r = cr_arr[[c, 1]];
+        let from_r = cr_slice[c * 2];
+        let to_r = cr_slice[c * 2 + 1];
         if from_r != -1 && to_r != -1 {
             new_n += (to_r - from_r) as usize;
         }
@@ -271,8 +294,8 @@ pub fn record_col_range_select_rs<'py>(
     let mut j: usize = 0;
     for (c_idx, &nc) in new_cols_cow.as_ref().iter().enumerate() {
         let c = nc as usize;
-        let from_r = cr_arr[[c, 0]];
-        let to_r = cr_arr[[c, 1]];
+        let from_r = cr_slice[c * 2];
+        let to_r = cr_slice[c * 2 + 1];
         if from_r == -1 || to_r == -1 {
             continue;
         }
@@ -287,7 +310,7 @@ pub fn record_col_range_select_rs<'py>(
             // Patch col field for each copied record
             let new_col = c_idx as i64;
             for k in 0..count {
-                let col_ptr = dst_data.add((j + k) * itemsize + COL_FIELD_OFFSET) as *mut i64;
+                let col_ptr = dst_data.add((j + k) * itemsize + col_field_offset) as *mut i64;
                 *col_ptr = new_col;
             }
         }
@@ -295,6 +318,20 @@ pub fn record_col_range_select_rs<'py>(
     }
 
     Ok(out)
+}
+
+fn is_contiguous_indices(indices: &[i64]) -> bool {
+    if indices.is_empty() {
+        return true;
+    }
+    let mut expected = indices[0];
+    for &idx in indices {
+        if idx != expected {
+            return false;
+        }
+        expected += 1;
+    }
+    true
 }
 
 #[pyfunction]
@@ -313,6 +350,7 @@ pub fn record_col_map_select_rs<'py>(
 
     // Get raw parts from input records
     let (src_data, itemsize, _src_n) = unsafe { array_raw_parts(&records)? };
+    let col_field_offset = record_col_offset(&records)?;
 
     // Compute col_start_idxs and total count
     let n_cols = col_lens_s.len();
@@ -339,20 +377,33 @@ pub fn record_col_map_select_rs<'py>(
         }
         let col_start_idx = col_start_idxs[new_col as usize];
         let new_col_val = new_col_i as i64;
-        for k in 0..col_len {
-            let src_record_idx = col_idxs_s[col_start_idx + k] as usize;
+        let col_idx_slice = &col_idxs_s[col_start_idx..col_start_idx + col_len];
+        if is_contiguous_indices(col_idx_slice) {
             unsafe {
-                // Copy one record
                 std::ptr::copy_nonoverlapping(
-                    src_data.add(src_record_idx * itemsize),
+                    src_data.add(col_idx_slice[0] as usize * itemsize),
                     dst_data.add(j * itemsize),
-                    itemsize,
+                    col_len * itemsize,
                 );
-                // Patch col field
-                let col_ptr = dst_data.add(j * itemsize + COL_FIELD_OFFSET) as *mut i64;
-                *col_ptr = new_col_val;
+                for k in 0..col_len {
+                    let col_ptr = dst_data.add((j + k) * itemsize + col_field_offset) as *mut i64;
+                    *col_ptr = new_col_val;
+                }
             }
-            j += 1;
+            j += col_len;
+        } else {
+            for &src_record_idx in col_idx_slice {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        src_data.add(src_record_idx as usize * itemsize),
+                        dst_data.add(j * itemsize),
+                        itemsize,
+                    );
+                    let col_ptr = dst_data.add(j * itemsize + col_field_offset) as *mut i64;
+                    *col_ptr = new_col_val;
+                }
+                j += 1;
+            }
         }
     }
 
@@ -362,9 +413,18 @@ pub fn record_col_map_select_rs<'py>(
 // ############# Sorting #############
 
 fn is_col_sorted(col_arr: &[i64]) -> bool {
-    for i in 0..col_arr.len().saturating_sub(1) {
-        if col_arr[i + 1] < col_arr[i] {
-            return false;
+    if col_arr.len() < 2 {
+        return true;
+    }
+    unsafe {
+        let col_ptr = col_arr.as_ptr();
+        let mut prev_col = *col_ptr;
+        for i in 1..col_arr.len() {
+            let col = *col_ptr.add(i);
+            if col < prev_col {
+                return false;
+            }
+            prev_col = col;
         }
     }
     true
@@ -380,12 +440,25 @@ pub fn is_col_sorted_rs<'py>(
 }
 
 fn is_col_idx_sorted(col_arr: &[i64], id_arr: &[i64]) -> bool {
-    for i in 0..col_arr.len().saturating_sub(1) {
-        if col_arr[i + 1] < col_arr[i] {
-            return false;
-        }
-        if col_arr[i + 1] == col_arr[i] && id_arr[i + 1] < id_arr[i] {
-            return false;
+    if col_arr.len() < 2 {
+        return true;
+    }
+    unsafe {
+        let col_ptr = col_arr.as_ptr();
+        let id_ptr = id_arr.as_ptr();
+        let mut prev_col = *col_ptr;
+        let mut prev_id = *id_ptr;
+        for i in 1..col_arr.len() {
+            let col = *col_ptr.add(i);
+            let id = *id_ptr.add(i);
+            if col < prev_col {
+                return false;
+            }
+            if col == prev_col && id < prev_id {
+                return false;
+            }
+            prev_col = col;
+            prev_id = id;
         }
     }
     true
@@ -440,8 +513,9 @@ fn expand_mapped(
     fill_value: f64,
 ) -> Array2<f64> {
     let mut out = Array2::<f64>::from_elem((nrows, ncols), fill_value);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for r in 0..mapped_arr.len() {
-        out[[idx_arr[r] as usize, col_arr[r] as usize]] = mapped_arr[r];
+        dst[idx_arr[r] as usize * ncols + col_arr[r] as usize] = mapped_arr[r];
     }
     out
 }
@@ -494,6 +568,7 @@ fn stack_expand_mapped(
     }
 
     let mut out = Array2::<f64>::from_elem((max_len, n_cols), fill_value);
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for col in 0..n_cols {
         let col_len = col_lens[col] as usize;
         if col_len == 0 {
@@ -501,7 +576,7 @@ fn stack_expand_mapped(
         }
         let col_start_idx = col_start_idxs[col];
         for k in 0..col_len {
-            out[[k, col]] = mapped_arr[col_idxs[col_start_idx + k] as usize];
+            dst[k * n_cols + col] = mapped_arr[col_idxs[col_start_idx + k] as usize];
         }
     }
     out
@@ -545,6 +620,7 @@ fn mapped_value_counts(
     }
 
     let mut out = Array2::<i64>::zeros((n_uniques, n_cols));
+    let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for col in 0..n_cols {
         let col_len = col_lens[col] as usize;
         if col_len == 0 {
@@ -553,7 +629,7 @@ fn mapped_value_counts(
         let col_start_idx = col_start_idxs[col];
         for c in 0..col_len {
             let code = codes[col_idxs[col_start_idx + c] as usize] as usize;
-            out[[code, col]] += 1;
+            dst[code * n_cols + col] += 1;
         }
     }
     out
