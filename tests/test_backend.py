@@ -11,6 +11,8 @@ from vectorbt.indicators import nb as indicator_nb
 from vectorbt.labels import dispatch as labels_dispatch
 from vectorbt.labels import nb as labels_nb
 from vectorbt.labels.enums import TrendMode
+from vectorbt.returns import dispatch as returns_dispatch
+from vectorbt.returns import nb as returns_nb
 from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
 
@@ -45,6 +47,8 @@ class TestBackendResolution:
         assert _backend.non_neg_int_compatible_with_rust("n", 0).supported
         assert not _backend.non_neg_int_compatible_with_rust("n", -1).supported
         assert not _backend.callback_unsupported_with_rust().supported
+        assert _backend.unit_interval_compatible_with_rust("cutoff", 0.5).supported
+        assert not _backend.unit_interval_compatible_with_rust("cutoff", 1.5).supported
 
         rolling_support = _backend.rolling_compatible_with_rust(
             np.ones((2, 2), dtype=np.float64),
@@ -485,6 +489,256 @@ class TestGenericRustParity:
             pd.testing.assert_frame_equal(df.vbt.rolling_mean(2), df.vbt.rolling_mean(2, backend="rust"))
         finally:
             vbt.settings.reset()
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+class TestReturnsRustParity:
+    def test_dispatch_matches_numba(self):
+        values = np.array(
+            [
+                [1.0, 5.0, 1.0],
+                [2.0, 4.0, 2.0],
+                [3.0, 3.0, 3.0],
+                [4.0, 2.0, 2.0],
+                [5.0, 1.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+        init_value = np.array([np.nan, np.nan, np.nan], dtype=np.float64)
+        returns = returns_nb.returns_nb(values, init_value)
+        benchmark = np.array(
+            [
+                [np.nan, np.nan, np.nan],
+                [0.8, -0.15, 0.9],
+                [0.4, -0.2, 0.6],
+                [0.25, -0.3, -0.25],
+                [0.2, -0.5, -0.4],
+            ],
+            dtype=np.float64,
+        )
+
+        np.testing.assert_allclose(
+            returns_dispatch.returns_1d(values[:, 0], np.nan, backend="rust"),
+            returns_nb.returns_1d_nb(values[:, 0], np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            returns_dispatch.cum_returns_1d(returns[:, 0], 0.0, backend="rust"),
+            returns_nb.cum_returns_1d_nb(returns[:, 0], 0.0),
+            equal_nan=True,
+        )
+        assert returns_dispatch.get_return(1.0, 2.0, backend="rust") == returns_nb.get_return_nb(1.0, 2.0)
+        np.testing.assert_allclose(
+            returns_dispatch.get_return(0.0, np.nan, backend="rust"),
+            returns_nb.get_return_nb(0.0, np.nan),
+            equal_nan=True,
+        )
+        assert returns_dispatch.cum_returns_final_1d(returns[:, 0], 0.0, backend="rust") == returns_nb.cum_returns_final_1d_nb(
+            returns[:, 0], 0.0
+        )
+
+        cases = [
+            (returns_dispatch.returns, returns_nb.returns_nb, (values, init_value)),
+            (returns_dispatch.cum_returns, returns_nb.cum_returns_nb, (returns, 0.0)),
+            (returns_dispatch.cum_returns_final, returns_nb.cum_returns_final_nb, (returns, 0.0)),
+            (returns_dispatch.annualized_return, returns_nb.annualized_return_nb, (returns, 365.0)),
+            (returns_dispatch.annualized_volatility, returns_nb.annualized_volatility_nb, (returns, 365.0, 2.0, 1)),
+            (returns_dispatch.drawdown, returns_nb.drawdown_nb, (returns,)),
+            (returns_dispatch.max_drawdown, returns_nb.max_drawdown_nb, (returns,)),
+            (returns_dispatch.calmar_ratio, returns_nb.calmar_ratio_nb, (returns, 365.0)),
+            (returns_dispatch.omega_ratio, returns_nb.omega_ratio_nb, (returns, 365.0, 0.01, 0.1)),
+            (returns_dispatch.sharpe_ratio, returns_nb.sharpe_ratio_nb, (returns, 365.0, 0.01, 1)),
+            (returns_dispatch.downside_risk, returns_nb.downside_risk_nb, (returns, 365.0, 0.1)),
+            (returns_dispatch.sortino_ratio, returns_nb.sortino_ratio_nb, (returns, 365.0, 0.1)),
+            (returns_dispatch.information_ratio, returns_nb.information_ratio_nb, (returns, benchmark, 1)),
+            (returns_dispatch.beta, returns_nb.beta_nb, (returns, benchmark)),
+            (returns_dispatch.alpha, returns_nb.alpha_nb, (returns, benchmark, 365.0, 0.01)),
+            (returns_dispatch.tail_ratio, returns_nb.tail_ratio_nb, (returns,)),
+            (returns_dispatch.value_at_risk, returns_nb.value_at_risk_nb, (returns, 0.05)),
+            (returns_dispatch.cond_value_at_risk, returns_nb.cond_value_at_risk_nb, (returns, 0.05)),
+            (returns_dispatch.capture, returns_nb.capture_nb, (returns, benchmark, 365.0)),
+            (returns_dispatch.up_capture, returns_nb.up_capture_nb, (returns, benchmark, 365.0)),
+            (returns_dispatch.down_capture, returns_nb.down_capture_nb, (returns, benchmark, 365.0)),
+        ]
+        for dispatch_func, nb_func, args in cases:
+            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+
+    def test_dispatch_explicit_rust_validation(self):
+        returns = np.array([[np.nan, 0.1], [0.2, 0.3]], dtype=np.float64)
+        benchmark = np.array([[np.nan], [0.2]], dtype=np.float64)
+
+        with pytest.raises(ValueError, match="same shape"):
+            returns_dispatch.beta(returns, benchmark, backend="rust")
+
+        with pytest.raises(ValueError, match="between 0 and 1"):
+            returns_dispatch.value_at_risk(returns, 1.5, backend="rust")
+
+    def test_dispatch_rolling_matches_numba(self):
+        returns = np.array(
+            [
+                [np.nan, np.nan, np.nan],
+                [0.10, -0.20, 0.30],
+                [0.05, np.nan, -0.10],
+                [-0.02, 0.15, 0.00],
+                [0.04, -0.05, 0.20],
+                [np.nan, 0.03, -0.04],
+            ],
+            dtype=np.float64,
+        )
+        benchmark = np.array(
+            [
+                [np.nan, np.nan, np.nan],
+                [0.08, -0.10, 0.20],
+                [0.02, -0.05, -0.08],
+                [-0.01, 0.10, 0.02],
+                [0.03, -0.03, 0.12],
+                [0.01, 0.02, -0.02],
+            ],
+            dtype=np.float64,
+        )
+        cases = [
+            (returns_dispatch.rolling_cum_returns_final, returns_nb.rolling_cum_returns_final_nb, (returns, 3, None, 0.0)),
+            (returns_dispatch.rolling_annualized_return, returns_nb.rolling_annualized_return_nb, (returns, 3, None, 365.0)),
+            (
+                returns_dispatch.rolling_annualized_volatility,
+                returns_nb.rolling_annualized_volatility_nb,
+                (returns, 3, None, 365.0, 2.0, 1),
+            ),
+            (returns_dispatch.rolling_max_drawdown, returns_nb.rolling_max_drawdown_nb, (returns, 3, None)),
+            (returns_dispatch.rolling_calmar_ratio, returns_nb.rolling_calmar_ratio_nb, (returns, 3, None, 365.0)),
+            (returns_dispatch.rolling_omega_ratio, returns_nb.rolling_omega_ratio_nb, (returns, 3, None, 365.0, 0.01, 0.1)),
+            (returns_dispatch.rolling_sharpe_ratio, returns_nb.rolling_sharpe_ratio_nb, (returns, 3, None, 365.0, 0.01, 1)),
+            (returns_dispatch.rolling_downside_risk, returns_nb.rolling_downside_risk_nb, (returns, 3, None, 365.0, 0.1)),
+            (returns_dispatch.rolling_sortino_ratio, returns_nb.rolling_sortino_ratio_nb, (returns, 3, None, 365.0, 0.1)),
+            (
+                returns_dispatch.rolling_information_ratio,
+                returns_nb.rolling_information_ratio_nb,
+                (returns, 3, None, benchmark, 1),
+            ),
+            (returns_dispatch.rolling_beta, returns_nb.rolling_beta_nb, (returns, 3, None, benchmark)),
+            (returns_dispatch.rolling_alpha, returns_nb.rolling_alpha_nb, (returns, 3, None, benchmark, 365.0, 0.01)),
+            (returns_dispatch.rolling_tail_ratio, returns_nb.rolling_tail_ratio_nb, (returns, 3, None)),
+            (returns_dispatch.rolling_value_at_risk, returns_nb.rolling_value_at_risk_nb, (returns, 3, None, 0.05)),
+            (
+                returns_dispatch.rolling_cond_value_at_risk,
+                returns_nb.rolling_cond_value_at_risk_nb,
+                (returns, 3, None, 0.05),
+            ),
+            (returns_dispatch.rolling_capture, returns_nb.rolling_capture_nb, (returns, 3, None, benchmark, 365.0)),
+            (returns_dispatch.rolling_up_capture, returns_nb.rolling_up_capture_nb, (returns, 3, None, benchmark, 365.0)),
+            (returns_dispatch.rolling_down_capture, returns_nb.rolling_down_capture_nb, (returns, 3, None, benchmark, 365.0)),
+        ]
+        for minp in (None, 1, 2):
+            for dispatch_func, nb_func, args in cases:
+                args = args[:2] + (minp,) + args[3:]
+                np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+
+        with pytest.raises(ValueError, match="minp must be <= window"):
+            returns_dispatch.rolling_sharpe_ratio(returns, 2, 3, 365.0, backend="rust")
+        with pytest.raises(ValueError, match="same shape"):
+            returns_dispatch.rolling_beta(returns, 3, None, benchmark[:, :1], backend="rust")
+
+    def test_dispatch_drawdown_edge_cases_match_numba(self):
+        returns = np.array([[np.inf, -np.inf], [0.1, -0.1]], dtype=np.float64)
+
+        np.testing.assert_allclose(
+            returns_dispatch.drawdown(returns, backend="rust"),
+            returns_nb.drawdown_nb(returns),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            returns_dispatch.max_drawdown(returns, backend="rust"),
+            returns_nb.max_drawdown_nb(returns),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            returns_dispatch.calmar_ratio(returns, 365.0, backend="rust"),
+            returns_nb.calmar_ratio_nb(returns, 365.0),
+            equal_nan=True,
+        )
+
+        empty_returns = np.empty((0, 2), dtype=np.float64)
+        with pytest.raises(ValueError, match="zero-size array"):
+            returns_dispatch.max_drawdown(empty_returns, backend="rust")
+        with pytest.raises(ValueError, match="zero-size array"):
+            returns_nb.max_drawdown_nb(empty_returns)
+        with pytest.raises(ValueError, match="zero-size array"):
+            returns_dispatch.calmar_ratio(empty_returns, 365.0, backend="rust")
+        with pytest.raises(ValueError, match="zero-size array"):
+            returns_nb.calmar_ratio_nb(empty_returns, 365.0)
+        with pytest.raises(ZeroDivisionError):
+            returns_dispatch.annualized_return(empty_returns, 365.0, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            returns_nb.annualized_return_nb(empty_returns, 365.0)
+        with pytest.raises(ZeroDivisionError):
+            returns_dispatch.cond_value_at_risk(empty_returns, backend="rust")
+        with pytest.raises(ZeroDivisionError):
+            returns_nb.cond_value_at_risk_nb(empty_returns)
+
+    def test_accessor_methods_match_numba(self):
+        price = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0],
+                "b": [5.0, 4.0, 3.0, 2.0, 1.0],
+                "c": [1.0, 2.0, 3.0, 2.0, 1.0],
+            },
+            index=pd.date_range("2020-01-01", periods=5, freq="D"),
+        )
+        rets = price.pct_change()
+        benchmark_rets = pd.DataFrame(
+            {
+                "a": [np.nan, 0.8, 0.4, 0.25, 0.2],
+                "b": [np.nan, -0.15, -0.2, -0.3, -0.5],
+                "c": [np.nan, 0.9, 0.6, -0.25, -0.4],
+            },
+            index=rets.index,
+        )
+
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.returns.from_value(price, backend="rust").obj,
+            pd.DataFrame.vbt.returns.from_value(price, backend="numba").obj,
+        )
+        pd.testing.assert_frame_equal(rets.vbt.returns.cumulative(backend="rust"), rets.vbt.returns.cumulative(backend="numba"))
+        pd.testing.assert_series_equal(rets.vbt.returns.total(backend="rust"), rets.vbt.returns.total(backend="numba"))
+        pd.testing.assert_series_equal(
+            rets.vbt.returns.annualized_volatility(backend="rust"),
+            rets.vbt.returns.annualized_volatility(backend="numba"),
+        )
+        pd.testing.assert_series_equal(
+            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, backend="rust"),
+            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, backend="numba"),
+        )
+        pd.testing.assert_series_equal(
+            rets.vbt.returns.common_sense_ratio(backend="rust"),
+            rets.vbt.returns.common_sense_ratio(backend="numba"),
+        )
+        pd.testing.assert_frame_equal(rets.vbt.returns.drawdown(backend="rust"), rets.vbt.returns.drawdown(backend="numba"))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_total(window=3, minp=1, backend="rust"),
+            rets.vbt.returns.rolling_total(window=3, minp=1, backend="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, backend="rust"),
+            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, backend="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_information_ratio(
+                benchmark_rets=benchmark_rets,
+                window=3,
+                minp=1,
+                backend="rust",
+            ),
+            rets.vbt.returns.rolling_information_ratio(
+                benchmark_rets=benchmark_rets,
+                window=3,
+                minp=1,
+                backend="numba",
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, backend="rust"),
+            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, backend="numba"),
+        )
 
 
 @pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")

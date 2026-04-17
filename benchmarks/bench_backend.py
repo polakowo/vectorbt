@@ -23,6 +23,7 @@ from vectorbt import _backend
 from vectorbt.generic import nb
 from vectorbt.indicators import nb as indicator_nb
 from vectorbt.labels import nb as labels_nb
+from vectorbt.returns import nb as returns_nb
 from vectorbt.signals import nb as signal_nb
 
 try:
@@ -39,6 +40,11 @@ try:
     from vectorbt_rust import labels as rust_labels
 except ImportError:
     rust_labels = None
+
+try:
+    from vectorbt_rust import returns as rust_returns
+except ImportError:
+    rust_returns = None
 
 try:
     from vectorbt_rust import signals as rust_signals
@@ -115,6 +121,11 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     signal_high = signal_ts + np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 + 0.1
     signal_low = signal_ts - np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 - 0.1
     signal_close = signal_ts + np.nan_to_num(a, nan=0.0) * 0.01
+    returns_init_value = np.full(a.shape[1], np.nan, dtype=np.float64)
+    returns_data = returns_nb.returns_nb(signal_close, returns_init_value)
+    returns_value_1d = np.ascontiguousarray(signal_close[:, 0])
+    returns_data_1d = np.ascontiguousarray(returns_data[:, 0])
+    benchmark_rets = (np.nan_to_num(a, nan=0.0) * 0.01).astype(np.float64)
     sl_stop = np.full(a.shape, 0.02, dtype=np.float64)
     sl_trail = np.ones(a.shape, dtype=np.bool_)
     tp_stop = np.full(a.shape, 0.03, dtype=np.float64)
@@ -646,6 +657,312 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             ),
         ]
 
+    returns_cases = []
+    if rust_returns is not None:
+        returns_cases = [
+            BenchmarkCase(
+                "returns.get_return",
+                returns_nb.get_return_nb,
+                (1.0, 2.0),
+                rust_returns.get_return_rs,
+                (1.0, 2.0),
+            ),
+            BenchmarkCase(
+                "returns.returns_1d",
+                returns_nb.returns_1d_nb,
+                (returns_value_1d, np.nan),
+                rust_returns.returns_1d_rs,
+                (returns_value_1d, np.nan),
+            ),
+            BenchmarkCase(
+                "returns.returns",
+                returns_nb.returns_nb,
+                (signal_close, returns_init_value),
+                rust_returns.returns_rs,
+                (signal_close, returns_init_value),
+            ),
+            BenchmarkCase(
+                "returns.cum_returns_1d",
+                returns_nb.cum_returns_1d_nb,
+                (returns_data_1d, 0.0),
+                rust_returns.cum_returns_1d_rs,
+                (returns_data_1d, 0.0),
+            ),
+            BenchmarkCase(
+                "returns.cum_returns",
+                returns_nb.cum_returns_nb,
+                (returns_data, 0.0),
+                rust_returns.cum_returns_rs,
+                (returns_data, 0.0),
+            ),
+            BenchmarkCase(
+                "returns.cum_returns_final_1d",
+                returns_nb.cum_returns_final_1d_nb,
+                (returns_data_1d, 0.0),
+                rust_returns.cum_returns_final_1d_rs,
+                (returns_data_1d, 0.0),
+            ),
+            BenchmarkCase(
+                "returns.cum_returns_final",
+                returns_nb.cum_returns_final_nb,
+                (returns_data, 0.0),
+                rust_returns.cum_returns_final_rs,
+                (returns_data, 0.0),
+            ),
+            BenchmarkCase(
+                "returns.annualized_return",
+                returns_nb.annualized_return_nb,
+                (returns_data, 365.0),
+                rust_returns.annualized_return_rs,
+                (returns_data, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.annualized_volatility",
+                returns_nb.annualized_volatility_nb,
+                (returns_data, 365.0, 2.0, 1),
+                rust_returns.annualized_volatility_rs,
+                (returns_data, 365.0, 2.0, 1),
+            ),
+            BenchmarkCase(
+                "returns.drawdown",
+                returns_nb.drawdown_nb,
+                (returns_data,),
+                rust_returns.drawdown_rs,
+                (returns_data,),
+            ),
+            BenchmarkCase(
+                "returns.max_drawdown",
+                returns_nb.max_drawdown_nb,
+                (returns_data,),
+                rust_returns.max_drawdown_rs,
+                (returns_data,),
+            ),
+            BenchmarkCase(
+                "returns.calmar_ratio",
+                returns_nb.calmar_ratio_nb,
+                (returns_data, 365.0),
+                rust_returns.calmar_ratio_rs,
+                (returns_data, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.omega_ratio",
+                returns_nb.omega_ratio_nb,
+                (returns_data, 365.0, 0.01, 0.1),
+                rust_returns.omega_ratio_rs,
+                (returns_data, 365.0, 0.01, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.sharpe_ratio",
+                returns_nb.sharpe_ratio_nb,
+                (returns_data, 365.0, 0.01, 1),
+                rust_returns.sharpe_ratio_rs,
+                (returns_data, 365.0, 0.01, 1),
+            ),
+            BenchmarkCase(
+                "returns.downside_risk",
+                returns_nb.downside_risk_nb,
+                (returns_data, 365.0, 0.1),
+                rust_returns.downside_risk_rs,
+                (returns_data, 365.0, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.sortino_ratio",
+                returns_nb.sortino_ratio_nb,
+                (returns_data, 365.0, 0.1),
+                rust_returns.sortino_ratio_rs,
+                (returns_data, 365.0, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.information_ratio",
+                returns_nb.information_ratio_nb,
+                (returns_data, benchmark_rets, 1),
+                rust_returns.information_ratio_rs,
+                (returns_data, benchmark_rets, 1),
+            ),
+            BenchmarkCase(
+                "returns.beta",
+                returns_nb.beta_nb,
+                (returns_data, benchmark_rets),
+                rust_returns.beta_rs,
+                (returns_data, benchmark_rets),
+            ),
+            BenchmarkCase(
+                "returns.alpha",
+                returns_nb.alpha_nb,
+                (returns_data, benchmark_rets, 365.0, 0.01),
+                rust_returns.alpha_rs,
+                (returns_data, benchmark_rets, 365.0, 0.01),
+            ),
+            BenchmarkCase(
+                "returns.tail_ratio",
+                returns_nb.tail_ratio_nb,
+                (returns_data,),
+                rust_returns.tail_ratio_rs,
+                (returns_data,),
+            ),
+            BenchmarkCase(
+                "returns.value_at_risk",
+                returns_nb.value_at_risk_nb,
+                (returns_data, 0.05),
+                rust_returns.value_at_risk_rs,
+                (returns_data, 0.05),
+            ),
+            BenchmarkCase(
+                "returns.cond_value_at_risk",
+                returns_nb.cond_value_at_risk_nb,
+                (returns_data, 0.05),
+                rust_returns.cond_value_at_risk_rs,
+                (returns_data, 0.05),
+            ),
+            BenchmarkCase(
+                "returns.capture",
+                returns_nb.capture_nb,
+                (returns_data, benchmark_rets, 365.0),
+                rust_returns.capture_rs,
+                (returns_data, benchmark_rets, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.up_capture",
+                returns_nb.up_capture_nb,
+                (returns_data, benchmark_rets, 365.0),
+                rust_returns.up_capture_rs,
+                (returns_data, benchmark_rets, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.down_capture",
+                returns_nb.down_capture_nb,
+                (returns_data, benchmark_rets, 365.0),
+                rust_returns.down_capture_rs,
+                (returns_data, benchmark_rets, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_total",
+                returns_nb.rolling_cum_returns_final_nb,
+                (returns_data, window, None, 0.0),
+                rust_returns.rolling_cum_returns_final_rs,
+                (returns_data, window, None, 0.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_annualized",
+                returns_nb.rolling_annualized_return_nb,
+                (returns_data, window, None, 365.0),
+                rust_returns.rolling_annualized_return_rs,
+                (returns_data, window, None, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_annualized_volatility",
+                returns_nb.rolling_annualized_volatility_nb,
+                (returns_data, window, None, 365.0, 2.0, 1),
+                rust_returns.rolling_annualized_volatility_rs,
+                (returns_data, window, None, 365.0, 2.0, 1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_max_drawdown",
+                returns_nb.rolling_max_drawdown_nb,
+                (returns_data, window, None),
+                rust_returns.rolling_max_drawdown_rs,
+                (returns_data, window, None),
+            ),
+            BenchmarkCase(
+                "returns.rolling_calmar_ratio",
+                returns_nb.rolling_calmar_ratio_nb,
+                (returns_data, window, None, 365.0),
+                rust_returns.rolling_calmar_ratio_rs,
+                (returns_data, window, None, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_omega_ratio",
+                returns_nb.rolling_omega_ratio_nb,
+                (returns_data, window, None, 365.0, 0.01, 0.1),
+                rust_returns.rolling_omega_ratio_rs,
+                (returns_data, window, None, 365.0, 0.01, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_sharpe_ratio",
+                returns_nb.rolling_sharpe_ratio_nb,
+                (returns_data, window, None, 365.0, 0.01, 1),
+                rust_returns.rolling_sharpe_ratio_rs,
+                (returns_data, window, None, 365.0, 0.01, 1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_downside_risk",
+                returns_nb.rolling_downside_risk_nb,
+                (returns_data, window, None, 365.0, 0.1),
+                rust_returns.rolling_downside_risk_rs,
+                (returns_data, window, None, 365.0, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_sortino_ratio",
+                returns_nb.rolling_sortino_ratio_nb,
+                (returns_data, window, None, 365.0, 0.1),
+                rust_returns.rolling_sortino_ratio_rs,
+                (returns_data, window, None, 365.0, 0.1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_information_ratio",
+                returns_nb.rolling_information_ratio_nb,
+                (returns_data, window, None, benchmark_rets, 1),
+                rust_returns.rolling_information_ratio_rs,
+                (returns_data, window, None, benchmark_rets, 1),
+            ),
+            BenchmarkCase(
+                "returns.rolling_beta",
+                returns_nb.rolling_beta_nb,
+                (returns_data, window, None, benchmark_rets),
+                rust_returns.rolling_beta_rs,
+                (returns_data, window, None, benchmark_rets),
+            ),
+            BenchmarkCase(
+                "returns.rolling_alpha",
+                returns_nb.rolling_alpha_nb,
+                (returns_data, window, None, benchmark_rets, 365.0, 0.01),
+                rust_returns.rolling_alpha_rs,
+                (returns_data, window, None, benchmark_rets, 365.0, 0.01),
+            ),
+            BenchmarkCase(
+                "returns.rolling_tail_ratio",
+                returns_nb.rolling_tail_ratio_nb,
+                (returns_data, window, None),
+                rust_returns.rolling_tail_ratio_rs,
+                (returns_data, window, None),
+            ),
+            BenchmarkCase(
+                "returns.rolling_value_at_risk",
+                returns_nb.rolling_value_at_risk_nb,
+                (returns_data, window, None, 0.05),
+                rust_returns.rolling_value_at_risk_rs,
+                (returns_data, window, None, 0.05),
+            ),
+            BenchmarkCase(
+                "returns.rolling_cond_value_at_risk",
+                returns_nb.rolling_cond_value_at_risk_nb,
+                (returns_data, window, None, 0.05),
+                rust_returns.rolling_cond_value_at_risk_rs,
+                (returns_data, window, None, 0.05),
+            ),
+            BenchmarkCase(
+                "returns.rolling_capture",
+                returns_nb.rolling_capture_nb,
+                (returns_data, window, None, benchmark_rets, 365.0),
+                rust_returns.rolling_capture_rs,
+                (returns_data, window, None, benchmark_rets, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_up_capture",
+                returns_nb.rolling_up_capture_nb,
+                (returns_data, window, None, benchmark_rets, 365.0),
+                rust_returns.rolling_up_capture_rs,
+                (returns_data, window, None, benchmark_rets, 365.0),
+            ),
+            BenchmarkCase(
+                "returns.rolling_down_capture",
+                returns_nb.rolling_down_capture_nb,
+                (returns_data, window, None, benchmark_rets, 365.0),
+                rust_returns.rolling_down_capture_rs,
+                (returns_data, window, None, benchmark_rets, 365.0),
+            ),
+        ]
+
     cases = [
         BenchmarkCase("shuffle_1d", nb.shuffle_1d_nb, (a_1d, seed), rust_generic.shuffle_1d_rs, (a_1d, seed), False),
         BenchmarkCase("shuffle", nb.shuffle_nb, (a, seed), rust_generic.shuffle_rs, (a, seed), False),
@@ -891,6 +1208,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     cases.extend(indicator_cases)
     cases.extend(signal_cases)
     cases.extend(labels_cases)
+    cases.extend(returns_cases)
     return cases
 
 

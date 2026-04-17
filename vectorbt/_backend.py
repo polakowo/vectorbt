@@ -114,6 +114,17 @@ def scalar_compatible_with_rust(name: str, value: tp.Any) -> RustSupport:
     return RustSupport(True)
 
 
+def unit_interval_compatible_with_rust(name: str, value: tp.Any) -> RustSupport:
+    """Return whether a scalar lies within the closed unit interval."""
+    scalar_support = scalar_compatible_with_rust(name, value)
+    if not scalar_support.supported:
+        return scalar_support
+    value = float(value)
+    if value < 0.0 or value > 1.0:
+        return RustSupport(False, f"Rust backend requires `{name}` to be between 0 and 1.")
+    return RustSupport(True)
+
+
 def non_neg_array_compatible_with_rust(name: str, a: tp.Any) -> RustSupport:
     """Return whether an array contains only non-negative int64 values for Rust."""
     support = array_compatible_with_rust(a, dtype=np.int64)
