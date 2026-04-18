@@ -1165,6 +1165,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         mapping: tp.Optional[tp.MappingLike] = None,
         incl_all_keys: bool = False,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """Return a Series/DataFrame containing counts of unique values.
@@ -1189,7 +1190,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        value_counts = dispatch.value_counts(codes, len(uniques), group_lens)
+        value_counts = dispatch.value_counts(codes, len(uniques), group_lens, backend=backend)
         if incl_all_keys and mapping is not None:
             missing_keys = []
             for x in mapping:
@@ -1374,9 +1375,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Conversion ############# #
 
-    def drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def drawdown(self, wrap_kwargs: tp.KwargsLike = None, backend: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Drawdown series."""
-        out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array()) - 1
+        out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array(), backend=backend) - 1
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
@@ -1548,12 +1549,14 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
         return self.scale(with_mean=True, with_std=True, **kwargs)
 
-    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def rebase(
+        self, base: float, wrap_kwargs: tp.KwargsLike = None, backend: tp.Optional[str] = None
+    ) -> tp.SeriesFrame:
         """Rebase all series to a given intial base.
 
         This makes comparing/plotting different series together easier.
         Will forward and backward fill NaN values."""
-        result = dispatch.bfill(dispatch.ffill(self.to_2d_array()))
+        result = dispatch.bfill(dispatch.ffill(self.to_2d_array(), backend=backend), backend=backend)
         result = result / result[0] * base
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 

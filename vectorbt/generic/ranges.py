@@ -208,6 +208,7 @@ class Ranges(Records):
         gap_value: tp.Optional[tp.Scalar] = None,
         attach_ts: bool = True,
         wrapper_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> RangesT:
         """Build `Ranges` from time series `ts`.
@@ -231,7 +232,7 @@ class Ranges(Records):
                 gap_value = -1
             else:
                 gap_value = np.nan
-        records_arr = dispatch.find_ranges(ts_arr, gap_value)
+        records_arr = dispatch.find_ranges(ts_arr, gap_value, backend=backend)
         wrapper = ArrayWrapper.from_obj(ts_pd, **wrapper_kwargs)
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 
@@ -244,6 +245,7 @@ class Ranges(Records):
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """Convert ranges to a mask.
 
@@ -255,6 +257,7 @@ class Ranges(Records):
             self.get_field_arr("status"),
             col_map,
             len(self.wrapper.index),
+            backend=backend,
         )
         return self.wrapper.wrap(mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
@@ -297,6 +300,7 @@ class Ranges(Records):
         normalize: bool = True,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Coverage, that is, the number of steps that are covered by all ranges.
 
@@ -311,6 +315,7 @@ class Ranges(Records):
             index_lens,
             overlapping=overlapping,
             normalize=normalize,
+            backend=backend,
         )
         wrap_kwargs = merge_dicts(dict(name_or_index="coverage"), wrap_kwargs)
         return self.wrapper.wrap_reduced(coverage, group_by=group_by, **wrap_kwargs)

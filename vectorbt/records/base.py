@@ -526,7 +526,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                     kwargs["col_mapper"] = None
         return Configured.replace(self, **kwargs)
 
-    def get_by_col_idxs(self, col_idxs: tp.Array1d) -> tp.RecordArray:
+    def get_by_col_idxs(self, col_idxs: tp.Array1d, backend: tp.Optional[str] = None) -> tp.RecordArray:
         """Get records corresponding to column indices.
 
         Returns new records array."""
@@ -535,10 +535,11 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                 self.values,
                 self.col_mapper.col_range,
                 to_1d_array(col_idxs),
+                backend=backend,
             )  # faster
         else:
             new_records_arr = dispatch.record_col_map_select(
-                self.values, self.col_mapper.col_map, to_1d_array(col_idxs)
+                self.values, self.col_mapper.col_map, to_1d_array(col_idxs), backend=backend
             )
         return new_records_arr
 
@@ -663,11 +664,11 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         return self.values[idx_field_name]
 
     @cached_method
-    def is_sorted(self, incl_id: bool = False) -> bool:
+    def is_sorted(self, incl_id: bool = False, backend: tp.Optional[str] = None) -> bool:
         """Check whether records are sorted."""
         if incl_id:
-            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr)
-        return dispatch.is_col_sorted(self.col_arr)
+            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr, backend=backend)
+        return dispatch.is_col_sorted(self.col_arr, backend=backend)
 
     def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).

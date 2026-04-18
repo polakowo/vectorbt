@@ -63,7 +63,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.generic import nb as generic_nb
+from vectorbt.generic import dispatch as generic_dispatch
 from vectorbt.indicators import dispatch
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.utils.colors import adjust_opacity
@@ -596,6 +596,7 @@ class _MACD(MACD):
         hist_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
+        backend: tp.Optional[str] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
@@ -638,7 +639,7 @@ class _MACD(MACD):
 
         # Plot hist
         hist = self_col.hist.values
-        hist_diff = generic_nb.diff_1d_nb(hist)
+        hist_diff = generic_dispatch.diff_1d(hist, backend=backend)
         marker_colors = np.full(hist.shape, adjust_opacity("silver", 0.75), dtype=object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity("green", 0.75)
         marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity("lightgreen", 0.75)

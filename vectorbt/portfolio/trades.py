@@ -1395,13 +1395,14 @@ class EntryTrades(Trades):
         orders: Orders,
         close: tp.Optional[tp.ArrayLike] = None,
         attach_close: bool = True,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> EntryTradesT:
         """Build `EntryTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
         trade_records_arr = dispatch.get_entry_trades(
-            orders.values, to_2d_array(close), orders.col_mapper.col_map
+            orders.values, to_2d_array(close), orders.col_mapper.col_map, backend=backend
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
@@ -1433,13 +1434,14 @@ class ExitTrades(Trades):
         orders: Orders,
         close: tp.Optional[tp.ArrayLike] = None,
         attach_close: bool = True,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> ExitTradesT:
         """Build `ExitTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
         trade_records_arr = dispatch.get_exit_trades(
-            orders.values, to_2d_array(close), orders.col_mapper.col_map
+            orders.values, to_2d_array(close), orders.col_mapper.col_map, backend=backend
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
@@ -1479,10 +1481,11 @@ class Positions(Trades):
         trades: Trades,
         close: tp.Optional[tp.ArrayLike] = None,
         attach_close: bool = True,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> PositionsT:
         """Build `Positions` from `Trades`."""
         if close is None:
             close = trades.close
-        position_records_arr = dispatch.get_positions(trades.values, trades.col_mapper.col_map)
+        position_records_arr = dispatch.get_positions(trades.values, trades.col_mapper.col_map, backend=backend)
         return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)

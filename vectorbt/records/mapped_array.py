@@ -564,11 +564,11 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         return self._mapping
 
     @cached_method
-    def is_sorted(self, incl_id: bool = False) -> bool:
+    def is_sorted(self, incl_id: bool = False, backend: tp.Optional[str] = None) -> bool:
         """Check whether mapped array is sorted."""
         if incl_id:
-            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr)
-        return dispatch.is_col_sorted(self.col_arr)
+            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr, backend=backend)
+        return dispatch.is_col_sorted(self.col_arr, backend=backend)
 
     def sort(
         self: MappedArrayT,
@@ -625,16 +625,20 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         return nb.mapped_to_mask_nb(self.values, col_map, inout_map_func_nb, *args)
 
     @cached_method
-    def top_n_mask(self, n: int, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
+    def top_n_mask(
+        self, n: int, group_by: tp.GroupByLike = None, backend: tp.Optional[str] = None, **kwargs
+    ) -> tp.Array1d:
         """Return mask of top N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        return dispatch.top_n_mapped_mask(self.values, col_map, n)
+        return dispatch.top_n_mapped_mask(self.values, col_map, n, backend=backend)
 
     @cached_method
-    def bottom_n_mask(self, n: int, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
+    def bottom_n_mask(
+        self, n: int, group_by: tp.GroupByLike = None, backend: tp.Optional[str] = None, **kwargs
+    ) -> tp.Array1d:
         """Return mask of bottom N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        return dispatch.bottom_n_mapped_mask(self.values, col_map, n)
+        return dispatch.bottom_n_mapped_mask(self.values, col_map, n, backend=backend)
 
     @cached_method
     def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
@@ -647,7 +651,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         return self.apply_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
-    def is_expandable(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
+    def is_expandable(
+        self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None, backend: tp.Optional[str] = None
+    ) -> bool:
         """See `vectorbt.records.nb.is_mapped_expandable_nb`."""
         if idx_arr is None:
             if self.idx_arr is None:
@@ -655,7 +661,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr = self.idx_arr
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        return dispatch.is_mapped_expandable(col_arr, idx_arr, target_shape)
+        return dispatch.is_mapped_expandable(col_arr, idx_arr, target_shape, backend=backend)
 
     def to_pd(
         self,
@@ -664,6 +670,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         fill_value: float = np.nan,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """Expand mapped array to a Series/DataFrame.
 
@@ -686,7 +693,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     **merge_dicts({}, wrap_kwargs),
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
-            out = dispatch.stack_expand_mapped(self.values, col_map, fill_value)
+            out = dispatch.stack_expand_mapped(self.values, col_map, fill_value, backend=backend)
             return self.wrapper.wrap(
                 out,
                 index=np.arange(out.shape[0]),
@@ -701,7 +708,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             raise ValueError("Multiple values are pointing to the same position. Use ignore_index.")
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        out = dispatch.expand_mapped(self.values, col_arr, idx_arr, target_shape, fill_value)
+        out = dispatch.expand_mapped(self.values, col_arr, idx_arr, target_shape, fill_value, backend=backend)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def apply(
@@ -1002,6 +1009,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         mapping: tp.Optional[tp.MappingLike] = None,
         incl_all_keys: bool = False,
         wrap_kwargs: tp.KwargsLike = None,
+        backend: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.accessors.GenericAccessor.value_counts`.
@@ -1018,7 +1026,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        value_counts = dispatch.mapped_value_counts(mapped_codes, len(mapped_uniques), col_map)
+        value_counts = dispatch.mapped_value_counts(mapped_codes, len(mapped_uniques), col_map, backend=backend)
         if incl_all_keys and mapping is not None:
             missing_keys = []
             for x in mapping:
