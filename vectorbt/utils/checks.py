@@ -111,8 +111,8 @@ def is_rust_func(arg: tp.Any, func_suffix: str = "_rs") -> bool:
     )
 
 
-def is_backend_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) -> bool:
-    """Check whether the argument is a backend-neutral dispatch function."""
+def is_engine_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) -> bool:
+    """Check whether the argument is an engine-neutral dispatch function."""
     if not callable(arg):
         return False
     if func_suffix is not None and not getattr(arg, "__name__", "").endswith(func_suffix):
@@ -120,26 +120,26 @@ def is_backend_dispatch_func(arg: tp.Any, func_suffix: tp.Optional[str] = None) 
     module = getattr(arg, "__module__", "")
     if not module.startswith("vectorbt.") or not module.endswith(".dispatch"):
         return False
-    return func_accepts_arg(arg, "backend")
+    return func_accepts_arg(arg, "engine")
 
 
-def is_backend_compatible_func(
+def is_engine_compatible_func(
     func: tp.Callable,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
     func_suffix: tp.Optional[str] = None,
 ) -> bool:
-    """Check whether `func` can be used with the requested backend."""
+    """Check whether `func` can be used with the requested engine."""
     from vectorbt._settings import settings
 
-    if backend is None:
-        backend = settings["backend"]
-    if backend == "auto":
-        return is_numba_func(func) or is_rust_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
-    if backend == "numba":
-        return is_numba_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
-    if backend == "rust":
-        return is_rust_func(func) or is_backend_dispatch_func(func, func_suffix=func_suffix)
-    raise ValueError("Invalid backend. Expected 'auto', 'numba', or 'rust'.")
+    if engine is None:
+        engine = settings["engine"]
+    if engine == "auto":
+        return is_numba_func(func) or is_rust_func(func) or is_engine_dispatch_func(func, func_suffix=func_suffix)
+    if engine == "numba":
+        return is_numba_func(func) or is_engine_dispatch_func(func, func_suffix=func_suffix)
+    if engine == "rust":
+        return is_rust_func(func) or is_engine_dispatch_func(func, func_suffix=func_suffix)
+    raise ValueError("Invalid engine. Expected 'auto', 'numba', or 'rust'.")
 
 
 def is_hashable(arg: tp.Any) -> bool:
@@ -416,14 +416,14 @@ def assert_rust_func(func: tp.Callable) -> None:
         raise AssertionError(f"Function {func} must be Rust backed")
 
 
-def assert_backend_func(
+def assert_engine_func(
     func: tp.Callable,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
     func_suffix: tp.Optional[str] = None,
 ) -> None:
-    """Raise exception if `func` cannot be used with the requested backend."""
-    if not is_backend_compatible_func(func, backend=backend, func_suffix=func_suffix):
-        raise AssertionError(f"Function {func} must be compatible with backend '{backend}'")
+    """Raise exception if `func` cannot be used with the requested engine."""
+    if not is_engine_compatible_func(func, engine=engine, func_suffix=func_suffix):
+        raise AssertionError(f"Function {func} must be compatible with engine '{engine}'")
 
 
 def assert_not_none(arg: tp.Any) -> None:

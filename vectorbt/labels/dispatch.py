@@ -1,18 +1,18 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for label functions."""
+"""Engine-neutral dispatch wrappers for label functions."""
 
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt._backend import (
+from vectorbt._engine import (
     array_compatible_with_rust,
     combine_rust_support,
     flex_broadcast_to_shape,
     matching_shape_compatible_with_rust,
     non_neg_int_compatible_with_rust,
-    resolve_backend,
+    resolve_engine,
 )
 from vectorbt.labels.enums import TrendMode
 
@@ -23,11 +23,11 @@ def future_mean_apply(
     ewm: bool,
     wait: int = 1,
     adjust: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.future_mean_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.future_mean_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
@@ -50,11 +50,11 @@ def future_std_apply(
     wait: int = 1,
     adjust: bool = False,
     ddof: int = 0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.future_std_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.future_std_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
@@ -75,11 +75,11 @@ def future_min_apply(
     close: tp.Array2d,
     window: int,
     wait: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.future_min_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.future_min_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
@@ -99,11 +99,11 @@ def future_max_apply(
     close: tp.Array2d,
     window: int,
     wait: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.future_max_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.future_max_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
@@ -122,11 +122,11 @@ def future_max_apply(
 def fixed_labels_apply(
     close: tp.Array2d,
     n: int,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.fixed_labels_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.fixed_labels_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("n", n),
@@ -147,11 +147,11 @@ def mean_labels_apply(
     ewm: bool,
     wait: int = 1,
     adjust: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.mean_labels_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.mean_labels_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
@@ -172,11 +172,11 @@ def local_extrema_apply(
     pos_th: tp.MaybeArray[float],
     neg_th: tp.MaybeArray[float],
     flex_2d: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.local_extrema_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.local_extrema_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(close, dtype=np.float64),
     )
     if eng == "rust":
@@ -193,11 +193,11 @@ def local_extrema_apply(
 def bn_trend_labels(
     close: tp.Array2d,
     local_extrema: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.bn_trend_labels_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.bn_trend_labels_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             array_compatible_with_rust(local_extrema, dtype=np.int64),
@@ -216,11 +216,11 @@ def bn_trend_labels(
 def bn_cont_trend_labels(
     close: tp.Array2d,
     local_extrema: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.bn_cont_trend_labels_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.bn_cont_trend_labels_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             array_compatible_with_rust(local_extrema, dtype=np.int64),
@@ -242,11 +242,11 @@ def bn_cont_sat_trend_labels(
     pos_th: tp.MaybeArray[float],
     neg_th: tp.MaybeArray[float],
     flex_2d: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.bn_cont_sat_trend_labels_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.bn_cont_sat_trend_labels_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             array_compatible_with_rust(local_extrema, dtype=np.int64),
@@ -268,11 +268,11 @@ def pct_trend_labels(
     close: tp.Array2d,
     local_extrema: tp.Array2d,
     normalize: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.pct_trend_labels_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.pct_trend_labels_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             array_compatible_with_rust(local_extrema, dtype=np.int64),
@@ -294,11 +294,11 @@ def trend_labels_apply(
     neg_th: tp.MaybeArray[float],
     mode: int,
     flex_2d: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.trend_labels_apply_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.trend_labels_apply_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(close, dtype=np.float64),
     )
     if eng == "rust":
@@ -319,11 +319,11 @@ def breakout_labels(
     neg_th: tp.MaybeArray[float],
     wait: int = 1,
     flex_2d: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.labels.nb.breakout_labels_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.labels.nb.breakout_labels_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),

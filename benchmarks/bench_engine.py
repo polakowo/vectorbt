@@ -19,7 +19,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from vectorbt import _backend
+from vectorbt import _engine
 from vectorbt.generic import nb
 from vectorbt.indicators import nb as indicator_nb
 from vectorbt.labels import nb as labels_nb
@@ -1625,7 +1625,7 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="Check Rust/Numba output parity before timing.")
     args = parser.parse_args()
 
-    if not _backend.is_rust_available() or rust_generic is None:
+    if not _engine.is_rust_available() or rust_generic is None:
         raise SystemExit("vectorbt-rust is not installed or version-compatible")
 
     a = make_array(args.rows, args.cols, args.nan_ratio, args.seed)

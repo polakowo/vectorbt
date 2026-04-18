@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 import vectorbt as vbt
-from vectorbt import _backend
+from vectorbt import _engine
 from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
 from vectorbt.indicators import dispatch as indicator_dispatch
@@ -17,85 +17,85 @@ from vectorbt.records import dispatch as records_dispatch
 from vectorbt.records import nb as records_nb
 from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
-from vectorbt.portfolio import dispatch
+from vectorbt.portfolio import dispatch as portfolio_dispatch
 from vectorbt.portfolio import nb as portfolio_nb
 
 
 def teardown_module():
     vbt.settings.reset()
-    _backend.clear_backend_cache()
+    _engine.clear_engine_cache()
 
 
-class TestBackendResolution:
+class TestEngineResolution:
     def test_array_compatible_with_rust(self):
-        assert _backend.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
-        assert _backend.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported
+        assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
+        assert _engine.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported
 
-        int_support = _backend.array_compatible_with_rust(np.array([1, 2], dtype=np.int64))
+        int_support = _engine.array_compatible_with_rust(np.array([1, 2], dtype=np.int64))
         assert not int_support.supported
         assert "float64" in int_support.reason
 
-        strided_support = _backend.array_compatible_with_rust(np.array([1.0, 2.0, 3.0])[::2])
+        strided_support = _engine.array_compatible_with_rust(np.array([1.0, 2.0, 3.0])[::2])
         assert strided_support.supported
 
     def test_global_rust_support_helpers(self):
-        assert _backend.combine_rust_support(_backend.RustSupport(True), _backend.RustSupport(True)).supported
+        assert _engine.combine_rust_support(_engine.RustSupport(True), _engine.RustSupport(True)).supported
 
-        unsupported = _backend.combine_rust_support(
-            _backend.RustSupport(True),
-            _backend.RustSupport(False, "unsupported"),
+        unsupported = _engine.combine_rust_support(
+            _engine.RustSupport(True),
+            _engine.RustSupport(False, "unsupported"),
         )
         assert not unsupported.supported
         assert unsupported.reason == "unsupported"
 
-        assert _backend.non_neg_int_compatible_with_rust("n", 0).supported
-        assert not _backend.non_neg_int_compatible_with_rust("n", -1).supported
-        assert not _backend.callback_unsupported_with_rust().supported
-        assert _backend.unit_interval_compatible_with_rust("cutoff", 0.5).supported
-        assert not _backend.unit_interval_compatible_with_rust("cutoff", 1.5).supported
+        assert _engine.non_neg_int_compatible_with_rust("n", 0).supported
+        assert not _engine.non_neg_int_compatible_with_rust("n", -1).supported
+        assert not _engine.callback_unsupported_with_rust().supported
+        assert _engine.unit_interval_compatible_with_rust("cutoff", 0.5).supported
+        assert not _engine.unit_interval_compatible_with_rust("cutoff", 1.5).supported
 
-        rolling_support = _backend.rolling_compatible_with_rust(
+        rolling_support = _engine.rolling_compatible_with_rust(
             np.ones((2, 2), dtype=np.float64),
             2,
             None,
         )
         assert rolling_support.supported
 
-    def test_resolve_backend(self, monkeypatch):
-        monkeypatch.setattr(_backend, "is_rust_available", lambda: True)
+    def test_resolve_engine(self, monkeypatch):
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
 
-        assert _backend.resolve_backend("auto", _backend.RustSupport(True)) == "rust"
-        assert _backend.resolve_backend("auto", _backend.RustSupport(False, "unsupported")) == "numba"
-        assert _backend.resolve_backend("numba", _backend.RustSupport(True)) == "numba"
-        assert _backend.resolve_backend("rust", _backend.RustSupport(True)) == "rust"
+        assert _engine.resolve_engine("auto", _engine.RustSupport(True)) == "rust"
+        assert _engine.resolve_engine("auto", _engine.RustSupport(False, "unsupported")) == "numba"
+        assert _engine.resolve_engine("numba", _engine.RustSupport(True)) == "numba"
+        assert _engine.resolve_engine("rust", _engine.RustSupport(True)) == "rust"
 
-        with pytest.raises(ValueError, match="Invalid backend"):
-            _backend.resolve_backend("bad", _backend.RustSupport(True))
+        with pytest.raises(ValueError, match="Invalid engine"):
+            _engine.resolve_engine("bad", _engine.RustSupport(True))
 
         with pytest.raises(TypeError, match="RustSupport"):
-            _backend.resolve_backend("auto", True)
+            _engine.resolve_engine("auto", True)
 
-    def test_resolve_backend_unavailable_rust(self, monkeypatch):
-        monkeypatch.setattr(_backend, "is_rust_available", lambda: False)
+    def test_resolve_engine_unavailable_rust(self, monkeypatch):
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: False)
 
-        assert _backend.resolve_backend("auto", _backend.RustSupport(True)) == "numba"
+        assert _engine.resolve_engine("auto", _engine.RustSupport(True)) == "numba"
         with pytest.raises(ImportError, match="vectorbt-rust is not installed"):
-            _backend.resolve_backend("rust", _backend.RustSupport(True))
+            _engine.resolve_engine("rust", _engine.RustSupport(True))
 
-    def test_resolve_backend_unsupported_rust_reason(self, monkeypatch):
-        monkeypatch.setattr(_backend, "is_rust_available", lambda: True)
+    def test_resolve_engine_unsupported_rust_reason(self, monkeypatch):
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
 
         with pytest.raises(ValueError, match="requires float64"):
-            _backend.resolve_backend("rust", _backend.RustSupport(False, "Rust backend requires float64 arrays."))
+            _engine.resolve_engine("rust", _engine.RustSupport(False, "Rust engine requires float64 arrays."))
 
     def test_callback_function_rejects_explicit_rust(self, monkeypatch):
-        monkeypatch.setattr(_backend, "is_rust_available", lambda: True)
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
 
         with pytest.raises(ValueError, match="callback-accepting"):
-            dispatch.apply(np.ones((2, 2)), lambda col, a: a, backend="rust")
+            dispatch.apply(np.ones((2, 2)), lambda col, a: a, engine="rust")
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestGenericRustParity:
     def test_dispatch_matches_numba(self):
         a_1d = np.array([1.0, np.nan, 3.0, 4.0, np.nan], dtype=np.float64)
@@ -277,7 +277,7 @@ class TestGenericRustParity:
             (dispatch.crossed_above, nb.crossed_above_nb, (a, np.full(a.shape, 2.0), 0)),
         ]
         for dispatch_func, nb_func, args in cases:
-            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+            np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
         reducers = [
             (dispatch.nth_reduce, nb.nth_reduce_nb, (0, a_1d, -1)),
@@ -297,7 +297,7 @@ class TestGenericRustParity:
             (dispatch.any_squeeze, nb.any_squeeze_nb, (0, 0, a_1d)),
         ]
         for dispatch_func, nb_func, args in reducers:
-            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+            np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
     def test_dispatch_optimized_kernels_match_numba_by_layout(self):
         base = np.array(
@@ -333,7 +333,7 @@ class TestGenericRustParity:
                 (dispatch.expanding_std, nb.expanding_std_nb, (a, 1, 0)),
             ]
             for dispatch_func, nb_func, args in cases:
-                np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+                np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
         empty_cols = np.empty((3, 0), dtype=np.float64)
         empty_col_cases = [
@@ -346,7 +346,7 @@ class TestGenericRustParity:
             (dispatch.expanding_mean, nb.expanding_mean_nb, (empty_cols, 1)),
         ]
         for dispatch_func, nb_func, args in empty_col_cases:
-            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+            np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
     def test_dispatch_matches_numba_for_record_outputs(self):
         ts = np.array(
@@ -360,13 +360,13 @@ class TestGenericRustParity:
             dtype=np.float64,
         )
 
-        ranges = dispatch.find_ranges(ts, np.nan, backend="rust")
+        ranges = dispatch.find_ranges(ts, np.nan, engine="rust")
         expected_ranges = nb.find_ranges_nb(ts, np.nan)
         assert ranges.dtype == range_dt
         assert ranges.dtype.itemsize == range_dt.itemsize
         np.testing.assert_array_equal(ranges, expected_ranges)
 
-        drawdowns = dispatch.get_drawdowns(ts, backend="rust")
+        drawdowns = dispatch.get_drawdowns(ts, engine="rust")
         expected_drawdowns = nb.get_drawdowns_nb(ts)
         assert drawdowns.dtype == drawdown_dt
         assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
@@ -375,7 +375,7 @@ class TestGenericRustParity:
     def test_dispatch_get_drawdowns_empty_rows(self):
         ts = np.empty((0, 3), dtype=np.float64)
 
-        drawdowns = dispatch.get_drawdowns(ts, backend="rust")
+        drawdowns = dispatch.get_drawdowns(ts, engine="rust")
         expected_drawdowns = nb.get_drawdowns_nb(ts)
         assert drawdowns.dtype == drawdown_dt
         assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
@@ -386,22 +386,22 @@ class TestGenericRustParity:
         a = np.column_stack((a_1d, a_1d + 1.0))
 
         np.testing.assert_allclose(
-            dispatch.rolling_std_1d(a_1d, 2, 1, 3, backend="rust"),
+            dispatch.rolling_std_1d(a_1d, 2, 1, 3, engine="rust"),
             np.full(a_1d.shape, np.nan),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            dispatch.rolling_std(a, 2, 1, 3, backend="rust"),
+            dispatch.rolling_std(a, 2, 1, 3, engine="rust"),
             np.full(a.shape, np.nan),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            dispatch.expanding_std_1d(a_1d, 1, 5, backend="rust"),
+            dispatch.expanding_std_1d(a_1d, 1, 5, engine="rust"),
             np.full(a_1d.shape, np.nan),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            dispatch.expanding_std(a, 1, 5, backend="rust"),
+            dispatch.expanding_std(a, 1, 5, engine="rust"),
             np.full(a.shape, np.nan),
             equal_nan=True,
         )
@@ -410,7 +410,7 @@ class TestGenericRustParity:
         peak = np.array([10.0, 8.0, 12.0])
         valley = np.array([5.0])
         np.testing.assert_allclose(
-            dispatch.dd_drawdown(peak, valley, backend="rust"),
+            dispatch.dd_drawdown(peak, valley, engine="rust"),
             nb.dd_drawdown_nb(peak, valley),
         )
 
@@ -418,58 +418,56 @@ class TestGenericRustParity:
         end = np.array([5], dtype=np.int64)
         valley_idx = np.array([3, 4, 5], dtype=np.int64)
         np.testing.assert_allclose(
-            dispatch.dd_recovery_duration(valley_idx, end, backend="rust"),
+            dispatch.dd_recovery_duration(valley_idx, end, engine="rust"),
             nb.dd_recovery_duration_nb(valley_idx, end),
         )
         np.testing.assert_allclose(
-            dispatch.dd_recovery_duration_ratio(start, valley_idx, end, backend="rust"),
+            dispatch.dd_recovery_duration_ratio(start, valley_idx, end, engine="rust"),
             nb.dd_recovery_duration_ratio_nb(start, valley_idx, end),
         )
 
         with pytest.raises(ValueError, match="broadcast"):
-            dispatch.dd_drawdown(peak, np.array([5.0, 4.0]), backend="rust")
+            dispatch.dd_drawdown(peak, np.array([5.0, 4.0]), engine="rust")
 
     def test_dispatch_rust_shuffle_is_seeded(self):
         a = np.arange(12, dtype=np.float64).reshape(4, 3)
 
-        out1 = dispatch.shuffle(a, seed=42, backend="rust")
-        out2 = dispatch.shuffle(a, seed=42, backend="rust")
+        out1 = dispatch.shuffle(a, seed=42, engine="rust")
+        out2 = dispatch.shuffle(a, seed=42, engine="rust")
         np.testing.assert_array_equal(out1, out2)
         for col in range(a.shape[1]):
             np.testing.assert_array_equal(np.sort(out1[:, col]), np.sort(a[:, col]))
 
         identical = np.tile(np.arange(20, dtype=np.float64).reshape(-1, 1), (1, 4))
-        shuffled = dispatch.shuffle(identical, seed=42, backend="rust")
+        shuffled = dispatch.shuffle(identical, seed=42, engine="rust")
         assert any(not np.array_equal(shuffled[:, 0], shuffled[:, col]) for col in range(1, identical.shape[1]))
 
     def test_dispatch_auto_falls_back_for_unsupported_array(self):
         a = np.array([[1, 2], [3, 4]], dtype=np.int64)
 
-        np.testing.assert_allclose(dispatch.diff(a, backend="auto"), nb.diff_nb(a), equal_nan=True)
+        np.testing.assert_allclose(dispatch.diff(a, engine="auto"), nb.diff_nb(a), equal_nan=True)
         with pytest.raises(ValueError, match="float64"):
-            dispatch.diff(a, backend="rust")
+            dispatch.diff(a, engine="rust")
 
     def test_dispatch_supports_strided_1d_arrays(self):
         a = np.array([1.0, np.nan, 2.0, 3.0, np.nan, 4.0], dtype=np.float64)[::2]
         mask = np.array([True, False, True, False, True, False], dtype=np.bool_)[::2]
         values = np.arange(6, dtype=np.float64)[::2]
 
+        np.testing.assert_allclose(dispatch.fillna_1d(a, -1.0, engine="rust"), nb.fillna_1d_nb(a, -1.0), equal_nan=True)
+        np.testing.assert_allclose(dispatch.diff_1d(a, 1, engine="rust"), nb.diff_1d_nb(a, 1), equal_nan=True)
         np.testing.assert_allclose(
-            dispatch.fillna_1d(a, -1.0, backend="rust"), nb.fillna_1d_nb(a, -1.0), equal_nan=True
-        )
-        np.testing.assert_allclose(dispatch.diff_1d(a, 1, backend="rust"), nb.diff_1d_nb(a, 1), equal_nan=True)
-        np.testing.assert_allclose(
-            dispatch.set_by_mask_1d(a, mask, -1.0, backend="rust"),
+            dispatch.set_by_mask_1d(a, mask, -1.0, engine="rust"),
             nb.set_by_mask_1d_nb(a, mask, -1.0),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            dispatch.set_by_mask_mult_1d(a, mask, values, backend="rust"),
+            dispatch.set_by_mask_mult_1d(a, mask, values, engine="rust"),
             nb.set_by_mask_mult_1d_nb(a, mask, values),
             equal_nan=True,
         )
 
-    def test_generic_accessors_accept_backend(self):
+    def test_generic_accessors_accept_engine(self):
         df = pd.DataFrame(
             {
                 "a": [1, 2, 3, 4, np.nan],
@@ -478,24 +476,24 @@ class TestGenericRustParity:
             }
         )
 
-        pd.testing.assert_frame_equal(df.vbt.diff(1, backend="rust"), df.vbt.diff(1, backend="numba"))
-        pd.testing.assert_frame_equal(df.vbt.rolling_mean(2, backend="rust"), df.vbt.rolling_mean(2, backend="numba"))
+        pd.testing.assert_frame_equal(df.vbt.diff(1, engine="rust"), df.vbt.diff(1, engine="numba"))
+        pd.testing.assert_frame_equal(df.vbt.rolling_mean(2, engine="rust"), df.vbt.rolling_mean(2, engine="numba"))
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_std(2, ddof=0, backend="rust"),
-            df.vbt.rolling_std(2, ddof=0, backend="numba"),
+            df.vbt.rolling_std(2, ddof=0, engine="rust"),
+            df.vbt.rolling_std(2, ddof=0, engine="numba"),
         )
 
-    def test_generic_accessors_use_global_backend(self):
+    def test_generic_accessors_use_global_engine(self):
         df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0]})
 
         try:
-            vbt.settings["backend"] = "rust"
-            pd.testing.assert_frame_equal(df.vbt.rolling_mean(2), df.vbt.rolling_mean(2, backend="rust"))
+            vbt.settings["engine"] = "rust"
+            pd.testing.assert_frame_equal(df.vbt.rolling_mean(2), df.vbt.rolling_mean(2, engine="rust"))
         finally:
             vbt.settings.reset()
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestReturnsRustParity:
     def test_dispatch_matches_numba(self):
         values = np.array(
@@ -522,23 +520,23 @@ class TestReturnsRustParity:
         )
 
         np.testing.assert_allclose(
-            returns_dispatch.returns_1d(values[:, 0], np.nan, backend="rust"),
+            returns_dispatch.returns_1d(values[:, 0], np.nan, engine="rust"),
             returns_nb.returns_1d_nb(values[:, 0], np.nan),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            returns_dispatch.cum_returns_1d(returns[:, 0], 0.0, backend="rust"),
+            returns_dispatch.cum_returns_1d(returns[:, 0], 0.0, engine="rust"),
             returns_nb.cum_returns_1d_nb(returns[:, 0], 0.0),
             equal_nan=True,
         )
-        assert returns_dispatch.get_return(1.0, 2.0, backend="rust") == returns_nb.get_return_nb(1.0, 2.0)
+        assert returns_dispatch.get_return(1.0, 2.0, engine="rust") == returns_nb.get_return_nb(1.0, 2.0)
         np.testing.assert_allclose(
-            returns_dispatch.get_return(0.0, np.nan, backend="rust"),
+            returns_dispatch.get_return(0.0, np.nan, engine="rust"),
             returns_nb.get_return_nb(0.0, np.nan),
             equal_nan=True,
         )
         assert returns_dispatch.cum_returns_final_1d(
-            returns[:, 0], 0.0, backend="rust"
+            returns[:, 0], 0.0, engine="rust"
         ) == returns_nb.cum_returns_final_1d_nb(returns[:, 0], 0.0)
 
         cases = [
@@ -565,17 +563,17 @@ class TestReturnsRustParity:
             (returns_dispatch.down_capture, returns_nb.down_capture_nb, (returns, benchmark, 365.0)),
         ]
         for dispatch_func, nb_func, args in cases:
-            np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+            np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
     def test_dispatch_explicit_rust_validation(self):
         returns = np.array([[np.nan, 0.1], [0.2, 0.3]], dtype=np.float64)
         benchmark = np.array([[np.nan], [0.2]], dtype=np.float64)
 
         with pytest.raises(ValueError, match="same shape"):
-            returns_dispatch.beta(returns, benchmark, backend="rust")
+            returns_dispatch.beta(returns, benchmark, engine="rust")
 
         with pytest.raises(ValueError, match="between 0 and 1"):
-            returns_dispatch.value_at_risk(returns, 1.5, backend="rust")
+            returns_dispatch.value_at_risk(returns, 1.5, engine="rust")
 
     def test_dispatch_rolling_matches_numba(self):
         returns = np.array(
@@ -667,47 +665,47 @@ class TestReturnsRustParity:
         for minp in (None, 1, 2):
             for dispatch_func, nb_func, args in cases:
                 args = args[:2] + (minp,) + args[3:]
-                np.testing.assert_allclose(dispatch_func(*args, backend="rust"), nb_func(*args), equal_nan=True)
+                np.testing.assert_allclose(dispatch_func(*args, engine="rust"), nb_func(*args), equal_nan=True)
 
         with pytest.raises(ValueError, match="minp must be <= window"):
-            returns_dispatch.rolling_sharpe_ratio(returns, 2, 3, 365.0, backend="rust")
+            returns_dispatch.rolling_sharpe_ratio(returns, 2, 3, 365.0, engine="rust")
         with pytest.raises(ValueError, match="same shape"):
-            returns_dispatch.rolling_beta(returns, 3, None, benchmark[:, :1], backend="rust")
+            returns_dispatch.rolling_beta(returns, 3, None, benchmark[:, :1], engine="rust")
 
     def test_dispatch_drawdown_edge_cases_match_numba(self):
         returns = np.array([[np.inf, -np.inf], [0.1, -0.1]], dtype=np.float64)
 
         np.testing.assert_allclose(
-            returns_dispatch.drawdown(returns, backend="rust"),
+            returns_dispatch.drawdown(returns, engine="rust"),
             returns_nb.drawdown_nb(returns),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            returns_dispatch.max_drawdown(returns, backend="rust"),
+            returns_dispatch.max_drawdown(returns, engine="rust"),
             returns_nb.max_drawdown_nb(returns),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            returns_dispatch.calmar_ratio(returns, 365.0, backend="rust"),
+            returns_dispatch.calmar_ratio(returns, 365.0, engine="rust"),
             returns_nb.calmar_ratio_nb(returns, 365.0),
             equal_nan=True,
         )
 
         empty_returns = np.empty((0, 2), dtype=np.float64)
         with pytest.raises(ValueError, match="zero-size array"):
-            returns_dispatch.max_drawdown(empty_returns, backend="rust")
+            returns_dispatch.max_drawdown(empty_returns, engine="rust")
         with pytest.raises(ValueError, match="zero-size array"):
             returns_nb.max_drawdown_nb(empty_returns)
         with pytest.raises(ValueError, match="zero-size array"):
-            returns_dispatch.calmar_ratio(empty_returns, 365.0, backend="rust")
+            returns_dispatch.calmar_ratio(empty_returns, 365.0, engine="rust")
         with pytest.raises(ValueError, match="zero-size array"):
             returns_nb.calmar_ratio_nb(empty_returns, 365.0)
         with pytest.raises(ZeroDivisionError):
-            returns_dispatch.annualized_return(empty_returns, 365.0, backend="rust")
+            returns_dispatch.annualized_return(empty_returns, 365.0, engine="rust")
         with pytest.raises(ZeroDivisionError):
             returns_nb.annualized_return_nb(empty_returns, 365.0)
         with pytest.raises(ZeroDivisionError):
-            returns_dispatch.cond_value_at_risk(empty_returns, backend="rust")
+            returns_dispatch.cond_value_at_risk(empty_returns, engine="rust")
         with pytest.raises(ZeroDivisionError):
             returns_nb.cond_value_at_risk_nb(empty_returns)
 
@@ -731,57 +729,57 @@ class TestReturnsRustParity:
         )
 
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.returns.from_value(price, backend="rust").obj,
-            pd.DataFrame.vbt.returns.from_value(price, backend="numba").obj,
+            pd.DataFrame.vbt.returns.from_value(price, engine="rust").obj,
+            pd.DataFrame.vbt.returns.from_value(price, engine="numba").obj,
         )
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.cumulative(backend="rust"), rets.vbt.returns.cumulative(backend="numba")
+            rets.vbt.returns.cumulative(engine="rust"), rets.vbt.returns.cumulative(engine="numba")
         )
-        pd.testing.assert_series_equal(rets.vbt.returns.total(backend="rust"), rets.vbt.returns.total(backend="numba"))
+        pd.testing.assert_series_equal(rets.vbt.returns.total(engine="rust"), rets.vbt.returns.total(engine="numba"))
         pd.testing.assert_series_equal(
-            rets.vbt.returns.annualized_volatility(backend="rust"),
-            rets.vbt.returns.annualized_volatility(backend="numba"),
-        )
-        pd.testing.assert_series_equal(
-            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, backend="rust"),
-            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, backend="numba"),
+            rets.vbt.returns.annualized_volatility(engine="rust"),
+            rets.vbt.returns.annualized_volatility(engine="numba"),
         )
         pd.testing.assert_series_equal(
-            rets.vbt.returns.common_sense_ratio(backend="rust"),
-            rets.vbt.returns.common_sense_ratio(backend="numba"),
+            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, engine="rust"),
+            rets.vbt.returns.information_ratio(benchmark_rets=benchmark_rets, engine="numba"),
+        )
+        pd.testing.assert_series_equal(
+            rets.vbt.returns.common_sense_ratio(engine="rust"),
+            rets.vbt.returns.common_sense_ratio(engine="numba"),
         )
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.drawdown(backend="rust"), rets.vbt.returns.drawdown(backend="numba")
+            rets.vbt.returns.drawdown(engine="rust"), rets.vbt.returns.drawdown(engine="numba")
         )
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.rolling_total(window=3, minp=1, backend="rust"),
-            rets.vbt.returns.rolling_total(window=3, minp=1, backend="numba"),
+            rets.vbt.returns.rolling_total(window=3, minp=1, engine="rust"),
+            rets.vbt.returns.rolling_total(window=3, minp=1, engine="numba"),
         )
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, backend="rust"),
-            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, backend="numba"),
+            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, engine="rust"),
+            rets.vbt.returns.rolling_annualized_volatility(window=3, minp=1, engine="numba"),
         )
         pd.testing.assert_frame_equal(
             rets.vbt.returns.rolling_information_ratio(
                 benchmark_rets=benchmark_rets,
                 window=3,
                 minp=1,
-                backend="rust",
+                engine="rust",
             ),
             rets.vbt.returns.rolling_information_ratio(
                 benchmark_rets=benchmark_rets,
                 window=3,
                 minp=1,
-                backend="numba",
+                engine="numba",
             ),
         )
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, backend="rust"),
-            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, backend="numba"),
+            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, engine="rust"),
+            rets.vbt.returns.rolling_common_sense_ratio(window=3, minp=1, engine="numba"),
         )
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestSignalsRustParity:
     def test_dispatch_matches_numba_for_masks(self):
         entries = np.array(
@@ -806,14 +804,14 @@ class TestSignalsRustParity:
         )
 
         for entry_first in (True, False):
-            result = signal_dispatch.clean_enex(entries, exits, entry_first, backend="rust")
+            result = signal_dispatch.clean_enex(entries, exits, entry_first, engine="rust")
             expected = signal_nb.clean_enex_nb(entries, exits, entry_first)
             np.testing.assert_array_equal(result[0], expected[0])
             np.testing.assert_array_equal(result[1], expected[1])
 
             entries_1d = entries[:, 0]
             exits_1d = exits[:, 0]
-            result_1d = signal_dispatch.clean_enex_1d(entries_1d, exits_1d, entry_first, backend="rust")
+            result_1d = signal_dispatch.clean_enex_1d(entries_1d, exits_1d, entry_first, engine="rust")
             expected_1d = signal_nb.clean_enex_1d_nb(entries_1d, exits_1d, entry_first)
             np.testing.assert_array_equal(result_1d[0], expected_1d[0])
             np.testing.assert_array_equal(result_1d[1], expected_1d[1])
@@ -843,11 +841,11 @@ class TestSignalsRustParity:
 
         for a in (a_c, a_f):
             np.testing.assert_array_equal(
-                signal_dispatch.sig_pos_rank(a, None, False, False, backend="rust"),
+                signal_dispatch.sig_pos_rank(a, None, False, False, engine="rust"),
                 signal_nb.rank_nb(a, None, False, signal_nb.sig_pos_rank_nb, np.full(a.shape[1], -1), False),
             )
             np.testing.assert_array_equal(
-                signal_dispatch.sig_pos_rank(a, reset_by, False, True, backend="rust"),
+                signal_dispatch.sig_pos_rank(a, reset_by, False, True, engine="rust"),
                 signal_nb.rank_nb(
                     a,
                     reset_by,
@@ -858,7 +856,7 @@ class TestSignalsRustParity:
                 ),
             )
             np.testing.assert_array_equal(
-                signal_dispatch.part_pos_rank(a, reset_by, True, backend="rust"),
+                signal_dispatch.part_pos_rank(a, reset_by, True, engine="rust"),
                 signal_nb.rank_nb(
                     a,
                     reset_by,
@@ -868,11 +866,11 @@ class TestSignalsRustParity:
                 ),
             )
             np.testing.assert_array_equal(
-                signal_dispatch.nth_index(a, -1, backend="rust"),
+                signal_dispatch.nth_index(a, -1, engine="rust"),
                 signal_nb.nth_index_nb(a, -1),
             )
             np.testing.assert_allclose(
-                signal_dispatch.norm_avg_index(a, backend="rust"),
+                signal_dispatch.norm_avg_index(a, engine="rust"),
                 signal_nb.norm_avg_index_nb(a),
                 equal_nan=True,
             )
@@ -907,7 +905,7 @@ class TestSignalsRustParity:
             (signal_dispatch.between_partition_ranges, signal_nb.between_partition_ranges_nb, (a,)),
         ]
         for dispatch_func, nb_func, args in cases:
-            result = dispatch_func(*args, backend="rust")
+            result = dispatch_func(*args, engine="rust")
             expected = nb_func(*args)
             assert result.dtype == range_dt
             assert result.dtype.itemsize == range_dt.itemsize
@@ -928,41 +926,41 @@ class TestSignalsRustParity:
         single_signal = np.array([True], dtype=np.bool_)
 
         a_1d = a[:, 1]
-        assert signal_dispatch.nth_index_1d(a_1d, 0, backend="rust") == signal_nb.nth_index_1d_nb(a_1d, 0)
-        assert signal_dispatch.nth_index_1d(a_1d, -1, backend="rust") == signal_nb.nth_index_1d_nb(a_1d, -1)
-        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 1, backend="rust"), signal_nb.nth_index_nb(a, 1))
+        assert signal_dispatch.nth_index_1d(a_1d, 0, engine="rust") == signal_nb.nth_index_1d_nb(a_1d, 0)
+        assert signal_dispatch.nth_index_1d(a_1d, -1, engine="rust") == signal_nb.nth_index_1d_nb(a_1d, -1)
+        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 1, engine="rust"), signal_nb.nth_index_nb(a, 1))
         with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index_1d(single_signal, backend="rust")
+            signal_dispatch.norm_avg_index_1d(single_signal, engine="rust")
         with pytest.raises(ZeroDivisionError):
             signal_nb.norm_avg_index_1d_nb(single_signal)
         with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(no_signal_cols, backend="rust")
+            signal_dispatch.norm_avg_index(no_signal_cols, engine="rust")
         with pytest.raises(ZeroDivisionError):
             signal_nb.norm_avg_index_nb(no_signal_cols)
         with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(empty_rows, backend="rust")
+            signal_dispatch.norm_avg_index(empty_rows, engine="rust")
         with pytest.raises(ZeroDivisionError):
             signal_nb.norm_avg_index_nb(empty_rows)
         with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(single_row, backend="rust")
+            signal_dispatch.norm_avg_index(single_row, engine="rust")
         with pytest.raises(ZeroDivisionError):
             signal_nb.norm_avg_index_nb(single_row)
 
     def test_dispatch_auto_falls_back_for_unsupported_array(self):
         a = np.array([[1, 0], [0, 1]], dtype=np.int64)
 
-        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 0, backend="auto"), signal_nb.nth_index_nb(a, 0))
+        np.testing.assert_array_equal(signal_dispatch.nth_index(a, 0, engine="auto"), signal_nb.nth_index_nb(a, 0))
         with pytest.raises(ValueError, match="bool"):
-            signal_dispatch.nth_index(a, 0, backend="rust")
+            signal_dispatch.nth_index(a, 0, engine="rust")
         with pytest.raises(ValueError, match="same shape"):
             signal_dispatch.clean_enex(
                 np.ones((2, 2), dtype=np.bool_),
                 np.ones((2, 1), dtype=np.bool_),
                 True,
-                backend="rust",
+                engine="rust",
             )
 
-    def test_signal_accessors_accept_backend(self):
+    def test_signal_accessors_accept_engine(self):
         mask = pd.DataFrame(
             {
                 "a": [True, False, True, False, True],
@@ -973,53 +971,53 @@ class TestSignalsRustParity:
         exits = pd.Series([False, True, False, True, False])
 
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.clean(exits, backend="rust")[0],
-            mask.vbt.signals.clean(exits, backend="numba")[0],
+            mask.vbt.signals.clean(exits, engine="rust")[0],
+            mask.vbt.signals.clean(exits, engine="numba")[0],
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.pos_rank(backend="rust"), mask.vbt.signals.pos_rank(backend="numba")
+            mask.vbt.signals.pos_rank(engine="rust"), mask.vbt.signals.pos_rank(engine="numba")
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="rust"),
-            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, backend="numba"),
+            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, engine="rust"),
+            mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True, engine="numba"),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.partition_pos_rank(after_false=True, backend="rust"),
-            mask.vbt.signals.partition_pos_rank(after_false=True, backend="numba"),
+            mask.vbt.signals.partition_pos_rank(after_false=True, engine="rust"),
+            mask.vbt.signals.partition_pos_rank(after_false=True, engine="numba"),
         )
-        pd.testing.assert_frame_equal(mask.vbt.signals.first(backend="rust"), mask.vbt.signals.first(backend="numba"))
-        pd.testing.assert_frame_equal(mask.vbt.signals.nth(1, backend="rust"), mask.vbt.signals.nth(1, backend="numba"))
+        pd.testing.assert_frame_equal(mask.vbt.signals.first(engine="rust"), mask.vbt.signals.first(engine="numba"))
+        pd.testing.assert_frame_equal(mask.vbt.signals.nth(1, engine="rust"), mask.vbt.signals.nth(1, engine="numba"))
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.from_nth(1, backend="rust"),
-            mask.vbt.signals.from_nth(1, backend="numba"),
+            mask.vbt.signals.from_nth(1, engine="rust"),
+            mask.vbt.signals.from_nth(1, engine="numba"),
         )
         pd.testing.assert_series_equal(
-            mask.vbt.signals.nth_index(-1, backend="rust"),
-            mask.vbt.signals.nth_index(-1, backend="numba"),
+            mask.vbt.signals.nth_index(-1, engine="rust"),
+            mask.vbt.signals.nth_index(-1, engine="numba"),
         )
         pd.testing.assert_series_equal(
-            mask.vbt.signals.norm_avg_index(backend="rust"),
-            mask.vbt.signals.norm_avg_index(backend="numba"),
+            mask.vbt.signals.norm_avg_index(engine="rust"),
+            mask.vbt.signals.norm_avg_index(engine="numba"),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.between_ranges(backend="rust").records_readable,
-            mask.vbt.signals.between_ranges(backend="numba").records_readable,
+            mask.vbt.signals.between_ranges(engine="rust").records_readable,
+            mask.vbt.signals.between_ranges(engine="numba").records_readable,
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.between_ranges(other=~mask, backend="rust").records_readable,
-            mask.vbt.signals.between_ranges(other=~mask, backend="numba").records_readable,
+            mask.vbt.signals.between_ranges(other=~mask, engine="rust").records_readable,
+            mask.vbt.signals.between_ranges(other=~mask, engine="numba").records_readable,
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.partition_ranges(backend="rust").records_readable,
-            mask.vbt.signals.partition_ranges(backend="numba").records_readable,
+            mask.vbt.signals.partition_ranges(engine="rust").records_readable,
+            mask.vbt.signals.partition_ranges(engine="numba").records_readable,
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.between_partition_ranges(backend="rust").records_readable,
-            mask.vbt.signals.between_partition_ranges(backend="numba").records_readable,
+            mask.vbt.signals.between_partition_ranges(engine="rust").records_readable,
+            mask.vbt.signals.between_partition_ranges(engine="numba").records_readable,
         )
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestIndicatorRustParity:
     def test_indicator_exports_match_nb_inventory(self):
         import vectorbt_rust.indicators as rust_indicators
@@ -1071,88 +1069,88 @@ class TestIndicatorRustParity:
         )
 
         np.testing.assert_allclose(
-            indicator_dispatch.ma(close, 2, False, backend="rust"), indicator_nb.ma_nb(close, 2, False), equal_nan=True
+            indicator_dispatch.ma(close, 2, False, engine="rust"), indicator_nb.ma_nb(close, 2, False), equal_nan=True
         )
         np.testing.assert_allclose(
-            indicator_dispatch.ma(close, 2, True, backend="rust"), indicator_nb.ma_nb(close, 2, True), equal_nan=True
+            indicator_dispatch.ma(close, 2, True, engine="rust"), indicator_nb.ma_nb(close, 2, True), equal_nan=True
         )
         np.testing.assert_allclose(
-            indicator_dispatch.mstd(close, 2, False, backend="rust"),
+            indicator_dispatch.mstd(close, 2, False, engine="rust"),
             indicator_nb.mstd_nb(close, 2, False),
             equal_nan=True,
         )
         np.testing.assert_allclose(
-            indicator_dispatch.mstd(close, 2, True, backend="rust"),
+            indicator_dispatch.mstd(close, 2, True, engine="rust"),
             indicator_nb.mstd_nb(close, 2, True),
             equal_nan=True,
         )
 
-        ma_cache = indicator_dispatch.ma_cache(close, [2, 2, 3], [False, False, True], False, backend="rust")
+        ma_cache = indicator_dispatch.ma_cache(close, [2, 2, 3], [False, False, True], False, engine="rust")
         ma_cache_nb = indicator_nb.ma_cache_nb(close, [2, 2, 3], [False, False, True], False)
         np.testing.assert_allclose(
-            indicator_dispatch.ma_apply(close, 3, True, False, ma_cache, backend="rust"),
+            indicator_dispatch.ma_apply(close, 3, True, False, ma_cache, engine="rust"),
             indicator_nb.ma_apply_nb(close, 3, True, False, ma_cache_nb),
             equal_nan=True,
         )
 
-        mstd_cache = indicator_dispatch.mstd_cache(close, [2, 3], [False, True], False, 0, backend="rust")
+        mstd_cache = indicator_dispatch.mstd_cache(close, [2, 3], [False, True], False, 0, engine="rust")
         mstd_cache_nb = indicator_nb.mstd_cache_nb(close, [2, 3], [False, True], False, 0)
         np.testing.assert_allclose(
-            indicator_dispatch.mstd_apply(close, 3, True, False, 0, mstd_cache, backend="rust"),
+            indicator_dispatch.mstd_apply(close, 3, True, False, 0, mstd_cache, engine="rust"),
             indicator_nb.mstd_apply_nb(close, 3, True, False, 0, mstd_cache_nb),
             equal_nan=True,
         )
 
-        bb_cache = indicator_dispatch.bb_cache(close, [2, 3], [False, True], [2.0, 3.0], False, 0, backend="rust")
+        bb_cache = indicator_dispatch.bb_cache(close, [2, 3], [False, True], [2.0, 3.0], False, 0, engine="rust")
         bb_cache_nb = indicator_nb.bb_cache_nb(close, [2, 3], [False, True], [2.0, 3.0], False, 0)
         for actual, expected in zip(
-            indicator_dispatch.bb_apply(close, 3, True, 2.0, False, 0, *bb_cache, backend="rust"),
+            indicator_dispatch.bb_apply(close, 3, True, 2.0, False, 0, *bb_cache, engine="rust"),
             indicator_nb.bb_apply_nb(close, 3, True, 2.0, False, 0, *bb_cache_nb),
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
 
-        rsi_cache = indicator_dispatch.rsi_cache(close, [2, 3], [False, True], False, backend="rust")
+        rsi_cache = indicator_dispatch.rsi_cache(close, [2, 3], [False, True], False, engine="rust")
         rsi_cache_nb = indicator_nb.rsi_cache_nb(close, [2, 3], [False, True], False)
         np.testing.assert_allclose(
-            indicator_dispatch.rsi_apply(close, 3, True, False, rsi_cache, backend="rust"),
+            indicator_dispatch.rsi_apply(close, 3, True, False, rsi_cache, engine="rust"),
             indicator_nb.rsi_apply_nb(close, 3, True, False, rsi_cache_nb),
             equal_nan=True,
         )
 
         stoch_cache = indicator_dispatch.stoch_cache(
-            high, low, close, [2, 3], [2, 3], [False, True], False, backend="rust"
+            high, low, close, [2, 3], [2, 3], [False, True], False, engine="rust"
         )
         stoch_cache_nb = indicator_nb.stoch_cache_nb(high, low, close, [2, 3], [2, 3], [False, True], False)
         for actual, expected in zip(
-            indicator_dispatch.stoch_apply(high, low, close, 3, 2, True, False, stoch_cache, backend="rust"),
+            indicator_dispatch.stoch_apply(high, low, close, 3, 2, True, False, stoch_cache, engine="rust"),
             indicator_nb.stoch_apply_nb(high, low, close, 3, 2, True, False, stoch_cache_nb),
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
 
         macd_cache = indicator_dispatch.macd_cache(
-            close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False, backend="rust"
+            close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False, engine="rust"
         )
         macd_cache_nb = indicator_nb.macd_cache_nb(close, [2, 3], [3, 4], [2, 3], [False, True], [False, True], False)
         for actual, expected in zip(
-            indicator_dispatch.macd_apply(close, 2, 3, 2, False, True, False, macd_cache, backend="rust"),
+            indicator_dispatch.macd_apply(close, 2, 3, 2, False, True, False, macd_cache, engine="rust"),
             indicator_nb.macd_apply_nb(close, 2, 3, 2, False, True, False, macd_cache_nb),
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
 
         np.testing.assert_allclose(
-            indicator_dispatch.true_range(high, low, close, backend="rust"),
+            indicator_dispatch.true_range(high, low, close, engine="rust"),
             indicator_nb.true_range_nb(high, low, close),
             equal_nan=True,
         )
-        atr_cache = indicator_dispatch.atr_cache(high, low, close, [2, 3], [False, True], False, backend="rust")
+        atr_cache = indicator_dispatch.atr_cache(high, low, close, [2, 3], [False, True], False, engine="rust")
         atr_cache_nb = indicator_nb.atr_cache_nb(high, low, close, [2, 3], [False, True], False)
         for actual, expected in zip(
-            indicator_dispatch.atr_apply(high, low, close, 3, True, False, *atr_cache, backend="rust"),
+            indicator_dispatch.atr_apply(high, low, close, 3, True, False, *atr_cache, engine="rust"),
             indicator_nb.atr_apply_nb(high, low, close, 3, True, False, *atr_cache_nb),
         ):
             np.testing.assert_allclose(actual, expected, equal_nan=True)
         np.testing.assert_allclose(
-            indicator_dispatch.obv_custom(close, volume, backend="rust"),
+            indicator_dispatch.obv_custom(close, volume, engine="rust"),
             indicator_nb.obv_custom_nb(close, volume),
             equal_nan=True,
         )
@@ -1164,25 +1162,25 @@ class TestIndicatorRustParity:
         volume = pd.Series([4.0, 3.0, 2.0, 1.0, 2.0, 3.0, 4.0])
 
         pd.testing.assert_frame_equal(
-            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").ma,
-            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").ma,
+            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust").ma,
+            vbt.MA.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba").ma,
         )
         pd.testing.assert_frame_equal(
-            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").mstd,
-            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").mstd,
+            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust").mstd,
+            vbt.MSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba").mstd,
         )
         for attr in ("middle", "upper", "lower"):
             pd.testing.assert_frame_equal(
                 getattr(
-                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"), attr
+                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust"), attr
                 ),
                 getattr(
-                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"), attr
+                    vbt.BBANDS.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba"), attr
                 ),
             )
         pd.testing.assert_frame_equal(
-            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").rsi,
-            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").rsi,
+            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust").rsi,
+            vbt.RSI.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba").rsi,
         )
         for attr in ("percent_k", "percent_d"):
             pd.testing.assert_frame_equal(
@@ -1195,7 +1193,7 @@ class TestIndicatorRustParity:
                         d_window=2,
                         d_ewm=(False, True),
                         param_product=True,
-                        backend="rust",
+                        engine="rust",
                     ),
                     attr,
                 ),
@@ -1208,7 +1206,7 @@ class TestIndicatorRustParity:
                         d_window=2,
                         d_ewm=(False, True),
                         param_product=True,
-                        backend="numba",
+                        engine="numba",
                     ),
                     attr,
                 ),
@@ -1224,7 +1222,7 @@ class TestIndicatorRustParity:
                         macd_ewm=(False, True),
                         signal_ewm=True,
                         param_product=True,
-                        backend="rust",
+                        engine="rust",
                     ),
                     attr,
                 ),
@@ -1237,7 +1235,7 @@ class TestIndicatorRustParity:
                         macd_ewm=(False, True),
                         signal_ewm=True,
                         param_product=True,
-                        backend="numba",
+                        engine="numba",
                     ),
                     attr,
                 ),
@@ -1245,23 +1243,21 @@ class TestIndicatorRustParity:
         for attr in ("tr", "atr"):
             pd.testing.assert_frame_equal(
                 getattr(
-                    vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust"),
+                    vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust"),
                     attr,
                 ),
                 getattr(
-                    vbt.ATR.run(
-                        high, low, close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba"
-                    ),
+                    vbt.ATR.run(high, low, close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba"),
                     attr,
                 ),
             )
         pd.testing.assert_series_equal(
-            vbt.OBV.run(close, volume, backend="rust").obv,
-            vbt.OBV.run(close, volume, backend="numba").obv,
+            vbt.OBV.run(close, volume, engine="rust").obv,
+            vbt.OBV.run(close, volume, engine="numba").obv,
         )
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestLabelsRustParity:
     def test_labels_exports_match_nb_inventory(self):
         import vectorbt_rust.labels as rust_labels
@@ -1303,35 +1299,35 @@ class TestLabelsRustParity:
             for ewm in (False, True):
                 for wait in (0, 1, 2):
                     np.testing.assert_allclose(
-                        labels_dispatch.future_mean_apply(close, 3, ewm, wait, False, backend="rust"),
+                        labels_dispatch.future_mean_apply(close, 3, ewm, wait, False, engine="rust"),
                         labels_nb.future_mean_apply_nb(close, 3, ewm, wait, False),
                         equal_nan=True,
                     )
                     np.testing.assert_allclose(
-                        labels_dispatch.future_std_apply(close, 3, ewm, wait, False, 0, backend="rust"),
+                        labels_dispatch.future_std_apply(close, 3, ewm, wait, False, 0, engine="rust"),
                         labels_nb.future_std_apply_nb(close, 3, ewm, wait, False, 0),
                         equal_nan=True,
                     )
                 np.testing.assert_allclose(
-                    labels_dispatch.future_min_apply(close, 3, 1, backend="rust"),
+                    labels_dispatch.future_min_apply(close, 3, 1, engine="rust"),
                     labels_nb.future_min_apply_nb(close, 3, 1),
                     equal_nan=True,
                 )
                 np.testing.assert_allclose(
-                    labels_dispatch.future_max_apply(close, 3, 1, backend="rust"),
+                    labels_dispatch.future_max_apply(close, 3, 1, engine="rust"),
                     labels_nb.future_max_apply_nb(close, 3, 1),
                     equal_nan=True,
                 )
 
             for n in (1, 2, 3):
                 np.testing.assert_allclose(
-                    labels_dispatch.fixed_labels_apply(close, n, backend="rust"),
+                    labels_dispatch.fixed_labels_apply(close, n, engine="rust"),
                     labels_nb.fixed_labels_apply_nb(close, n),
                     equal_nan=True,
                 )
 
             np.testing.assert_allclose(
-                labels_dispatch.mean_labels_apply(close, 3, False, 1, False, backend="rust"),
+                labels_dispatch.mean_labels_apply(close, 3, False, 1, False, engine="rust"),
                 labels_nb.mean_labels_apply_nb(close, 3, False, 1, False),
                 equal_nan=True,
             )
@@ -1340,7 +1336,7 @@ class TestLabelsRustParity:
             pos_th = 0.1
             neg_th = 0.1
             np.testing.assert_array_equal(
-                labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, backend="rust"),
+                labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, engine="rust"),
                 labels_nb.local_extrema_apply_nb(close, pos_th, neg_th, True),
             )
 
@@ -1348,7 +1344,7 @@ class TestLabelsRustParity:
             pos_th_col = np.array([0.05, 0.1, 0.2], dtype=np.float64)
             neg_th_col = np.array([0.1, 0.1, 0.05], dtype=np.float64)
             np.testing.assert_array_equal(
-                labels_dispatch.local_extrema_apply(close, pos_th_col, neg_th_col, True, backend="rust"),
+                labels_dispatch.local_extrema_apply(close, pos_th_col, neg_th_col, True, engine="rust"),
                 labels_nb.local_extrema_apply_nb(close, pos_th_col, neg_th_col, True),
             )
 
@@ -1363,7 +1359,7 @@ class TestLabelsRustParity:
             pos_th_col = np.array([0.01, 0.08, 0.25], dtype=np.float64)
             neg_th_col = np.array([0.4, 0.25, 0.08], dtype=np.float64)
             np.testing.assert_array_equal(
-                labels_dispatch.local_extrema_apply(square_close, pos_th_col, neg_th_col, True, backend="rust"),
+                labels_dispatch.local_extrema_apply(square_close, pos_th_col, neg_th_col, True, engine="rust"),
                 labels_nb.local_extrema_apply_nb(square_close, pos_th_col, neg_th_col, True),
             )
             for mode in (
@@ -1374,17 +1370,13 @@ class TestLabelsRustParity:
                 TrendMode.PctChangeNorm,
             ):
                 np.testing.assert_allclose(
-                    labels_dispatch.trend_labels_apply(
-                        square_close, pos_th_col, neg_th_col, mode, True, backend="rust"
-                    ),
+                    labels_dispatch.trend_labels_apply(square_close, pos_th_col, neg_th_col, mode, True, engine="rust"),
                     labels_nb.trend_labels_apply_nb(square_close, pos_th_col, neg_th_col, mode, True),
                     equal_nan=True,
                 )
             for wait in (0, 1, 2):
                 np.testing.assert_allclose(
-                    labels_dispatch.breakout_labels(
-                        square_close, 2, pos_th_col, neg_th_col, wait, True, backend="rust"
-                    ),
+                    labels_dispatch.breakout_labels(square_close, 2, pos_th_col, neg_th_col, wait, True, engine="rust"),
                     labels_nb.breakout_labels_nb(square_close, 2, pos_th_col, neg_th_col, wait, True),
                     equal_nan=True,
                 )
@@ -1397,41 +1389,41 @@ class TestLabelsRustParity:
                 TrendMode.PctChangeNorm,
             ):
                 np.testing.assert_allclose(
-                    labels_dispatch.trend_labels_apply(close, pos_th, neg_th, mode, True, backend="rust"),
+                    labels_dispatch.trend_labels_apply(close, pos_th, neg_th, mode, True, engine="rust"),
                     labels_nb.trend_labels_apply_nb(close, pos_th, neg_th, mode, True),
                     equal_nan=True,
                 )
 
-            le = labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, backend="numba")
+            le = labels_dispatch.local_extrema_apply(close, pos_th, neg_th, True, engine="numba")
             np.testing.assert_allclose(
-                labels_dispatch.bn_trend_labels(close, le, backend="rust"),
+                labels_dispatch.bn_trend_labels(close, le, engine="rust"),
                 labels_nb.bn_trend_labels_nb(close, le),
                 equal_nan=True,
             )
             np.testing.assert_allclose(
-                labels_dispatch.bn_cont_trend_labels(close, le, backend="rust"),
+                labels_dispatch.bn_cont_trend_labels(close, le, engine="rust"),
                 labels_nb.bn_cont_trend_labels_nb(close, le),
                 equal_nan=True,
             )
             np.testing.assert_allclose(
-                labels_dispatch.bn_cont_sat_trend_labels(close, le, pos_th, neg_th, True, backend="rust"),
+                labels_dispatch.bn_cont_sat_trend_labels(close, le, pos_th, neg_th, True, engine="rust"),
                 labels_nb.bn_cont_sat_trend_labels_nb(close, le, pos_th, neg_th, True),
                 equal_nan=True,
             )
             np.testing.assert_allclose(
-                labels_dispatch.pct_trend_labels(close, le, False, backend="rust"),
+                labels_dispatch.pct_trend_labels(close, le, False, engine="rust"),
                 labels_nb.pct_trend_labels_nb(close, le, False),
                 equal_nan=True,
             )
             np.testing.assert_allclose(
-                labels_dispatch.pct_trend_labels(close, le, True, backend="rust"),
+                labels_dispatch.pct_trend_labels(close, le, True, engine="rust"),
                 labels_nb.pct_trend_labels_nb(close, le, True),
                 equal_nan=True,
             )
 
             for wait in (0, 1, 2):
                 np.testing.assert_allclose(
-                    labels_dispatch.breakout_labels(close, 3, pos_th, neg_th, wait, True, backend="rust"),
+                    labels_dispatch.breakout_labels(close, 3, pos_th, neg_th, wait, True, engine="rust"),
                     labels_nb.breakout_labels_nb(close, 3, pos_th, neg_th, wait, True),
                     equal_nan=True,
                 )
@@ -1439,17 +1431,17 @@ class TestLabelsRustParity:
     def test_dispatch_auto_falls_back_for_unsupported_array(self):
         close_int = np.arange(15, dtype=np.int32).reshape(5, 3)
         np.testing.assert_array_equal(
-            labels_dispatch.fixed_labels_apply(close_int, 1, backend="auto"),
+            labels_dispatch.fixed_labels_apply(close_int, 1, engine="auto"),
             labels_nb.fixed_labels_apply_nb(close_int, 1),
         )
         with pytest.raises(ValueError, match="float64"):
-            labels_dispatch.fixed_labels_apply(close_int, 1, backend="rust")
+            labels_dispatch.fixed_labels_apply(close_int, 1, engine="rust")
 
     def test_dispatch_raises_on_shape_mismatch(self):
         close = np.ones((4, 2), dtype=np.float64)
         local_extrema = np.zeros((4, 3), dtype=np.int64)
         with pytest.raises(ValueError, match="same shape"):
-            labels_dispatch.bn_trend_labels(close, local_extrema, backend="rust")
+            labels_dispatch.bn_trend_labels(close, local_extrema, engine="rust")
 
     def test_basic_labels_match_numba(self):
         close = pd.DataFrame(
@@ -1460,32 +1452,32 @@ class TestLabelsRustParity:
         )
 
         pd.testing.assert_frame_equal(
-            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").fmean,
-            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").fmean,
+            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust").fmean,
+            vbt.FMEAN.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba").fmean,
         )
         pd.testing.assert_frame_equal(
-            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="rust").fstd,
-            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, backend="numba").fstd,
+            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="rust").fstd,
+            vbt.FSTD.run(close, window=(2, 3), ewm=(False, True), param_product=True, engine="numba").fstd,
         )
         pd.testing.assert_frame_equal(
-            vbt.FMIN.run(close, window=(2, 3), backend="rust").fmin,
-            vbt.FMIN.run(close, window=(2, 3), backend="numba").fmin,
+            vbt.FMIN.run(close, window=(2, 3), engine="rust").fmin,
+            vbt.FMIN.run(close, window=(2, 3), engine="numba").fmin,
         )
         pd.testing.assert_frame_equal(
-            vbt.FMAX.run(close, window=(2, 3), backend="rust").fmax,
-            vbt.FMAX.run(close, window=(2, 3), backend="numba").fmax,
+            vbt.FMAX.run(close, window=(2, 3), engine="rust").fmax,
+            vbt.FMAX.run(close, window=(2, 3), engine="numba").fmax,
         )
         pd.testing.assert_frame_equal(
-            vbt.FIXLB.run(close, n=(1, 2), backend="rust").labels,
-            vbt.FIXLB.run(close, n=(1, 2), backend="numba").labels,
+            vbt.FIXLB.run(close, n=(1, 2), engine="rust").labels,
+            vbt.FIXLB.run(close, n=(1, 2), engine="numba").labels,
         )
         pd.testing.assert_frame_equal(
-            vbt.MEANLB.run(close, window=2, ewm=False, backend="rust").labels,
-            vbt.MEANLB.run(close, window=2, ewm=False, backend="numba").labels,
+            vbt.MEANLB.run(close, window=2, ewm=False, engine="rust").labels,
+            vbt.MEANLB.run(close, window=2, ewm=False, engine="numba").labels,
         )
         pd.testing.assert_frame_equal(
-            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, backend="rust").labels,
-            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, backend="numba").labels,
+            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, engine="rust").labels,
+            vbt.LEXLB.run(close, pos_th=0.1, neg_th=0.1, engine="numba").labels,
         )
         for mode in (
             TrendMode.Binary,
@@ -1495,16 +1487,16 @@ class TestLabelsRustParity:
             TrendMode.PctChangeNorm,
         ):
             pd.testing.assert_frame_equal(
-                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, backend="rust").labels,
-                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, backend="numba").labels,
+                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, engine="rust").labels,
+                vbt.TRENDLB.run(close, pos_th=0.1, neg_th=0.1, mode=mode, engine="numba").labels,
             )
         pd.testing.assert_frame_equal(
-            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="rust").labels,
-            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, backend="numba").labels,
+            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, engine="rust").labels,
+            vbt.BOLB.run(close, window=3, pos_th=0.05, neg_th=0.05, engine="numba").labels,
         )
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed")
 class TestRecordsRustParity:
     def test_records_exports_match_nb_inventory(self):
         import vectorbt_rust.records as rust_records
@@ -1530,14 +1522,14 @@ class TestRecordsRustParity:
     def test_col_range(self):
         col_arr = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
         np.testing.assert_array_equal(
-            records_dispatch.col_range(col_arr, 3, backend="rust"),
+            records_dispatch.col_range(col_arr, 3, engine="rust"),
             records_nb.col_range_nb(col_arr, 3),
         )
 
     def test_col_range_empty_cols(self):
         col_arr = np.array([0, 0, 2, 2], dtype=np.int64)
         np.testing.assert_array_equal(
-            records_dispatch.col_range(col_arr, 3, backend="rust"),
+            records_dispatch.col_range(col_arr, 3, engine="rust"),
             records_nb.col_range_nb(col_arr, 3),
         )
 
@@ -1545,14 +1537,14 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
         cr = records_nb.col_range_nb(col_arr, 3)
         new_cols = np.array([0, 2], dtype=np.int64)
-        rust_idxs, rust_cols = records_dispatch.col_range_select(cr, new_cols, backend="rust")
+        rust_idxs, rust_cols = records_dispatch.col_range_select(cr, new_cols, engine="rust")
         nb_idxs, nb_cols = records_nb.col_range_select_nb(cr, new_cols)
         np.testing.assert_array_equal(rust_idxs, nb_idxs)
         np.testing.assert_array_equal(rust_cols, nb_cols)
 
     def test_col_map(self):
         col_arr = np.array([0, 1, 2, 0, 1, 2, 0, 2, 2], dtype=np.int64)
-        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 3, backend="rust")
+        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 3, engine="rust")
         nb_idxs, nb_lens = records_nb.col_map_nb(col_arr, 3)
         np.testing.assert_array_equal(rust_idxs, nb_idxs)
         np.testing.assert_array_equal(rust_lens, nb_lens)
@@ -1561,7 +1553,7 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 1, 2, 0, 1, 2, 0, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
         new_cols = np.array([0, 2], dtype=np.int64)
-        rust_idxs, rust_cols = records_dispatch.col_map_select(cm, new_cols, backend="rust")
+        rust_idxs, rust_cols = records_dispatch.col_map_select(cm, new_cols, engine="rust")
         nb_idxs, nb_cols = records_nb.col_map_select_nb(cm, new_cols)
         np.testing.assert_array_equal(rust_idxs, nb_idxs)
         np.testing.assert_array_equal(rust_cols, nb_cols)
@@ -1578,7 +1570,7 @@ class TestRecordsRustParity:
         cr = records_nb.col_range_nb(records["col"], 3)
         new_cols = np.array([0, 2], dtype=np.int64)
         np.testing.assert_array_equal(
-            records_dispatch.record_col_range_select(records, cr, new_cols, backend="rust"),
+            records_dispatch.record_col_range_select(records, cr, new_cols, engine="rust"),
             records_nb.record_col_range_select_nb(records, cr, new_cols),
         )
 
@@ -1594,30 +1586,30 @@ class TestRecordsRustParity:
         cm = records_nb.col_map_nb(records["col"], 3)
         new_cols = np.array([0, 2], dtype=np.int64)
         np.testing.assert_array_equal(
-            records_dispatch.record_col_map_select(records, cm, new_cols, backend="rust"),
+            records_dispatch.record_col_map_select(records, cm, new_cols, engine="rust"),
             records_nb.record_col_map_select_nb(records, cm, new_cols),
         )
 
     def test_is_col_sorted(self):
         sorted_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
         unsorted_arr = np.array([0, 2, 1, 1, 0], dtype=np.int64)
-        assert records_dispatch.is_col_sorted(sorted_arr, backend="rust") is True
-        assert records_dispatch.is_col_sorted(unsorted_arr, backend="rust") is False
+        assert records_dispatch.is_col_sorted(sorted_arr, engine="rust") is True
+        assert records_dispatch.is_col_sorted(unsorted_arr, engine="rust") is False
 
     def test_is_col_idx_sorted(self):
         col_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
         id_sorted = np.array([0, 1, 0, 1, 0], dtype=np.int64)
         id_unsorted = np.array([1, 0, 0, 1, 0], dtype=np.int64)
-        assert records_dispatch.is_col_idx_sorted(col_arr, id_sorted, backend="rust") is True
-        assert records_dispatch.is_col_idx_sorted(col_arr, id_unsorted, backend="rust") is False
+        assert records_dispatch.is_col_idx_sorted(col_arr, id_sorted, engine="rust") is True
+        assert records_dispatch.is_col_idx_sorted(col_arr, id_unsorted, engine="rust") is False
 
     def test_is_mapped_expandable(self):
         col_arr = np.array([0, 0, 1, 1, 2], dtype=np.int64)
         idx_arr = np.array([0, 1, 0, 1, 0], dtype=np.int64)
-        assert records_dispatch.is_mapped_expandable(col_arr, idx_arr, (2, 3), backend="rust") is True
+        assert records_dispatch.is_mapped_expandable(col_arr, idx_arr, (2, 3), engine="rust") is True
         # Conflicting positions
         idx_dup = np.array([0, 0, 0, 1, 0], dtype=np.int64)
-        assert records_dispatch.is_mapped_expandable(col_arr, idx_dup, (2, 3), backend="rust") is False
+        assert records_dispatch.is_mapped_expandable(col_arr, idx_dup, (2, 3), engine="rust") is False
 
     def test_expand_mapped(self):
         mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0], dtype=np.float64)
@@ -1625,7 +1617,7 @@ class TestRecordsRustParity:
         idx_arr = np.array([0, 1, 0, 1, 0], dtype=np.int64)
         target_shape = (2, 3)
         np.testing.assert_allclose(
-            records_dispatch.expand_mapped(mapped_arr, col_arr, idx_arr, target_shape, np.nan, backend="rust"),
+            records_dispatch.expand_mapped(mapped_arr, col_arr, idx_arr, target_shape, np.nan, engine="rust"),
             records_nb.expand_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, np.nan),
             equal_nan=True,
         )
@@ -1635,7 +1627,7 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
         np.testing.assert_allclose(
-            records_dispatch.stack_expand_mapped(mapped_arr, cm, np.nan, backend="rust"),
+            records_dispatch.stack_expand_mapped(mapped_arr, cm, np.nan, engine="rust"),
             records_nb.stack_expand_mapped_nb(mapped_arr, cm, np.nan),
             equal_nan=True,
         )
@@ -1645,7 +1637,7 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
         np.testing.assert_array_equal(
-            records_dispatch.mapped_value_counts(codes, 3, cm, backend="rust"),
+            records_dispatch.mapped_value_counts(codes, 3, cm, engine="rust"),
             records_nb.mapped_value_counts_nb(codes, 3, cm),
         )
 
@@ -1654,7 +1646,7 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
         np.testing.assert_array_equal(
-            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, backend="rust"),
+            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
         )
 
@@ -1663,7 +1655,7 @@ class TestRecordsRustParity:
         col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
         np.testing.assert_array_equal(
-            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, backend="rust"),
+            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
         )
 
@@ -1671,34 +1663,34 @@ class TestRecordsRustParity:
         col_arr_int32 = np.array([0, 0, 1, 1, 2], dtype=np.int32)
         # auto should fall back to numba
         np.testing.assert_array_equal(
-            records_dispatch.col_range(col_arr_int32, 3, backend="auto"),
+            records_dispatch.col_range(col_arr_int32, 3, engine="auto"),
             records_nb.col_range_nb(col_arr_int32, 3),
         )
         # explicit rust should raise
         with pytest.raises(ValueError, match="int64"):
-            records_dispatch.col_range(col_arr_int32, 3, backend="rust")
+            records_dispatch.col_range(col_arr_int32, 3, engine="rust")
 
     def test_empty_arrays(self):
         col_arr = np.array([], dtype=np.int64)
-        cr = records_dispatch.col_range(col_arr, 0, backend="rust")
+        cr = records_dispatch.col_range(col_arr, 0, engine="rust")
         assert cr.shape == (0, 2)
-        cm_idxs, cm_lens = records_dispatch.col_map(col_arr, 0, backend="rust")
+        cm_idxs, cm_lens = records_dispatch.col_map(col_arr, 0, engine="rust")
         assert cm_idxs.shape == (0,)
         assert cm_lens.shape == (0,)
 
     def test_single_column(self):
         col_arr = np.array([0, 0, 0], dtype=np.int64)
         np.testing.assert_array_equal(
-            records_dispatch.col_range(col_arr, 1, backend="rust"),
+            records_dispatch.col_range(col_arr, 1, engine="rust"),
             records_nb.col_range_nb(col_arr, 1),
         )
-        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 1, backend="rust")
+        rust_idxs, rust_lens = records_dispatch.col_map(col_arr, 1, engine="rust")
         nb_idxs, nb_lens = records_nb.col_map_nb(col_arr, 1)
         np.testing.assert_array_equal(rust_idxs, nb_idxs)
         np.testing.assert_array_equal(rust_lens, nb_lens)
 
 
-@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+@pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestPortfolioRustParity:
     """Test that portfolio dispatch functions produce identical results via Rust and Numba."""
 
@@ -1723,10 +1715,10 @@ class TestPortfolioRustParity:
         self.call_seq[:, 1] = 1
         self.call_seq[:, 2] = 0
 
-    def _run_sim(self, backend, **kwargs):
-        """Run simulate_from_orders with given backend."""
+    def _run_sim(self, engine, **kwargs):
+        """Run simulate_from_orders with given engine."""
         call_seq = self.call_seq.copy()
-        return dispatch.simulate_from_orders(
+        return portfolio_dispatch.simulate_from_orders(
             self.target_shape,
             self.group_lens_ungrouped,
             self.init_cash.copy(),
@@ -1738,7 +1730,7 @@ class TestPortfolioRustParity:
             max_orders=self.target_shape[0] * self.target_shape[1],
             max_logs=0,
             flex_2d=True,
-            backend=backend,
+            engine=engine,
             **kwargs,
         )
 
@@ -1761,8 +1753,8 @@ class TestPortfolioRustParity:
     def test_simulate_from_orders_cash_sharing(self):
         """Cash sharing simulation parity."""
         call_seq_cs = portfolio_nb.build_call_seq(self.target_shape, self.group_lens, call_seq_type=0)
-        for backend in ("rust", "numba"):
-            or_res, _ = dispatch.simulate_from_orders(
+        for engine in ("rust", "numba"):
+            or_res, _ = portfolio_dispatch.simulate_from_orders(
                 self.target_shape,
                 self.group_lens,
                 self.init_cash_grouped.copy(),
@@ -1774,9 +1766,9 @@ class TestPortfolioRustParity:
                 max_orders=self.target_shape[0] * self.target_shape[1],
                 max_logs=0,
                 flex_2d=True,
-                backend=backend,
+                engine=engine,
             )
-            if backend == "rust":
+            if engine == "rust":
                 or_rust = or_res
             else:
                 or_nb_res = or_res
@@ -1789,7 +1781,7 @@ class TestPortfolioRustParity:
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         for direction in (0, 1, 2):
-            rust = dispatch.asset_flow(self.target_shape, or_nb, col_map, direction, backend="rust")
+            rust = portfolio_dispatch.asset_flow(self.target_shape, or_nb, col_map, direction, engine="rust")
             numba = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, direction)
             np.testing.assert_allclose(rust, numba, err_msg=f"asset_flow mismatch dir={direction}")
 
@@ -1799,7 +1791,7 @@ class TestPortfolioRustParity:
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         af = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, 2)
         np.testing.assert_allclose(
-            dispatch.assets(af, backend="rust"),
+            portfolio_dispatch.assets(af, engine="rust"),
             portfolio_nb.assets_nb(af),
         )
 
@@ -1808,7 +1800,7 @@ class TestPortfolioRustParity:
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         for free in (True, False):
-            rust = dispatch.cash_flow(self.target_shape, or_nb, col_map, free, backend="rust")
+            rust = portfolio_dispatch.cash_flow(self.target_shape, or_nb, col_map, free, engine="rust")
             numba = portfolio_nb.cash_flow_nb(self.target_shape, or_nb, col_map, free)
             np.testing.assert_allclose(rust, numba, err_msg=f"cash_flow mismatch free={free}")
 
@@ -1818,7 +1810,7 @@ class TestPortfolioRustParity:
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         cf = portfolio_nb.cash_flow_nb(self.target_shape, or_nb, col_map, False)
         np.testing.assert_allclose(
-            dispatch.cash(cf, self.init_cash, backend="rust"),
+            portfolio_dispatch.cash(cf, self.init_cash, engine="rust"),
             portfolio_nb.cash_nb(cf, self.init_cash),
         )
 
@@ -1829,7 +1821,7 @@ class TestPortfolioRustParity:
         af = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, 2)
         assets = portfolio_nb.assets_nb(af)
         np.testing.assert_allclose(
-            dispatch.asset_value(self.close, assets, backend="rust"),
+            portfolio_dispatch.asset_value(self.close, assets, engine="rust"),
             portfolio_nb.asset_value_nb(self.close, assets),
         )
 
@@ -1843,7 +1835,7 @@ class TestPortfolioRustParity:
         assets = portfolio_nb.assets_nb(af)
         av = portfolio_nb.asset_value_nb(self.close, assets)
         np.testing.assert_allclose(
-            dispatch.value(cash, av, backend="rust"),
+            portfolio_dispatch.value(cash, av, engine="rust"),
             portfolio_nb.value_nb(cash, av),
         )
 
@@ -1852,7 +1844,7 @@ class TestPortfolioRustParity:
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         np.testing.assert_allclose(
-            dispatch.total_profit(self.target_shape, self.close, or_nb, col_map, backend="rust"),
+            portfolio_dispatch.total_profit(self.target_shape, self.close, or_nb, col_map, engine="rust"),
             portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map),
         )
 
@@ -1862,7 +1854,7 @@ class TestPortfolioRustParity:
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         tp_ = portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map)
         np.testing.assert_allclose(
-            dispatch.final_value(tp_, self.init_cash, backend="rust"),
+            portfolio_dispatch.final_value(tp_, self.init_cash, engine="rust"),
             portfolio_nb.final_value_nb(tp_, self.init_cash),
         )
 
@@ -1872,14 +1864,14 @@ class TestPortfolioRustParity:
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         tp_ = portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map)
         np.testing.assert_allclose(
-            dispatch.total_return(tp_, self.init_cash, backend="rust"),
+            portfolio_dispatch.total_return(tp_, self.init_cash, engine="rust"),
             portfolio_nb.total_return_nb(tp_, self.init_cash),
         )
 
     def test_benchmark_value_parity(self):
         """benchmark_value dispatch matches numba."""
         np.testing.assert_allclose(
-            dispatch.benchmark_value(self.close, self.init_cash, backend="rust"),
+            portfolio_dispatch.benchmark_value(self.close, self.init_cash, engine="rust"),
             portfolio_nb.benchmark_value_nb(self.close, self.init_cash),
         )
 
@@ -1888,7 +1880,7 @@ class TestPortfolioRustParity:
         av = np.random.rand(5, 3).astype(np.float64) * 10
         cash = np.random.rand(5, 3).astype(np.float64) * 100
         np.testing.assert_allclose(
-            dispatch.gross_exposure(av, cash, backend="rust"),
+            portfolio_dispatch.gross_exposure(av, cash, engine="rust"),
             portfolio_nb.gross_exposure_nb(av, cash),
         )
 
@@ -1897,7 +1889,7 @@ class TestPortfolioRustParity:
         cf = np.random.randn(5, 3).astype(np.float64)
         av = np.abs(np.random.randn(5, 3).astype(np.float64)) * 10 + 1
         np.testing.assert_allclose(
-            dispatch.asset_returns(cf, av, backend="rust"),
+            portfolio_dispatch.asset_returns(cf, av, engine="rust"),
             portfolio_nb.asset_returns_nb(cf, av),
         )
 
@@ -1905,7 +1897,7 @@ class TestPortfolioRustParity:
         """get_entry_trades dispatch matches numba."""
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
-        rust = dispatch.get_entry_trades(or_nb, self.close, col_map, backend="rust")
+        rust = portfolio_dispatch.get_entry_trades(or_nb, self.close, col_map, engine="rust")
         numba = portfolio_nb.get_entry_trades_nb(or_nb, self.close, col_map)
         assert len(rust) == len(numba)
         for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
@@ -1915,7 +1907,7 @@ class TestPortfolioRustParity:
         """get_exit_trades dispatch matches numba."""
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
-        rust = dispatch.get_exit_trades(or_nb, self.close, col_map, backend="rust")
+        rust = portfolio_dispatch.get_exit_trades(or_nb, self.close, col_map, engine="rust")
         numba = portfolio_nb.get_exit_trades_nb(or_nb, self.close, col_map)
         assert len(rust) == len(numba)
         for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
@@ -1927,7 +1919,7 @@ class TestPortfolioRustParity:
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
         trades = portfolio_nb.get_exit_trades_nb(or_nb, self.close, col_map)
         trade_col_map = records_nb.col_map_nb(trades["col"], self.target_shape[1])
-        rust = dispatch.get_positions(trades, trade_col_map, backend="rust")
+        rust = portfolio_dispatch.get_positions(trades, trade_col_map, engine="rust")
         numba = portfolio_nb.get_positions_nb(trades, trade_col_map)
         assert len(rust) == len(numba)
         for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
@@ -1938,31 +1930,31 @@ class TestPortfolioRustParity:
         a = np.random.rand(5, 3).astype(np.float64)
         gl = np.array([2, 1], dtype=np.int64)
         np.testing.assert_allclose(
-            dispatch.sum_grouped(a, gl, backend="rust"),
+            portfolio_dispatch.sum_grouped(a, gl, engine="rust"),
             portfolio_nb.sum_grouped_nb(a, gl),
         )
         np.testing.assert_allclose(
-            dispatch.cash_flow_grouped(a, gl, backend="rust"),
+            portfolio_dispatch.cash_flow_grouped(a, gl, engine="rust"),
             portfolio_nb.cash_flow_grouped_nb(a, gl),
         )
         np.testing.assert_allclose(
-            dispatch.asset_value_grouped(a, gl, backend="rust"),
+            portfolio_dispatch.asset_value_grouped(a, gl, engine="rust"),
             portfolio_nb.asset_value_grouped_nb(a, gl),
         )
         np.testing.assert_allclose(
-            dispatch.init_cash_grouped(self.init_cash, gl, True, backend="rust"),
+            portfolio_dispatch.init_cash_grouped(self.init_cash, gl, True, engine="rust"),
             portfolio_nb.init_cash_grouped_nb(self.init_cash, gl, True),
         )
         np.testing.assert_allclose(
-            dispatch.init_cash_fn(self.init_cash, gl, False, backend="rust"),
+            portfolio_dispatch.init_cash_fn(self.init_cash, gl, False, engine="rust"),
             portfolio_nb.init_cash_nb(self.init_cash, gl, False),
         )
         np.testing.assert_allclose(
-            dispatch.total_profit_grouped(self.init_cash, gl, backend="rust"),
+            portfolio_dispatch.total_profit_grouped(self.init_cash, gl, engine="rust"),
             portfolio_nb.total_profit_grouped_nb(self.init_cash, gl),
         )
         np.testing.assert_allclose(
-            dispatch.benchmark_value_grouped(self.close, gl, self.init_cash_grouped, backend="rust"),
+            portfolio_dispatch.benchmark_value_grouped(self.close, gl, self.init_cash_grouped, engine="rust"),
             portfolio_nb.benchmark_value_grouped_nb(self.close, gl, self.init_cash_grouped),
         )
 
@@ -1970,21 +1962,21 @@ class TestPortfolioRustParity:
         """build_call_seq dispatch matches numba."""
         for cst in (0, 1):
             np.testing.assert_array_equal(
-                dispatch.build_call_seq(self.target_shape, self.group_lens, cst, backend="rust"),
+                portfolio_dispatch.build_call_seq(self.target_shape, self.group_lens, cst, engine="rust"),
                 portfolio_nb.build_call_seq_nb(self.target_shape, self.group_lens, cst),
             )
 
     def test_fallback_auto(self):
-        """auto backend falls back to numba for non-float64 arrays."""
+        """auto engine falls back to numba for non-float64 arrays."""
         int32_close = self.close.astype(np.int32)
-        result = dispatch.assets(int32_close, backend="auto")
+        result = portfolio_dispatch.assets(int32_close, engine="auto")
         assert result is not None
 
     def test_f_order_arrays(self):
         """Rust handles F-order arrays correctly."""
         close_f = np.asfortranarray(self.close)
         assets = np.asfortranarray(np.ones_like(self.close))
-        rust = dispatch.asset_value(close_f, assets, backend="rust")
+        rust = portfolio_dispatch.asset_value(close_f, assets, engine="rust")
         numba = portfolio_nb.asset_value_nb(close_f, assets)
         np.testing.assert_allclose(rust, numba)
 

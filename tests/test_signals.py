@@ -526,17 +526,17 @@ class TestAccessors:
     def test_generate_random(self):
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, n=3, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="numba"
+                5, n=3, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="numba"
             ),
             pd.Series(np.array([False, True, True, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         with pytest.raises(Exception):
             _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
         with pytest.raises(ValueError, match="non-negative"):
-            _ = pd.Series.vbt.signals.generate_random(5, n=-1, backend="rust")
+            _ = pd.Series.vbt.signals.generate_random(5, n=-1, engine="rust")
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=3, seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+                (5, 3), n=3, seed=seed, index=mask.index, columns=mask.columns, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -554,7 +554,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+                (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -573,13 +573,13 @@ class TestAccessors:
         # rust
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, n=3, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="rust"
+                5, n=3, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="rust"
             ),
             pd.Series(np.array([True, False, True, True, False]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=3, seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+                (5, 3), n=3, seed=seed, index=mask.index, columns=mask.columns, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -597,7 +597,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+                (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -615,7 +615,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, prob=0.5, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="numba"
+                5, prob=0.5, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="numba"
             ),
             pd.Series(np.array([True, False, False, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
@@ -623,7 +623,7 @@ class TestAccessors:
             _ = pd.Series.vbt.signals.generate_random((5, 2), prob=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=0.5, seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+                (5, 3), prob=0.5, seed=seed, index=mask.index, columns=mask.columns, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -641,7 +641,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=[0.0, 0.5, 1.0], seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+                (5, 3), prob=[0.0, 0.5, 1.0], seed=seed, index=mask.index, columns=mask.columns, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -667,7 +667,7 @@ class TestAccessors:
                 seed=seed,
                 index=mask.index,
                 columns=mask.columns,
-                backend="numba",
+                engine="numba",
             ),
             pd.DataFrame(
                 np.array(
@@ -686,13 +686,13 @@ class TestAccessors:
         # rust prob-path
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, prob=0.5, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="rust"
+                5, prob=0.5, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="rust"
             ),
             pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=0.5, seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+                (5, 3), prob=0.5, seed=seed, index=mask.index, columns=mask.columns, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -710,7 +710,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=[0.0, 0.5, 1.0], seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+                (5, 3), prob=[0.0, 0.5, 1.0], seed=seed, index=mask.index, columns=mask.columns, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -734,7 +734,7 @@ class TestAccessors:
                 seed=seed,
                 index=mask.index,
                 columns=mask.columns,
-                backend="rust",
+                engine="rust",
             ),
             pd.DataFrame(
                 np.array(
@@ -754,9 +754,9 @@ class TestAccessors:
     def test_generate_random_both(self):
         # n
         with pytest.raises(ValueError, match="non-negative"):
-            _ = pd.Series.vbt.signals.generate_random_both(5, n=-1, backend="rust")
+            _ = pd.Series.vbt.signals.generate_random_both(5, n=-1, engine="rust")
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, n=2, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="numba"
+            5, n=2, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="numba"
         )
         pd.testing.assert_series_equal(
             en, pd.Series(np.array([True, False, True, False, False]), index=mask["a"].index, name=mask["a"].name)
@@ -765,7 +765,7 @@ class TestAccessors:
             ex, pd.Series(np.array([False, True, False, False, True]), index=mask["a"].index, name=mask["a"].name)
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=2, seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+            (5, 3), n=2, seed=seed, index=mask.index, columns=mask.columns, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -800,7 +800,7 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+            (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -835,7 +835,7 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0, backend="numba"
+            (2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -850,7 +850,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(ex, pd.DataFrame(np.array([[True, True, True], [True, True, True]])))
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (3, 3), n=2, seed=seed, entry_wait=0, exit_wait=1, backend="numba"
+            (3, 3), n=2, seed=seed, entry_wait=0, exit_wait=1, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en, pd.DataFrame(np.array([[True, True, True], [True, True, True], [False, False, False]]))
@@ -868,7 +868,7 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (7, 3), n=2, seed=seed, entry_wait=2, exit_wait=2, backend="numba"
+            (7, 3), n=2, seed=seed, entry_wait=2, exit_wait=2, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -915,7 +915,7 @@ class TestAccessors:
         assert np.all(greater & less)
         # rust
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, n=2, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="rust"
+            5, n=2, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="rust"
         )
         pd.testing.assert_series_equal(
             en, pd.Series(np.array([True, False, False, True, False]), index=mask["a"].index, name=mask["a"].name)
@@ -924,7 +924,7 @@ class TestAccessors:
             ex, pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name)
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=2, seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+            (5, 3), n=2, seed=seed, index=mask.index, columns=mask.columns, engine="rust"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -959,7 +959,7 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+            (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns, engine="rust"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -994,12 +994,12 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0, backend="rust"
+            (2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0, engine="rust"
         )
         pd.testing.assert_frame_equal(en, pd.DataFrame(np.array([[True, True, True], [True, True, True]])))
         pd.testing.assert_frame_equal(ex, pd.DataFrame(np.array([[True, True, True], [True, True, True]])))
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (3, 3), n=2, seed=seed, entry_wait=0, exit_wait=1, backend="rust"
+            (3, 3), n=2, seed=seed, entry_wait=0, exit_wait=1, engine="rust"
         )
         pd.testing.assert_frame_equal(
             en, pd.DataFrame(np.array([[True, True, True], [True, True, True], [False, False, False]]))
@@ -1017,7 +1017,7 @@ class TestAccessors:
             ),
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (7, 3), n=2, seed=seed, entry_wait=2, exit_wait=2, backend="rust"
+            (7, 3), n=2, seed=seed, entry_wait=2, exit_wait=2, engine="rust"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1054,7 +1054,7 @@ class TestAccessors:
 
         # probs
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="numba"
+            5, entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="numba"
         )
         pd.testing.assert_series_equal(
             en, pd.Series(np.array([True, False, False, False, True]), index=mask["a"].index, name=mask["a"].name)
@@ -1063,7 +1063,7 @@ class TestAccessors:
             ex, pd.Series(np.array([False, True, False, False, False]), index=mask["a"].index, name=mask["a"].name)
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask.index, columns=mask.columns, backend="numba"
+            (5, 3), entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask.index, columns=mask.columns, engine="numba"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1104,7 +1104,7 @@ class TestAccessors:
             seed=seed,
             index=mask.index,
             columns=mask.columns,
-            backend="numba",
+            engine="numba",
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1140,7 +1140,7 @@ class TestAccessors:
         )
         # rust prob-path
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask["a"].index, name=mask["a"].name, backend="rust"
+            5, entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="rust"
         )
         pd.testing.assert_series_equal(
             en, pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name)
@@ -1149,7 +1149,7 @@ class TestAccessors:
             ex, pd.Series(np.array([False, False, False, True, False]), index=mask["a"].index, name=mask["a"].name)
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask.index, columns=mask.columns, backend="rust"
+            (5, 3), entry_prob=0.5, exit_prob=1.0, seed=seed, index=mask.index, columns=mask.columns, engine="rust"
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1190,7 +1190,7 @@ class TestAccessors:
             seed=seed,
             index=mask.index,
             columns=mask.columns,
-            backend="rust",
+            engine="rust",
         )
         pd.testing.assert_frame_equal(
             en,
@@ -1331,11 +1331,11 @@ class TestAccessors:
 
     def test_generate_random_exits(self):
         pd.testing.assert_series_equal(
-            mask["a"].vbt.signals.generate_random_exits(seed=seed, backend="numba"),
+            mask["a"].vbt.signals.generate_random_exits(seed=seed, engine="numba"),
             pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(seed=seed, backend="numba"),
+            mask.vbt.signals.generate_random_exits(seed=seed, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1351,7 +1351,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(seed=seed, wait=0, backend="numba"),
+            mask.vbt.signals.generate_random_exits(seed=seed, wait=0, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1368,11 +1368,11 @@ class TestAccessors:
         )
         # rust
         pd.testing.assert_series_equal(
-            mask["a"].vbt.signals.generate_random_exits(seed=seed, backend="rust"),
+            mask["a"].vbt.signals.generate_random_exits(seed=seed, engine="rust"),
             pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(seed=seed, backend="rust"),
+            mask.vbt.signals.generate_random_exits(seed=seed, engine="rust"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1388,7 +1388,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(seed=seed, wait=0, backend="rust"),
+            mask.vbt.signals.generate_random_exits(seed=seed, wait=0, engine="rust"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1404,11 +1404,11 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_series_equal(
-            mask["a"].vbt.signals.generate_random_exits(prob=1.0, seed=seed, backend="numba"),
+            mask["a"].vbt.signals.generate_random_exits(prob=1.0, seed=seed, engine="numba"),
             pd.Series(np.array([False, True, False, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, seed=seed, backend="numba"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, seed=seed, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1424,7 +1424,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=[0.0, 0.5, 1.0], seed=seed, backend="numba"),
+            mask.vbt.signals.generate_random_exits(prob=[0.0, 0.5, 1.0], seed=seed, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1440,7 +1440,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, wait=0, seed=seed, backend="numba"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, wait=0, seed=seed, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1456,7 +1456,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, until_next=False, seed=seed, backend="numba"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, until_next=False, seed=seed, engine="numba"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1473,11 +1473,11 @@ class TestAccessors:
         )
         # rust prob-path
         pd.testing.assert_series_equal(
-            mask["a"].vbt.signals.generate_random_exits(prob=1.0, seed=seed, backend="rust"),
+            mask["a"].vbt.signals.generate_random_exits(prob=1.0, seed=seed, engine="rust"),
             pd.Series(np.array([False, True, False, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, seed=seed, backend="rust"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, seed=seed, engine="rust"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1493,7 +1493,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, wait=0, seed=seed, backend="rust"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, wait=0, seed=seed, engine="rust"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1509,7 +1509,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=1.0, until_next=False, seed=seed, backend="rust"),
+            mask.vbt.signals.generate_random_exits(prob=1.0, until_next=False, seed=seed, engine="rust"),
             pd.DataFrame(
                 np.array(
                     [
@@ -1531,35 +1531,35 @@ class TestAccessors:
 
         # stop loss
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, backend="numba"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, engine="numba"),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, backend="rust"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, engine="rust"),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, backend="numba"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, engine="numba"),
             pd.Series(np.array([False, False, False, True, False, False])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, backend="rust"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, engine="rust"),
             pd.Series(np.array([False, False, False, True, False, False])),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, pick_first=False, backend="numba"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, pick_first=False, engine="numba"),
             pd.Series(np.array([False, False, False, True, True, True])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, pick_first=False, backend="rust"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, pick_first=False, engine="rust"),
             pd.Series(np.array([False, False, False, True, True, True])),
         )
         pd.testing.assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
-                t.vbt.tile(3), [np.nan, -0.5, -1.0], trailing=True, pick_first=False, backend="numba"
+                t.vbt.tile(3), [np.nan, -0.5, -1.0], trailing=True, pick_first=False, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -1577,7 +1577,7 @@ class TestAccessors:
         # rust
         pd.testing.assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
-                t.vbt.tile(3), [np.nan, -0.5, -1.0], trailing=True, pick_first=False, backend="rust"
+                t.vbt.tile(3), [np.nan, -0.5, -1.0], trailing=True, pick_first=False, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -1593,45 +1593,45 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3, backend="numba"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3, engine="numba"),
             pd.Series(np.array([False, False, False, False, True, False])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3, backend="rust"),
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3, engine="rust"),
             pd.Series(np.array([False, False, False, False, True, False])),
         )
         # take profit
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, backend="numba"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, engine="numba"),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, backend="rust"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, engine="rust"),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, backend="numba"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, engine="numba"),
             pd.Series(np.array([False, False, False, True, False, False])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, backend="rust"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, engine="rust"),
             pd.Series(np.array([False, False, False, True, False, False])),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, pick_first=False, backend="numba"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, pick_first=False, engine="numba"),
             pd.Series(np.array([False, False, False, True, True, True])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, pick_first=False, backend="rust"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, pick_first=False, engine="rust"),
             pd.Series(np.array([False, False, False, True, True, True])),
         )
         pd.testing.assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
-                (4 - t).vbt.tile(3), [np.nan, 0.5, 1.0], trailing=True, pick_first=False, backend="numba"
+                (4 - t).vbt.tile(3), [np.nan, 0.5, 1.0], trailing=True, pick_first=False, engine="numba"
             ),
             pd.DataFrame(
                 np.array(
@@ -1649,7 +1649,7 @@ class TestAccessors:
         # rust
         pd.testing.assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
-                (4 - t).vbt.tile(3), [np.nan, 0.5, 1.0], trailing=True, pick_first=False, backend="rust"
+                (4 - t).vbt.tile(3), [np.nan, 0.5, 1.0], trailing=True, pick_first=False, engine="rust"
             ),
             pd.DataFrame(
                 np.array(
@@ -1665,94 +1665,92 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3, backend="numba"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3, engine="numba"),
             pd.Series(np.array([False, False, False, False, True, False])),
         )
         # rust
         pd.testing.assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3, backend="rust"),
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3, engine="rust"),
             pd.Series(np.array([False, False, False, False, True, False])),
         )
         # chain
         e = pd.Series([True, True, True, True, True, True])
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True, backend="numba")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True, engine="numba")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, True])))
         # rust
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True, backend="rust")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True, engine="rust")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, True])))
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, chain=True, backend="numba")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, chain=True, engine="numba")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, False, True])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
         # rust
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, chain=True, backend="rust")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, chain=True, engine="rust")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, False, True])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, chain=True, backend="numba")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, chain=True, engine="numba")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
         # rust
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, chain=True, backend="rust")
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, chain=True, engine="rust")
         pd.testing.assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
         # until_next and pick_first
         e2 = pd.Series([True, True, True, True, True, True])
         t2 = pd.Series([6, 5, 4, 3, 2, 1]).astype(np.float64)
-        ex = e2.vbt.signals.generate_stop_exits(t2, -0.1, until_next=False, pick_first=False, backend="numba")
+        ex = e2.vbt.signals.generate_stop_exits(t2, -0.1, until_next=False, pick_first=False, engine="numba")
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, True, True, True, True, True])))
         # rust
-        ex = e2.vbt.signals.generate_stop_exits(t2, -0.1, until_next=False, pick_first=False, backend="rust")
+        ex = e2.vbt.signals.generate_stop_exits(t2, -0.1, until_next=False, pick_first=False, engine="rust")
         pd.testing.assert_series_equal(ex, pd.Series(np.array([False, True, True, True, True, True])))
 
     def test_generate_ohlc_stop_exits(self):
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1, backend="numba")
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1, engine="numba")
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1, backend="numba")
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1, engine="numba")
         # rust
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1, backend="rust")
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1, engine="rust")
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1, backend="rust")
+            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1, engine="rust")
 
-        for _backend in ["numba", "rust"]:
+        for _engine in ["numba", "rust"]:
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, -0.1, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, backend=_backend),
+                mask.vbt.signals.generate_stop_exits(ts, -0.1, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, engine=_engine),
             )
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True, backend=_backend),
+                mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True, engine=_engine),
             )
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, 0.1, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, backend=_backend),
+                mask.vbt.signals.generate_stop_exits(ts, 0.1, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, engine=_engine),
             )
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, 0.1, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, reverse=True, backend=_backend),
+                mask.vbt.signals.generate_stop_exits(ts, 0.1, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, reverse=True, engine=_engine),
             )
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, 0.1, trailing=True, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(
-                    ts, sl_stop=0.1, sl_trail=True, reverse=True, backend=_backend
-                ),
+                mask.vbt.signals.generate_stop_exits(ts, 0.1, trailing=True, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True, reverse=True, engine=_engine),
             )
             pd.testing.assert_frame_equal(
-                mask.vbt.signals.generate_stop_exits(ts, -0.1, backend=_backend),
-                mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, reverse=True, backend=_backend),
+                mask.vbt.signals.generate_stop_exits(ts, -0.1, engine=_engine),
+                mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, reverse=True, engine=_engine),
             )
 
         def _test_ohlc_stop_exits(**kwargs):
-            """Run generate_ohlc_stop_exits with both backends and assert parity; return numba result."""
-            backend = kwargs.pop("backend", None)
-            if backend is not None:
-                backends = [backend]
+            """Run generate_ohlc_stop_exits with both engines and assert parity; return numba result."""
+            engine = kwargs.pop("engine", None)
+            if engine is not None:
+                engines = [engine]
             else:
-                backends = ["numba", "rust"]
+                engines = ["numba", "rust"]
             results = []
-            for _backend in backends:
+            for _engine in engines:
                 out_dict = {"stop_price": np.nan, "stop_type": -1}
                 result = mask.vbt.signals.generate_ohlc_stop_exits(
                     price["open"],
@@ -1760,11 +1758,11 @@ class TestAccessors:
                     price["low"],
                     price["close"],
                     out_dict=out_dict,
-                    backend=_backend,
+                    engine=_engine,
                     **kwargs,
                 )
                 results.append((result, out_dict["stop_price"], out_dict["stop_type"]))
-            # Validate cross-backend parity when both ran
+            # Validate cross-engine parity when both ran
             if len(results) > 1:
                 r0, sp0, st0 = results[0]
                 r1, sp1, st1 = results[1]
@@ -3176,11 +3174,11 @@ class TestFactory:
 
 class TestGenerators:
     def test_RAND(self):
-        rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed, backend="numba")
+        rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed, engine="numba")
         pd.testing.assert_series_equal(
             rand.entries, pd.Series(np.array([True, False, False, False, False, False]), name=1)
         )
-        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="numba")
+        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3197,7 +3195,7 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="rand_n"),
             ),
         )
-        rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba")
+        rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3216,7 +3214,7 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(1, 0), (2, 1), (3, 0), (4, 1)], names=["rand_n", None]),
             ),
         )
-        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="rust")
+        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(
@@ -3235,7 +3233,7 @@ class TestGenerators:
         )
 
     def test_RANDX(self):
-        randx = vbt.RANDX.run(mask, seed=seed, backend="numba")
+        randx = vbt.RANDX.run(mask, seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             randx.exits,
             pd.DataFrame(
@@ -3252,7 +3250,7 @@ class TestGenerators:
                 index=mask.index,
             ),
         )
-        randx = vbt.RANDX.run(mask, seed=seed, backend="rust")
+        randx = vbt.RANDX.run(mask, seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             randx.exits,
             pd.DataFrame(
@@ -3271,14 +3269,14 @@ class TestGenerators:
         )
 
     def test_RANDNX(self):
-        randnx = vbt.RANDNX.run(n=1, input_shape=(6,), seed=seed, backend="numba")
+        randnx = vbt.RANDNX.run(n=1, input_shape=(6,), seed=seed, engine="numba")
         pd.testing.assert_series_equal(
             randnx.entries, pd.Series(np.array([True, False, False, False, False, False]), name=1)
         )
         pd.testing.assert_series_equal(
             randnx.exits, pd.Series(np.array([False, True, False, False, False, False]), name=1)
         )
-        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="numba")
+        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(
@@ -3311,7 +3309,7 @@ class TestGenerators:
                 columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
             ),
         )
-        randnx = vbt.RANDNX.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, backend="numba")
+        randnx = vbt.RANDNX.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(
@@ -3348,7 +3346,7 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(1, 0), (2, 1), (3, 0), (4, 1)], names=["randnx_n", None]),
             ),
         )
-        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, backend="rust")
+        randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(
@@ -3383,9 +3381,9 @@ class TestGenerators:
         )
 
     def test_RPROB(self):
-        rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed, backend="numba")
+        rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed, engine="numba")
         pd.testing.assert_series_equal(rprob.entries, pd.Series(np.array([True, True, True, True, True]), name=1))
-        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, backend="numba")
+        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3402,7 +3400,7 @@ class TestGenerators:
             ),
         )
         rprob = vbt.RPROB.run(
-            prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed, backend="numba"
+            prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed, engine="numba"
         )
         pd.testing.assert_frame_equal(
             rprob.entries,
@@ -3421,7 +3419,7 @@ class TestGenerators:
                 ),
             ),
         )
-        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, backend="rust")
+        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3439,7 +3437,7 @@ class TestGenerators:
         )
 
     def test_RPROBX(self):
-        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="numba")
+        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             rprobx.exits,
             pd.DataFrame(
@@ -3469,7 +3467,7 @@ class TestGenerators:
                 ),
             ),
         )
-        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="rust")
+        rprobx = vbt.RPROBX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             rprobx.exits,
             pd.DataFrame(
@@ -3501,7 +3499,7 @@ class TestGenerators:
         )
 
     def test_RPROBCX(self):
-        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="numba")
+        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, engine="numba")
         pd.testing.assert_frame_equal(
             rprobcx.new_entries,
             pd.DataFrame(
@@ -3560,7 +3558,7 @@ class TestGenerators:
                 ),
             ),
         )
-        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, backend="rust")
+        rprobcx = vbt.RPROBCX.run(mask, prob=[0.0, 0.5, 1.0], seed=seed, engine="rust")
         pd.testing.assert_frame_equal(
             rprobcx.new_entries,
             pd.DataFrame(
@@ -3621,7 +3619,7 @@ class TestGenerators:
         )
 
     def test_RPROBNX(self):
-        rprobnx = vbt.RPROBNX.run(entry_prob=1.0, exit_prob=1.0, input_shape=(5,), seed=seed, backend="numba")
+        rprobnx = vbt.RPROBNX.run(entry_prob=1.0, exit_prob=1.0, input_shape=(5,), seed=seed, engine="numba")
         pd.testing.assert_series_equal(
             rprobnx.entries, pd.Series(np.array([True, False, True, False, True]), name=(1.0, 1.0))
         )
@@ -3633,7 +3631,7 @@ class TestGenerators:
             exit_prob=np.asarray([0.0, 1.0, 0.0, 1.0, 0.0]),
             input_shape=(5,),
             seed=seed,
-            backend="numba",
+            engine="numba",
         )
         pd.testing.assert_series_equal(
             rprobnx.entries, pd.Series(np.array([True, False, True, False, True]), name=("array_0", "array_0"))
@@ -3642,7 +3640,7 @@ class TestGenerators:
             rprobnx.exits, pd.Series(np.array([False, True, False, True, False]), name=("array_0", "array_0"))
         )
         rprobnx = vbt.RPROBNX.run(
-            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, backend="numba"
+            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, engine="numba"
         )
         pd.testing.assert_frame_equal(
             rprobnx.entries,
@@ -3663,7 +3661,7 @@ class TestGenerators:
             ),
         )
         rprobnx = vbt.RPROBNX.run(
-            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, backend="rust"
+            entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed, engine="rust"
         )
         pd.testing.assert_frame_equal(
             rprobnx.entries,

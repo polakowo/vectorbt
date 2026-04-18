@@ -1737,7 +1737,7 @@ class TestChecks:
         with pytest.raises(Exception):
             checks.assert_numba_func(test_func)
 
-    def test_assert_backend_func(self):
+    def test_assert_engine_func(self):
         def test_func(x):
             return x
 
@@ -1745,16 +1745,16 @@ class TestChecks:
         def test_func_nb(x):
             return x
 
-        assert checks.is_backend_dispatch_func(dispatch.nansum)
-        assert checks.is_backend_dispatch_func(dispatch.min_reduce, func_suffix="_reduce")
-        assert not checks.is_backend_dispatch_func(dispatch.nansum, func_suffix="_reduce")
+        assert checks.is_engine_dispatch_func(dispatch.nansum)
+        assert checks.is_engine_dispatch_func(dispatch.min_reduce, func_suffix="_reduce")
+        assert not checks.is_engine_dispatch_func(dispatch.nansum, func_suffix="_reduce")
 
-        checks.assert_backend_func(test_func_nb, backend="numba")
-        checks.assert_backend_func(test_func_nb, backend="auto")
-        checks.assert_backend_func(dispatch.nansum, backend="numba")
-        checks.assert_backend_func(dispatch.nansum, backend="rust")
-        checks.assert_backend_func(dispatch.nansum, backend="auto")
-        checks.assert_backend_func(dispatch.min_reduce, backend="rust", func_suffix="_reduce")
+        checks.assert_engine_func(test_func_nb, engine="numba")
+        checks.assert_engine_func(test_func_nb, engine="auto")
+        checks.assert_engine_func(dispatch.nansum, engine="numba")
+        checks.assert_engine_func(dispatch.nansum, engine="rust")
+        checks.assert_engine_func(dispatch.nansum, engine="auto")
+        checks.assert_engine_func(dispatch.min_reduce, engine="rust", func_suffix="_reduce")
 
         try:
             from vectorbt_rust.generic import nansum_rs
@@ -1762,18 +1762,18 @@ class TestChecks:
             nansum_rs = None
         if nansum_rs is not None:
             checks.assert_rust_func(nansum_rs)
-            checks.assert_backend_func(nansum_rs, backend="rust")
+            checks.assert_engine_func(nansum_rs, engine="rust")
 
         with pytest.raises(Exception, match="Numba compiled"):
             checks.assert_numba_func(dispatch.nansum)
         with pytest.raises(Exception, match="Rust backed"):
             checks.assert_rust_func(dispatch.nansum)
         with pytest.raises(Exception, match="compatible"):
-            checks.assert_backend_func(dispatch.nansum, backend="rust", func_suffix="_reduce")
+            checks.assert_engine_func(dispatch.nansum, engine="rust", func_suffix="_reduce")
         with pytest.raises(Exception, match="compatible"):
-            checks.assert_backend_func(test_func, backend="auto")
-        with pytest.raises(ValueError, match="Invalid backend"):
-            checks.assert_backend_func(test_func_nb, backend="bad")
+            checks.assert_engine_func(test_func, engine="auto")
+        with pytest.raises(ValueError, match="Invalid engine"):
+            checks.assert_engine_func(test_func_nb, engine="bad")
 
     def test_assert_not_none(self):
         checks.assert_not_none(0)

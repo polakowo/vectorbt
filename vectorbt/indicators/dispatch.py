@@ -1,14 +1,14 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for indicator functions."""
+"""Engine-neutral dispatch wrappers for indicator functions."""
 
 from vectorbt import _typing as tp
-from vectorbt._backend import (
+from vectorbt._engine import (
     array_compatible_with_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
-    resolve_backend,
+    resolve_engine,
 )
 
 
@@ -17,10 +17,10 @@ def ma(
     window: int,
     ewm: bool,
     adjust: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.indicators.nb.ma_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
+    """Engine-neutral `vectorbt.indicators.nb.ma_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.indicators import ma_rs
 
@@ -36,10 +36,10 @@ def mstd(
     ewm: bool,
     adjust: bool = False,
     ddof: int = 0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.indicators.nb.mstd_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a))
+    """Engine-neutral `vectorbt.indicators.nb.mstd_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a))
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_rs
 
@@ -54,10 +54,10 @@ def ma_cache(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> dict:
     """Caching function for `vectorbt.indicators.basic.MA`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import ma_cache_rs
 
@@ -73,10 +73,10 @@ def ma_apply(
     ewm: bool,
     adjust: bool,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.MA`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import ma_apply_rs
 
@@ -92,10 +92,10 @@ def mstd_cache(
     ewms: tp.List[bool],
     adjust: bool,
     ddof: int,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> dict:
     """Caching function for `vectorbt.indicators.basic.MSTD`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_cache_rs
 
@@ -112,10 +112,10 @@ def mstd_apply(
     adjust: bool,
     ddof: int,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.MSTD`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_apply_rs
 
@@ -132,10 +132,10 @@ def bb_cache(
     alphas: tp.List[float],
     adjust: bool,
     ddof: int,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[dict, dict]:
     """Caching function for `vectorbt.indicators.basic.BBANDS`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import bb_cache_rs
 
@@ -154,10 +154,10 @@ def bb_apply(
     ddof: int,
     ma_cache_dict: dict,
     mstd_cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbt.indicators.basic.BBANDS`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import bb_apply_rs
 
@@ -172,10 +172,10 @@ def rsi_cache(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> dict:
     """Caching function for `vectorbt.indicators.basic.RSI`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import rsi_cache_rs
 
@@ -191,10 +191,10 @@ def rsi_apply(
     ewm: bool,
     adjust: bool,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbt.indicators.basic.RSI`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import rsi_apply_rs
 
@@ -212,11 +212,11 @@ def stoch_cache(
     d_windows: tp.List[int],
     d_ewms: tp.List[bool],
     adjust: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> dict:
     """Caching function for `vectorbt.indicators.basic.STOCH`."""
-    eng = resolve_backend(
-        backend,
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(high),
             array_compatible_with_rust(low),
@@ -243,11 +243,11 @@ def stoch_apply(
     d_ewm: bool,
     adjust: bool,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbt.indicators.basic.STOCH`."""
-    eng = resolve_backend(
-        backend,
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(high),
             array_compatible_with_rust(low),
@@ -273,10 +273,10 @@ def macd_cache(
     macd_ewms: tp.List[bool],
     signal_ewms: tp.List[bool],
     adjust: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> dict:
     """Caching function for `vectorbt.indicators.basic.MACD`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import macd_cache_rs
 
@@ -295,10 +295,10 @@ def macd_apply(
     signal_ewm: bool,
     adjust: bool,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbt.indicators.basic.MACD`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(close))
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(close))
     if eng == "rust":
         from vectorbt_rust.indicators import macd_apply_rs
 
@@ -330,11 +330,11 @@ def true_range(
     high: tp.Array2d,
     low: tp.Array2d,
     close: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.indicators.nb.true_range_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.indicators.nb.true_range_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(high),
             array_compatible_with_rust(low),
@@ -359,11 +359,11 @@ def atr_cache(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, dict]:
     """Caching function for `vectorbt.indicators.basic.ATR`."""
-    eng = resolve_backend(
-        backend,
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(high),
             array_compatible_with_rust(low),
@@ -390,11 +390,11 @@ def atr_apply(
     adjust: bool,
     tr: tp.Array2d,
     cache_dict: dict,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbt.indicators.basic.ATR`."""
-    eng = resolve_backend(
-        backend,
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(high),
             array_compatible_with_rust(low),
@@ -417,11 +417,11 @@ def atr_apply(
 def obv_custom(
     close: tp.Array2d,
     volume_ts: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.indicators.nb.obv_custom_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.indicators.nb.obv_custom_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close),
             array_compatible_with_rust(volume_ts),

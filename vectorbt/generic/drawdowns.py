@@ -269,14 +269,14 @@ class Drawdowns(Ranges):
         ts: tp.ArrayLike,
         attach_ts: bool = True,
         wrapper_kwargs: tp.KwargsLike = None,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         **kwargs,
     ) -> DrawdownsT:
         """Build `Drawdowns` from time series `ts`.
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
         ts_pd = to_pd_array(ts)
-        records_arr = dispatch.get_drawdowns(to_2d_array(ts_pd), backend=backend)
+        records_arr = dispatch.get_drawdowns(to_2d_array(ts_pd), engine=engine)
         wrapper = ArrayWrapper.from_obj(ts_pd, **merge_dicts({}, wrapper_kwargs))
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
 

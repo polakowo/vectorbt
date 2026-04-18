@@ -500,7 +500,7 @@ class TestAccessors:
             df.iloc[::2].sum().rename("apply_and_reduce") + 3,
         )
         pd.testing.assert_series_equal(
-            df.vbt.apply_and_reduce(every_nth_nb, dispatch.sum_reduce, apply_args=(2,), backend="numba"),
+            df.vbt.apply_and_reduce(every_nth_nb, dispatch.sum_reduce, apply_args=(2,), engine="numba"),
             df.iloc[::2].sum().rename("apply_and_reduce"),
         )
         pd.testing.assert_series_equal(
@@ -518,7 +518,7 @@ class TestAccessors:
         assert df["a"].vbt.reduce(sum_nb) == df["a"].sum()
         assert df["a"].vbt.reduce(reduce_func=sum_nb) == df["a"].sum()
         pd.testing.assert_series_equal(df.vbt.reduce(sum_nb), df.sum().rename("reduce"))
-        pd.testing.assert_series_equal(df.vbt.reduce(dispatch.sum_reduce, backend="numba"), df.sum().rename("reduce"))
+        pd.testing.assert_series_equal(df.vbt.reduce(dispatch.sum_reduce, engine="numba"), df.sum().rename("reduce"))
         pd.testing.assert_series_equal(
             df.vbt.reduce(sum_nb, wrap_kwargs=dict(to_timedelta=True)), df.sum().rename("reduce") * day_dt
         )
@@ -634,7 +634,7 @@ class TestAccessors:
             ),
         )
         pd.testing.assert_frame_equal(
-            df.vbt.squeeze_grouped(squeeze_func=dispatch.sum_squeeze, group_by=group_by, backend="numba"),
+            df.vbt.squeeze_grouped(squeeze_func=dispatch.sum_squeeze, group_by=group_by, engine="numba"),
             pd.DataFrame(
                 [[1.0, 1.0], [6.0, 2.0], [6.0, 0.0], [6.0, 2.0], [1.0, 1.0]], index=df.index, columns=["g1", "g2"]
             ),

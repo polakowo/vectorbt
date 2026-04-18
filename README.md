@@ -70,7 +70,7 @@ VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt
 - **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
 - **Automation tools** for scheduled updates and Telegram notifications
 - **Composable Python API** for rapid experimentation and AI agent-driven workflows
-- **Optional Rust backend** for precompiled speed without JIT overhead
+- **Optional Rust engine** for precompiled speed without JIT overhead
 
 ## Installation
 

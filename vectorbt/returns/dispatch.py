@@ -1,16 +1,16 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for returns functions."""
+"""Engine-neutral dispatch wrappers for returns functions."""
 
 from vectorbt import _typing as tp
-from vectorbt._backend import (
+from vectorbt._engine import (
     RustSupport,
     array_compatible_with_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
     non_neg_int_compatible_with_rust,
-    resolve_backend,
+    resolve_engine,
     rolling_compatible_with_rust,
     scalar_compatible_with_rust,
     unit_interval_compatible_with_rust,
@@ -26,18 +26,18 @@ def returns_init_value_compatible_with_rust(value: tp.Any, init_value: tp.Any) -
     if not init_support.supported:
         return init_support
     if value.ndim != 2:
-        return RustSupport(False, "Rust backend requires `value` to be a 2D NumPy array.")
+        return RustSupport(False, "Rust engine requires `value` to be a 2D NumPy array.")
     if init_value.ndim != 1:
-        return RustSupport(False, "Rust backend requires `init_value` to be a 1D NumPy array.")
+        return RustSupport(False, "Rust engine requires `init_value` to be a 1D NumPy array.")
     if init_value.shape[0] != value.shape[1]:
-        return RustSupport(False, "Rust backend requires `init_value` to match the number of columns in `value`.")
+        return RustSupport(False, "Rust engine requires `init_value` to match the number of columns in `value`.")
     return RustSupport(True)
 
 
-def get_return(input_value: float, output_value: float, backend: tp.Optional[str] = None) -> float:
-    """Backend-neutral `vectorbt.returns.nb.get_return_nb`."""
-    eng = resolve_backend(
-        backend,
+def get_return(input_value: float, output_value: float, engine: tp.Optional[str] = None) -> float:
+    """Engine-neutral `vectorbt.returns.nb.get_return_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             scalar_compatible_with_rust("input_value", input_value),
             scalar_compatible_with_rust("output_value", output_value),
@@ -52,10 +52,10 @@ def get_return(input_value: float, output_value: float, backend: tp.Optional[str
     return get_return_nb(input_value, output_value)
 
 
-def returns_1d(value: tp.Array1d, init_value: float, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.returns_1d_nb`."""
-    eng = resolve_backend(
-        backend,
+def returns_1d(value: tp.Array1d, init_value: float, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.returns_1d_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(value),
             scalar_compatible_with_rust("init_value", init_value),
@@ -70,9 +70,9 @@ def returns_1d(value: tp.Array1d, init_value: float, backend: tp.Optional[str] =
     return returns_1d_nb(value, init_value)
 
 
-def returns(value: tp.Array2d, init_value: tp.Array1d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.returns_nb`."""
-    eng = resolve_backend(backend, supports_rust=returns_init_value_compatible_with_rust(value, init_value))
+def returns(value: tp.Array2d, init_value: tp.Array1d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.returns_nb`."""
+    eng = resolve_engine(engine, supports_rust=returns_init_value_compatible_with_rust(value, init_value))
     if eng == "rust":
         from vectorbt_rust.returns import returns_rs
 
@@ -82,10 +82,10 @@ def returns(value: tp.Array2d, init_value: tp.Array1d, backend: tp.Optional[str]
     return returns_nb(value, init_value)
 
 
-def cum_returns_1d(returns: tp.Array1d, start_value: float, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.cum_returns_1d_nb`."""
-    eng = resolve_backend(
-        backend,
+def cum_returns_1d(returns: tp.Array1d, start_value: float, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.cum_returns_1d_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("start_value", start_value),
@@ -100,10 +100,10 @@ def cum_returns_1d(returns: tp.Array1d, start_value: float, backend: tp.Optional
     return cum_returns_1d_nb(returns, start_value)
 
 
-def cum_returns(returns: tp.Array2d, start_value: float, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.cum_returns_nb`."""
-    eng = resolve_backend(
-        backend,
+def cum_returns(returns: tp.Array2d, start_value: float, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.cum_returns_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("start_value", start_value),
@@ -121,11 +121,11 @@ def cum_returns(returns: tp.Array2d, start_value: float, backend: tp.Optional[st
 def cum_returns_final_1d(
     returns: tp.Array1d,
     start_value: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> float:
-    """Backend-neutral `vectorbt.returns.nb.cum_returns_final_1d_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.cum_returns_final_1d_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("start_value", start_value),
@@ -143,11 +143,11 @@ def cum_returns_final_1d(
 def cum_returns_final(
     returns: tp.Array2d,
     start_value: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.cum_returns_final_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.cum_returns_final_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("start_value", start_value),
@@ -162,10 +162,10 @@ def cum_returns_final(
     return cum_returns_final_nb(returns, start_value)
 
 
-def annualized_return(returns: tp.Array2d, ann_factor: float, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.annualized_return_nb`."""
-    eng = resolve_backend(
-        backend,
+def annualized_return(returns: tp.Array2d, ann_factor: float, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.annualized_return_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -185,11 +185,11 @@ def annualized_volatility(
     ann_factor: float,
     levy_alpha: float = 2.0,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.annualized_volatility_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.annualized_volatility_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -206,9 +206,9 @@ def annualized_volatility(
     return annualized_volatility_nb(returns, ann_factor, levy_alpha, ddof)
 
 
-def drawdown(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.drawdown_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(returns))
+def drawdown(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.drawdown_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(returns))
     if eng == "rust":
         from vectorbt_rust.returns import drawdown_rs
 
@@ -218,9 +218,9 @@ def drawdown(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array2
     return drawdown_nb(returns)
 
 
-def max_drawdown(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.max_drawdown_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(returns))
+def max_drawdown(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.max_drawdown_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(returns))
     if eng == "rust":
         from vectorbt_rust.returns import max_drawdown_rs
 
@@ -230,10 +230,10 @@ def max_drawdown(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Ar
     return max_drawdown_nb(returns)
 
 
-def calmar_ratio(returns: tp.Array2d, ann_factor: float, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.calmar_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+def calmar_ratio(returns: tp.Array2d, ann_factor: float, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.calmar_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -253,11 +253,11 @@ def omega_ratio(
     ann_factor: float,
     risk_free: float = 0.0,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.omega_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.omega_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -279,11 +279,11 @@ def sharpe_ratio(
     ann_factor: float,
     risk_free: float = 0.0,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.sharpe_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.sharpe_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -304,11 +304,11 @@ def downside_risk(
     returns: tp.Array2d,
     ann_factor: float,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.downside_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.downside_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -328,11 +328,11 @@ def sortino_ratio(
     returns: tp.Array2d,
     ann_factor: float,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.sortino_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.sortino_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -352,11 +352,11 @@ def information_ratio(
     returns: tp.Array2d,
     benchmark_rets: tp.Array2d,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.information_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.information_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -373,10 +373,10 @@ def information_ratio(
     return information_ratio_nb(returns, benchmark_rets, ddof)
 
 
-def beta(returns: tp.Array2d, benchmark_rets: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.beta_nb`."""
-    eng = resolve_backend(
-        backend,
+def beta(returns: tp.Array2d, benchmark_rets: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.beta_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -397,11 +397,11 @@ def alpha(
     benchmark_rets: tp.Array2d,
     ann_factor: float,
     risk_free: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.alpha_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.alpha_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -419,9 +419,9 @@ def alpha(
     return alpha_nb(returns, benchmark_rets, ann_factor, risk_free)
 
 
-def tail_ratio(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.tail_ratio_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(returns))
+def tail_ratio(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.tail_ratio_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(returns))
     if eng == "rust":
         from vectorbt_rust.returns import tail_ratio_rs
 
@@ -434,11 +434,11 @@ def tail_ratio(returns: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Arra
 def value_at_risk(
     returns: tp.Array2d,
     cutoff: float = 0.05,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.value_at_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.value_at_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             unit_interval_compatible_with_rust("cutoff", cutoff),
@@ -456,11 +456,11 @@ def value_at_risk(
 def cond_value_at_risk(
     returns: tp.Array2d,
     cutoff: float = 0.05,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.cond_value_at_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.cond_value_at_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             unit_interval_compatible_with_rust("cutoff", cutoff),
@@ -479,11 +479,11 @@ def capture(
     returns: tp.Array2d,
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -504,11 +504,11 @@ def up_capture(
     returns: tp.Array2d,
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.up_capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.up_capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -529,11 +529,11 @@ def down_capture(
     returns: tp.Array2d,
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.returns.nb.down_capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.down_capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(returns),
             array_compatible_with_rust(benchmark_rets),
@@ -555,11 +555,11 @@ def rolling_cum_returns_final(
     window: int,
     minp: tp.Optional[int],
     start_value: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_cum_returns_final_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_cum_returns_final_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("start_value", start_value),
@@ -579,11 +579,11 @@ def rolling_annualized_return(
     window: int,
     minp: tp.Optional[int],
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_annualized_return_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_annualized_return_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -605,11 +605,11 @@ def rolling_annualized_volatility(
     ann_factor: float,
     levy_alpha: float = 2.0,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_annualized_volatility_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_annualized_volatility_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -630,10 +630,10 @@ def rolling_max_drawdown(
     returns: tp.Array2d,
     window: int,
     minp: tp.Optional[int],
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_max_drawdown_nb`."""
-    eng = resolve_backend(backend, supports_rust=rolling_compatible_with_rust(returns, window, minp))
+    """Engine-neutral `vectorbt.returns.nb.rolling_max_drawdown_nb`."""
+    eng = resolve_engine(engine, supports_rust=rolling_compatible_with_rust(returns, window, minp))
     if eng == "rust":
         from vectorbt_rust.returns import rolling_max_drawdown_rs
 
@@ -648,11 +648,11 @@ def rolling_calmar_ratio(
     window: int,
     minp: tp.Optional[int],
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_calmar_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_calmar_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -674,11 +674,11 @@ def rolling_omega_ratio(
     ann_factor: float,
     risk_free: float = 0.0,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_omega_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_omega_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -702,11 +702,11 @@ def rolling_sharpe_ratio(
     ann_factor: float,
     risk_free: float = 0.0,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_sharpe_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_sharpe_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -729,11 +729,11 @@ def rolling_downside_risk(
     minp: tp.Optional[int],
     ann_factor: float,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_downside_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_downside_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -755,11 +755,11 @@ def rolling_sortino_ratio(
     minp: tp.Optional[int],
     ann_factor: float,
     required_return: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_sortino_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_sortino_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             scalar_compatible_with_rust("ann_factor", ann_factor),
@@ -781,11 +781,11 @@ def rolling_information_ratio(
     minp: tp.Optional[int],
     benchmark_rets: tp.Array2d,
     ddof: int = 1,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_information_ratio_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_information_ratio_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),
@@ -807,11 +807,11 @@ def rolling_beta(
     window: int,
     minp: tp.Optional[int],
     benchmark_rets: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_beta_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_beta_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),
@@ -834,11 +834,11 @@ def rolling_alpha(
     benchmark_rets: tp.Array2d,
     ann_factor: float,
     risk_free: float = 0.0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_alpha_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_alpha_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),
@@ -860,10 +860,10 @@ def rolling_tail_ratio(
     returns: tp.Array2d,
     window: int,
     minp: tp.Optional[int],
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_tail_ratio_nb`."""
-    eng = resolve_backend(backend, supports_rust=rolling_compatible_with_rust(returns, window, minp))
+    """Engine-neutral `vectorbt.returns.nb.rolling_tail_ratio_nb`."""
+    eng = resolve_engine(engine, supports_rust=rolling_compatible_with_rust(returns, window, minp))
     if eng == "rust":
         from vectorbt_rust.returns import rolling_tail_ratio_rs
 
@@ -878,11 +878,11 @@ def rolling_value_at_risk(
     window: int,
     minp: tp.Optional[int],
     cutoff: float = 0.05,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_value_at_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_value_at_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             unit_interval_compatible_with_rust("cutoff", cutoff),
@@ -902,11 +902,11 @@ def rolling_cond_value_at_risk(
     window: int,
     minp: tp.Optional[int],
     cutoff: float = 0.05,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_cond_value_at_risk_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_cond_value_at_risk_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             unit_interval_compatible_with_rust("cutoff", cutoff),
@@ -927,11 +927,11 @@ def rolling_capture(
     minp: tp.Optional[int],
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),
@@ -954,11 +954,11 @@ def rolling_up_capture(
     minp: tp.Optional[int],
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_up_capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_up_capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),
@@ -981,11 +981,11 @@ def rolling_down_capture(
     minp: tp.Optional[int],
     benchmark_rets: tp.Array2d,
     ann_factor: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.returns.nb.rolling_down_capture_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.returns.nb.rolling_down_capture_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             rolling_compatible_with_rust(returns, window, minp),
             array_compatible_with_rust(benchmark_rets),

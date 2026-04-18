@@ -1,20 +1,20 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for signal functions."""
+"""Engine-neutral dispatch wrappers for signal functions."""
 
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt._backend import (
+from vectorbt._engine import (
     array_compatible_with_rust,
     flex_broadcast_to_shape,
     callback_unsupported_with_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
     non_neg_array_compatible_with_rust,
-    resolve_backend,
-    resolve_random_backend,
+    resolve_engine,
+    resolve_random_engine,
     seed_for_rust,
 )
 
@@ -24,10 +24,10 @@ def generate(
     pick_first: bool,
     choice_func: tp.ChoiceFunc,
     *args: tp.Any,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_nb`."""
-    resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
+    """Engine-neutral `vectorbt.signals.nb.generate_nb`."""
+    resolve_engine(engine, supports_rust=callback_unsupported_with_rust())
     from vectorbt.signals.nb import generate_nb
 
     return generate_nb(shape, pick_first, choice_func, *args)
@@ -41,10 +41,10 @@ def generate_ex(
     pick_first: bool,
     exit_choice_func: tp.ChoiceFunc,
     *args: tp.Any,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_ex_nb`."""
-    resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
+    """Engine-neutral `vectorbt.signals.nb.generate_ex_nb`."""
+    resolve_engine(engine, supports_rust=callback_unsupported_with_rust())
     from vectorbt.signals.nb import generate_ex_nb
 
     return generate_ex_nb(entries, wait, until_next, skip_until_exit, pick_first, exit_choice_func, *args)
@@ -60,10 +60,10 @@ def generate_enex(
     entry_args: tp.Args,
     exit_choice_func: tp.ChoiceFunc,
     exit_args: tp.Args,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.generate_enex_nb`."""
-    resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
+    """Engine-neutral `vectorbt.signals.nb.generate_enex_nb`."""
+    resolve_engine(engine, supports_rust=callback_unsupported_with_rust())
     from vectorbt.signals.nb import generate_enex_nb
 
     return generate_enex_nb(
@@ -83,11 +83,11 @@ def clean_enex_1d(
     entries: tp.Array1d,
     exits: tp.Array1d,
     entry_first: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """Backend-neutral `vectorbt.signals.nb.clean_enex_1d_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.clean_enex_1d_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(exits, dtype=np.bool_),
@@ -107,11 +107,11 @@ def clean_enex(
     entries: tp.Array2d,
     exits: tp.Array2d,
     entry_first: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.clean_enex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.clean_enex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(exits, dtype=np.bool_),
@@ -131,11 +131,11 @@ def generate_rand(
     shape: tp.Shape,
     n: tp.Array1d,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=non_neg_array_compatible_with_rust("n", n),
     )
     if eng == "rust":
@@ -153,11 +153,11 @@ def generate_rand_by_prob(
     pick_first: bool,
     flex_2d: bool,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_by_prob_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_by_prob_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(prob, dtype=np.float64),
     )
     if eng == "rust":
@@ -175,11 +175,11 @@ def generate_rand_ex(
     until_next: bool,
     skip_until_exit: bool,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_ex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_ex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(entries, dtype=np.bool_),
     )
     if eng == "rust":
@@ -199,11 +199,11 @@ def generate_rand_ex_by_prob(
     skip_until_exit: bool,
     flex_2d: bool,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_ex_by_prob_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_ex_by_prob_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(prob, dtype=np.float64),
@@ -240,11 +240,11 @@ def generate_rand_enex(
     entry_wait: int,
     exit_wait: int,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_enex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_enex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=non_neg_array_compatible_with_rust("n", n),
     )
     if eng == "rust":
@@ -266,11 +266,11 @@ def generate_rand_enex_by_prob(
     exit_pick_first: bool,
     flex_2d: bool,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entry_prob, dtype=np.float64),
             array_compatible_with_rust(exit_prob, dtype=np.float64),
@@ -316,11 +316,11 @@ def generate_stop_ex(
     skip_until_exit: bool,
     pick_first: bool,
     flex_2d: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_stop_ex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_stop_ex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(ts, dtype=np.float64),
@@ -368,11 +368,11 @@ def generate_stop_enex(
     exit_wait: int,
     pick_first: bool,
     flex_2d: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.generate_stop_enex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_stop_enex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(ts, dtype=np.float64),
@@ -427,11 +427,11 @@ def generate_ohlc_stop_ex(
     skip_until_exit: bool,
     pick_first: bool,
     flex_2d: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(open, dtype=np.float64),
@@ -517,11 +517,11 @@ def generate_ohlc_stop_enex(
     exit_wait: int,
     pick_first: bool,
     flex_2d: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Backend-neutral `vectorbt.signals.nb.generate_ohlc_stop_enex_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.generate_ohlc_stop_enex_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(open, dtype=np.float64),
@@ -592,16 +592,16 @@ def rand_apply(
     input_shape: tp.Shape,
     n: tp.Array1d,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RAND`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
     return generate_rand(
         input_shape,
         n,
-        seed=seed_for_rust(seed, backend, non_neg_array_compatible_with_rust("n", n)),
-        backend=backend,
+        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
+        engine=engine,
     )
 
 
@@ -611,17 +611,17 @@ def rand_ex_apply(
     until_next: bool = True,
     skip_until_exit: bool = False,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RANDX`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     return generate_rand_ex(
         entries,
         wait,
         until_next,
         skip_until_exit,
-        seed=seed_for_rust(seed, backend, array_compatible_with_rust(entries, dtype=np.bool_)),
-        backend=backend,
+        seed=seed_for_rust(seed, engine, array_compatible_with_rust(entries, dtype=np.bool_)),
+        engine=engine,
     )
 
 
@@ -631,18 +631,18 @@ def rand_enex_apply(
     entry_wait: int = 1,
     exit_wait: int = 1,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.RANDNX`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
     return generate_rand_enex(
         input_shape,
         n,
         entry_wait,
         exit_wait,
-        seed=seed_for_rust(seed, backend, non_neg_array_compatible_with_rust("n", n)),
-        backend=backend,
+        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
+        engine=engine,
     )
 
 
@@ -652,18 +652,18 @@ def rand_by_prob_apply(
     flex_2d: bool,
     pick_first: bool = False,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RPROB`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     prob = flex_broadcast_to_shape(prob, input_shape, np.float64)
     return generate_rand_by_prob(
         input_shape,
         prob,
         pick_first,
         flex_2d,
-        seed=seed_for_rust(seed, backend, array_compatible_with_rust(prob, dtype=np.float64)),
-        backend=backend,
+        seed=seed_for_rust(seed, engine, array_compatible_with_rust(prob, dtype=np.float64)),
+        engine=engine,
     )
 
 
@@ -675,10 +675,10 @@ def rand_ex_by_prob_apply(
     until_next: bool = True,
     skip_until_exit: bool = False,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RPROBX`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
     return generate_rand_ex_by_prob(
         entries,
@@ -689,14 +689,14 @@ def rand_ex_by_prob_apply(
         flex_2d,
         seed=seed_for_rust(
             seed,
-            backend,
+            engine,
             combine_rust_support(
                 array_compatible_with_rust(entries, dtype=np.bool_),
                 array_compatible_with_rust(prob, dtype=np.float64),
                 matching_shape_compatible_with_rust("prob", entries, prob),
             ),
         ),
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -710,10 +710,10 @@ def rand_enex_by_prob_apply(
     entry_pick_first: bool = True,
     exit_pick_first: bool = True,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.RPROBNX`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     entry_prob = flex_broadcast_to_shape(entry_prob, input_shape, np.float64)
     exit_prob = flex_broadcast_to_shape(exit_prob, input_shape, np.float64)
     return generate_rand_enex_by_prob(
@@ -727,14 +727,14 @@ def rand_enex_by_prob_apply(
         flex_2d,
         seed=seed_for_rust(
             seed,
-            backend,
+            engine,
             combine_rust_support(
                 array_compatible_with_rust(entry_prob, dtype=np.float64),
                 array_compatible_with_rust(exit_prob, dtype=np.float64),
                 matching_shape_compatible_with_rust("exit_prob", entry_prob, exit_prob),
             ),
         ),
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -750,16 +750,16 @@ def rand_chain_by_prob_apply(
     until_next: bool = True,
     skip_until_exit: bool = False,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.RPROBCX`."""
-    backend = resolve_random_backend(backend)
+    engine = resolve_random_engine(engine)
     if exit_wait is None:
         exit_wait = wait
     prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
     if (
-        resolve_backend(
-            backend,
+        resolve_engine(
+            engine,
             supports_rust=combine_rust_support(
                 array_compatible_with_rust(entries.astype(np.float64), dtype=np.float64),
                 array_compatible_with_rust(prob, dtype=np.float64),
@@ -781,7 +781,7 @@ def rand_chain_by_prob_apply(
             (entries,),
             rand_by_prob_choice_nb,
             (prob, exit_pick_first, temp_idx_arr, flex_2d),
-            backend=backend,
+            engine=engine,
         )
     entry_prob = entries.astype(np.float64)
     return generate_rand_enex_by_prob(
@@ -795,14 +795,14 @@ def rand_chain_by_prob_apply(
         flex_2d,
         seed=seed_for_rust(
             seed,
-            backend,
+            engine,
             combine_rust_support(
                 array_compatible_with_rust(entry_prob, dtype=np.float64),
                 array_compatible_with_rust(prob, dtype=np.float64),
                 matching_shape_compatible_with_rust("exit_prob", entry_prob, prob),
             ),
         ),
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -816,7 +816,7 @@ def stop_ex_apply(
     until_next: bool = True,
     skip_until_exit: bool = False,
     pick_first: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.STX`."""
     ts = np.asarray(ts, dtype=np.float64)
@@ -832,7 +832,7 @@ def stop_ex_apply(
         skip_until_exit,
         pick_first,
         flex_2d,
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -848,7 +848,7 @@ def stop_enex_apply(
     pick_first: bool = True,
     until_next: bool = True,
     skip_until_exit: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.STCX`."""
     if exit_wait is None:
@@ -865,7 +865,7 @@ def stop_enex_apply(
         exit_wait,
         pick_first,
         flex_2d,
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -887,7 +887,7 @@ def ohlc_stop_ex_apply(
     until_next: bool = True,
     skip_until_exit: bool = False,
     pick_first: bool = True,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.OHLCSTX`."""
     open = np.asarray(open, dtype=np.float64)
@@ -916,7 +916,7 @@ def ohlc_stop_ex_apply(
         skip_until_exit,
         pick_first,
         flex_2d,
-        backend=backend,
+        engine=engine,
     )
 
 
@@ -940,7 +940,7 @@ def ohlc_stop_enex_apply(
     pick_first: bool = True,
     until_next: bool = True,
     skip_until_exit: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.OHLCSTCX`."""
     if exit_wait is None:
@@ -970,13 +970,13 @@ def ohlc_stop_enex_apply(
         exit_wait,
         pick_first,
         flex_2d,
-        backend=backend,
+        engine=engine,
     )
 
 
-def between_ranges(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.signals.nb.between_ranges_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def between_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.signals.nb.between_ranges_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import between_ranges_rs
 
@@ -990,11 +990,11 @@ def between_two_ranges(
     a: tp.Array2d,
     b: tp.Array2d,
     from_other: bool = False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.signals.nb.between_two_ranges_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.signals.nb.between_two_ranges_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(a, dtype=np.bool_),
             array_compatible_with_rust(b, dtype=np.bool_),
@@ -1010,9 +1010,9 @@ def between_two_ranges(
     return between_two_ranges_nb(a, b, from_other=from_other)
 
 
-def partition_ranges(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.signals.nb.partition_ranges_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def partition_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.signals.nb.partition_ranges_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import partition_ranges_rs
 
@@ -1022,9 +1022,9 @@ def partition_ranges(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Reco
     return partition_ranges_nb(a)
 
 
-def between_partition_ranges(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.signals.nb.between_partition_ranges_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def between_partition_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.signals.nb.between_partition_ranges_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import between_partition_ranges_rs
 
@@ -1040,10 +1040,10 @@ def rank(
     after_false: bool,
     rank_func: tp.RankFunc,
     *args: tp.Any,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.signals.nb.rank_nb`."""
-    resolve_backend(backend, supports_rust=callback_unsupported_with_rust())
+    """Engine-neutral `vectorbt.signals.nb.rank_nb`."""
+    resolve_engine(engine, supports_rust=callback_unsupported_with_rust())
     from vectorbt.signals.nb import rank_nb
 
     return rank_nb(a, reset_by, after_false, rank_func, *args)
@@ -1064,10 +1064,10 @@ def sig_pos_rank(
     reset_by: tp.Optional[tp.Array2d],
     after_false: bool,
     allow_gaps: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral signal position rank specialization."""
-    eng = resolve_backend(backend, supports_rust=_rank_support(a, reset_by))
+    """Engine-neutral signal position rank specialization."""
+    eng = resolve_engine(engine, supports_rust=_rank_support(a, reset_by))
     if eng == "rust":
         from vectorbt_rust.signals import sig_pos_rank_rs
 
@@ -1082,10 +1082,10 @@ def part_pos_rank(
     a: tp.Array2d,
     reset_by: tp.Optional[tp.Array2d],
     after_false: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral partition position rank specialization."""
-    eng = resolve_backend(backend, supports_rust=_rank_support(a, reset_by))
+    """Engine-neutral partition position rank specialization."""
+    eng = resolve_engine(engine, supports_rust=_rank_support(a, reset_by))
     if eng == "rust":
         from vectorbt_rust.signals import part_pos_rank_rs
 
@@ -1096,9 +1096,9 @@ def part_pos_rank(
     return rank_nb(a, reset_by, after_false, part_pos_rank_nb, part_pos_temp)
 
 
-def nth_index_1d(a: tp.Array1d, n: int, backend: tp.Optional[str] = None) -> int:
-    """Backend-neutral `vectorbt.signals.nb.nth_index_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def nth_index_1d(a: tp.Array1d, n: int, engine: tp.Optional[str] = None) -> int:
+    """Engine-neutral `vectorbt.signals.nb.nth_index_1d_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import nth_index_1d_rs
 
@@ -1108,9 +1108,9 @@ def nth_index_1d(a: tp.Array1d, n: int, backend: tp.Optional[str] = None) -> int
     return nth_index_1d_nb(a, n)
 
 
-def nth_index(a: tp.Array2d, n: int, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.signals.nb.nth_index_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def nth_index(a: tp.Array2d, n: int, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.signals.nb.nth_index_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import nth_index_rs
 
@@ -1120,9 +1120,9 @@ def nth_index(a: tp.Array2d, n: int, backend: tp.Optional[str] = None) -> tp.Arr
     return nth_index_nb(a, n)
 
 
-def norm_avg_index_1d(a: tp.Array1d, backend: tp.Optional[str] = None) -> float:
-    """Backend-neutral `vectorbt.signals.nb.norm_avg_index_1d_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def norm_avg_index_1d(a: tp.Array1d, engine: tp.Optional[str] = None) -> float:
+    """Engine-neutral `vectorbt.signals.nb.norm_avg_index_1d_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import norm_avg_index_1d_rs
 
@@ -1132,9 +1132,9 @@ def norm_avg_index_1d(a: tp.Array1d, backend: tp.Optional[str] = None) -> float:
     return norm_avg_index_1d_nb(a)
 
 
-def norm_avg_index(a: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array1d:
-    """Backend-neutral `vectorbt.signals.nb.norm_avg_index_nb`."""
-    eng = resolve_backend(backend, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
+def norm_avg_index(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.signals.nb.norm_avg_index_nb`."""
+    eng = resolve_engine(engine, supports_rust=array_compatible_with_rust(a, dtype=np.bool_))
     if eng == "rust":
         from vectorbt_rust.signals import norm_avg_index_rs
 

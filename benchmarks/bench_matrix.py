@@ -1,4 +1,4 @@
-"""Run bench_backend.py across multiple configurations and emit a markdown table.
+"""Run bench_engine.py across multiple configurations and emit a markdown table.
 
 Usage:
     python benchmarks/bench_matrix.py
@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-BENCH_SCRIPT = str(Path(__file__).with_name("bench_backend.py"))
+BENCH_SCRIPT = str(Path(__file__).with_name("bench_engine.py"))
 
 CONFIGS = [
     {"rows": 100, "cols": 1, "label": "100x1"},

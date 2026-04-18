@@ -413,22 +413,22 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         window: int,
         minp: tp.Optional[int] = None,
         ddof: int = 1,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.rolling_std`."""
-        out = dispatch.rolling_std(self.to_2d_array(), window, minp=minp, ddof=ddof, backend=backend)
+        out = dispatch.rolling_std(self.to_2d_array(), window, minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def expanding_std(
         self,
         minp: tp.Optional[int] = 1,
         ddof: int = 1,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.expanding_std`."""
-        out = dispatch.expanding_std(self.to_2d_array(), minp=minp, ddof=ddof, backend=backend)
+        out = dispatch.expanding_std(self.to_2d_array(), minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def ewm_mean(
@@ -436,11 +436,11 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         span: int,
         minp: tp.Optional[int] = 0,
         adjust: bool = True,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.ewm_mean`."""
-        out = dispatch.ewm_mean(self.to_2d_array(), span, minp=minp, adjust=adjust, backend=backend)
+        out = dispatch.ewm_mean(self.to_2d_array(), span, minp=minp, adjust=adjust, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def ewm_std(
@@ -449,7 +449,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         minp: tp.Optional[int] = 0,
         adjust: bool = True,
         ddof: int = 1,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.ewm_std`."""
@@ -459,7 +459,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             minp=minp,
             adjust=adjust,
             ddof=ddof,
-            backend=backend,
+            engine=engine,
         )
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -468,16 +468,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         apply_func: tp.Union[tp.ApplyFunc, tp.RowApplyFunc],
         *args,
         axis: int = 0,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Apply a function `apply_func` along an axis."""
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if axis == 0:
-            out = dispatch.apply(self.to_2d_array(), apply_func, *args, backend=backend)
+            out = dispatch.apply(self.to_2d_array(), apply_func, *args, engine=engine)
         elif axis == 1:
-            out = dispatch.row_apply(self.to_2d_array(), apply_func, *args, backend=backend)
+            out = dispatch.row_apply(self.to_2d_array(), apply_func, *args, engine=engine)
         else:
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
@@ -489,7 +489,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         *args,
         minp: tp.Optional[int] = None,
         on_matrix: bool = False,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.dispatch.rolling_apply` and
@@ -516,12 +516,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.666667  2.666667  2.666667
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
-            out = dispatch.rolling_matrix_apply(self.to_2d_array(), window, minp, apply_func, *args, backend=backend)
+            out = dispatch.rolling_matrix_apply(self.to_2d_array(), window, minp, apply_func, *args, engine=engine)
         else:
-            out = dispatch.rolling_apply(self.to_2d_array(), window, minp, apply_func, *args, backend=backend)
+            out = dispatch.rolling_apply(self.to_2d_array(), window, minp, apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def expanding_apply(
@@ -530,7 +530,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         *args,
         minp: tp.Optional[int] = 1,
         on_matrix: bool = False,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.dispatch.expanding_apply` and
@@ -557,12 +557,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.600000  2.600000  2.600000
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
-            out = dispatch.expanding_matrix_apply(self.to_2d_array(), minp, apply_func, *args, backend=backend)
+            out = dispatch.expanding_matrix_apply(self.to_2d_array(), minp, apply_func, *args, engine=engine)
         else:
-            out = dispatch.expanding_apply(self.to_2d_array(), minp, apply_func, *args, backend=backend)
+            out = dispatch.expanding_apply(self.to_2d_array(), minp, apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def groupby_apply(
@@ -571,7 +571,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
         *args,
         on_matrix: bool = False,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
@@ -597,16 +597,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             3  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
         regrouped = self.obj.groupby(by, axis=0, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         else:
-            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index=list(regrouped.indices.keys())), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -616,7 +616,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
         *args,
         on_matrix: bool = False,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
@@ -642,16 +642,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
         resampled = self.obj.resample(freq, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         else:
-            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, backend=backend)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         out_obj = self.wrapper.wrap(out, group_by=False, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrapper.wrap(
@@ -667,7 +667,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         apply_func: tp.ApplyMapFunc,
         *args,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.dispatch.applymap`.
@@ -684,16 +684,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  25.0   1.0  1.0
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
+        checks.assert_engine_func(apply_func, engine=engine)
 
-        out = dispatch.applymap(self.to_2d_array(), apply_func, *args, backend=backend)
+        out = dispatch.applymap(self.to_2d_array(), apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def filter(
         self,
         filter_func: tp.FilterFunc,
         *args,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.dispatch.filter`.
@@ -710,9 +710,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  5.0  NaN  NaN
             ```
         """
-        checks.assert_backend_func(filter_func, backend=backend)
+        checks.assert_engine_func(filter_func, engine=engine)
 
-        out = dispatch.filter(self.to_2d_array(), filter_func, *args, backend=backend)
+        out = dispatch.filter(self.to_2d_array(), filter_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def apply_and_reduce(
@@ -721,7 +721,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         reduce_func: tp.ReduceFunc,
         apply_args: tp.Optional[tuple] = None,
         reduce_args: tp.Optional[tuple] = None,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.generic.dispatch.apply_and_reduce`.
@@ -737,8 +737,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: float64
             ```
         """
-        checks.assert_backend_func(apply_func, backend=backend)
-        checks.assert_backend_func(reduce_func, backend=backend, func_suffix="_reduce")
+        checks.assert_engine_func(apply_func, engine=engine)
+        checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
         if apply_args is None:
             apply_args = ()
         if reduce_args is None:
@@ -750,7 +750,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             apply_args,
             reduce_func,
             reduce_args,
-            backend=backend,
+            engine=engine,
         )
         wrap_kwargs = merge_dicts(dict(name_or_index="apply_and_reduce"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
@@ -771,7 +771,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         flatten: bool = False,
         order: str = "C",
         to_index: bool = True,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeriesFrame[float]:
@@ -830,7 +830,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             max      5.0     3.0
             ```
         """
-        checks.assert_backend_func(reduce_func, backend=backend, func_suffix="_reduce")
+        checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
 
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -844,7 +844,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         in_c_order,
                         reduce_func,
                         *args,
-                        backend=backend,
+                        engine=engine,
                     )
                 else:
                     out = dispatch.flat_reduce_grouped(
@@ -853,7 +853,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         in_c_order,
                         reduce_func,
                         *args,
-                        backend=backend,
+                        engine=engine,
                     )
                 if returns_idx:
                     if in_c_order:
@@ -867,7 +867,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         group_lens,
                         reduce_func,
                         *args,
-                        backend=backend,
+                        engine=engine,
                     )
                 else:
                     out = dispatch.reduce_grouped(
@@ -875,13 +875,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         group_lens,
                         reduce_func,
                         *args,
-                        backend=backend,
+                        engine=engine,
                     )
         else:
             if returns_array:
-                out = dispatch.reduce_to_array(self.to_2d_array(), reduce_func, *args, backend=backend)
+                out = dispatch.reduce_to_array(self.to_2d_array(), reduce_func, *args, engine=engine)
             else:
-                out = dispatch.reduce(self.to_2d_array(), reduce_func, *args, backend=backend)
+                out = dispatch.reduce(self.to_2d_array(), reduce_func, *args, engine=engine)
 
         # Perform post-processing
         wrap_kwargs = merge_dicts(
@@ -1165,7 +1165,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         mapping: tp.Optional[tp.MappingLike] = None,
         incl_all_keys: bool = False,
         wrap_kwargs: tp.KwargsLike = None,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """Return a Series/DataFrame containing counts of unique values.
@@ -1190,7 +1190,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        value_counts = dispatch.value_counts(codes, len(uniques), group_lens, backend=backend)
+        value_counts = dispatch.value_counts(codes, len(uniques), group_lens, engine=engine)
         if incl_all_keys and mapping is not None:
             missing_keys = []
             for x in mapping:
@@ -1375,9 +1375,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Conversion ############# #
 
-    def drawdown(self, wrap_kwargs: tp.KwargsLike = None, backend: tp.Optional[str] = None) -> tp.SeriesFrame:
+    def drawdown(self, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Drawdown series."""
-        out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array(), backend=backend) - 1
+        out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array(), engine=engine) - 1
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
@@ -1438,7 +1438,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
@@ -1476,7 +1476,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             reshape_fns.to_2d_array(self_obj),
             reshape_fns.to_2d_array(other_obj),
             wait=wait,
-            backend=backend,
+            engine=engine,
         )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1484,7 +1484,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         broadcast_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
@@ -1496,7 +1496,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             reshape_fns.to_2d_array(other_obj),
             reshape_fns.to_2d_array(self_obj),
             wait=wait,
-            backend=backend,
+            engine=engine,
         )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1550,13 +1550,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         return self.scale(with_mean=True, with_std=True, **kwargs)
 
     def rebase(
-        self, base: float, wrap_kwargs: tp.KwargsLike = None, backend: tp.Optional[str] = None
+        self, base: float, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None
     ) -> tp.SeriesFrame:
         """Rebase all series to a given intial base.
 
         This makes comparing/plotting different series together easier.
         Will forward and backward fill NaN values."""
-        result = dispatch.bfill(dispatch.ffill(self.to_2d_array(), backend=backend), backend=backend)
+        result = dispatch.bfill(dispatch.ffill(self.to_2d_array(), engine=engine), engine=engine)
         result = result / result[0] * base
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -2028,7 +2028,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         self,
         squeeze_func: tp.GroupSqueezeFunc,
         *args,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
@@ -2036,7 +2036,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.squeeze_grouped`."""
         obj_frame = self.obj.to_frame().transpose()
-        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func, *args, backend=backend, group_by=group_by).iloc[0]
+        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func, *args, engine=engine, group_by=group_by).iloc[0]
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
         return ArrayWrapper.from_obj(obj_frame).wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
 
@@ -2649,7 +2649,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         self,
         squeeze_func: tp.GroupSqueezeFunc,
         *args,
-        backend: tp.Optional[str] = None,
+        engine: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
@@ -2672,10 +2672,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
-        checks.assert_backend_func(squeeze_func, backend=backend, func_suffix="_squeeze")
+        checks.assert_engine_func(squeeze_func, engine=engine, func_suffix="_squeeze")
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        out = dispatch.squeeze_grouped(self.to_2d_array(), group_lens, squeeze_func, *args, backend=backend)
+        out = dispatch.squeeze_grouped(self.to_2d_array(), group_lens, squeeze_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def flatten_grouped(

@@ -1,19 +1,19 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-neutral dispatch wrappers for portfolio functions."""
+"""Engine-neutral dispatch wrappers for portfolio functions."""
 
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt._backend import (
+from vectorbt._engine import (
     RustSupport,
     array_compatible_with_rust,
     col_map_compatible_with_rust,
     combine_rust_support,
     flex_broadcast_to_shape,
     non_neg_int_compatible_with_rust,
-    resolve_backend,
+    resolve_engine,
     scalar_compatible_with_rust,
 )
 from vectorbt.records.dispatch import record_array_compatible_with_rust
@@ -22,9 +22,9 @@ from vectorbt.records.dispatch import record_array_compatible_with_rust
 # ############# Core order functions ############# #
 
 
-def order_not_filled(status: int, status_info: int, backend: tp.Optional[str] = None):
-    """Backend-neutral `vectorbt.portfolio.nb.order_not_filled_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def order_not_filled(status: int, status_info: int, engine: tp.Optional[str] = None):
+    """Engine-neutral `vectorbt.portfolio.nb.order_not_filled_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import order_not_filled_rs
 
@@ -48,10 +48,10 @@ def buy(
     lock_cash=False,
     allow_partial=True,
     percent=np.nan,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ):
-    """Backend-neutral `vectorbt.portfolio.nb.buy_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.buy_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import buy_rs
 
@@ -103,10 +103,10 @@ def sell(
     lock_cash=False,
     allow_partial=True,
     percent=np.nan,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ):
-    """Backend-neutral `vectorbt.portfolio.nb.sell_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.sell_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import sell_rs
 
@@ -144,9 +144,9 @@ def sell(
     )
 
 
-def execute_order(state, order, backend: tp.Optional[str] = None):
-    """Backend-neutral `vectorbt.portfolio.nb.execute_order_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def execute_order(state, order, engine: tp.Optional[str] = None):
+    """Engine-neutral `vectorbt.portfolio.nb.execute_order_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import execute_order_rs
 
@@ -164,10 +164,10 @@ def update_value(
     val_price_before,
     order_price,
     value_before,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ):
-    """Backend-neutral `vectorbt.portfolio.nb.update_value_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.update_value_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import update_value_rs
 
@@ -197,10 +197,10 @@ def order_nb(
     allow_partial=True,
     raise_reject=False,
     log=False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ):
-    """Backend-neutral `vectorbt.portfolio.nb.order_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.order_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import order_nb_rs
 
@@ -255,10 +255,10 @@ def close_position(
     allow_partial=True,
     raise_reject=False,
     log=False,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ):
-    """Backend-neutral `vectorbt.portfolio.nb.close_position_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.close_position_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import close_position_rs
 
@@ -294,9 +294,9 @@ def close_position(
     )
 
 
-def order_nothing(backend: tp.Optional[str] = None):
-    """Backend-neutral `vectorbt.portfolio.nb.order_nothing_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def order_nothing(engine: tp.Optional[str] = None):
+    """Engine-neutral `vectorbt.portfolio.nb.order_nothing_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import order_nothing_rs
 
@@ -306,9 +306,9 @@ def order_nothing(backend: tp.Optional[str] = None):
     return order_nothing_nb()
 
 
-def raise_rejected_order(order_result, backend: tp.Optional[str] = None):
-    """Backend-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def raise_rejected_order(order_result, engine: tp.Optional[str] = None):
+    """Engine-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import raise_rejected_order_rs
 
@@ -321,10 +321,10 @@ def raise_rejected_order(order_result, backend: tp.Optional[str] = None):
 # ############# Call sequence & validation ############# #
 
 
-def check_group_lens(group_lens: tp.Array1d, n_cols: int, backend: tp.Optional[str] = None) -> None:
-    """Backend-neutral `vectorbt.portfolio.nb.check_group_lens_nb`."""
-    eng = resolve_backend(
-        backend,
+def check_group_lens(group_lens: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None) -> None:
+    """Engine-neutral `vectorbt.portfolio.nb.check_group_lens_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
     )
     if eng == "rust":
@@ -341,11 +341,11 @@ def check_group_init_cash(
     n_cols: int,
     init_cash: tp.Array1d,
     cash_sharing: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> None:
-    """Backend-neutral `vectorbt.portfolio.nb.check_group_init_cash_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.check_group_init_cash_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(group_lens, dtype=np.int64),
             array_compatible_with_rust(init_cash),
@@ -360,10 +360,10 @@ def check_group_init_cash(
     return check_group_init_cash_nb(group_lens, n_cols, init_cash, cash_sharing)
 
 
-def is_grouped(group_lens: tp.Array1d, backend: tp.Optional[str] = None) -> bool:
-    """Backend-neutral `vectorbt.portfolio.nb.is_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+def is_grouped(group_lens: tp.Array1d, engine: tp.Optional[str] = None) -> bool:
+    """Engine-neutral `vectorbt.portfolio.nb.is_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
     )
     if eng == "rust":
@@ -379,11 +379,11 @@ def build_call_seq(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     call_seq_type: int = 0,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.build_call_seq_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.build_call_seq_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
     )
     if eng == "rust":
@@ -399,11 +399,11 @@ def shuffle_call_seq(
     call_seq: tp.Array2d,
     group_lens: tp.Array1d,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> None:
-    """Backend-neutral `vectorbt.portfolio.nb.shuffle_call_seq_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.shuffle_call_seq_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(call_seq, dtype=np.int64),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -427,10 +427,10 @@ def approx_order_value(
     free_cash: float,
     val_price: float,
     value: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> float:
-    """Backend-neutral `vectorbt.portfolio.nb.approx_order_value_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.approx_order_value_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import approx_order_value_rs
 
@@ -446,11 +446,11 @@ def get_group_value(
     cash_now: float,
     last_position: tp.Array1d,
     last_val_price: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> float:
-    """Backend-neutral `vectorbt.portfolio.nb.get_group_value_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.get_group_value_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(last_position),
             array_compatible_with_rust(last_val_price),
@@ -497,11 +497,11 @@ def simulate_from_orders(
     max_logs: int = 0,
     flex_2d: bool = True,
     seed: tp.Optional[int] = None,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
-    """Backend-neutral `vectorbt.portfolio.nb.simulate_from_orders_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.simulate_from_orders_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(group_lens, dtype=np.int64),
             array_compatible_with_rust(init_cash),
@@ -594,9 +594,9 @@ def simulate_from_orders(
 # ############# Scalar helpers ############# #
 
 
-def get_long_size(position_before: float, position_now: float, backend: tp.Optional[str] = None) -> float:
-    """Backend-neutral `vectorbt.portfolio.nb.get_long_size_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def get_long_size(position_before: float, position_now: float, engine: tp.Optional[str] = None) -> float:
+    """Engine-neutral `vectorbt.portfolio.nb.get_long_size_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import get_long_size_rs
 
@@ -606,9 +606,9 @@ def get_long_size(position_before: float, position_now: float, backend: tp.Optio
     return get_long_size_nb(position_before, position_now)
 
 
-def get_short_size(position_before: float, position_now: float, backend: tp.Optional[str] = None) -> float:
-    """Backend-neutral `vectorbt.portfolio.nb.get_short_size_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+def get_short_size(position_before: float, position_now: float, engine: tp.Optional[str] = None) -> float:
+    """Engine-neutral `vectorbt.portfolio.nb.get_short_size_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import get_short_size_rs
 
@@ -624,10 +624,10 @@ def get_free_cash_diff(
     debt_now: float,
     price: float,
     fees: float,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[float, float]:
-    """Backend-neutral `vectorbt.portfolio.nb.get_free_cash_diff_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.get_free_cash_diff_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import get_free_cash_diff_rs
 
@@ -644,10 +644,10 @@ def get_trade_stats(
     exit_price: float,
     exit_fees: float,
     direction: int,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Tuple[float, float]:
-    """Backend-neutral `vectorbt.portfolio.nb.get_trade_stats_nb`."""
-    eng = resolve_backend(backend, supports_rust=RustSupport(True))
+    """Engine-neutral `vectorbt.portfolio.nb.get_trade_stats_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
         from vectorbt_rust.portfolio import get_trade_stats_rs
 
@@ -665,11 +665,11 @@ def asset_flow(
     order_records: tp.RecordArray,
     col_map: tp.ColMap,
     direction: int,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.asset_flow_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.asset_flow_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
@@ -685,10 +685,10 @@ def asset_flow(
     return asset_flow_nb(target_shape, order_records, col_map, direction)
 
 
-def assets(asset_flow: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.assets_nb`."""
-    eng = resolve_backend(
-        backend,
+def assets(asset_flow: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.assets_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(asset_flow),
     )
     if eng == "rust":
@@ -708,11 +708,11 @@ def cash_flow(
     order_records: tp.RecordArray,
     col_map: tp.ColMap,
     free: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.cash_flow_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.cash_flow_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
@@ -728,10 +728,10 @@ def cash_flow(
     return cash_flow_nb(target_shape, order_records, col_map, free)
 
 
-def sum_grouped(a: tp.Array2d, group_lens: tp.Array1d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.sum_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+def sum_grouped(a: tp.Array2d, group_lens: tp.Array1d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.sum_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(a),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -749,11 +749,11 @@ def sum_grouped(a: tp.Array2d, group_lens: tp.Array1d, backend: tp.Optional[str]
 def cash_flow_grouped(
     cash_flow: tp.Array2d,
     group_lens: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.cash_flow_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.cash_flow_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash_flow),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -772,11 +772,11 @@ def init_cash_grouped(
     init_cash: tp.Array1d,
     group_lens: tp.Array1d,
     cash_sharing: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.init_cash_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.init_cash_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(init_cash),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -795,11 +795,11 @@ def init_cash_fn(
     init_cash: tp.Array1d,
     group_lens: tp.Array1d,
     cash_sharing: bool,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.init_cash_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.init_cash_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(init_cash),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -814,10 +814,10 @@ def init_cash_fn(
     return init_cash_nb(init_cash, group_lens, cash_sharing)
 
 
-def cash(cash_flow: tp.Array2d, init_cash: tp.Array1d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.cash_nb`."""
-    eng = resolve_backend(
-        backend,
+def cash(cash_flow: tp.Array2d, init_cash: tp.Array1d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.cash_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash_flow),
             array_compatible_with_rust(init_cash),
@@ -837,11 +837,11 @@ def cash_in_sim_order(
     group_lens: tp.Array1d,
     init_cash_grouped: tp.Array1d,
     call_seq: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.cash_in_sim_order_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.cash_in_sim_order_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash_flow),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -863,11 +863,11 @@ def cash_grouped(
     cash_flow_grouped: tp.Array2d,
     group_lens: tp.Array1d,
     init_cash_grouped: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.cash_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.cash_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash_flow_grouped),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -886,10 +886,10 @@ def cash_grouped(
 # ############# Performance metrics ############# #
 
 
-def asset_value(close: tp.Array2d, assets: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.asset_value_nb`."""
-    eng = resolve_backend(
-        backend,
+def asset_value(close: tp.Array2d, assets: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.asset_value_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close),
             array_compatible_with_rust(assets),
@@ -907,11 +907,11 @@ def asset_value(close: tp.Array2d, assets: tp.Array2d, backend: tp.Optional[str]
 def asset_value_grouped(
     asset_value: tp.Array2d,
     group_lens: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.asset_value_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.asset_value_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(asset_value),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -931,11 +931,11 @@ def value_in_sim_order(
     asset_value: tp.Array2d,
     group_lens: tp.Array1d,
     call_seq: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.value_in_sim_order_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.value_in_sim_order_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash),
             array_compatible_with_rust(asset_value),
@@ -952,10 +952,10 @@ def value_in_sim_order(
     return value_in_sim_order_nb(cash, asset_value, group_lens, call_seq)
 
 
-def value(cash: tp.Array2d, asset_value: tp.Array2d, backend: tp.Optional[str] = None) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.value_nb`."""
-    eng = resolve_backend(
-        backend,
+def value(cash: tp.Array2d, asset_value: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.value_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash),
             array_compatible_with_rust(asset_value),
@@ -975,11 +975,11 @@ def total_profit(
     close: tp.Array2d,
     order_records: tp.RecordArray,
     col_map: tp.ColMap,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.total_profit_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.total_profit_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
@@ -999,11 +999,11 @@ def total_profit(
 def total_profit_grouped(
     total_profit: tp.Array1d,
     group_lens: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.total_profit_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.total_profit_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(total_profit),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -1021,11 +1021,11 @@ def total_profit_grouped(
 def final_value(
     total_profit: tp.Array1d,
     init_cash: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.final_value_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.final_value_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(total_profit),
             array_compatible_with_rust(init_cash),
@@ -1043,11 +1043,11 @@ def final_value(
 def total_return(
     total_profit: tp.Array1d,
     init_cash: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.total_return_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.total_return_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(total_profit),
             array_compatible_with_rust(init_cash),
@@ -1067,11 +1067,11 @@ def returns_in_sim_order(
     group_lens: tp.Array1d,
     init_cash_grouped: tp.Array1d,
     call_seq: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.returns_in_sim_order_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.returns_in_sim_order_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(value_iso),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -1091,11 +1091,11 @@ def returns_in_sim_order(
 def asset_returns(
     cash_flow: tp.Array2d,
     asset_value: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.asset_returns_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.asset_returns_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(cash_flow),
             array_compatible_with_rust(asset_value),
@@ -1113,11 +1113,11 @@ def asset_returns(
 def benchmark_value(
     close: tp.Array2d,
     init_cash: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.benchmark_value_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.benchmark_value_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close),
             array_compatible_with_rust(init_cash),
@@ -1136,11 +1136,11 @@ def benchmark_value_grouped(
     close: tp.Array2d,
     group_lens: tp.Array1d,
     init_cash_grouped: tp.Array1d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.benchmark_value_grouped_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.benchmark_value_grouped_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(close),
             array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -1158,11 +1158,11 @@ def benchmark_value_grouped(
 
 def total_benchmark_return(
     benchmark_value: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.total_benchmark_return_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.total_benchmark_return_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=array_compatible_with_rust(benchmark_value),
     )
     if eng == "rust":
@@ -1177,11 +1177,11 @@ def total_benchmark_return(
 def gross_exposure(
     asset_value: tp.Array2d,
     cash: tp.Array2d,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
-    """Backend-neutral `vectorbt.portfolio.nb.gross_exposure_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.gross_exposure_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(asset_value),
             array_compatible_with_rust(cash),
@@ -1203,11 +1203,11 @@ def get_entry_trades(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.ColMap,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.portfolio.nb.get_entry_trades_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.get_entry_trades_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(order_records),
             array_compatible_with_rust(close),
@@ -1228,11 +1228,11 @@ def get_exit_trades(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.ColMap,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.portfolio.nb.get_exit_trades_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.get_exit_trades_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(order_records),
             array_compatible_with_rust(close),
@@ -1251,11 +1251,11 @@ def get_exit_trades(
 
 def trade_winning_streak(
     records: tp.RecordArray,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=record_array_compatible_with_rust(records),
     )
     if eng == "rust":
@@ -1269,11 +1269,11 @@ def trade_winning_streak(
 
 def trade_losing_streak(
     records: tp.RecordArray,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.Array1d:
-    """Backend-neutral `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=record_array_compatible_with_rust(records),
     )
     if eng == "rust":
@@ -1288,11 +1288,11 @@ def trade_losing_streak(
 def get_positions(
     trade_records: tp.RecordArray,
     col_map: tp.ColMap,
-    backend: tp.Optional[str] = None,
+    engine: tp.Optional[str] = None,
 ) -> tp.RecordArray:
-    """Backend-neutral `vectorbt.portfolio.nb.get_positions_nb`."""
-    eng = resolve_backend(
-        backend,
+    """Engine-neutral `vectorbt.portfolio.nb.get_positions_nb`."""
+    eng = resolve_engine(
+        engine,
         supports_rust=combine_rust_support(
             record_array_compatible_with_rust(trade_records),
             col_map_compatible_with_rust(col_map),

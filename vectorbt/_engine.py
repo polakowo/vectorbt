@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Centralized backend resolution for dispatching between numba and Rust backends."""
+"""Centralized engine resolution for dispatching between Numba and Rust engines."""
 
 from dataclasses import dataclass, field
 
@@ -17,13 +17,13 @@ _rust_status: tp.Optional[bool] = None
 
 @dataclass(frozen=True)
 class RustSupport:
-    """Rust support result for a backend-neutral function call."""
+    """Rust support result for an engine-neutral function call."""
 
     supported: bool = field()
-    """Whether the Rust backend supports this function call."""
+    """Whether the Rust engine supports this function call."""
 
     reason: str = field(default="")
-    """Reason shown when this function call cannot use the Rust backend."""
+    """Reason shown when this function call cannot use the Rust engine."""
 
     def __bool__(self) -> bool:
         return self.supported
@@ -55,15 +55,15 @@ def is_rust_available() -> bool:
     return _rust_status
 
 
-def clear_backend_cache() -> None:
-    """Clear cached backend availability checks."""
+def clear_engine_cache() -> None:
+    """Clear cached engine availability checks."""
     global _rust_status
     _rust_status = None
 
 
 def callback_unsupported_with_rust() -> RustSupport:
     """Return Rust support for callback-accepting functions."""
-    return RustSupport(False, "Rust backend is not implemented for callback-accepting functions.")
+    return RustSupport(False, "Rust engine is not implemented for callback-accepting functions.")
 
 
 def combine_rust_support(*support_results: RustSupport) -> RustSupport:
@@ -79,38 +79,38 @@ def combine_rust_support(*support_results: RustSupport) -> RustSupport:
 def non_neg_int_compatible_with_rust(name: str, value: tp.Optional[int]) -> RustSupport:
     """Return whether a Python integer parameter can be passed to Rust as `usize`."""
     if value is not None and value < 0:
-        return RustSupport(False, f"Rust backend requires `{name}` to be non-negative.")
+        return RustSupport(False, f"Rust engine requires `{name}` to be non-negative.")
     return RustSupport(True)
 
 
 def array_compatible_with_rust(a: tp.Any, dtype: tp.Any = np.float64) -> RustSupport:
-    """Return whether the array is compatible with the Rust backend."""
+    """Return whether the array is compatible with the Rust engine."""
     if not isinstance(a, np.ndarray):
-        return RustSupport(False, "Rust backend requires a NumPy array.")
+        return RustSupport(False, "Rust engine requires a NumPy array.")
     if a.dtype != dtype:
-        return RustSupport(False, f"Rust backend requires {np.dtype(dtype).name} arrays.")
+        return RustSupport(False, f"Rust engine requires {np.dtype(dtype).name} arrays.")
     if a.ndim not in (1, 2):
-        return RustSupport(False, "Rust backend requires 1D or 2D arrays.")
+        return RustSupport(False, "Rust engine requires 1D or 2D arrays.")
     return RustSupport(True)
 
 
 def matching_shape_compatible_with_rust(name: str, a: tp.Any, other: tp.Any) -> RustSupport:
     """Return whether two arrays have the same shape."""
     if not isinstance(a, np.ndarray) or not isinstance(other, np.ndarray):
-        return RustSupport(False, f"Rust backend requires `{name}` to be a NumPy array.")
+        return RustSupport(False, f"Rust engine requires `{name}` to be a NumPy array.")
     if a.shape != other.shape:
-        return RustSupport(False, f"Rust backend requires `{name}` to have the same shape as input.")
+        return RustSupport(False, f"Rust engine requires `{name}` to have the same shape as input.")
     return RustSupport(True)
 
 
 def scalar_compatible_with_rust(name: str, value: tp.Any) -> RustSupport:
     """Return whether a scalar can be passed to Rust as f64."""
     if isinstance(value, np.ndarray):
-        return RustSupport(False, f"Rust backend requires `{name}` to be a scalar.")
+        return RustSupport(False, f"Rust engine requires `{name}` to be a scalar.")
     try:
         float(value)
     except (TypeError, ValueError):
-        return RustSupport(False, f"Rust backend requires `{name}` to be convertible to float64.")
+        return RustSupport(False, f"Rust engine requires `{name}` to be convertible to float64.")
     return RustSupport(True)
 
 
@@ -121,7 +121,7 @@ def unit_interval_compatible_with_rust(name: str, value: tp.Any) -> RustSupport:
         return scalar_support
     value = float(value)
     if value < 0.0 or value > 1.0:
-        return RustSupport(False, f"Rust backend requires `{name}` to be between 0 and 1.")
+        return RustSupport(False, f"Rust engine requires `{name}` to be between 0 and 1.")
     return RustSupport(True)
 
 
@@ -131,17 +131,17 @@ def non_neg_array_compatible_with_rust(name: str, a: tp.Any) -> RustSupport:
     if not support.supported:
         return support
     if np.any(a < 0):
-        return RustSupport(False, f"Rust backend requires `{name}` to contain non-negative values.")
+        return RustSupport(False, f"Rust engine requires `{name}` to contain non-negative values.")
     return RustSupport(True)
 
 
 def array_and_non_neg_int_compatible_with_rust(a: tp.Any, name: str, value: tp.Optional[int]) -> RustSupport:
-    """Return whether an array and a non-negative integer parameter are compatible with the Rust backend."""
+    """Return whether an array and a non-negative integer parameter are compatible with the Rust engine."""
     return combine_rust_support(array_compatible_with_rust(a), non_neg_int_compatible_with_rust(name, value))
 
 
 def mask_and_array_compatible_with_rust(a: tp.Any, mask: tp.Any) -> RustSupport:
-    """Return whether an array and its boolean mask are compatible with the Rust backend."""
+    """Return whether an array and its boolean mask are compatible with the Rust engine."""
     return combine_rust_support(
         array_compatible_with_rust(a),
         array_compatible_with_rust(mask, dtype=np.bool_),
@@ -150,7 +150,7 @@ def mask_and_array_compatible_with_rust(a: tp.Any, mask: tp.Any) -> RustSupport:
 
 
 def mask_and_values_compatible_with_rust(a: tp.Any, mask: tp.Any, values: tp.Any) -> RustSupport:
-    """Return whether an array, its mask, and replacement values are compatible with the Rust backend."""
+    """Return whether an array, its mask, and replacement values are compatible with the Rust engine."""
     return combine_rust_support(
         mask_and_array_compatible_with_rust(a, mask),
         array_compatible_with_rust(values),
@@ -159,22 +159,22 @@ def mask_and_values_compatible_with_rust(a: tp.Any, mask: tp.Any, values: tp.Any
 
 
 def col_range_compatible_with_rust(col_range: tp.Any) -> RustSupport:
-    """Return whether a ColRange (2D int64 array) is compatible with the Rust backend."""
+    """Return whether a ColRange (2D int64 array) is compatible with the Rust engine."""
     if not isinstance(col_range, np.ndarray):
-        return RustSupport(False, "Rust backend requires `col_range` to be a NumPy array.")
+        return RustSupport(False, "Rust engine requires `col_range` to be a NumPy array.")
     if col_range.dtype != np.int64:
-        return RustSupport(False, "Rust backend requires `col_range` to be int64.")
+        return RustSupport(False, "Rust engine requires `col_range` to be int64.")
     if col_range.ndim != 2 or col_range.shape[1] != 2:
-        return RustSupport(False, "Rust backend requires `col_range` to have shape (n_cols, 2).")
+        return RustSupport(False, "Rust engine requires `col_range` to have shape (n_cols, 2).")
     return RustSupport(True)
 
 
 def col_map_compatible_with_rust(col_map: tp.Any) -> RustSupport:
-    """Return whether a column map (pair of arrays) is compatible with the Rust backend."""
+    """Return whether a column map (pair of arrays) is compatible with the Rust engine."""
     try:
         col_idxs, col_lens = col_map
     except (TypeError, ValueError):
-        return RustSupport(False, "Rust backend requires `col_map` to be a pair of NumPy arrays.")
+        return RustSupport(False, "Rust engine requires `col_map` to be a pair of NumPy arrays.")
     return combine_rust_support(
         array_compatible_with_rust(col_idxs, dtype=np.int64),
         non_neg_array_compatible_with_rust("col_lens", col_lens),
@@ -182,7 +182,7 @@ def col_map_compatible_with_rust(col_map: tp.Any) -> RustSupport:
 
 
 def rolling_compatible_with_rust(a: tp.Any, window: int, minp: tp.Optional[int]) -> RustSupport:
-    """Return whether rolling arguments are compatible with the Rust backend."""
+    """Return whether rolling arguments are compatible with the Rust engine."""
     return combine_rust_support(
         array_compatible_with_rust(a),
         non_neg_int_compatible_with_rust("window", window),
@@ -225,40 +225,40 @@ def flex_broadcast_to_shape(
     return np.broadcast_to(arr, shape)
 
 
-def resolve_random_backend(backend: tp.Optional[str] = None) -> str:
-    """Resolve backend for randomized functions.
+def resolve_random_engine(engine: tp.Optional[str] = None) -> str:
+    """Resolve engine for randomized functions.
 
-    Randomized functions default to Numba, including `backend='auto'`, to preserve
-    legacy NumPy/Numba random streams unless a backend is requested explicitly.
+    Randomized functions default to Numba, including `engine='auto'`, to preserve
+    legacy NumPy/Numba random streams unless an engine is requested explicitly.
     """
-    if backend is None or backend == "auto":
+    if engine is None or engine == "auto":
         return "numba"
-    return backend
+    return engine
 
 
-def seed_for_rust(seed: tp.Optional[int], backend: tp.Optional[str], supports_rust: RustSupport) -> tp.Optional[int]:
-    """Return seed only when the resolved backend is Rust."""
-    if resolve_backend(backend, supports_rust=supports_rust) == "rust":
+def seed_for_rust(seed: tp.Optional[int], engine: tp.Optional[str], supports_rust: RustSupport) -> tp.Optional[int]:
+    """Return seed only when the resolved engine is Rust."""
+    if resolve_engine(engine, supports_rust=supports_rust) == "rust":
         return seed
     return None
 
 
-def resolve_backend(backend: tp.Optional[str] = None, supports_rust: RustSupport = RustSupport(True)) -> str:
-    """Resolve which backend to use for a given function call.
+def resolve_engine(engine: tp.Optional[str] = None, supports_rust: RustSupport = RustSupport(True)) -> str:
+    """Resolve which engine to use for a given function call.
 
-    Set `backend` to override the global `settings['backend']`.
+    Set `engine` to override the global `settings['engine']`.
     Set `supports_rust` to a `RustSupport` instance for callback-accepting
     functions, unsupported dtypes, or any other condition that prevents Rust
     dispatch.
 
     Returns `'numba'` or `'rust'`."""
-    if backend is None:
-        backend = settings["backend"]
+    if engine is None:
+        engine = settings["engine"]
     if not isinstance(supports_rust, RustSupport):
         raise TypeError("supports_rust must be a RustSupport instance.")
-    if backend == "numba":
+    if engine == "numba":
         return "numba"
-    if backend == "rust":
+    if engine == "rust":
         if not is_rust_available():
             raise ImportError(
                 "vectorbt-rust is not installed. "
@@ -266,10 +266,10 @@ def resolve_backend(backend: tp.Optional[str] = None, supports_rust: RustSupport
                 "(or pip install vectorbt[rust])"
             )
         if not supports_rust.supported:
-            raise ValueError(f"{supports_rust.reason} Use backend='numba'.")
+            raise ValueError(f"{supports_rust.reason} Use engine='numba'.")
         return "rust"
-    if backend != "auto":
-        raise ValueError("Invalid backend. Expected 'auto', 'numba', or 'rust'.")
+    if engine != "auto":
+        raise ValueError("Invalid engine. Expected 'auto', 'numba', or 'rust'.")
     if supports_rust.supported and is_rust_available():
         return "rust"
     return "numba"
