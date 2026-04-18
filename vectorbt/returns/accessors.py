@@ -249,7 +249,7 @@ class ReturnsAccessor(GenericAccessor):
 
         returns = dispatch.returns(value_2d, init_value, engine=engine)
         returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
-        return cls(returns, **kwargs)
+        return cls(returns, engine=engine, **kwargs)
 
     @property
     def benchmark_rets(self) -> tp.Optional[tp.SeriesFrame]:
@@ -318,6 +318,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.returns.dispatch.cum_returns`."""
+        engine = engine if engine is not None else self.engine
         if start_value is None:
             start_value = self.defaults["start_value"]
         cumulative = dispatch.cum_returns(self.to_2d_array(), start_value, engine=engine)
@@ -326,6 +327,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def total(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.cum_returns_final`."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.cum_returns_final(self.to_2d_array(), 0.0, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -338,6 +340,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.total`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -348,6 +351,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def annualized(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.annualized_return`."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.annualized_return(self.to_2d_array(), self.ann_factor, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="annualized_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -360,6 +364,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.annualized`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -376,6 +381,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.annualized_volatility`."""
+        engine = engine if engine is not None else self.engine
         if levy_alpha is None:
             levy_alpha = self.defaults["levy_alpha"]
         if ddof is None:
@@ -400,6 +406,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.annualized_volatility`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -422,6 +429,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def calmar_ratio(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.calmar_ratio`."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.calmar_ratio(self.to_2d_array(), self.ann_factor, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="calmar_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -434,6 +442,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.calmar_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -450,6 +459,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.omega_ratio`."""
+        engine = engine if engine is not None else self.engine
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if required_return is None:
@@ -474,6 +484,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.omega_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -502,6 +513,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.sharpe_ratio`."""
+        engine = engine if engine is not None else self.engine
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if ddof is None:
@@ -520,6 +532,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.sharpe_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -581,6 +594,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.downside_risk`."""
+        engine = engine if engine is not None else self.engine
         if required_return is None:
             required_return = self.defaults["required_return"]
         result = dispatch.downside_risk(self.to_2d_array(), self.ann_factor, required_return, engine=engine)
@@ -596,6 +610,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.downside_risk`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -615,6 +630,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.sortino_ratio`."""
+        engine = engine if engine is not None else self.engine
         if required_return is None:
             required_return = self.defaults["required_return"]
         result = dispatch.sortino_ratio(self.to_2d_array(), self.ann_factor, required_return, engine=engine)
@@ -630,6 +646,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.sortino_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -650,6 +667,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.information_ratio`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if ddof is None:
@@ -669,6 +687,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.information_ratio`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -691,6 +710,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.beta`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -707,6 +727,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.beta`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -726,6 +747,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.alpha`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if risk_free is None:
@@ -745,6 +767,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.alpha`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -762,6 +785,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def tail_ratio(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.tail_ratio`."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.tail_ratio(self.to_2d_array(), engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="tail_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -774,6 +798,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.tail_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -788,6 +813,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """Common Sense Ratio."""
+        engine = engine if engine is not None else self.engine
         result = to_1d_array(self.tail_ratio(engine=engine)) * (1 + to_1d_array(self.annualized(engine=engine)))
         wrap_kwargs = merge_dicts(dict(name_or_index="common_sense_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -800,6 +826,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.common_sense_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -817,6 +844,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.value_at_risk`."""
+        engine = engine if engine is not None else self.engine
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
         result = dispatch.value_at_risk(self.to_2d_array(), cutoff, engine=engine)
@@ -832,6 +860,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.value_at_risk`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -849,6 +878,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.cond_value_at_risk`."""
+        engine = engine if engine is not None else self.engine
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
         result = dispatch.cond_value_at_risk(self.to_2d_array(), cutoff, engine=engine)
@@ -864,6 +894,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.cond_value_at_risk`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -881,6 +912,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -897,6 +929,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -917,6 +950,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.up_capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -933,6 +967,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.up_capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -953,6 +988,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """See `vectorbt.returns.dispatch.down_capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
@@ -969,6 +1005,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.down_capture`."""
+        engine = engine if engine is not None else self.engine
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
         if window is None:
@@ -984,6 +1021,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def drawdown(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Relative decline from a peak."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.drawdown(self.to_2d_array(), engine=engine)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
@@ -992,6 +1030,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbt.returns.dispatch.max_drawdown`.
 
         Yields the same result as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.max_drawdown(self.to_2d_array(), engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="max_drawdown"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
@@ -1004,6 +1043,7 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.max_drawdown`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -1026,10 +1066,12 @@ class ReturnsAccessor(GenericAccessor):
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
+        engine = engine if engine is not None else self.engine
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
         return Drawdowns.from_ts(
             self.cumulative(start_value=1.0, engine=engine),
             wrapper_kwargs=wrapper_kwargs,
+            engine=engine,
             **kwargs,
         )
 

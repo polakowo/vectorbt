@@ -492,9 +492,10 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         wrapper: ArrayWrapper,
         records_arr: tp.RecordArray,
         col_mapper: tp.Optional[ColumnMapper] = None,
+        engine: tp.Optional[str] = None,
         **kwargs,
     ) -> None:
-        Wrapping.__init__(self, wrapper, records_arr=records_arr, col_mapper=col_mapper, **kwargs)
+        Wrapping.__init__(self, wrapper, records_arr=records_arr, col_mapper=col_mapper, engine=engine, **kwargs)
         StatsBuilderMixin.__init__(self)
 
         # Check fields
@@ -509,9 +510,15 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                         raise TypeError(f"Field '{field}' from {dtype} cannot be found in records or config")
 
         self._records_arr = records_arr
+        self._engine = engine
         if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, self.col_arr)
+            col_mapper = ColumnMapper(wrapper, self.col_arr, engine=engine)
         self._col_mapper = col_mapper
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     def replace(self: RecordsT, **kwargs) -> RecordsT:
         """See `vectorbt.utils.config.Configured.replace`.
@@ -530,7 +537,8 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """Get records corresponding to column indices.
 
         Returns new records array."""
-        if self.col_mapper.is_sorted():
+        engine = engine if engine is not None else self.engine
+        if self.col_mapper.is_sorted(engine=engine):
             new_records_arr = dispatch.record_col_range_select(
                 self.values,
                 self.col_mapper.col_range,
@@ -550,7 +558,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
             column_only_select=True,
             **kwargs,
         )
-        new_records_arr = self.get_by_col_idxs(col_idxs)
+        new_records_arr = self.get_by_col_idxs(col_idxs, engine=self.engine)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
     def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
@@ -666,16 +674,24 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     @cached_method
     def is_sorted(self, incl_id: bool = False, engine: tp.Optional[str] = None) -> bool:
         """Check whether records are sorted."""
+        engine = engine if engine is not None else self.engine
         if incl_id:
             return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr, engine=engine)
         return dispatch.is_col_sorted(self.col_arr, engine=engine)
 
-    def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
+    def sort(
+        self: RecordsT,
+        incl_id: bool = False,
+        group_by: tp.GroupByLike = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).
 
         !!! note
             Sorting is expensive. A better approach is to append records already in the correct order."""
-        if self.is_sorted(incl_id=incl_id):
+        engine = engine if engine is not None else self.engine
+        if self.is_sorted(incl_id=incl_id, engine=engine):
             return self.replace(**kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
@@ -712,6 +728,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=self.col_mapper,
+            engine=self.engine,
             **kwargs,
         ).regroup(group_by)
 

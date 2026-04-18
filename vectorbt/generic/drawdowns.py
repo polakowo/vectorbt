@@ -278,7 +278,7 @@ class Drawdowns(Ranges):
         ts_pd = to_pd_array(ts)
         records_arr = dispatch.get_drawdowns(to_2d_array(ts_pd), engine=engine)
         wrapper = ArrayWrapper.from_obj(ts_pd, **merge_dicts({}, wrapper_kwargs))
-        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
+        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, engine=engine, **kwargs)
 
     @property
     def ts(self) -> tp.Optional[tp.SeriesFrame]:
@@ -292,7 +292,9 @@ class Drawdowns(Ranges):
         """See `vectorbt.generic.dispatch.dd_drawdown`.
 
         Takes into account both recovered and active drawdowns."""
-        drawdown = dispatch.dd_drawdown(self.get_field_arr("peak_val"), self.get_field_arr("valley_val"))
+        drawdown = dispatch.dd_drawdown(
+            self.get_field_arr("peak_val"), self.get_field_arr("valley_val"), engine=self.engine
+        )
         return self.map_array(drawdown)
 
     @cached_method
@@ -328,7 +330,9 @@ class Drawdowns(Ranges):
         """See `vectorbt.generic.dispatch.dd_recovery_return`.
 
         Takes into account both recovered and active drawdowns."""
-        recovery_return = dispatch.dd_recovery_return(self.get_field_arr("valley_val"), self.get_field_arr("end_val"))
+        recovery_return = dispatch.dd_recovery_return(
+            self.get_field_arr("valley_val"), self.get_field_arr("end_val"), engine=self.engine
+        )
         return self.map_array(recovery_return)
 
     @cached_method
@@ -367,6 +371,7 @@ class Drawdowns(Ranges):
         decline_duration = dispatch.dd_decline_duration(
             self.get_field_arr("start_idx"),
             self.get_field_arr("valley_idx"),
+            engine=self.engine,
         )
         return self.map_array(decline_duration)
 
@@ -380,6 +385,7 @@ class Drawdowns(Ranges):
         recovery_duration = dispatch.dd_recovery_duration(
             self.get_field_arr("valley_idx"),
             self.get_field_arr("end_idx"),
+            engine=self.engine,
         )
         return self.map_array(recovery_duration)
 
@@ -392,6 +398,7 @@ class Drawdowns(Ranges):
             self.get_field_arr("start_idx"),
             self.get_field_arr("valley_idx"),
             self.get_field_arr("end_idx"),
+            engine=self.engine,
         )
         return self.map_array(recovery_duration_ratio)
 

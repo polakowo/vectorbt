@@ -375,8 +375,14 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+    def __init__(
+        self,
+        obj: tp.SeriesFrame,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        BaseAccessor.__init__(self, obj, mapping=mapping, engine=engine, **kwargs)
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
 
@@ -388,6 +394,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                     mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         self._mapping = mapping
+        self._engine = engine
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     @property
     def sr_accessor_cls(self) -> tp.Type["GenericSRAccessor"]:
@@ -417,6 +429,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.rolling_std`."""
+        engine = engine if engine is not None else self.engine
         out = dispatch.rolling_std(self.to_2d_array(), window, minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -428,6 +441,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.expanding_std`."""
+        engine = engine if engine is not None else self.engine
         out = dispatch.expanding_std(self.to_2d_array(), minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -440,6 +454,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.ewm_mean`."""
+        engine = engine if engine is not None else self.engine
         out = dispatch.ewm_mean(self.to_2d_array(), span, minp=minp, adjust=adjust, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -453,6 +468,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.ewm_std`."""
+        engine = engine if engine is not None else self.engine
         out = dispatch.ewm_std(
             self.to_2d_array(),
             span,
@@ -472,6 +488,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Apply a function `apply_func` along an axis."""
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         if axis == 0:
@@ -516,6 +533,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.666667  2.666667  2.666667
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
@@ -557,6 +575,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.600000  2.600000  2.600000
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
@@ -597,6 +616,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             3  2.333333  2.333333  2.333333
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         regrouped = self.obj.groupby(by, axis=0, **kwargs)
@@ -642,6 +662,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.333333  2.333333  2.333333
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         resampled = self.obj.resample(freq, **kwargs)
@@ -684,6 +705,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  25.0   1.0  1.0
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
         out = dispatch.applymap(self.to_2d_array(), apply_func, *args, engine=engine)
@@ -710,6 +732,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  5.0  NaN  NaN
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(filter_func, engine=engine)
 
         out = dispatch.filter(self.to_2d_array(), filter_func, *args, engine=engine)
@@ -737,6 +760,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: float64
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
         checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
         if apply_args is None:
@@ -830,6 +854,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             max      5.0     3.0
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
 
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -899,14 +924,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return min of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="min"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.min_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -922,14 +950,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return max of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="max"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.max_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -945,14 +976,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return mean of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="mean"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.mean_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -968,14 +1002,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return median of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="median"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.median_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -992,8 +1029,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         ddof: int = 1,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return standard deviation of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="std"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
@@ -1001,6 +1040,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 ddof,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -1016,14 +1056,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return sum of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="sum"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.sum_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -1039,14 +1082,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         self,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return count of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="count", dtype=np.int64), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.count_reduce,
                 group_by=group_by,
                 flatten=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -1057,8 +1103,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         group_by: tp.GroupByLike = None,
         order: str = "C",
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return labeled index of min of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="idxmin"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
@@ -1067,6 +1115,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 flatten=True,
                 returns_idx=True,
                 order=order,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -1081,8 +1130,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         group_by: tp.GroupByLike = None,
         order: str = "C",
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Return labeled index of max of non-NaN elements."""
+        engine = engine if engine is not None else self.engine
         wrap_kwargs = merge_dicts(dict(name_or_index="idxmax"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
@@ -1091,6 +1142,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 flatten=True,
                 returns_idx=True,
                 order=order,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
 
@@ -1106,6 +1158,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         ddof: int = 1,
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """See `vectorbt.generic.dispatch.describe_reduce`.
 
@@ -1136,6 +1189,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(["count", "mean", "std", "min", *perc_formatted, "max"])
         wrap_kwargs = merge_dicts(dict(name_or_index=index), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 dispatch.describe_reduce,
@@ -1144,6 +1198,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 group_by=group_by,
                 flatten=True,
                 returns_array=True,
+                engine=engine,
                 wrap_kwargs=wrap_kwargs,
             )
         return self.reduce(
@@ -1151,6 +1206,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             percentiles,
             ddof,
             returns_array=True,
+            engine=engine,
             wrap_kwargs=wrap_kwargs,
         )
 
@@ -1187,6 +1243,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
+        engine = engine if engine is not None else self.engine
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -1377,6 +1434,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     def drawdown(self, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Drawdown series."""
+        engine = engine if engine is not None else self.engine
         out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array(), engine=engine) - 1
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -1390,6 +1448,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbt.generic.ranges.Ranges`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        kwargs.setdefault("engine", self.engine)
         return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     @property
@@ -1402,6 +1461,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        kwargs.setdefault("engine", self.engine)
         return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(
@@ -1420,6 +1480,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
             idx_arr = idx_arr[not_nan_mask]
+        kwargs.setdefault("engine", self.engine)
         return MappedArray(
             self.wrapper,
             np.asarray(mapped_arr, dtype=dtype),
@@ -1471,6 +1532,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: bool
             ```
         """
+        engine = engine if engine is not None else self.engine
         self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         out = dispatch.crossed_above(
             reshape_fns.to_2d_array(self_obj),
@@ -1491,6 +1553,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """Generate crossover below another array.
 
         See `vectorbt.generic.dispatch.crossed_above` but in reversed order."""
+        engine = engine if engine is not None else self.engine
         self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         out = dispatch.crossed_above(
             reshape_fns.to_2d_array(other_obj),
@@ -1549,13 +1612,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
         return self.scale(with_mean=True, with_std=True, **kwargs)
 
-    def rebase(
-        self, base: float, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None
-    ) -> tp.SeriesFrame:
+    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Rebase all series to a given intial base.
 
         This makes comparing/plotting different series together easier.
         Will forward and backward fill NaN values."""
+        engine = engine if engine is not None else self.engine
         result = dispatch.bfill(dispatch.ffill(self.to_2d_array(), engine=engine), engine=engine)
         result = result / result[0] * base
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
@@ -2035,6 +2097,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         """Squeeze each group of elements into a single element.
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.squeeze_grouped`."""
+        engine = engine if engine is not None else self.engine
         obj_frame = self.obj.to_frame().transpose()
         squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func, *args, engine=engine, group_by=group_by).iloc[0]
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
@@ -2045,12 +2108,14 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         group_by: tp.GroupByLike = None,
         order: str = "C",
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Flatten each group of elements.
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.flatten_grouped`."""
+        engine = engine if engine is not None else self.engine
         obj_frame = self.obj.to_frame().transpose()
-        return obj_frame.vbt.flatten_grouped(group_by=group_by, order=order, wrap_kwargs=wrap_kwargs)
+        return obj_frame.vbt.flatten_grouped(group_by=group_by, order=order, wrap_kwargs=wrap_kwargs, engine=engine)
 
     def plot_against(
         self,
@@ -2670,6 +2735,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             2020-01-05    3.0     1.0
             ```
         """
+        engine = engine if engine is not None else self.engine
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_engine_func(squeeze_func, engine=engine, func_suffix="_squeeze")
@@ -2683,6 +2749,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         group_by: tp.GroupByLike = None,
         order: str = "C",
         wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """Flatten each group of columns.
 
@@ -2723,6 +2790,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             2020-01-05    1.0     NaN
             ```
         """
+        engine = engine if engine is not None else self.engine
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_in(order.upper(), ["C", "F"])
@@ -2733,10 +2801,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         else:
             func = dispatch.flatten_grouped
         if order.upper() == "C":
-            out = func(self.to_2d_array(), group_lens, True)
+            out = func(self.to_2d_array(), group_lens, True, engine=engine)
             new_index = index_fns.repeat_index(self.wrapper.index, np.max(group_lens))
         else:
-            out = func(self.to_2d_array(), group_lens, False)
+            out = func(self.to_2d_array(), group_lens, False, engine=engine)
             new_index = index_fns.tile_index(self.wrapper.index, np.max(group_lens))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)

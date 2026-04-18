@@ -428,6 +428,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   True  False   True
             ```
         """
+        engine = engine if engine is not None else self.engine
         checks.assert_engine_func(exit_choice_func, engine=engine)
 
         exits = dispatch.generate_ex(
@@ -458,6 +459,7 @@ class SignalsAccessor(GenericAccessor):
         If one array passed, see `SignalsAccessor.first`.
         If two arrays passed, entries and exits, see `vectorbt.signals.nb.clean_enex_nb`."""
         if not isinstance(cls_or_self, type):
+            engine = engine if engine is not None else cls_or_self.engine
             args = (cls_or_self.obj, *args)
         if len(args) == 1:
             obj = args[0]
@@ -708,6 +710,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False   True
             ```
         """
+        engine = engine if engine is not None else self.engine
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
             entries_2d = reshape_fns.to_2d_array(obj)
@@ -792,6 +795,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
@@ -1011,6 +1015,7 @@ class SignalsAccessor(GenericAccessor):
                 The last two examples above make entries dependent upon exits - this makes only sense
                 if you have no other exit arrays to combine this stop exit array with.
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
@@ -1215,6 +1220,7 @@ class SignalsAccessor(GenericAccessor):
             array([0, 2])
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1234,6 +1240,7 @@ class SignalsAccessor(GenericAccessor):
             )
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
+        kwargs.setdefault("engine", engine)
         return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
 
     def partition_ranges(
@@ -1258,7 +1265,9 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                4              5    Open
             ```
         """
+        engine = engine if engine is not None else self.engine
         range_records = dispatch.partition_ranges(self.to_2d_array(), engine=engine)
+        kwargs.setdefault("engine", engine)
         return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
     def between_partition_ranges(
@@ -1280,7 +1289,9 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                3              5  Closed
             ```
         """
+        engine = engine if engine is not None else self.engine
         range_records = dispatch.between_partition_ranges(self.to_2d_array(), engine=engine)
+        kwargs.setdefault("engine", engine)
         return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
     # ############# Ranking ############# #
@@ -1306,6 +1317,7 @@ class SignalsAccessor(GenericAccessor):
         It should take both broadcasted arrays (`reset_by` can be None) and return a tuple.
 
         Set `as_mapped` to True to return an instance of `vectorbt.records.mapped_array.MappedArray`."""
+        engine = engine if engine is not None else self.engine
         checks.assert_not_none(rank_func)
         checks.assert_engine_func(rank_func, engine=engine)
         if broadcast_kwargs is None:
@@ -1380,6 +1392,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1444,6 +1457,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1471,6 +1485,7 @@ class SignalsAccessor(GenericAccessor):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == 0`."""
+        engine = engine if engine is not None else self.engine
         pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -1482,6 +1497,7 @@ class SignalsAccessor(GenericAccessor):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == n`."""
+        engine = engine if engine is not None else self.engine
         pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -1493,6 +1509,7 @@ class SignalsAccessor(GenericAccessor):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank >= n`."""
+        engine = engine if engine is not None else self.engine
         pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -1544,8 +1561,9 @@ class SignalsAccessor(GenericAccessor):
             Timestamp('2020-01-05 00:00:00')
             ```
         """
+        engine = engine if engine is not None else self.engine
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
-            squeezed = self.squeeze_grouped(generic_nb.any_squeeze_nb, group_by=group_by)
+            squeezed = self.squeeze_grouped(generic_nb.any_squeeze_nb, group_by=group_by, engine=engine)
             arr = reshape_fns.to_2d_array(squeezed)
         else:
             arr = self.to_2d_array()
@@ -1589,6 +1607,7 @@ class SignalsAccessor(GenericAccessor):
             0.0
             ```
         """
+        engine = engine if engine is not None else self.engine
         norm_avg_index = dispatch.norm_avg_index(self.to_2d_array(), engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="norm_avg_index"), wrap_kwargs)
         norm_avg_index = self.wrapper.wrap_reduced(norm_avg_index, group_by=False, **wrap_kwargs)

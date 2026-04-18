@@ -1537,6 +1537,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         call_seq: tp.Optional[tp.Array2d] = None,
         fillna_close: tp.Optional[bool] = None,
         trades_type: tp.Optional[tp.Union[int, str]] = None,
+        engine: tp.Optional[str] = None,
     ) -> None:
         Wrapping.__init__(
             self,
@@ -1549,6 +1550,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             call_seq=call_seq,
             fillna_close=fillna_close,
             trades_type=trades_type,
+            engine=engine,
         )
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
@@ -1574,6 +1576,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self._call_seq = call_seq
         self._fillna_close = fillna_close
         self._trades_type = trades_type
+        self._engine = engine
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
@@ -2025,6 +2033,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq=call_seq if attach_call_seq else None,
+            engine=engine,
             **kwargs,
         )
 
@@ -4059,7 +4068,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
-        return Orders(self.wrapper, self.order_records, close=self.close, **kwargs).regroup(group_by)
+        return Orders(self.wrapper, self.order_records, close=self.close, engine=self.engine, **kwargs).regroup(
+            group_by
+        )
 
     @property
     def log_records(self) -> tp.RecordArray:
@@ -4088,7 +4099,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get entry trade records.
 
         See `vectorbt.portfolio.trades.EntryTrades`."""
-        return EntryTrades.from_orders(self.orders, **kwargs).regroup(group_by)
+        return EntryTrades.from_orders(self.orders, engine=self.engine, **kwargs).regroup(group_by)
 
     @cached_property
     def exit_trades(self) -> ExitTrades:
@@ -4100,7 +4111,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get exit trade records.
 
         See `vectorbt.portfolio.trades.ExitTrades`."""
-        return ExitTrades.from_orders(self.orders, **kwargs).regroup(group_by)
+        return ExitTrades.from_orders(self.orders, engine=self.engine, **kwargs).regroup(group_by)
 
     @cached_property
     def trades(self) -> Trades:
@@ -4117,7 +4128,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
-        return Positions.from_trades(self.exit_trades, **kwargs).regroup(group_by)
+        return Positions.from_trades(self.exit_trades, engine=self.engine, **kwargs).regroup(group_by)
 
     @cached_method
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
@@ -4146,7 +4157,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         value = self.value(group_by=group_by, wrap_kwargs=wrap_kwargs)
         wrapper_kwargs = merge_dicts(self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
-        return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, engine=self.engine, **kwargs)
 
     # ############# Assets ############# #
 
@@ -4157,6 +4168,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
+        engine = engine if engine is not None else self.engine
         direction = map_enum_fields(direction, Direction)
         asset_flow = dispatch.asset_flow(
             self.wrapper.shape_2d,
@@ -4174,6 +4186,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get asset series per column.
 
         Returns the current position at each time step."""
+        engine = engine if engine is not None else self.engine
         direction = map_enum_fields(direction, Direction)
         asset_flow = to_2d_array(self.asset_flow(direction="both"))
         assets = dispatch.assets(asset_flow, engine=engine)
@@ -4236,6 +4249,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         Use `free` to return the flow of the free cash, which never goes above the initial level,
         because an operation always costs money."""
+        engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             cash_flow = to_2d_array(self.cash_flow(group_by=False, free=free))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -4261,6 +4275,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             If the initial cash balance was found automatically and no own cash is used throughout
             the simulation (for example, when shorting), it will be set to 1 instead of 0 to enable
             smooth calculation of returns."""
+        engine = engine if engine is not None else self.engine
         if isinstance(self._init_cash, int):
             cash_flow = to_2d_array(self.cash_flow(group_by=group_by))
             cash_min = np.min(np.cumsum(cash_flow, axis=0), axis=0)
@@ -4291,6 +4306,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         See the explanation on `in_sim_order` in `Portfolio.value`.
         For `free`, see `Portfolio.cash_flow`."""
+        engine = engine if engine is not None else self.engine
         if in_sim_order and not self.cash_sharing:
             raise ValueError("Cash sharing must be enabled for in_sim_order=True")
 
@@ -4327,6 +4343,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         engine: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
+        engine = engine if engine is not None else self.engine
         direction = map_enum_fields(direction, Direction)
         if self.fillna_close:
             close = to_2d_array(self.get_filled_close()).copy()
@@ -4355,6 +4372,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         Gross exposure is the sum of absolute position values divided by portfolio value.
         For grouped portfolios with mixed long/short positions, per-column absolute values
         are summed before dividing by group portfolio value."""
+        engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             # For grouped portfolios, we need sum(abs(per_column)) per group,
             # not abs(sum(per_column)). The latter gives net exposure, not gross.
@@ -4393,6 +4411,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         simulation order (see [row-major order](https://en.wikipedia.org/wiki/Row-_and_column-major_order).
         This value cannot be used for generating returns as-is. Useful to analyze how value
         evolved throughout simulation."""
+        engine = engine if engine is not None else self.engine
         cash = to_2d_array(self.cash(group_by=group_by, in_sim_order=in_sim_order))
         asset_value = to_2d_array(self.asset_value(group_by=group_by))
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
@@ -4417,6 +4436,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get total profit per column/group.
 
         Calculated directly from order records (fast)."""
+        engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             total_profit = to_1d_array(self.total_profit(group_by=False))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -4441,6 +4461,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None
     ) -> tp.MaybeSeries:
         """Get total profit per column/group."""
+        engine = engine if engine is not None else self.engine
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
         final_value = dispatch.final_value(total_profit, init_cash, engine=engine)
@@ -4452,6 +4473,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None
     ) -> tp.MaybeSeries:
         """Get total profit per column/group."""
+        engine = engine if engine is not None else self.engine
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
         total_return = dispatch.total_return(total_profit, init_cash, engine=engine)
@@ -4467,6 +4489,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         engine: tp.Optional[str] = None,
     ) -> tp.SeriesFrame:
         """Get return series per column/group based on portfolio value."""
+        engine = engine if engine is not None else self.engine
         value = to_2d_array(self.value(group_by=group_by, in_sim_order=in_sim_order))
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             if self.call_seq is None:
@@ -4494,6 +4517,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         value. It ignores passive cash and thus it will return the same numbers irrespective of the amount of
         cash currently available, even `np.inf`. The scale of returns is comparable to that of going
         all in and keeping available cash at zero."""
+        engine = engine if engine is not None else self.engine
         cash_flow = to_2d_array(self.cash_flow(group_by=group_by))
         asset_value = to_2d_array(self.asset_value(group_by=group_by))
         asset_returns = dispatch.asset_returns(cash_flow, asset_value, engine=engine)
@@ -4574,6 +4598,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         !!! note
             Does not take into account fees and slippage. For this, create a separate portfolio."""
+        engine = engine if engine is not None else self.engine
         if self.fillna_close:
             close = to_2d_array(self.get_filled_close())
         else:
@@ -4592,6 +4617,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None
     ) -> tp.SeriesFrame:
         """Get return series per column/group based on benchmark value."""
+        engine = engine if engine is not None else self.engine
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         benchmark_returns = returns_dispatch.returns(benchmark_value, init_cash, engine=engine)
@@ -4607,6 +4633,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         engine: tp.Optional[str] = None,
     ) -> tp.MaybeSeries:
         """Get total benchmark return."""
+        engine = engine if engine is not None else self.engine
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
         total_benchmark_return = dispatch.total_benchmark_return(benchmark_value, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_benchmark_return"), wrap_kwargs)

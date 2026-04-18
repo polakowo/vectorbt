@@ -438,6 +438,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         idx_arr: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
         col_mapper: tp.Optional[ColumnMapper] = None,
+        engine: tp.Optional[str] = None,
         **kwargs,
     ) -> None:
         Wrapping.__init__(
@@ -449,6 +450,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=col_mapper,
+            engine=engine,
             **kwargs,
         )
         StatsBuilderMixin.__init__(self)
@@ -476,9 +478,15 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         self._col_arr = col_arr
         self._idx_arr = idx_arr
         self._mapping = mapping
+        self._engine = engine
         if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, col_arr)
+            col_mapper = ColumnMapper(wrapper, col_arr, engine=engine)
         self._col_mapper = col_mapper
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     def replace(self: MappedArrayT, **kwargs) -> MappedArrayT:
         """See `vectorbt.utils.config.Configured.replace`.
@@ -500,7 +508,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             column_only_select=True,
             **kwargs,
         )
-        new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
+        new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs, engine=self.engine)
         new_mapped_arr = self.values[new_indices]
         new_id_arr = self.id_arr[new_indices]
         if self.idx_arr is not None:
@@ -566,6 +574,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     @cached_method
     def is_sorted(self, incl_id: bool = False, engine: tp.Optional[str] = None) -> bool:
         """Check whether mapped array is sorted."""
+        engine = engine if engine is not None else self.engine
         if incl_id:
             return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr, engine=engine)
         return dispatch.is_col_sorted(self.col_arr, engine=engine)
@@ -575,14 +584,16 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         incl_id: bool = False,
         idx_arr: tp.Optional[tp.Array1d] = None,
         group_by: tp.GroupByLike = None,
+        engine: tp.Optional[str] = None,
         **kwargs,
     ) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional).
 
         `**kwargs` are passed to `MappedArray.replace`."""
+        engine = engine if engine is not None else self.engine
         if idx_arr is None:
             idx_arr = self.idx_arr
-        if self.is_sorted(incl_id=incl_id):
+        if self.is_sorted(incl_id=incl_id, engine=engine):
             return self.replace(idx_arr=idx_arr, **kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
@@ -629,6 +640,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         self, n: int, group_by: tp.GroupByLike = None, engine: tp.Optional[str] = None, **kwargs
     ) -> tp.Array1d:
         """Return mask of top N elements in each column/group."""
+        engine = engine if engine is not None else self.engine
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         return dispatch.top_n_mapped_mask(self.values, col_map, n, engine=engine)
 
@@ -637,6 +649,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         self, n: int, group_by: tp.GroupByLike = None, engine: tp.Optional[str] = None, **kwargs
     ) -> tp.Array1d:
         """Return mask of bottom N elements in each column/group."""
+        engine = engine if engine is not None else self.engine
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         return dispatch.bottom_n_mapped_mask(self.values, col_map, n, engine=engine)
 
@@ -655,6 +668,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None, engine: tp.Optional[str] = None
     ) -> bool:
         """See `vectorbt.records.nb.is_mapped_expandable_nb`."""
+        engine = engine if engine is not None else self.engine
         if idx_arr is None:
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
@@ -684,6 +698,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         !!! warning
             Mapped arrays represent information in the most memory-friendly format.
             Mapping back to pandas may occupy lots of memory if records are sparse."""
+        engine = engine if engine is not None else self.engine
         if ignore_index:
             if self.wrapper.ndim == 1:
                 return self.wrapper.wrap(
@@ -704,7 +719,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        if not self.is_expandable(idx_arr=idx_arr, group_by=group_by):
+        if not self.is_expandable(idx_arr=idx_arr, group_by=group_by, engine=engine):
             raise ValueError("Multiple values are pointing to the same position. Use ignore_index.")
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
@@ -1016,6 +1031,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
         !!! note
             Does not take into account missing values."""
+        engine = engine if engine is not None else self.engine
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):

@@ -49,6 +49,8 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                 wrap_kwargs: tp.KwargsLike = None,
                 **kwargs,
             ) -> tp.SeriesFrame:
+                if "engine" not in kwargs and "engine" in inspect.signature(_func).parameters:
+                    kwargs["engine"] = getattr(self, "engine", None)
                 args = (self.to_2d_array(),) + args
                 inspect.signature(_func).bind(*args, **kwargs)
 

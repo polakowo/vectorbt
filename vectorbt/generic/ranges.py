@@ -234,7 +234,7 @@ class Ranges(Records):
                 gap_value = np.nan
         records_arr = dispatch.find_ranges(ts_arr, gap_value, engine=engine)
         wrapper = ArrayWrapper.from_obj(ts_pd, **wrapper_kwargs)
-        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
+        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, engine=engine, **kwargs)
 
     @property
     def ts(self) -> tp.Optional[tp.SeriesFrame]:
@@ -250,6 +250,7 @@ class Ranges(Records):
         """Convert ranges to a mask.
 
         See `vectorbt.generic.dispatch.ranges_to_mask`."""
+        engine = engine if engine is not None else self.engine
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         mask = dispatch.ranges_to_mask(
             self.get_field_arr("start_idx"),
@@ -268,6 +269,7 @@ class Ranges(Records):
             self.get_field_arr("start_idx"),
             self.get_field_arr("end_idx"),
             self.get_field_arr("status"),
+            engine=self.engine,
         )
         return self.map_array(duration)
 
@@ -305,6 +307,7 @@ class Ranges(Records):
         """Coverage, that is, the number of steps that are covered by all ranges.
 
         See `vectorbt.generic.dispatch.range_coverage`."""
+        engine = engine if engine is not None else self.engine
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         index_lens = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         coverage = dispatch.range_coverage(

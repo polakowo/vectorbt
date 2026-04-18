@@ -1404,7 +1404,7 @@ class EntryTrades(Trades):
         trade_records_arr = dispatch.get_entry_trades(
             orders.values, to_2d_array(close), orders.col_mapper.col_map, engine=engine
         )
-        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, engine=engine, **kwargs)
 
 
 # ############# ExitTrades ############# #
@@ -1443,7 +1443,7 @@ class ExitTrades(Trades):
         trade_records_arr = dispatch.get_exit_trades(
             orders.values, to_2d_array(close), orders.col_mapper.col_map, engine=engine
         )
-        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, engine=engine, **kwargs)
 
 
 # ############# Positions ############# #
@@ -1488,4 +1488,4 @@ class Positions(Trades):
         if close is None:
             close = trades.close
         position_records_arr = dispatch.get_positions(trades.values, trades.col_mapper.col_map, engine=engine)
-        return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)
+        return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, engine=engine, **kwargs)
