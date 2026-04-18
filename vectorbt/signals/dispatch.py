@@ -134,6 +134,11 @@ def generate_rand(
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_nb
+
+        return generate_rand_nb(shape, n, seed=seed)
     eng = resolve_engine(
         engine,
         supports_rust=non_neg_array_compatible_with_rust("n", n),
@@ -156,6 +161,11 @@ def generate_rand_by_prob(
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_by_prob_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_by_prob_nb
+
+        return generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
     eng = resolve_engine(
         engine,
         supports_rust=array_compatible_with_rust(prob, dtype=np.float64),
@@ -178,6 +188,11 @@ def generate_rand_ex(
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_ex_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_ex_nb
+
+        return generate_rand_ex_nb(entries, wait, until_next, skip_until_exit, seed=seed)
     eng = resolve_engine(
         engine,
         supports_rust=array_compatible_with_rust(entries, dtype=np.bool_),
@@ -202,6 +217,19 @@ def generate_rand_ex_by_prob(
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_ex_by_prob_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_ex_by_prob_nb
+
+        return generate_rand_ex_by_prob_nb(
+            entries,
+            prob,
+            wait,
+            until_next,
+            skip_until_exit,
+            flex_2d,
+            seed=seed,
+        )
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
@@ -243,6 +271,11 @@ def generate_rand_enex(
     engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_enex_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_enex_nb
+
+        return generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
     eng = resolve_engine(
         engine,
         supports_rust=non_neg_array_compatible_with_rust("n", n),
@@ -269,6 +302,21 @@ def generate_rand_enex_by_prob(
     engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Engine-neutral `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.signals.nb import generate_rand_enex_by_prob_nb
+
+        return generate_rand_enex_by_prob_nb(
+            shape,
+            entry_prob,
+            exit_prob,
+            entry_wait,
+            exit_wait,
+            entry_pick_first,
+            exit_pick_first,
+            flex_2d,
+            seed=seed,
+        )
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(

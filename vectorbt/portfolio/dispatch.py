@@ -14,6 +14,7 @@ from vectorbt._engine import (
     flex_broadcast_to_shape,
     non_neg_int_compatible_with_rust,
     resolve_engine,
+    resolve_random_engine,
     scalar_compatible_with_rust,
 )
 from vectorbt.records.dispatch import record_array_compatible_with_rust
@@ -310,8 +311,17 @@ def raise_rejected_order(order_result, engine: tp.Optional[str] = None):
     """Engine-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
     eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
-        from vectorbt_rust.portfolio import raise_rejected_order_rs
+        from vectorbt_rust.portfolio import OrderResult as RustOrderResult, raise_rejected_order_rs
 
+        if not isinstance(order_result, RustOrderResult):
+            order_result = RustOrderResult(
+                order_result.size,
+                order_result.price,
+                order_result.fees,
+                order_result.side,
+                order_result.status,
+                order_result.status_info,
+            )
         return raise_rejected_order_rs(order_result)
     from vectorbt.portfolio.nb import raise_rejected_order_nb
 
@@ -382,6 +392,12 @@ def build_call_seq(
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.portfolio.nb.build_call_seq_nb`."""
+    if call_seq_type == 2:
+        eng = resolve_random_engine(engine)
+        if eng == "numba":
+            from vectorbt.portfolio.nb import build_call_seq_nb
+
+            return build_call_seq_nb(target_shape, group_lens, call_seq_type)
     eng = resolve_engine(
         engine,
         supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
@@ -402,6 +418,11 @@ def shuffle_call_seq(
     engine: tp.Optional[str] = None,
 ) -> None:
     """Engine-neutral `vectorbt.portfolio.nb.shuffle_call_seq_nb`."""
+    eng = resolve_random_engine(engine)
+    if eng == "numba":
+        from vectorbt.portfolio.nb import shuffle_call_seq_nb
+
+        return shuffle_call_seq_nb(call_seq, group_lens)
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
@@ -500,6 +521,40 @@ def simulate_from_orders(
     engine: tp.Optional[str] = None,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Engine-neutral `vectorbt.portfolio.nb.simulate_from_orders_nb`."""
+    if np.any(np.asarray(reject_prob) > 0):
+        eng = resolve_random_engine(engine)
+        if eng == "numba":
+            from vectorbt.portfolio.nb import simulate_from_orders_nb
+
+            return simulate_from_orders_nb(
+                target_shape,
+                group_lens,
+                init_cash,
+                call_seq,
+                size,
+                price,
+                size_type,
+                direction,
+                fees,
+                fixed_fees,
+                slippage,
+                min_size,
+                max_size,
+                size_granularity,
+                reject_prob,
+                lock_cash,
+                allow_partial,
+                raise_reject,
+                log,
+                val_price,
+                close,
+                auto_call_seq=auto_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=flex_2d,
+            )
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
@@ -791,7 +846,7 @@ def init_cash_grouped(
     return init_cash_grouped_nb(init_cash, group_lens, cash_sharing)
 
 
-def init_cash_fn(
+def init_cash(
     init_cash: tp.Array1d,
     group_lens: tp.Array1d,
     cash_sharing: bool,

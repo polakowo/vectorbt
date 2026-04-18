@@ -2,13 +2,12 @@
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 #[allow(dead_code)]
-
 use ndarray::Array2;
 use numpy::{
     Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2,
     PyUntypedArrayMethods,
 };
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
@@ -31,8 +30,8 @@ fn usize_to_mut_ptr(v: usize) -> *mut u8 {
     v as *mut u8
 }
 
-use crate::generic::{array1_as_slice_cow, array2_as_slice_cow, validate_group_lens};
-use crate::records::{array_raw_parts, numpy_empty, record_col_offset, AsArrayPtr};
+use crate::generic::{array1_as_slice_cow, array2_as_slice_cow};
+use crate::records::{array_raw_parts, numpy_empty};
 
 // ############# Math utilities ############# //
 
@@ -285,15 +284,15 @@ const NO_ORDER: Order = Order {
     price: f64::NAN,
     size_type: -1,
     direction: -1,
-    fees: 0.0,
-    fixed_fees: 0.0,
-    slippage: 0.0,
-    min_size: 0.0,
-    max_size: f64::INFINITY,
+    fees: f64::NAN,
+    fixed_fees: f64::NAN,
+    slippage: f64::NAN,
+    min_size: f64::NAN,
+    max_size: f64::NAN,
     size_granularity: f64::NAN,
-    reject_prob: 0.0,
+    reject_prob: f64::NAN,
     lock_cash: false,
-    allow_partial: true,
+    allow_partial: false,
     raise_reject: false,
     log: false,
 };
@@ -487,6 +486,33 @@ unsafe impl Element for TradeRecord {
 
 // ############# Helpers for record field access ############# //
 
+enum PortfolioSimError {
+    RejectedOrder(&'static str),
+    OrderRecordsOutOfRange,
+    LogRecordsOutOfRange,
+}
+
+fn portfolio_sim_error_to_pyerr(py: Python<'_>, err: PortfolioSimError) -> PyErr {
+    match err {
+        PortfolioSimError::RejectedOrder(msg) => {
+            match py
+                .import_bound("vectorbt.portfolio.enums")
+                .and_then(|m| m.getattr("RejectedOrderError"))
+                .and_then(|exc_type| exc_type.call1((msg,)))
+            {
+                Ok(exc) => PyErr::from_value_bound(exc),
+                Err(_) => PyValueError::new_err(msg),
+            }
+        }
+        PortfolioSimError::OrderRecordsOutOfRange => {
+            PyIndexError::new_err("order_records index out of range. Set a higher max_orders.")
+        }
+        PortfolioSimError::LogRecordsOutOfRange => {
+            PyIndexError::new_err("log_records index out of range. Set a higher max_logs.")
+        }
+    }
+}
+
 struct RecordFieldOffsets {
     id: usize,
     col: usize,
@@ -623,11 +649,20 @@ fn log_record_offsets(records: &Bound<'_, pyo3::PyAny>) -> PyResult<LogFieldOffs
         req_slippage: fields.get_item("req_slippage")?.get_item(1)?.extract()?,
         req_min_size: fields.get_item("req_min_size")?.get_item(1)?.extract()?,
         req_max_size: fields.get_item("req_max_size")?.get_item(1)?.extract()?,
-        req_size_granularity: fields.get_item("req_size_granularity")?.get_item(1)?.extract()?,
+        req_size_granularity: fields
+            .get_item("req_size_granularity")?
+            .get_item(1)?
+            .extract()?,
         req_reject_prob: fields.get_item("req_reject_prob")?.get_item(1)?.extract()?,
         req_lock_cash: fields.get_item("req_lock_cash")?.get_item(1)?.extract()?,
-        req_allow_partial: fields.get_item("req_allow_partial")?.get_item(1)?.extract()?,
-        req_raise_reject: fields.get_item("req_raise_reject")?.get_item(1)?.extract()?,
+        req_allow_partial: fields
+            .get_item("req_allow_partial")?
+            .get_item(1)?
+            .extract()?,
+        req_raise_reject: fields
+            .get_item("req_raise_reject")?
+            .get_item(1)?
+            .extract()?,
         req_log: fields.get_item("req_log")?.get_item(1)?.extract()?,
         new_cash: fields.get_item("new_cash")?.get_item(1)?.extract()?,
         new_position: fields.get_item("new_position")?.get_item(1)?.extract()?,
@@ -700,10 +735,11 @@ fn buy(
         if exec_state.position >= 0.0 {
             exec_state.free_cash
         } else {
-            let cover_req_cash =
-                exec_state.position.abs() * adj_price * (1.0 + fees) + fixed_fees;
-            let cover_free_cash =
-                add(exec_state.free_cash + 2.0 * exec_state.debt, -cover_req_cash);
+            let cover_req_cash = exec_state.position.abs() * adj_price * (1.0 + fees) + fixed_fees;
+            let cover_free_cash = add(
+                exec_state.free_cash + 2.0 * exec_state.debt,
+                -cover_req_cash,
+            );
             if cover_free_cash > 0.0 {
                 exec_state.free_cash + 2.0 * exec_state.debt
             } else if cover_free_cash < 0.0 {
@@ -813,7 +849,10 @@ fn buy(
     if is_less(final_size, min_size) {
         return (
             exec_state,
-            order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED),
+            order_not_filled(
+                ORDER_STATUS_REJECTED,
+                ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
+            ),
         );
     }
 
@@ -969,7 +1008,10 @@ fn sell(
     if is_less(size_limit, min_size) {
         return (
             exec_state,
-            order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED),
+            order_not_filled(
+                ORDER_STATUS_REJECTED,
+                ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
+            ),
         );
     }
 
@@ -1170,11 +1212,6 @@ fn execute_order(
     }
 
     if order_size_type == SIZE_TYPE_VALUE || order_size_type == SIZE_TYPE_TARGET_VALUE {
-        assert!(
-            val_price.is_finite() || val_price <= 0.0 || val_price.is_infinite(),
-            // The Python code checks: if np.isinf(val_price) or val_price <= 0 -> raise
-            // and if np.isnan(val_price) -> ignore
-        );
         if val_price.is_nan() {
             return (
                 exec_state,
@@ -1286,7 +1323,13 @@ fn update_value(
 
 /// Fill an order record into a pre-allocated OrderRecord buffer.
 #[inline]
-fn fill_order_record(records: &mut [OrderRecord], idx: usize, i: i64, col: i64, order_result: &OrderResult) {
+fn fill_order_record(
+    records: &mut [OrderRecord],
+    idx: usize,
+    i: i64,
+    col: i64,
+    order_result: &OrderResult,
+) {
     records[idx] = OrderRecord {
         id: idx as i64,
         col,
@@ -1368,15 +1411,17 @@ fn process_order(
     do_update_value: bool,
     order: &Order,
     order_records: &mut Vec<OrderRecord>,
-    log_data: Option<(*mut u8, &LogFieldOffsets)>,
+    log_data: Option<(*mut u8, &LogFieldOffsets, usize)>,
     rng: &mut impl Rng,
-) -> (OrderResult, ProcessOrderState) {
+) -> Result<(OrderResult, ProcessOrderState), PortfolioSimError> {
     let (exec_state, order_result) = execute_order(state, order, rng);
 
     // Raise if rejected
     let is_rejected = order_result.status == ORDER_STATUS_REJECTED;
     if is_rejected && order.raise_reject {
-        raise_rejected_order_panic(&order_result);
+        return Err(PortfolioSimError::RejectedOrder(rejected_order_message(
+            &order_result,
+        )));
     }
 
     // Update value
@@ -1399,7 +1444,7 @@ fn process_order(
     if is_filled {
         let oidx = state.oidx as usize;
         if oidx >= order_records.capacity() {
-            panic!("order_records index out of range. Set a higher max_orders.");
+            return Err(PortfolioSimError::OrderRecordsOutOfRange);
         }
         if oidx >= order_records.len() {
             order_records.push(OrderRecord {
@@ -1418,8 +1463,11 @@ fn process_order(
 
     let mut new_lidx = state.lidx;
     if order.log {
-        if let Some((log_ptr, log_offsets)) = log_data {
+        if let Some((log_ptr, log_offsets, log_capacity)) = log_data {
             let lidx = state.lidx as usize;
+            if lidx >= log_capacity {
+                return Err(PortfolioSimError::LogRecordsOutOfRange);
+            }
             unsafe {
                 fill_log_record_raw(
                     log_ptr,
@@ -1455,11 +1503,11 @@ fn process_order(
         lidx: new_lidx,
     };
 
-    (order_result, new_state)
+    Ok((order_result, new_state))
 }
 
-fn raise_rejected_order_panic(order_result: &OrderResult) {
-    let msg = match order_result.status_info {
+fn rejected_order_message(order_result: &OrderResult) -> &'static str {
+    match order_result.status_info {
         ORDER_STATUS_INFO_SIZE_NAN => "Size is NaN",
         ORDER_STATUS_INFO_PRICE_NAN => "Price is NaN",
         ORDER_STATUS_INFO_VAL_PRICE_NAN => "Asset valuation price is NaN",
@@ -1475,8 +1523,7 @@ fn raise_rejected_order_panic(order_result: &OrderResult) {
         ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED => "Final size is less than minimum allowed",
         ORDER_STATUS_INFO_PARTIAL_FILL => "Final size is less than requested",
         _ => "Rejected order",
-    };
-    panic!("{}", msg);
+    }
 }
 
 // ############# Approximate order value ############# //
@@ -1491,24 +1538,32 @@ fn approx_order_value(
     val_price: f64,
     value: f64,
 ) -> f64 {
-    let mut order_value;
-    if size_type == SIZE_TYPE_AMOUNT {
-        order_value = size * val_price;
-    } else if size_type == SIZE_TYPE_VALUE {
-        order_value = size;
-    } else if size_type == SIZE_TYPE_PERCENT {
-        order_value = size * free_cash;
-    } else if size_type == SIZE_TYPE_TARGET_AMOUNT {
-        order_value = size * val_price - position * val_price;
-    } else if size_type == SIZE_TYPE_TARGET_VALUE {
-        order_value = size - position * val_price;
-    } else if size_type == SIZE_TYPE_TARGET_PERCENT {
-        order_value = size * value - position * val_price;
-    } else {
-        order_value = 0.0;
-    }
+    let order_value;
+    let asset_value_now = position * val_price;
+    let mut size_now = size;
     if direction == DIRECTION_SHORT_ONLY {
-        order_value *= -1.0;
+        size_now *= -1.0;
+    }
+    if size_type == SIZE_TYPE_AMOUNT {
+        order_value = size_now * val_price;
+    } else if size_type == SIZE_TYPE_VALUE {
+        order_value = size_now;
+    } else if size_type == SIZE_TYPE_PERCENT {
+        if size_now >= 0.0 {
+            order_value = size_now * cash_now;
+        } else if direction == DIRECTION_LONG_ONLY {
+            order_value = size_now * asset_value_now;
+        } else {
+            order_value = size_now * (2.0 * asset_value_now.max(0.0) + free_cash.max(0.0));
+        }
+    } else if size_type == SIZE_TYPE_TARGET_AMOUNT {
+        order_value = size_now * val_price - asset_value_now;
+    } else if size_type == SIZE_TYPE_TARGET_VALUE {
+        order_value = size_now - asset_value_now;
+    } else if size_type == SIZE_TYPE_TARGET_PERCENT {
+        order_value = size_now * value - asset_value_now;
+    } else {
+        order_value = f64::NAN;
     }
     order_value
 }
@@ -1639,7 +1694,10 @@ pub fn sell_py(
 
 #[pyfunction]
 #[pyo3(name = "execute_order_rs")]
-pub fn execute_order_py(state: ProcessOrderState, order: Order) -> (ExecuteOrderState, OrderResult) {
+pub fn execute_order_py(
+    state: ProcessOrderState,
+    order: Order,
+) -> (ExecuteOrderState, OrderResult) {
     let mut rng = rand::thread_rng();
     execute_order(&state, &order, &mut rng)
 }
@@ -1752,9 +1810,9 @@ pub fn close_position_py(
     log: bool,
 ) -> Order {
     Order {
-        size: f64::INFINITY,
+        size: 0.0,
         price,
-        size_type: SIZE_TYPE_AMOUNT,
+        size_type: SIZE_TYPE_TARGET_AMOUNT,
         direction: DIRECTION_BOTH,
         fees,
         fixed_fees,
@@ -1778,25 +1836,11 @@ pub fn order_nothing_py() -> Order {
 
 #[pyfunction]
 #[pyo3(name = "raise_rejected_order_rs")]
-pub fn raise_rejected_order_py(order_result: OrderResult) -> PyResult<()> {
-    let msg = match order_result.status_info {
-        ORDER_STATUS_INFO_SIZE_NAN => "Size is NaN",
-        ORDER_STATUS_INFO_PRICE_NAN => "Price is NaN",
-        ORDER_STATUS_INFO_VAL_PRICE_NAN => "Asset valuation price is NaN",
-        ORDER_STATUS_INFO_VALUE_NAN => "Asset/group value is NaN",
-        ORDER_STATUS_INFO_VALUE_ZERO_NEG => "Asset/group value is zero or negative",
-        ORDER_STATUS_INFO_SIZE_ZERO => "Size is zero",
-        ORDER_STATUS_INFO_NO_CASH_SHORT => "Not enough cash to short",
-        ORDER_STATUS_INFO_NO_CASH_LONG => "Not enough cash to long",
-        ORDER_STATUS_INFO_NO_OPEN_POSITION => "No open position to reduce/close",
-        ORDER_STATUS_INFO_MAX_SIZE_EXCEEDED => "Size is greater than maximum allowed",
-        ORDER_STATUS_INFO_RANDOM_EVENT => "Random event happened",
-        ORDER_STATUS_INFO_CANT_COVER_FEES => "Not enough cash to cover fees",
-        ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED => "Final size is less than minimum allowed",
-        ORDER_STATUS_INFO_PARTIAL_FILL => "Final size is less than requested",
-        _ => "Rejected order",
-    };
-    Err(PyValueError::new_err(msg))
+pub fn raise_rejected_order_py(py: Python<'_>, order_result: OrderResult) -> PyResult<()> {
+    Err(portfolio_sim_error_to_pyerr(
+        py,
+        PortfolioSimError::RejectedOrder(rejected_order_message(&order_result)),
+    ))
 }
 
 // ############# PyO3 exports: Validation & call sequence ############# //
@@ -1862,7 +1906,9 @@ pub fn approx_order_value_py(
     val_price: f64,
     value: f64,
 ) -> f64 {
-    approx_order_value(size, size_type, direction, cash_now, position, free_cash, val_price, value)
+    approx_order_value(
+        size, size_type, direction, cash_now, position, free_cash, val_price, value,
+    )
 }
 
 #[pyfunction]
@@ -1890,28 +1936,38 @@ pub fn build_call_seq_py<'py>(
     let gl = array1_as_slice_cow(&group_lens);
     let (nrows, ncols) = target_shape;
 
-    let result = py.allow_threads(|| {
-        let gl_usize = validate_group_lens_raw(&gl)?;
-        let mut out = vec![0i64; nrows * ncols];
-        let mut from_col: usize = 0;
-        for group in 0..gl_usize.len() {
-            let group_len = gl_usize[group];
-            let to_col = from_col + group_len;
-            for i in 0..nrows {
-                for k in 0..group_len {
-                    let idx = i * ncols + from_col + k;
-                    if call_seq_type == CALL_SEQ_REVERSED {
-                        out[idx] = (group_len - 1 - k) as i64;
-                    } else {
-                        out[idx] = k as i64;
+    let result = py
+        .allow_threads(|| {
+            let gl_usize = validate_group_lens_raw(&gl)?;
+            let mut out = vec![0i64; nrows * ncols];
+            let mut rng = rand::thread_rng();
+            let mut from_col: usize = 0;
+            for group in 0..gl_usize.len() {
+                let group_len = gl_usize[group];
+                let to_col = from_col + group_len;
+                for i in 0..nrows {
+                    for k in 0..group_len {
+                        let idx = i * ncols + from_col + k;
+                        if call_seq_type == CALL_SEQ_REVERSED {
+                            out[idx] = (group_len - 1 - k) as i64;
+                        } else {
+                            out[idx] = k as i64;
+                        }
+                    }
+                    if call_seq_type == CALL_SEQ_RANDOM {
+                        let start = i * ncols + from_col;
+                        let slice = &mut out[start..start + group_len];
+                        for j in (1..slice.len()).rev() {
+                            let k = rng.gen_range(0..=j);
+                            slice.swap(j, k);
+                        }
                     }
                 }
+                from_col = to_col;
             }
-            from_col = to_col;
-        }
-        Ok::<_, String>(out)
-    })
-    .map_err(PyValueError::new_err)?;
+            Ok::<_, String>(out)
+        })
+        .map_err(PyValueError::new_err)?;
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -1931,9 +1987,9 @@ pub fn shuffle_call_seq_py<'py>(
     let nrows = call_seq.shape()[0];
     let ncols = call_seq.shape()[1];
 
-    let data = call_seq.as_slice_mut().map_err(|_| {
-        PyValueError::new_err("call_seq must be contiguous")
-    })?;
+    let data = call_seq
+        .as_slice_mut()
+        .map_err(|_| PyValueError::new_err("call_seq must be contiguous"))?;
 
     let mut rng: Box<dyn rand::RngCore> = match seed {
         Some(s) => Box::new(ChaCha8Rng::seed_from_u64(s)),
@@ -1981,7 +2037,14 @@ pub fn get_trade_stats_py(
     exit_fees: f64,
     direction: i64,
 ) -> (f64, f64) {
-    get_trade_stats(size, entry_price, entry_fees, exit_price, exit_fees, direction)
+    get_trade_stats(
+        size,
+        entry_price,
+        entry_fees,
+        exit_price,
+        exit_fees,
+        direction,
+    )
 }
 
 fn get_trade_stats(
@@ -2135,7 +2198,7 @@ pub fn simulate_from_orders_py<'py>(
     target_shape: (usize, usize),
     group_lens: PyReadonlyArray1<'py, i64>,
     init_cash: PyReadonlyArray1<'py, f64>,
-    call_seq: PyReadonlyArray2<'py, i64>,
+    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
     // Pre-broadcast 2D arrays
     size: PyReadonlyArray2<'py, f64>,
     price: PyReadonlyArray2<'py, f64>,
@@ -2166,7 +2229,14 @@ pub fn simulate_from_orders_py<'py>(
     // Extract slices
     let gl_cow = array1_as_slice_cow(&group_lens);
     let ic_cow = array1_as_slice_cow(&init_cash);
-    let cs_cow = array2_as_slice_cow(&call_seq);
+    let cs_cow = {
+        let cs_view = call_seq.as_array();
+        if cs_view.is_standard_layout() {
+            call_seq.as_slice()?.to_vec()
+        } else {
+            cs_view.iter().copied().collect()
+        }
+    };
     let size_cow = array2_as_slice_cow(&size);
     let price_cow = array2_as_slice_cow(&price);
     let st_cow = array2_as_slice_cow(&size_type);
@@ -2186,10 +2256,30 @@ pub fn simulate_from_orders_py<'py>(
     let close_cow = array2_as_slice_cow(&close);
 
     // Allocate log records via numpy (because of mixed types)
+    let cash_sharing = gl_cow.iter().any(|&g| g > 1);
+    let total_cols: i64 = gl_cow.iter().sum();
+    if total_cols != ncols as i64 {
+        return Err(PyValueError::new_err(
+            "group_lens has incorrect total number of columns",
+        ));
+    }
+    if cash_sharing {
+        if ic_cow.len() != gl_cow.len() {
+            return Err(PyValueError::new_err(
+                "If cash sharing is enabled, init_cash must match the number of groups",
+            ));
+        }
+    } else if ic_cow.len() != ncols {
+        return Err(PyValueError::new_err(
+            "If cash sharing is disabled, init_cash must match the number of columns",
+        ));
+    }
+
+    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
     let log_dt = py
         .import_bound("vectorbt.portfolio.enums")?
         .getattr("log_dt")?;
-    let log_arr = numpy_empty(py, max_logs, &log_dt)?;
+    let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
     let log_offsets = log_record_offsets(&log_arr)?;
     let (log_data, _log_itemsize, _) = unsafe { array_raw_parts(&log_arr)? };
     let log_data_usize = ptr_to_usize(log_data);
@@ -2197,46 +2287,60 @@ pub fn simulate_from_orders_py<'py>(
     let max_ord = max_orders.unwrap_or(nrows * ncols);
 
     // Run the simulation
-    let (order_records, lidx) = py.allow_threads(|| {
-        simulate_from_orders_inner(
-            nrows,
-            ncols,
-            gl_cow.as_ref(),
-            ic_cow.as_ref(),
-            cs_cow.as_ref(),
-            size_cow.as_ref(),
-            price_cow.as_ref(),
-            st_cow.as_ref(),
-            dir_cow.as_ref(),
-            fees_cow.as_ref(),
-            ff_cow.as_ref(),
-            slip_cow.as_ref(),
-            mins_cow.as_ref(),
-            maxs_cow.as_ref(),
-            sg_cow.as_ref(),
-            rp_cow.as_ref(),
-            lc_cow.as_ref(),
-            ap_cow.as_ref(),
-            rr_cow.as_ref(),
-            log_cow.as_ref(),
-            vp_cow.as_ref(),
-            close_cow.as_ref(),
-            auto_call_seq,
-            ffill_val_price,
-            update_value,
-            max_ord,
-            max_logs,
-            usize_to_mut_ptr(log_data_usize),
-            &log_offsets,
-            seed,
-        )
-    });
+    let (order_records, lidx, call_seq_out) = py
+        .allow_threads(|| {
+            simulate_from_orders_inner(
+                nrows,
+                ncols,
+                gl_cow.as_ref(),
+                ic_cow.as_ref(),
+                cs_cow.as_ref(),
+                size_cow.as_ref(),
+                price_cow.as_ref(),
+                st_cow.as_ref(),
+                dir_cow.as_ref(),
+                fees_cow.as_ref(),
+                ff_cow.as_ref(),
+                slip_cow.as_ref(),
+                mins_cow.as_ref(),
+                maxs_cow.as_ref(),
+                sg_cow.as_ref(),
+                rp_cow.as_ref(),
+                lc_cow.as_ref(),
+                ap_cow.as_ref(),
+                rr_cow.as_ref(),
+                log_cow.as_ref(),
+                vp_cow.as_ref(),
+                close_cow.as_ref(),
+                auto_call_seq,
+                ffill_val_price,
+                update_value,
+                max_ord,
+                effective_max_logs,
+                usize_to_mut_ptr(log_data_usize),
+                &log_offsets,
+                seed,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+
+    if auto_call_seq {
+        let mut cs_view = call_seq.as_array_mut();
+        for i in 0..nrows {
+            for col in 0..ncols {
+                cs_view[(i, col)] = call_seq_out[i * ncols + col];
+            }
+        }
+    }
 
     let order_arr = PyArray1::from_vec_bound(py, order_records);
 
     // Slice log array to actual count
-    let log_arr_sliced = if lidx < max_logs {
-        log_arr.call_method1("__getitem__", (pyo3::types::PySlice::new_bound(py, 0, lidx as isize, 1),))?
+    let log_arr_sliced = if lidx < effective_max_logs {
+        log_arr.call_method1(
+            "__getitem__",
+            (pyo3::types::PySlice::new_bound(py, 0, lidx as isize, 1),),
+        )?
     } else {
         log_arr
     };
@@ -2276,7 +2380,7 @@ fn simulate_from_orders_inner(
     log_data: *mut u8,
     log_offsets: &LogFieldOffsets,
     seed: Option<u64>,
-) -> (Vec<OrderRecord>, usize) {
+) -> Result<(Vec<OrderRecord>, usize, Vec<i64>), PortfolioSimError> {
     let mut rng = match seed {
         Some(s) => ChaCha8Rng::seed_from_u64(s),
         None => ChaCha8Rng::seed_from_u64(rand::random()),
@@ -2299,11 +2403,6 @@ fn simulate_from_orders_inner(
     for group in 0..group_lens.len() {
         let group_len = group_lens[group] as usize;
         let to_col = from_col + group_len;
-        let cash_sharing = group_len > 1
-            || (group_lens.len() > 1 && group_lens.iter().any(|&g| g > 1));
-        // Cash sharing is true when is_grouped is true (any group has > 1 column)
-        // But actually in simulate_from_orders_nb, cash_sharing = is_grouped_nb(group_lens)
-        // which checks if any group_len > 1.
         let cash_sharing_global = group_lens.iter().any(|&g| g > 1);
         let mut cash_now = init_cash[group];
         let mut free_cash_now = init_cash[group];
@@ -2384,10 +2483,7 @@ fn simulate_from_orders_inner(
                 let mut col = from_col + k;
                 if cash_sharing_global {
                     let col_i = call_seq_mut[i * ncols + col] as usize;
-                    assert!(
-                        col_i < group_len,
-                        "Call index exceeds bounds of the group"
-                    );
+                    assert!(col_i < group_len, "Call index exceeds bounds of the group");
                     col = from_col + col_i;
                 }
 
@@ -2432,7 +2528,7 @@ fn simulate_from_orders_inner(
                 };
 
                 let log_info = if max_logs > 0 {
-                    Some((log_data, log_offsets as &LogFieldOffsets))
+                    Some((log_data, log_offsets as &LogFieldOffsets, max_logs))
                 } else {
                     None
                 };
@@ -2447,7 +2543,7 @@ fn simulate_from_orders_inner(
                     &mut order_records,
                     log_info,
                     &mut rng,
-                );
+                )?;
 
                 cash_now = new_state.cash;
                 free_cash_now = new_state.free_cash;
@@ -2478,7 +2574,7 @@ fn simulate_from_orders_inner(
     }
 
     order_records.truncate(oidx as usize);
-    (order_records, lidx as usize)
+    Ok((order_records, lidx as usize, call_seq_mut))
 }
 
 // ############# Post-simulation: Asset flow ############# //
@@ -2502,7 +2598,13 @@ pub fn asset_flow_py<'py>(
 
     let result = py.allow_threads(|| {
         asset_flow_inner(
-            usize_to_ptr(src_send), &offsets, ci_cow.as_ref(), cl_cow.as_ref(), nrows, ncols, direction,
+            usize_to_ptr(src_send),
+            &offsets,
+            ci_cow.as_ref(),
+            cl_cow.as_ref(),
+            nrows,
+            ncols,
+            direction,
         )
     });
 
@@ -2614,7 +2716,13 @@ pub fn cash_flow_py<'py>(
 
     let result = py.allow_threads(|| {
         cash_flow_inner(
-            usize_to_ptr(src_send), &offsets, ci_cow.as_ref(), cl_cow.as_ref(), nrows, ncols, free,
+            usize_to_ptr(src_send),
+            &offsets,
+            ci_cow.as_ref(),
+            cl_cow.as_ref(),
+            nrows,
+            ncols,
+            free,
         )
     });
 
@@ -3120,7 +3228,11 @@ pub fn final_value_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let tp_cow = array1_as_slice_cow(&total_profit);
     let ic_cow = array1_as_slice_cow(&init_cash);
-    let out: Vec<f64> = tp_cow.iter().zip(ic_cow.iter()).map(|(t, i)| t + i).collect();
+    let out: Vec<f64> = tp_cow
+        .iter()
+        .zip(ic_cow.iter())
+        .map(|(t, i)| t + i)
+        .collect();
     Ok(PyArray1::from_vec_bound(py, out))
 }
 
@@ -3133,7 +3245,11 @@ pub fn total_return_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let tp_cow = array1_as_slice_cow(&total_profit);
     let ic_cow = array1_as_slice_cow(&init_cash);
-    let out: Vec<f64> = tp_cow.iter().zip(ic_cow.iter()).map(|(t, i)| t / i).collect();
+    let out: Vec<f64> = tp_cow
+        .iter()
+        .zip(ic_cow.iter())
+        .map(|(t, i)| t / i)
+        .collect();
     Ok(PyArray1::from_vec_bound(py, out))
 }
 
@@ -3340,8 +3456,14 @@ pub fn get_entry_trades_py<'py>(
 
     let trades = py.allow_threads(|| {
         get_entry_trades_inner(
-            usize_to_ptr(src_send), &offsets, ci_cow.as_ref(), cl_cow.as_ref(),
-            close_cow.as_ref(), nrows, ncols, n_records,
+            usize_to_ptr(src_send),
+            &offsets,
+            ci_cow.as_ref(),
+            cl_cow.as_ref(),
+            close_cow.as_ref(),
+            nrows,
+            ncols,
+            n_records,
         )
     });
 
@@ -3439,10 +3561,22 @@ fn get_entry_trades_inner(
                     exit_fees_sum += order_fees;
 
                     fill_entry_trades_in_position(
-                        src_data, offsets, col_idxs, &col_start_idxs,
-                        col, first_c, c, first_entry_size, first_entry_fees,
-                        order_idx, exit_size_sum, exit_gross_sum, exit_fees_sum,
-                        direction, TRADE_STATUS_CLOSED, parent_id,
+                        src_data,
+                        offsets,
+                        col_idxs,
+                        &col_start_idxs,
+                        col,
+                        first_c,
+                        c,
+                        first_entry_size,
+                        first_entry_fees,
+                        order_idx,
+                        exit_size_sum,
+                        exit_gross_sum,
+                        exit_fees_sum,
+                        direction,
+                        TRADE_STATUS_CLOSED,
+                        parent_id,
                         &mut records,
                     );
                 } else if is_less(exit_size_sum + order_size, entry_size_sum) {
@@ -3459,10 +3593,22 @@ fn get_entry_trades_inner(
                     exit_fees_sum += remaining_size / order_size * order_fees;
 
                     fill_entry_trades_in_position(
-                        src_data, offsets, col_idxs, &col_start_idxs,
-                        col, first_c, c, first_entry_size, first_entry_fees,
-                        order_idx, exit_size_sum, exit_gross_sum, exit_fees_sum,
-                        direction, TRADE_STATUS_CLOSED, parent_id,
+                        src_data,
+                        offsets,
+                        col_idxs,
+                        &col_start_idxs,
+                        col,
+                        first_c,
+                        c,
+                        first_entry_size,
+                        first_entry_fees,
+                        order_idx,
+                        exit_size_sum,
+                        exit_gross_sum,
+                        exit_fees_sum,
+                        direction,
+                        TRADE_STATUS_CLOSED,
+                        parent_id,
                         &mut records,
                     );
 
@@ -3494,10 +3640,22 @@ fn get_entry_trades_inner(
             exit_gross_sum += remaining_size * close[(nrows - 1) * ncols + col];
 
             fill_entry_trades_in_position(
-                src_data, offsets, col_idxs, &col_start_idxs,
-                col, first_c, col_len - 1, first_entry_size, first_entry_fees,
-                (nrows - 1) as i64, exit_size_sum, exit_gross_sum, exit_fees_sum,
-                direction, TRADE_STATUS_OPEN, parent_id,
+                src_data,
+                offsets,
+                col_idxs,
+                &col_start_idxs,
+                col,
+                first_c,
+                col_len - 1,
+                first_entry_size,
+                first_entry_fees,
+                (nrows - 1) as i64,
+                exit_size_sum,
+                exit_gross_sum,
+                exit_fees_sum,
+                direction,
+                TRADE_STATUS_OPEN,
+                parent_id,
                 &mut records,
             );
         }
@@ -3552,7 +3710,14 @@ fn fill_entry_trades_in_position(
         let entry_price = unsafe { *(base.add(offsets.price) as *const f64) };
         let entry_idx = unsafe { *(base.add(offsets.idx) as *const i64) };
 
-        let (pnl, ret) = get_trade_stats(entry_size, entry_price, entry_fees, exit_price, exit_fees, direction);
+        let (pnl, ret) = get_trade_stats(
+            entry_size,
+            entry_price,
+            entry_fees,
+            exit_price,
+            exit_fees,
+            direction,
+        );
         let tidx = records.len();
         records.push(TradeRecord {
             id: tidx as i64,
@@ -3593,8 +3758,14 @@ pub fn get_exit_trades_py<'py>(
 
     let trades = py.allow_threads(|| {
         get_exit_trades_inner(
-            usize_to_ptr(src_send), &offsets, ci_cow.as_ref(), cl_cow.as_ref(),
-            close_cow.as_ref(), nrows, ncols, n_records,
+            usize_to_ptr(src_send),
+            &offsets,
+            ci_cow.as_ref(),
+            cl_cow.as_ref(),
+            close_cow.as_ref(),
+            nrows,
+            ncols,
+            n_records,
         )
     });
 
@@ -3689,7 +3860,12 @@ fn get_exit_trades_inner(
                     let entry_fees = size_fraction * entry_fees_sum;
 
                     let (pnl, ret) = get_trade_stats(
-                        exit_size, entry_price, entry_fees, exit_price, exit_fees, direction,
+                        exit_size,
+                        entry_price,
+                        entry_fees,
+                        exit_price,
+                        exit_fees,
+                        direction,
                     );
 
                     let tidx = records.len();
@@ -3730,7 +3906,12 @@ fn get_exit_trades_inner(
                     let entry_fees = size_fraction * entry_fees_sum;
 
                     let (pnl, ret) = get_trade_stats(
-                        cl_exit_size, entry_price, entry_fees, cl_exit_price, cl_exit_fees, direction,
+                        cl_exit_size,
+                        entry_price,
+                        entry_fees,
+                        cl_exit_price,
+                        cl_exit_fees,
+                        direction,
                     );
 
                     let tidx = records.len();
@@ -3777,7 +3958,12 @@ fn get_exit_trades_inner(
             let entry_fees = size_fraction * entry_fees_sum;
 
             let (pnl, ret) = get_trade_stats(
-                exit_size, entry_price, entry_fees, exit_price, exit_fees, direction,
+                exit_size,
+                entry_price,
+                entry_fees,
+                exit_price,
+                exit_fees,
+                direction,
             );
 
             let tidx = records.len();
@@ -3878,7 +4064,13 @@ pub fn get_positions_py<'py>(
     let cl_cow = array1_as_slice_cow(&col_lens);
 
     let positions = py.allow_threads(|| {
-        get_positions_inner(usize_to_ptr(src_send), &toffsets, ci_cow.as_ref(), cl_cow.as_ref(), n_records)
+        get_positions_inner(
+            usize_to_ptr(src_send),
+            &toffsets,
+            ci_cow.as_ref(),
+            cl_cow.as_ref(),
+            n_records,
+        )
     });
 
     Ok(PyArray1::from_vec_bound(py, positions))
@@ -3924,8 +4116,15 @@ fn get_positions_inner(
                     // Aggregate trades from from_tidx to tidx
                     let pidx = records.len();
                     let pos = aggregate_position(
-                        src_data, offsets, col_idxs, col_start_idxs[col] as usize,
-                        from_tidx, c, col, pidx, n_records,
+                        src_data,
+                        offsets,
+                        col_idxs,
+                        col_start_idxs[col] as usize,
+                        from_tidx,
+                        c,
+                        col,
+                        pidx,
+                        n_records,
                     );
                     records.push(pos);
                 }
@@ -3938,8 +4137,15 @@ fn get_positions_inner(
         let pidx = records.len();
         let last_tidx_c = col_len;
         let pos = aggregate_position(
-            src_data, offsets, col_idxs, col_start_idxs[col] as usize,
-            from_tidx, last_tidx_c, col, pidx, n_records,
+            src_data,
+            offsets,
+            col_idxs,
+            col_start_idxs[col] as usize,
+            from_tidx,
+            last_tidx_c,
+            col,
+            pidx,
+            n_records,
         );
         records.push(pos);
     }
@@ -4009,7 +4215,14 @@ fn aggregate_position(
 
     let entry_price = weighted_entry_price / total_size;
     let exit_price = weighted_exit_price / total_size;
-    let (pnl, ret) = get_trade_stats(total_size, entry_price, total_entry_fees, exit_price, total_exit_fees, direction);
+    let (pnl, ret) = get_trade_stats(
+        total_size,
+        entry_price,
+        total_entry_fees,
+        exit_price,
+        total_exit_fees,
+        direction,
+    );
 
     TradeRecord {
         id: pidx as i64,

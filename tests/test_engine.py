@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -19,6 +22,7 @@ from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
 from vectorbt.portfolio import dispatch as portfolio_dispatch
 from vectorbt.portfolio import nb as portfolio_nb
+from vectorbt.portfolio.enums import CallSeqType, Direction, OrderResult, OrderStatusInfo, RejectedOrderError, SizeType
 
 
 def teardown_module():
@@ -27,6 +31,38 @@ def teardown_module():
 
 
 class TestEngineResolution:
+    def test_rust_exports_with_numba_counterparts_have_dispatch_functions(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        modules = ("generic", "indicators", "labels", "portfolio", "records", "returns", "signals")
+
+        missing_dispatch = []
+        for module in modules:
+            rust_text = (repo_root / "rust" / "src" / f"{module}.rs").read_text()
+            nb_text = (repo_root / "vectorbt" / module / "nb.py").read_text()
+            dispatch_text = (repo_root / "vectorbt" / module / "dispatch.py").read_text()
+
+            nb_names = set(re.findall(r"^def (\w+)_nb\(", nb_text, flags=re.MULTILINE))
+            dispatch_names = set(re.findall(r"^def (\w+)\(", dispatch_text, flags=re.MULTILINE))
+
+            for match in re.finditer(r"wrap_pyfunction!\((\w+),\s*m\)", rust_text):
+                rust_ident = match.group(1)
+                fn_match = re.search(
+                    rf"((?:#\[[^\n]+\]\s*)*)pub fn {re.escape(rust_ident)}\b",
+                    rust_text,
+                )
+                if fn_match is None:
+                    continue
+                attrs = fn_match.group(1)
+                name_match = re.search(r'#\[pyo3\(name\s*=\s*"([^"]+)"\)\]', attrs)
+                export_name = name_match.group(1) if name_match else rust_ident
+                if not export_name.endswith("_rs"):
+                    continue
+                base_name = export_name[:-3]
+                if base_name in nb_names and base_name not in dispatch_names:
+                    missing_dispatch.append(f"{module}.{base_name}")
+
+        assert missing_dispatch == []
+
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
         assert _engine.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported
@@ -442,6 +478,10 @@ class TestGenericRustParity:
         shuffled = dispatch.shuffle(identical, seed=42, engine="rust")
         assert any(not np.array_equal(shuffled[:, 0], shuffled[:, col]) for col in range(1, identical.shape[1]))
 
+    def test_dispatch_random_auto_uses_numba(self):
+        a = np.arange(12, dtype=np.float64).reshape(4, 3)
+        np.testing.assert_array_equal(dispatch.shuffle(a, seed=42, engine="auto"), nb.shuffle_nb(a, seed=42))
+
     def test_dispatch_auto_falls_back_for_unsupported_array(self):
         a = np.array([[1, 2], [3, 4]], dtype=np.int64)
 
@@ -781,6 +821,18 @@ class TestReturnsRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestSignalsRustParity:
+    def test_random_dispatch_auto_uses_numba_and_explicit_rust_is_allowed(self):
+        shape = (8, 2)
+        n = np.array([2, 3], dtype=np.int64)
+
+        auto = signal_dispatch.generate_rand(shape, n, seed=42, engine="auto")
+        numba = signal_nb.generate_rand_nb(shape, n, seed=42)
+        rust = signal_dispatch.generate_rand(shape, n, seed=42, engine="rust")
+
+        np.testing.assert_array_equal(auto, numba)
+        assert rust.shape == auto.shape
+        np.testing.assert_array_equal(rust.sum(axis=0), n)
+
     def test_dispatch_matches_numba_for_masks(self):
         entries = np.array(
             [
@@ -1776,6 +1828,154 @@ class TestPortfolioRustParity:
         for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
             np.testing.assert_allclose(or_rust[field], or_nb_res[field], err_msg=f"Mismatch in {field}")
 
+    def test_close_position_order_parity(self):
+        """close_position dispatch matches numba."""
+        rust = portfolio_dispatch.close_position(engine="rust")
+        numba = portfolio_nb.close_position_nb()
+        for field in numba._fields:
+            rust_value = getattr(rust, field)
+            numba_value = getattr(numba, field)
+            if isinstance(numba_value, float):
+                np.testing.assert_allclose(rust_value, numba_value, equal_nan=True)
+            else:
+                assert rust_value == numba_value
+
+    def test_order_nothing_parity(self):
+        """order_nothing dispatch matches numba."""
+        rust = portfolio_dispatch.order_nothing(engine="rust")
+        numba = portfolio_nb.order_nothing_nb()
+        for field in numba._fields:
+            rust_value = getattr(rust, field)
+            numba_value = getattr(numba, field)
+            if isinstance(numba_value, float):
+                np.testing.assert_allclose(rust_value, numba_value, equal_nan=True)
+            else:
+                assert rust_value == numba_value
+
+    def test_raise_rejected_order_exception_parity(self):
+        """raise_rejected_order dispatch raises the portfolio exception."""
+        order_result = OrderResult(
+            np.nan,
+            np.nan,
+            np.nan,
+            -1,
+            2,
+            OrderStatusInfo.PartialFill,
+        )
+        with pytest.raises(RejectedOrderError, match="Final size is less than requested"):
+            portfolio_dispatch.raise_rejected_order(order_result, engine="rust")
+
+    def test_approx_order_value_percent_parity(self):
+        """approx_order_value dispatch matches numba for percent orders."""
+        cases = [
+            (0.5, SizeType.Percent, Direction.Both, 100.0, 10.0, 80.0, 2.0, 120.0),
+            (-0.5, SizeType.Percent, Direction.Both, 100.0, 10.0, 80.0, 2.0, 120.0),
+            (0.5, SizeType.Percent, Direction.ShortOnly, 100.0, 10.0, 80.0, 2.0, 120.0),
+            (-0.5, SizeType.Percent, Direction.LongOnly, 100.0, 10.0, 80.0, 2.0, 120.0),
+        ]
+        for case in cases:
+            np.testing.assert_allclose(
+                portfolio_dispatch.approx_order_value(*case, engine="rust"),
+                portfolio_nb.approx_order_value_nb(*case),
+                err_msg=f"approx_order_value mismatch for {case}",
+            )
+
+    def test_simulate_from_orders_validates_group_lens(self):
+        """simulate_from_orders validates group_lens before Rust execution."""
+        with pytest.raises(ValueError, match="group_lens has incorrect total number of columns"):
+            portfolio_dispatch.simulate_from_orders(
+                (2, 2),
+                np.array([1], dtype=np.int64),
+                np.array([100.0], dtype=np.float64),
+                np.zeros((2, 2), dtype=np.int64),
+                close=np.ones((2, 2), dtype=np.float64),
+                max_orders=4,
+                engine="rust",
+            )
+
+    def test_simulate_from_orders_logs_with_zero_max_logs(self):
+        """simulate_from_orders keeps Numba max_logs=0 behavior."""
+        target_shape = (1, 1)
+        group_lens = np.array([1], dtype=np.int64)
+        init_cash = np.array([100.0], dtype=np.float64)
+        call_seq = np.zeros(target_shape, dtype=np.int64)
+        close = np.ones(target_shape, dtype=np.float64)
+        log = np.ones(target_shape, dtype=np.bool_)
+
+        rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
+            target_shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            log=log,
+            max_orders=1,
+            max_logs=0,
+            engine="rust",
+        )
+        numba_orders, numba_logs = portfolio_nb.simulate_from_orders_nb(
+            target_shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            log=log,
+            max_orders=1,
+            max_logs=0,
+        )
+        assert len(rust_orders) == len(numba_orders)
+        assert len(rust_logs) == len(numba_logs)
+        for field in numba_logs.dtype.names:
+            np.testing.assert_allclose(rust_logs[field], numba_logs[field], equal_nan=True, err_msg=field)
+
+    def test_simulate_from_orders_rust_raise_reject_exception(self):
+        """simulate_from_orders maps Rust rejected orders to RejectedOrderError."""
+        with pytest.raises(RejectedOrderError, match="Final size is less than requested"):
+            portfolio_dispatch.simulate_from_orders(
+                (1, 1),
+                np.array([1], dtype=np.int64),
+                np.array([100.0], dtype=np.float64),
+                np.zeros((1, 1), dtype=np.int64),
+                size=np.array([[1000.0]], dtype=np.float64),
+                close=np.array([[1.0]], dtype=np.float64),
+                allow_partial=np.array([[False]], dtype=np.bool_),
+                raise_reject=np.array([[True]], dtype=np.bool_),
+                max_orders=1,
+                max_logs=1,
+                engine="rust",
+            )
+
+    def test_simulate_from_orders_rust_max_orders_exception(self):
+        """simulate_from_orders maps Rust order capacity errors to IndexError."""
+        with pytest.raises(IndexError, match="order_records index out of range"):
+            portfolio_dispatch.simulate_from_orders(
+                (2, 1),
+                np.array([1], dtype=np.int64),
+                np.array([100.0], dtype=np.float64),
+                np.zeros((2, 1), dtype=np.int64),
+                size=np.array([[1.0], [-1.0]], dtype=np.float64),
+                close=np.array([[1.0], [2.0]], dtype=np.float64),
+                max_orders=1,
+                max_logs=1,
+                engine="rust",
+            )
+
+    def test_simulate_from_orders_rust_max_logs_exception(self):
+        """simulate_from_orders maps Rust log capacity errors to IndexError."""
+        with pytest.raises(IndexError, match="log_records index out of range"):
+            portfolio_dispatch.simulate_from_orders(
+                (2, 1),
+                np.array([1], dtype=np.int64),
+                np.array([100.0], dtype=np.float64),
+                np.zeros((2, 1), dtype=np.int64),
+                size=np.array([[1.0], [-1.0]], dtype=np.float64),
+                close=np.array([[1.0], [2.0]], dtype=np.float64),
+                log=np.array([[True], [True]], dtype=np.bool_),
+                max_orders=2,
+                max_logs=1,
+                engine="rust",
+            )
+
     def test_asset_flow_parity(self):
         """asset_flow dispatch matches numba."""
         or_nb, _ = self._run_sim("numba")
@@ -1946,7 +2146,7 @@ class TestPortfolioRustParity:
             portfolio_nb.init_cash_grouped_nb(self.init_cash, gl, True),
         )
         np.testing.assert_allclose(
-            portfolio_dispatch.init_cash_fn(self.init_cash, gl, False, engine="rust"),
+            portfolio_dispatch.init_cash(self.init_cash, gl, False, engine="rust"),
             portfolio_nb.init_cash_nb(self.init_cash, gl, False),
         )
         np.testing.assert_allclose(
@@ -1965,6 +2165,57 @@ class TestPortfolioRustParity:
                 portfolio_dispatch.build_call_seq(self.target_shape, self.group_lens, cst, engine="rust"),
                 portfolio_nb.build_call_seq_nb(self.target_shape, self.group_lens, cst),
             )
+
+    def test_build_call_seq_random_shuffles(self):
+        """build_call_seq random dispatch shuffles each group."""
+        target_shape = (100, 4)
+        group_lens = np.array([4], dtype=np.int64)
+        default = portfolio_dispatch.build_call_seq(target_shape, group_lens, CallSeqType.Default, engine="rust")
+        random_seq = portfolio_dispatch.build_call_seq(target_shape, group_lens, CallSeqType.Random, engine="rust")
+        assert any(not np.array_equal(row, default[0]) for row in random_seq)
+        for row in random_seq:
+            np.testing.assert_array_equal(np.sort(row), np.array([0, 1, 2, 3]))
+
+    def test_portfolio_random_auto_uses_numba_and_explicit_rust_is_allowed(self):
+        """Random portfolio paths use Numba under auto but allow explicit Rust."""
+        shape = (5, 1)
+        group_lens = np.array([1], dtype=np.int64)
+        init_cash = np.array([100.0], dtype=np.float64)
+        call_seq = np.zeros(shape, dtype=np.int64)
+        close = np.arange(1.0, 6.0).reshape(shape)
+        reject_prob = np.full(shape, 0.5, dtype=np.float64)
+
+        np.random.seed(42)
+        auto_orders, _ = portfolio_dispatch.simulate_from_orders(
+            shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            reject_prob=reject_prob,
+            engine="auto",
+        )
+        np.random.seed(42)
+        numba_orders = portfolio_nb.simulate_from_orders_nb(
+            shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            reject_prob=reject_prob,
+        )[0]
+        rust_orders, _ = portfolio_dispatch.simulate_from_orders(
+            shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            reject_prob=reject_prob,
+            seed=42,
+            engine="rust",
+        )
+        assert len(rust_orders) >= 0
+        np.testing.assert_array_equal(auto_orders, numba_orders)
 
     def test_fallback_auto(self):
         """auto engine falls back to numba for non-float64 arrays."""

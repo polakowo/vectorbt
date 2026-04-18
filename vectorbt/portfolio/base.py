@@ -4289,7 +4289,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 init_cash = dispatch.init_cash_grouped(init_cash, group_lens, self.cash_sharing, engine=engine)
             else:
                 group_lens = self.wrapper.grouper.get_group_lens()
-                init_cash = dispatch.init_cash_fn(init_cash, group_lens, self.cash_sharing, engine=engine)
+                init_cash = dispatch.init_cash(init_cash, group_lens, self.cash_sharing, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="init_cash"), wrap_kwargs)
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
