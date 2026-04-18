@@ -12,6 +12,7 @@ use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::borrow::Cow;
 
 /// Encode a raw pointer as usize so it can cross allow_threads boundaries.
 /// Safety: the caller must ensure the pointed-to memory outlives the closure.
@@ -2242,9 +2243,9 @@ pub fn simulate_from_orders_py<'py>(
     let cs_cow = {
         let cs_view = call_seq.as_array();
         if cs_view.is_standard_layout() {
-            call_seq.as_slice()?.to_vec()
+            Cow::Borrowed(call_seq.as_slice()?)
         } else {
-            cs_view.iter().copied().collect()
+            Cow::Owned(cs_view.iter().copied().collect())
         }
     };
     let size_cow = array2_as_slice_cow(&size);
@@ -2285,10 +2286,10 @@ pub fn simulate_from_orders_py<'py>(
         ));
     }
 
-    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
     let log_dt = py
         .import_bound("vectorbt.portfolio.enums")?
         .getattr("log_dt")?;
+    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
     let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
     let log_offsets = log_record_offsets(&log_arr)?;
     let (log_data, _log_itemsize, _) = unsafe { array_raw_parts(&log_arr)? };
@@ -2299,6 +2300,38 @@ pub fn simulate_from_orders_py<'py>(
     // Run the simulation
     let (order_records, lidx, call_seq_out) = py
         .allow_threads(|| {
+            if !cash_sharing && !auto_call_seq {
+                let (order_records, lidx) = simulate_from_orders_non_shared_inner(
+                    nrows,
+                    ncols,
+                    ic_cow.as_ref(),
+                    size_cow.as_ref(),
+                    price_cow.as_ref(),
+                    st_cow.as_ref(),
+                    dir_cow.as_ref(),
+                    fees_cow.as_ref(),
+                    ff_cow.as_ref(),
+                    slip_cow.as_ref(),
+                    mins_cow.as_ref(),
+                    maxs_cow.as_ref(),
+                    sg_cow.as_ref(),
+                    rp_cow.as_ref(),
+                    lc_cow.as_ref(),
+                    ap_cow.as_ref(),
+                    rr_cow.as_ref(),
+                    log_cow.as_ref(),
+                    vp_cow.as_ref(),
+                    close_cow.as_ref(),
+                    ffill_val_price,
+                    update_value,
+                    max_ord,
+                    effective_max_logs,
+                    usize_to_mut_ptr(log_data_usize),
+                    &log_offsets,
+                    seed,
+                )?;
+                return Ok((order_records, lidx, None));
+            }
             simulate_from_orders_inner(
                 nrows,
                 ncols,
@@ -2333,8 +2366,9 @@ pub fn simulate_from_orders_py<'py>(
             )
         })
         .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+    drop(cs_cow);
 
-    if auto_call_seq {
+    if let Some(call_seq_out) = call_seq_out {
         let mut cs_view = call_seq.as_array_mut();
         for i in 0..nrows {
             for col in 0..ncols {
@@ -2356,6 +2390,147 @@ pub fn simulate_from_orders_py<'py>(
     };
 
     Ok((order_arr, log_arr_sliced))
+}
+
+fn simulate_from_orders_non_shared_inner(
+    nrows: usize,
+    ncols: usize,
+    init_cash: &[f64],
+    size_s: &[f64],
+    price_s: &[f64],
+    size_type_s: &[i64],
+    direction_s: &[i64],
+    fees_s: &[f64],
+    fixed_fees_s: &[f64],
+    slippage_s: &[f64],
+    min_size_s: &[f64],
+    max_size_s: &[f64],
+    size_granularity_s: &[f64],
+    reject_prob_s: &[f64],
+    lock_cash_s: &[bool],
+    allow_partial_s: &[bool],
+    raise_reject_s: &[bool],
+    log_s: &[bool],
+    val_price_s: &[f64],
+    close_s: &[f64],
+    ffill_val_price: bool,
+    do_update_value: bool,
+    max_orders: usize,
+    max_logs: usize,
+    log_data: *mut u8,
+    log_offsets: &LogFieldOffsets,
+    seed: Option<u64>,
+) -> Result<(Vec<OrderRecord>, usize), PortfolioSimError> {
+    let mut rng = match seed {
+        Some(s) => ChaCha8Rng::seed_from_u64(s),
+        None => ChaCha8Rng::seed_from_u64(rand::random()),
+    };
+
+    let mut order_records: Vec<OrderRecord> = Vec::with_capacity(max_orders.min(nrows * ncols));
+    let mut oidx: i64 = 0;
+    let mut lidx: i64 = 0;
+
+    for col in 0..ncols {
+        let mut cash_now = init_cash[col];
+        let mut free_cash_now = init_cash[col];
+        let mut last_position = 0.0f64;
+        let mut last_debt = 0.0f64;
+        let mut last_val_price = f64::NAN;
+
+        for i in 0..nrows {
+            let idx = i * ncols + col;
+
+            let mut order_price = price_s[idx];
+            if order_price.is_infinite() {
+                if order_price > 0.0 {
+                    order_price = close_s[idx];
+                } else if i > 0 {
+                    order_price = close_s[(i - 1) * ncols + col];
+                } else {
+                    order_price = f64::NAN;
+                }
+            }
+
+            let mut val_price_now = val_price_s[idx];
+            if val_price_now.is_infinite() {
+                if val_price_now > 0.0 {
+                    val_price_now = order_price;
+                } else if i > 0 {
+                    val_price_now = close_s[(i - 1) * ncols + col];
+                } else {
+                    val_price_now = f64::NAN;
+                }
+            }
+            if !val_price_now.is_nan() || !ffill_val_price {
+                last_val_price = val_price_now;
+            }
+
+            let mut value_now = cash_now;
+            if last_position != 0.0 {
+                value_now += last_position * last_val_price;
+            }
+
+            let order = Order {
+                size: size_s[idx],
+                price: order_price,
+                size_type: size_type_s[idx],
+                direction: direction_s[idx],
+                fees: fees_s[idx],
+                fixed_fees: fixed_fees_s[idx],
+                slippage: slippage_s[idx],
+                min_size: min_size_s[idx],
+                max_size: max_size_s[idx],
+                size_granularity: size_granularity_s[idx],
+                reject_prob: reject_prob_s[idx],
+                lock_cash: lock_cash_s[idx],
+                allow_partial: allow_partial_s[idx],
+                raise_reject: raise_reject_s[idx],
+                log: log_s[idx],
+            };
+
+            let state = ProcessOrderState {
+                cash: cash_now,
+                position: last_position,
+                debt: last_debt,
+                free_cash: free_cash_now,
+                val_price: last_val_price,
+                value: value_now,
+                oidx,
+                lidx,
+            };
+
+            let log_info = if max_logs > 0 {
+                Some((log_data, log_offsets as &LogFieldOffsets, max_logs))
+            } else {
+                None
+            };
+
+            let (_order_result, new_state) = process_order(
+                i as i64,
+                col as i64,
+                col as i64,
+                &state,
+                do_update_value,
+                &order,
+                &mut order_records,
+                log_info,
+                &mut rng,
+            )?;
+
+            cash_now = new_state.cash;
+            free_cash_now = new_state.free_cash;
+            oidx = new_state.oidx;
+            lidx = new_state.lidx;
+            last_position = new_state.position;
+            last_debt = new_state.debt;
+            if !new_state.val_price.is_nan() || !ffill_val_price {
+                last_val_price = new_state.val_price;
+            }
+        }
+    }
+
+    order_records.truncate(oidx as usize);
+    Ok((order_records, lidx as usize))
 }
 
 /// Inner simulation function that runs without GIL.
@@ -2390,7 +2565,7 @@ fn simulate_from_orders_inner(
     log_data: *mut u8,
     log_offsets: &LogFieldOffsets,
     seed: Option<u64>,
-) -> Result<(Vec<OrderRecord>, usize, Vec<i64>), PortfolioSimError> {
+) -> Result<(Vec<OrderRecord>, usize, Option<Vec<i64>>), PortfolioSimError> {
     let mut rng = match seed {
         Some(s) => ChaCha8Rng::seed_from_u64(s),
         None => ChaCha8Rng::seed_from_u64(rand::random()),
@@ -2401,10 +2576,17 @@ fn simulate_from_orders_inner(
     let mut last_debt = vec![0.0f64; ncols];
     let mut last_val_price = vec![f64::NAN; ncols];
     let mut order_price_arr = vec![f64::NAN; ncols];
-    let mut temp_order_value = vec![0.0f64; ncols];
-
-    // Mutable copy of call_seq for auto_call_seq
-    let mut call_seq_mut: Vec<i64> = call_seq.to_vec();
+    let cash_sharing_global = group_lens.iter().any(|&g| g > 1);
+    let mut temp_order_value = if cash_sharing_global && auto_call_seq {
+        vec![0.0f64; ncols]
+    } else {
+        Vec::new()
+    };
+    let mut call_seq_mut = if auto_call_seq {
+        Some(call_seq.to_vec())
+    } else {
+        None
+    };
 
     let mut oidx: i64 = 0;
     let mut lidx: i64 = 0;
@@ -2413,7 +2595,6 @@ fn simulate_from_orders_inner(
     for group in 0..group_lens.len() {
         let group_len = group_lens[group] as usize;
         let to_col = from_col + group_len;
-        let cash_sharing_global = group_lens.iter().any(|&g| g > 1);
         let mut cash_now = init_cash[group];
         let mut free_cash_now = init_cash[group];
 
@@ -2481,9 +2662,12 @@ fn simulate_from_orders_inner(
 
                     // Sort call_seq by order value
                     let cs_start = i * ncols + from_col;
+                    let call_seq_mut_ref = call_seq_mut
+                        .as_mut()
+                        .expect("call_seq must be mutable when auto_call_seq is enabled");
                     insert_argsort(
                         &mut temp_order_value[..group_len],
-                        &mut call_seq_mut[cs_start..cs_start + group_len],
+                        &mut call_seq_mut_ref[cs_start..cs_start + group_len],
                     );
                 }
             }
@@ -2492,7 +2676,12 @@ fn simulate_from_orders_inner(
             for k in 0..group_len {
                 let mut col = from_col + k;
                 if cash_sharing_global {
-                    let col_i = call_seq_mut[i * ncols + col] as usize;
+                    let call_seq_ref = if let Some(ref call_seq_mut_ref) = call_seq_mut {
+                        call_seq_mut_ref.as_slice()
+                    } else {
+                        call_seq
+                    };
+                    let col_i = call_seq_ref[i * ncols + col] as usize;
                     assert!(col_i < group_len, "Call index exceeds bounds of the group");
                     col = from_col + col_i;
                 }
