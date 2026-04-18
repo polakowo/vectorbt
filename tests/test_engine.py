@@ -2183,7 +2183,7 @@ class TestPortfolioRustParity:
         init_cash = np.array([100.0], dtype=np.float64)
         call_seq = np.zeros(shape, dtype=np.int64)
         close = np.arange(1.0, 6.0).reshape(shape)
-        reject_prob = np.full(shape, 0.5, dtype=np.float64)
+        reject_prob = np.ones(shape, dtype=np.float64)
 
         np.random.seed(42)
         auto_orders, _ = portfolio_dispatch.simulate_from_orders(

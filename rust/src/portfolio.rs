@@ -101,6 +101,16 @@ fn get_return(input_value: f64, output_value: f64) -> f64 {
     r
 }
 
+fn col_start_idxs_usize(col_lens: &[i64]) -> Vec<usize> {
+    let mut out = Vec::with_capacity(col_lens.len());
+    let mut cumsum = 0usize;
+    for &col_len in col_lens {
+        out.push(cumsum);
+        cumsum += col_len as usize;
+    }
+    out
+}
+
 // ############# Enum constants ############# //
 
 // SizeType
@@ -2622,13 +2632,7 @@ fn asset_flow_inner(
     direction: i64,
 ) -> Vec<f64> {
     let n_cols = col_lens.len();
-    let mut col_start_idxs = vec![0i64; n_cols];
-    let mut cumsum: i64 = 0;
-    for c in 0..n_cols {
-        col_start_idxs[c] = cumsum;
-        cumsum += col_lens[c];
-    }
-
+    let col_start_idxs = col_start_idxs_usize(col_lens);
     let mut out = vec![0.0f64; nrows * ncols];
 
     for col in 0..n_cols {
@@ -2640,7 +2644,7 @@ fn asset_flow_inner(
         let mut position_now: f64 = 0.0;
 
         for c in 0..col_len {
-            let oidx = col_idxs[(col_start_idxs[col] + c as i64) as usize] as usize;
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
             let base = unsafe { src_data.add(oidx * offsets.itemsize) };
             let id = unsafe { *(base.add(offsets.id) as *const i64) };
             let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
@@ -2680,7 +2684,10 @@ pub fn assets_py<'py>(
     let af_cow = array2_as_slice_cow(&asset_flow);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         for col in 0..ncols {
             let mut position_now = 0.0f64;
             for i in 0..nrows {
@@ -2740,13 +2747,7 @@ fn cash_flow_inner(
     free: bool,
 ) -> Vec<f64> {
     let n_cols = col_lens.len();
-    let mut col_start_idxs = vec![0i64; n_cols];
-    let mut cumsum: i64 = 0;
-    for c in 0..n_cols {
-        col_start_idxs[c] = cumsum;
-        cumsum += col_lens[c];
-    }
-
+    let col_start_idxs = col_start_idxs_usize(col_lens);
     let mut out = vec![0.0f64; nrows * ncols];
 
     for col in 0..n_cols {
@@ -2758,8 +2759,31 @@ fn cash_flow_inner(
         let mut position_now: f64 = 0.0;
         let mut debt_now: f64 = 0.0;
 
+        if !free {
+            for c in 0..col_len {
+                let oidx = col_idxs[col_start_idxs[col] + c] as usize;
+                let base = unsafe { src_data.add(oidx * offsets.itemsize) };
+                let id = unsafe { *(base.add(offsets.id) as *const i64) };
+                let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
+                let side = unsafe { *(base.add(offsets.side) as *const i64) };
+                let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
+                let price = unsafe { *(base.add(offsets.price) as *const f64) };
+                let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
+
+                assert!(id >= last_id, "id must come in ascending order per column");
+                last_id = id;
+
+                if side == ORDER_SIDE_SELL {
+                    size *= -1.0;
+                }
+                let cash_flow = -size * price - fees;
+                out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
+            }
+            continue;
+        }
+
         for c in 0..col_len {
-            let oidx = col_idxs[(col_start_idxs[col] + c as i64) as usize] as usize;
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
             let base = unsafe { src_data.add(oidx * offsets.itemsize) };
             let id = unsafe { *(base.add(offsets.id) as *const i64) };
             let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
@@ -2775,15 +2799,9 @@ fn cash_flow_inner(
                 size *= -1.0;
             }
             let new_position_now = add(position_now, size);
-            let cash_flow;
-            if free {
-                let (new_debt, cf) =
-                    get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
-                debt_now = new_debt;
-                cash_flow = cf;
-            } else {
-                cash_flow = -size * price - fees;
-            }
+            let (new_debt, cash_flow) =
+                get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
+            debt_now = new_debt;
             out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
             position_now = new_position_now;
         }
@@ -2805,24 +2823,37 @@ pub fn sum_grouped_py<'py>(
     let n_groups = gl_cow.len();
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * n_groups];
-        let mut from_col: usize = 0;
-        for group in 0..n_groups {
-            let to_col = from_col + gl_cow[group] as usize;
-            for i in 0..nrows {
-                let mut sum = 0.0f64;
-                for col in from_col..to_col {
-                    sum += a_cow[i * ncols + col];
-                }
-                out[i * n_groups + group] = sum;
-            }
-            from_col = to_col;
-        }
-        out
+        sum_grouped_inner(a_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
     });
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
+}
+
+fn sum_grouped_inner(
+    a: &[f64],
+    group_lens: &[i64],
+    nrows: usize,
+    ncols: usize,
+    n_groups: usize,
+) -> Vec<f64> {
+    let group_starts = col_start_idxs_usize(group_lens);
+    let mut out = Vec::with_capacity(nrows * n_groups);
+    unsafe {
+        out.set_len(nrows * n_groups);
+    }
+    for group in 0..n_groups {
+        let from_col = group_starts[group];
+        let to_col = from_col + group_lens[group] as usize;
+        for i in 0..nrows {
+            let mut sum = 0.0f64;
+            for col in from_col..to_col {
+                sum += a[i * ncols + col];
+            }
+            out[i * n_groups + group] = sum;
+        }
+    }
+    out
 }
 
 #[pyfunction]
@@ -2832,7 +2863,18 @@ pub fn cash_flow_grouped_py<'py>(
     cash_flow: PyReadonlyArray2<'py, f64>,
     group_lens: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    sum_grouped_py(py, cash_flow, group_lens)
+    let nrows = cash_flow.shape()[0];
+    let ncols = cash_flow.shape()[1];
+    let cf_cow = array2_as_slice_cow(&cash_flow);
+    let gl_cow = array1_as_slice_cow(&group_lens);
+    let n_groups = gl_cow.len();
+
+    let result = py.allow_threads(|| {
+        sum_grouped_inner(cf_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
+    });
+
+    let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
 #[pyfunction]
@@ -2910,7 +2952,10 @@ pub fn cash_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         for col in 0..ncols {
             for i in 0..nrows {
                 let cash_now = if i == 0 {
@@ -2945,7 +2990,10 @@ pub fn cash_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -2983,15 +3031,16 @@ pub fn cash_grouped_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash_grouped);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * n_groups];
-        let mut from_col: usize = 0;
+        let mut out = Vec::with_capacity(nrows * n_groups);
+        unsafe {
+            out.set_len(nrows * n_groups);
+        }
         for group in 0..gl_cow.len() {
             let mut cash_now = ic_cow[group];
             for i in 0..nrows {
                 cash_now = add(cash_now, cfg_cow[i * n_groups + group]);
                 out[i * n_groups + group] = cash_now;
             }
-            from_col += gl_cow[group] as usize;
         }
         out
     });
@@ -3015,11 +3064,11 @@ pub fn asset_value_py<'py>(
     let a_cow = array2_as_slice_cow(&assets);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
-        for idx in 0..nrows * ncols {
-            out[idx] = c_cow[idx] * a_cow[idx];
-        }
-        out
+        c_cow
+            .iter()
+            .zip(a_cow.iter())
+            .map(|(close, assets)| close * assets)
+            .collect::<Vec<f64>>()
     });
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
@@ -3033,7 +3082,18 @@ pub fn asset_value_grouped_py<'py>(
     asset_value: PyReadonlyArray2<'py, f64>,
     group_lens: PyReadonlyArray1<'py, i64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    sum_grouped_py(py, asset_value, group_lens)
+    let nrows = asset_value.shape()[0];
+    let ncols = asset_value.shape()[1];
+    let av_cow = array2_as_slice_cow(&asset_value);
+    let gl_cow = array1_as_slice_cow(&group_lens);
+    let n_groups = gl_cow.len();
+
+    let result = py.allow_threads(|| {
+        sum_grouped_inner(av_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
+    });
+
+    let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
 #[pyfunction]
@@ -3049,11 +3109,11 @@ pub fn value_py<'py>(
     let av_cow = array2_as_slice_cow(&asset_value);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
-        for idx in 0..nrows * ncols {
-            out[idx] = c_cow[idx] + av_cow[idx];
-        }
-        out
+        c_cow
+            .iter()
+            .zip(av_cow.iter())
+            .map(|(cash, asset_value)| cash + asset_value)
+            .collect::<Vec<f64>>()
     });
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
@@ -3077,7 +3137,10 @@ pub fn value_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -3138,12 +3201,7 @@ pub fn total_profit_py<'py>(
     let result = py.allow_threads(|| {
         let src_data = usize_to_ptr(src_send);
         let n_cols = cl_cow.len();
-        let mut col_start_idxs = vec![0i64; n_cols];
-        let mut cumsum: i64 = 0;
-        for c in 0..n_cols {
-            col_start_idxs[c] = cumsum;
-            cumsum += cl_cow[c];
-        }
+        let col_start_idxs = col_start_idxs_usize(cl_cow.as_ref());
 
         let mut assets = vec![0.0f64; ncols];
         let mut cash = vec![0.0f64; ncols];
@@ -3158,7 +3216,7 @@ pub fn total_profit_py<'py>(
             let mut last_id: i64 = -1;
 
             for c in 0..col_len {
-                let oidx = ci_cow[(col_start_idxs[col] + c as i64) as usize] as usize;
+                let oidx = ci_cow[col_start_idxs[col] + c] as usize;
                 let base = unsafe { src_data.add(oidx * offsets.itemsize) };
                 let id = unsafe { *(base.add(offsets.id) as *const i64) };
                 let side = unsafe { *(base.add(offsets.side) as *const i64) };
@@ -3204,17 +3262,17 @@ pub fn total_profit_grouped_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let tp_cow = array1_as_slice_cow(&total_profit);
     let gl_cow = array1_as_slice_cow(&group_lens);
+    let group_starts = col_start_idxs_usize(gl_cow.as_ref());
 
     let mut out = vec![0.0f64; gl_cow.len()];
-    let mut from_col: usize = 0;
     for group in 0..gl_cow.len() {
+        let from_col = group_starts[group];
         let to_col = from_col + gl_cow[group] as usize;
         let mut sum = 0.0f64;
         for col in from_col..to_col {
             sum += tp_cow[col];
         }
         out[group] = sum;
-        from_col = to_col;
     }
     Ok(PyArray1::from_vec_bound(py, out))
 }
@@ -3270,7 +3328,10 @@ pub fn returns_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -3304,7 +3365,10 @@ pub fn asset_returns_py<'py>(
     let av_cow = array2_as_slice_cow(&asset_value);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
         for col in 0..ncols {
             for i in 0..nrows {
                 let input_value = if i == 0 {
@@ -3336,11 +3400,15 @@ pub fn benchmark_value_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
-        for col in 0..ncols {
-            let close_0 = c_cow[col]; // close[0, col]
-            for i in 0..nrows {
-                out[i * ncols + col] = c_cow[i * ncols + col] / close_0 * ic_cow[col];
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
+        for i in 0..nrows {
+            let row_offset = i * ncols;
+            for col in 0..ncols {
+                let close_0 = c_cow[col]; // close[0, col]
+                out[row_offset + col] = c_cow[row_offset + col] / close_0 * ic_cow[col];
             }
         }
         out
@@ -3364,11 +3432,15 @@ pub fn benchmark_value_grouped_py<'py>(
     let gl_cow = array1_as_slice_cow(&group_lens);
     let ic_cow = array1_as_slice_cow(&init_cash_grouped);
     let n_groups = gl_cow.len();
+    let group_starts = col_start_idxs_usize(gl_cow.as_ref());
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * n_groups];
-        let mut from_col: usize = 0;
+        let mut out = Vec::with_capacity(nrows * n_groups);
+        unsafe {
+            out.set_len(nrows * n_groups);
+        }
         for group in 0..n_groups {
+            let from_col = group_starts[group];
             let group_len = gl_cow[group] as usize;
             let to_col = from_col + group_len;
             let col_init_cash = ic_cow[group] / group_len as f64;
@@ -3379,7 +3451,6 @@ pub fn benchmark_value_grouped_py<'py>(
                 }
                 out[i * n_groups + group] = col_init_cash * sum;
             }
-            from_col = to_col;
         }
         out
     });
@@ -3418,14 +3489,14 @@ pub fn gross_exposure_py<'py>(
     let c_cow = array2_as_slice_cow(&cash);
 
     let result = py.allow_threads(|| {
-        let mut out = vec![0.0f64; nrows * ncols];
+        let mut out = Vec::with_capacity(nrows * ncols);
         for idx in 0..nrows * ncols {
             let denom = add(av_cow[idx], c_cow[idx]);
-            out[idx] = if denom == 0.0 {
+            out.push(if denom == 0.0 {
                 0.0
             } else {
                 av_cow[idx] / denom
-            };
+            });
         }
         out
     });
@@ -3481,12 +3552,7 @@ fn get_entry_trades_inner(
     n_records: usize,
 ) -> Vec<TradeRecord> {
     let n_cols = col_lens.len();
-    let mut col_start_idxs = vec![0i64; n_cols];
-    let mut cumsum: i64 = 0;
-    for c in 0..n_cols {
-        col_start_idxs[c] = cumsum;
-        cumsum += col_lens[c];
-    }
+    let col_start_idxs = col_start_idxs_usize(col_lens);
 
     let mut records: Vec<TradeRecord> = Vec::with_capacity(n_records);
     let mut parent_id: i64 = -1;
@@ -3510,7 +3576,7 @@ fn get_entry_trades_inner(
         let mut first_entry_fees: f64 = 0.0;
 
         for c in 0..col_len {
-            let oidx = col_idxs[(col_start_idxs[col] + c as i64) as usize] as usize;
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
             let base = unsafe { src_data.add(oidx * offsets.itemsize) };
             let id = unsafe { *(base.add(offsets.id) as *const i64) };
             let order_idx = unsafe { *(base.add(offsets.idx) as *const i64) };
@@ -3668,7 +3734,7 @@ fn fill_entry_trades_in_position(
     src_data: *const u8,
     offsets: &RecordFieldOffsets,
     col_idxs: &[i64],
-    col_start_idxs: &[i64],
+    col_start_idxs: &[usize],
     col: usize,
     first_c: usize,
     last_c: usize,
@@ -3686,7 +3752,7 @@ fn fill_entry_trades_in_position(
     let exit_price = exit_gross_sum / exit_size_sum;
 
     for c in first_c..=last_c {
-        let oidx = col_idxs[(col_start_idxs[col] + c as i64) as usize] as usize;
+        let oidx = col_idxs[col_start_idxs[col] + c] as usize;
         let base = unsafe { src_data.add(oidx * offsets.itemsize) };
         let order_side = unsafe { *(base.add(offsets.side) as *const i64) };
 
@@ -3783,12 +3849,7 @@ fn get_exit_trades_inner(
     n_records: usize,
 ) -> Vec<TradeRecord> {
     let n_cols = col_lens.len();
-    let mut col_start_idxs = vec![0i64; n_cols];
-    let mut cumsum: i64 = 0;
-    for c in 0..n_cols {
-        col_start_idxs[c] = cumsum;
-        cumsum += col_lens[c];
-    }
+    let col_start_idxs = col_start_idxs_usize(col_lens);
 
     let mut records: Vec<TradeRecord> = Vec::with_capacity(n_records);
     let mut parent_id: i64 = -1;
@@ -3807,7 +3868,7 @@ fn get_exit_trades_inner(
         let mut entry_fees_sum: f64 = 0.0;
 
         for c in 0..col_len {
-            let oidx = col_idxs[(col_start_idxs[col] + c as i64) as usize] as usize;
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
             let base = unsafe { src_data.add(oidx * offsets.itemsize) };
             let id = unsafe { *(base.add(offsets.id) as *const i64) };
             let i = unsafe { *(base.add(offsets.idx) as *const i64) };

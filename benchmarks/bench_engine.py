@@ -1438,8 +1438,50 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         pf_cf = portfolio_nb.cash_flow_nb(pf_target_shape, nb_or, pf_col_map, False)
         pf_cash = portfolio_nb.cash_nb(pf_cf, pf_init_cash)
         pf_av = portfolio_nb.asset_value_nb(pf_close, pf_assets)
+        pf_group_lens_grouped = np.array([max(1, cols // 2), cols - max(1, cols // 2)], dtype=np.int64)
+        if pf_group_lens_grouped[-1] == 0:
+            pf_group_lens_grouped = np.array([cols], dtype=np.int64)
+        pf_init_cash_grouped = pf_group_lens_grouped.astype(np.float64) * 10000.0
+        pf_call_seq_grouped = portfolio_nb.build_call_seq_nb(pf_target_shape, pf_group_lens_grouped, 0)
+        pf_cf_grouped = portfolio_nb.cash_flow_grouped_nb(pf_cf, pf_group_lens_grouped)
+        pf_cash_grouped = portfolio_nb.cash_grouped_nb(
+            pf_target_shape,
+            pf_cf_grouped,
+            pf_group_lens_grouped,
+            pf_init_cash_grouped,
+        )
+        pf_av_grouped = portfolio_nb.asset_value_grouped_nb(pf_av, pf_group_lens_grouped)
+        pf_cash_iso = portfolio_nb.cash_in_sim_order_nb(
+            pf_cf,
+            pf_group_lens_grouped,
+            pf_init_cash_grouped,
+            pf_call_seq_grouped,
+        )
+        pf_value_iso = portfolio_nb.value_in_sim_order_nb(
+            pf_cash_iso,
+            pf_av,
+            pf_group_lens_grouped,
+            pf_call_seq_grouped,
+        )
+        pf_returns_iso = portfolio_nb.returns_in_sim_order_nb(
+            pf_value_iso,
+            pf_group_lens_grouped,
+            pf_init_cash_grouped,
+            pf_call_seq_grouped,
+        )
+        pf_benchmark_value = portfolio_nb.benchmark_value_nb(pf_close, pf_init_cash)
+        pf_exit_trades = portfolio_nb.get_exit_trades_nb(nb_or, pf_close, pf_col_map)
+        pf_trade_col_map = records_nb.col_map_nb(pf_exit_trades["col"], cols)
+        pf_trade_col_idxs, pf_trade_col_lens = pf_trade_col_map
 
         portfolio_cases = [
+            BenchmarkCase(
+                "portfolio.build_call_seq",
+                portfolio_nb.build_call_seq_nb,
+                (pf_target_shape, pf_group_lens_grouped, 0),
+                rust_portfolio.build_call_seq_rs,
+                (pf_target_shape, pf_group_lens_grouped, 0),
+            ),
             BenchmarkCase(
                 "portfolio.simulate_from_orders",
                 lambda: portfolio_nb.simulate_from_orders_nb(
@@ -1511,11 +1553,67 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (nb_or, pf_col_idxs, pf_col_lens, pf_target_shape, 2),
             ),
             BenchmarkCase(
+                "portfolio.assets",
+                portfolio_nb.assets_nb,
+                (pf_af,),
+                rust_portfolio.assets_rs,
+                (pf_af,),
+            ),
+            BenchmarkCase(
                 "portfolio.cash_flow",
                 portfolio_nb.cash_flow_nb,
                 (pf_target_shape, nb_or, pf_col_map, False),
                 rust_portfolio.cash_flow_rs,
                 (nb_or, pf_col_idxs, pf_col_lens, pf_target_shape, False),
+            ),
+            BenchmarkCase(
+                "portfolio.sum_grouped",
+                portfolio_nb.sum_grouped_nb,
+                (pf_cf, pf_group_lens_grouped),
+                rust_portfolio.sum_grouped_rs,
+                (pf_cf, pf_group_lens_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.cash_flow_grouped",
+                portfolio_nb.cash_flow_grouped_nb,
+                (pf_cf, pf_group_lens_grouped),
+                rust_portfolio.cash_flow_grouped_rs,
+                (pf_cf, pf_group_lens_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.init_cash_grouped",
+                portfolio_nb.init_cash_grouped_nb,
+                (pf_init_cash, pf_group_lens_grouped, False),
+                rust_portfolio.init_cash_grouped_rs,
+                (pf_init_cash, pf_group_lens_grouped, False),
+            ),
+            BenchmarkCase(
+                "portfolio.init_cash",
+                portfolio_nb.init_cash_nb,
+                (pf_init_cash_grouped, pf_group_lens_grouped, True),
+                rust_portfolio.init_cash_rs,
+                (pf_init_cash_grouped, pf_group_lens_grouped, True),
+            ),
+            BenchmarkCase(
+                "portfolio.cash",
+                portfolio_nb.cash_nb,
+                (pf_cf, pf_init_cash),
+                rust_portfolio.cash_rs,
+                (pf_cf, pf_init_cash),
+            ),
+            BenchmarkCase(
+                "portfolio.cash_in_sim_order",
+                portfolio_nb.cash_in_sim_order_nb,
+                (pf_cf, pf_group_lens_grouped, pf_init_cash_grouped, pf_call_seq_grouped),
+                rust_portfolio.cash_in_sim_order_rs,
+                (pf_cf, pf_group_lens_grouped, pf_init_cash_grouped, pf_call_seq_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.cash_grouped",
+                portfolio_nb.cash_grouped_nb,
+                (pf_target_shape, pf_cf_grouped, pf_group_lens_grouped, pf_init_cash_grouped),
+                rust_portfolio.cash_grouped_rs,
+                (pf_target_shape, pf_cf_grouped, pf_group_lens_grouped, pf_init_cash_grouped),
             ),
             BenchmarkCase(
                 "portfolio.total_profit",
@@ -1525,6 +1623,27 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_target_shape, pf_close, nb_or, pf_col_idxs, pf_col_lens),
             ),
             BenchmarkCase(
+                "portfolio.total_profit_grouped",
+                portfolio_nb.total_profit_grouped_nb,
+                (pf_init_cash, pf_group_lens_grouped),
+                rust_portfolio.total_profit_grouped_rs,
+                (pf_init_cash, pf_group_lens_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.final_value",
+                portfolio_nb.final_value_nb,
+                (pf_init_cash, pf_init_cash),
+                rust_portfolio.final_value_rs,
+                (pf_init_cash, pf_init_cash),
+            ),
+            BenchmarkCase(
+                "portfolio.total_return",
+                portfolio_nb.total_return_nb,
+                (pf_init_cash, pf_init_cash),
+                rust_portfolio.total_return_rs,
+                (pf_init_cash, pf_init_cash),
+            ),
+            BenchmarkCase(
                 "portfolio.asset_value",
                 portfolio_nb.asset_value_nb,
                 (pf_close, pf_assets),
@@ -1532,11 +1651,60 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_close, pf_assets),
             ),
             BenchmarkCase(
+                "portfolio.asset_value_grouped",
+                portfolio_nb.asset_value_grouped_nb,
+                (pf_av, pf_group_lens_grouped),
+                rust_portfolio.asset_value_grouped_rs,
+                (pf_av, pf_group_lens_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.value_in_sim_order",
+                portfolio_nb.value_in_sim_order_nb,
+                (pf_cash_iso, pf_av, pf_group_lens_grouped, pf_call_seq_grouped),
+                rust_portfolio.value_in_sim_order_rs,
+                (pf_cash_iso, pf_av, pf_group_lens_grouped, pf_call_seq_grouped),
+            ),
+            BenchmarkCase(
                 "portfolio.value",
                 portfolio_nb.value_nb,
                 (pf_cash, pf_av),
                 rust_portfolio.value_rs,
                 (pf_cash, pf_av),
+            ),
+            BenchmarkCase(
+                "portfolio.returns_in_sim_order",
+                portfolio_nb.returns_in_sim_order_nb,
+                (pf_value_iso, pf_group_lens_grouped, pf_init_cash_grouped, pf_call_seq_grouped),
+                rust_portfolio.returns_in_sim_order_rs,
+                (pf_value_iso, pf_group_lens_grouped, pf_init_cash_grouped, pf_call_seq_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.asset_returns",
+                portfolio_nb.asset_returns_nb,
+                (pf_cf, pf_av),
+                rust_portfolio.asset_returns_rs,
+                (pf_cf, pf_av),
+            ),
+            BenchmarkCase(
+                "portfolio.benchmark_value",
+                portfolio_nb.benchmark_value_nb,
+                (pf_close, pf_init_cash),
+                rust_portfolio.benchmark_value_rs,
+                (pf_close, pf_init_cash),
+            ),
+            BenchmarkCase(
+                "portfolio.benchmark_value_grouped",
+                portfolio_nb.benchmark_value_grouped_nb,
+                (pf_close, pf_group_lens_grouped, pf_init_cash_grouped),
+                rust_portfolio.benchmark_value_grouped_rs,
+                (pf_close, pf_group_lens_grouped, pf_init_cash_grouped),
+            ),
+            BenchmarkCase(
+                "portfolio.total_benchmark_return",
+                portfolio_nb.total_benchmark_return_nb,
+                (pf_benchmark_value,),
+                rust_portfolio.total_benchmark_return_rs,
+                (pf_benchmark_value,),
             ),
             BenchmarkCase(
                 "portfolio.gross_exposure",
@@ -1559,6 +1727,28 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (nb_or, pf_close, pf_col_map),
                 rust_portfolio.get_exit_trades_rs,
                 (nb_or, pf_close, pf_col_idxs, pf_col_lens),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.trade_winning_streak",
+                portfolio_nb.trade_winning_streak_nb,
+                (pf_exit_trades,),
+                rust_portfolio.trade_winning_streak_rs,
+                (pf_exit_trades,),
+            ),
+            BenchmarkCase(
+                "portfolio.trade_losing_streak",
+                portfolio_nb.trade_losing_streak_nb,
+                (pf_exit_trades,),
+                rust_portfolio.trade_losing_streak_rs,
+                (pf_exit_trades,),
+            ),
+            BenchmarkCase(
+                "portfolio.get_positions",
+                portfolio_nb.get_positions_nb,
+                (pf_exit_trades, pf_trade_col_map),
+                rust_portfolio.get_positions_rs,
+                (pf_exit_trades, pf_trade_col_idxs, pf_trade_col_lens),
                 check=False,
             ),
         ]
