@@ -1421,7 +1421,7 @@ from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broad
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.portfolio import nb
+from vectorbt.portfolio import dispatch, nb
 from vectorbt.portfolio.decorators import attach_returns_acc_methods
 from vectorbt.portfolio.enums import *
 from vectorbt.portfolio.logs import Logs
@@ -2000,18 +2000,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             max_logs = 1
 
         # Perform the simulation
-        order_records, log_records = nb.simulate_from_orders_nb(
+        order_records, log_records = dispatch.simulate_from_orders(
             target_shape_2d,
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
             *map(np.asarray, broadcasted_args),
-            auto_call_seq,
-            ffill_val_price,
-            update_value,
-            max_orders,
-            max_logs,
-            close.ndim == 2,
+            auto_call_seq=auto_call_seq,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            max_orders=max_orders,
+            max_logs=max_logs,
+            flex_2d=close.ndim == 2,
         )
 
         # Create an instance
@@ -4154,7 +4154,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         Returns the total transacted amount of assets at each time step."""
         direction = map_enum_fields(direction, Direction)
-        asset_flow = nb.asset_flow_nb(
+        asset_flow = dispatch.asset_flow(
             self.wrapper.shape_2d,
             self.orders.values,
             self.orders.col_mapper.col_map,
@@ -4169,7 +4169,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         Returns the current position at each time step."""
         direction = map_enum_fields(direction, Direction)
         asset_flow = to_2d_array(self.asset_flow(direction="both"))
-        assets = nb.assets_nb(asset_flow)
+        assets = dispatch.assets(asset_flow)
         if direction == Direction.LongOnly:
             assets = np.where(assets > 0, assets, 0.0)
         if direction == Direction.ShortOnly:
@@ -4231,9 +4231,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             cash_flow = to_2d_array(self.cash_flow(group_by=False, free=free))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            cash_flow = nb.cash_flow_grouped_nb(cash_flow, group_lens)
+            cash_flow = dispatch.cash_flow_grouped(cash_flow, group_lens)
         else:
-            cash_flow = nb.cash_flow_nb(self.wrapper.shape_2d, self.orders.values, self.orders.col_mapper.col_map, free)
+            cash_flow = dispatch.cash_flow(
+                self.wrapper.shape_2d, self.orders.values, self.orders.col_mapper.col_map, free
+            )
         return self.wrapper.wrap(cash_flow, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_property
@@ -4259,10 +4261,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash = to_1d_array(self._init_cash)
             if self.wrapper.grouper.is_grouped(group_by=group_by):
                 group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-                init_cash = nb.init_cash_grouped_nb(init_cash, group_lens, self.cash_sharing)
+                init_cash = dispatch.init_cash_grouped(init_cash, group_lens, self.cash_sharing)
             else:
                 group_lens = self.wrapper.grouper.get_group_lens()
-                init_cash = nb.init_cash_nb(init_cash, group_lens, self.cash_sharing)
+                init_cash = dispatch.init_cash_fn(init_cash, group_lens, self.cash_sharing)
         wrap_kwargs = merge_dicts(dict(name_or_index="init_cash"), wrap_kwargs)
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
@@ -4285,7 +4287,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
-            cash = nb.cash_grouped_nb(self.wrapper.shape_2d, cash_flow, group_lens, init_cash)
+            cash = dispatch.cash_grouped(self.wrapper.shape_2d, cash_flow, group_lens, init_cash)
         else:
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
                 if self.call_seq is None:
@@ -4297,10 +4299,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = to_1d_array(self.init_cash)
                 call_seq = to_2d_array(self.call_seq)
-                cash = nb.cash_in_sim_order_nb(cash_flow, group_lens, init_cash, call_seq)
+                cash = dispatch.cash_in_sim_order(cash_flow, group_lens, init_cash, call_seq)
             else:
                 init_cash = to_1d_array(self.get_init_cash(group_by=False))
-                cash = nb.cash_nb(cash_flow, init_cash)
+                cash = dispatch.cash(cash_flow, init_cash)
         return self.wrapper.wrap(cash, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     # ############# Performance ############# #
@@ -4323,9 +4325,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             asset_value = to_2d_array(self.asset_value(direction=direction, group_by=False))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            asset_value = nb.asset_value_grouped_nb(asset_value, group_lens)
+            asset_value = dispatch.asset_value_grouped(asset_value, group_lens)
         else:
-            asset_value = nb.asset_value_nb(close, assets)
+            asset_value = dispatch.asset_value(close, assets)
         return self.wrapper.wrap(asset_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
@@ -4345,11 +4347,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             # not abs(sum(per_column)). The latter gives net exposure, not gross.
             asset_value_ungrouped = to_2d_array(self.asset_value(group_by=False, direction=direction))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            abs_asset_value = nb.asset_value_grouped_nb(np.abs(asset_value_ungrouped), group_lens)
+            abs_asset_value = dispatch.asset_value_grouped(np.abs(asset_value_ungrouped), group_lens)
         else:
             abs_asset_value = np.abs(to_2d_array(self.asset_value(group_by=group_by, direction=direction)))
         cash = to_2d_array(self.cash(group_by=group_by, free=True))
-        gross_exposure = nb.gross_exposure_nb(abs_asset_value, cash)
+        gross_exposure = dispatch.gross_exposure(abs_asset_value, cash)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
@@ -4388,10 +4390,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 )
             group_lens = self.wrapper.grouper.get_group_lens()
             call_seq = to_2d_array(self.call_seq)
-            value = nb.value_in_sim_order_nb(cash, asset_value, group_lens, call_seq)
+            value = dispatch.value_in_sim_order(cash, asset_value, group_lens, call_seq)
             # price of NaN is already addressed by ungrouped_value_nb
         else:
-            value = nb.value_nb(cash, asset_value)
+            value = dispatch.value(cash, asset_value)
         return self.wrapper.wrap(value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
@@ -4402,13 +4404,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             total_profit = to_1d_array(self.total_profit(group_by=False))
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            total_profit = nb.total_profit_grouped_nb(total_profit, group_lens)
+            total_profit = dispatch.total_profit_grouped(total_profit, group_lens)
         else:
             if self.fillna_close:
                 close = to_2d_array(self.get_filled_close())
             else:
                 close = to_2d_array(self.close)
-            total_profit = nb.total_profit_nb(
+            total_profit = dispatch.total_profit(
                 self.wrapper.shape_2d,
                 close,
                 self.orders.values,
@@ -4422,7 +4424,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get total profit per column/group."""
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
-        final_value = nb.final_value_nb(total_profit, init_cash)
+        final_value = dispatch.final_value(total_profit, init_cash)
         wrap_kwargs = merge_dicts(dict(name_or_index="final_value"), wrap_kwargs)
         return self.wrapper.wrap_reduced(final_value, group_by=group_by, **wrap_kwargs)
 
@@ -4431,7 +4433,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Get total profit per column/group."""
         init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
         total_profit = to_1d_array(self.total_profit(group_by=group_by))
-        total_return = nb.total_return_nb(total_profit, init_cash)
+        total_return = dispatch.total_return(total_profit, init_cash)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_return, group_by=group_by, **wrap_kwargs)
 
@@ -4454,7 +4456,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             group_lens = self.wrapper.grouper.get_group_lens()
             init_cash_grouped = to_1d_array(self.init_cash)
             call_seq = to_2d_array(self.call_seq)
-            returns = nb.returns_in_sim_order_nb(value, group_lens, init_cash_grouped, call_seq)
+            returns = dispatch.returns_in_sim_order(value, group_lens, init_cash_grouped, call_seq)
         else:
             init_cash = to_1d_array(self.get_init_cash(group_by=group_by))
             returns = returns_nb.returns_nb(value, init_cash)
@@ -4470,7 +4472,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         all in and keeping available cash at zero."""
         cash_flow = to_2d_array(self.cash_flow(group_by=group_by))
         asset_value = to_2d_array(self.asset_value(group_by=group_by))
-        asset_returns = nb.asset_returns_nb(cash_flow, asset_value)
+        asset_returns = dispatch.asset_returns(cash_flow, asset_value)
         return self.wrapper.wrap(asset_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @property
@@ -4553,10 +4555,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash_grouped = to_1d_array(self.get_init_cash(group_by=group_by))
-            benchmark_value = nb.benchmark_value_grouped_nb(close, group_lens, init_cash_grouped)
+            benchmark_value = dispatch.benchmark_value_grouped(close, group_lens, init_cash_grouped)
         else:
             init_cash = to_1d_array(self.get_init_cash(group_by=False))
-            benchmark_value = nb.benchmark_value_nb(close, init_cash)
+            benchmark_value = dispatch.benchmark_value(close, init_cash)
         return self.wrapper.wrap(benchmark_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
@@ -4577,7 +4579,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     ) -> tp.MaybeSeries:
         """Get total benchmark return."""
         benchmark_value = to_2d_array(self.benchmark_value(group_by=group_by))
-        total_benchmark_return = nb.total_benchmark_return_nb(benchmark_value)
+        total_benchmark_return = dispatch.total_benchmark_return(benchmark_value)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_benchmark_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_benchmark_return, group_by=group_by, **wrap_kwargs)
 

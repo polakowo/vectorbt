@@ -57,6 +57,13 @@ try:
 except ImportError:
     rust_signals = None
 
+try:
+    from vectorbt_rust import portfolio as rust_portfolio
+except ImportError:
+    rust_portfolio = None
+
+from vectorbt.portfolio import nb as portfolio_nb
+
 
 @dataclass(frozen=True)
 class BenchmarkCase:
@@ -1363,6 +1370,200 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     cases.extend(labels_cases)
     cases.extend(records_cases)
     cases.extend(returns_cases)
+
+    # --- Portfolio ---
+    portfolio_cases = []
+    if rust_portfolio is not None:
+        rows, cols = a.shape
+        pf_close = np.abs(a) + 1.0  # ensure positive prices
+        pf_size = np.tile(np.array([1.0, -0.5, 0.5, -1.0, 0.0], dtype=np.float64), (cols, 1)).T
+        if pf_size.shape[0] < rows:
+            pf_size = np.resize(pf_size, (rows, cols)).astype(np.float64)
+        else:
+            pf_size = pf_size[:rows, :cols].copy()
+        pf_target_shape = (rows, cols)
+        pf_group_lens = np.ones(cols, dtype=np.int64)
+        pf_init_cash = np.full(cols, 10000.0, dtype=np.float64)
+        pf_call_seq = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_fees = np.full(pf_target_shape, 0.001, dtype=np.float64)
+        pf_size_type = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_direction = np.full(pf_target_shape, 2, dtype=np.int64)
+        pf_fixed_fees = np.zeros(pf_target_shape, dtype=np.float64)
+        pf_slippage = np.zeros(pf_target_shape, dtype=np.float64)
+        pf_min_size = np.zeros(pf_target_shape, dtype=np.float64)
+        pf_max_size = np.full(pf_target_shape, np.inf, dtype=np.float64)
+        pf_size_gran = np.full(pf_target_shape, np.nan, dtype=np.float64)
+        pf_reject_prob = np.zeros(pf_target_shape, dtype=np.float64)
+        pf_lock_cash = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_allow_partial = np.ones(pf_target_shape, dtype=np.bool_)
+        pf_raise_reject = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_log = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_val_price = np.full(pf_target_shape, np.inf, dtype=np.float64)
+        max_orders = rows * cols
+
+        # Pre-run Numba to get order records for post-sim benchmarks
+        nb_or, _ = portfolio_nb.simulate_from_orders_nb(
+            pf_target_shape,
+            pf_group_lens,
+            pf_init_cash.copy(),
+            pf_call_seq.copy(),
+            pf_size,
+            pf_close,
+            pf_size_type,
+            pf_direction,
+            pf_fees,
+            pf_fixed_fees,
+            pf_slippage,
+            pf_min_size,
+            pf_max_size,
+            pf_size_gran,
+            pf_reject_prob,
+            pf_lock_cash,
+            pf_allow_partial,
+            pf_raise_reject,
+            pf_log,
+            pf_val_price,
+            pf_close,
+            False,
+            True,
+            False,
+            max_orders,
+            0,
+            True,
+        )
+        pf_col_map = records_nb.col_map_nb(nb_or["col"], cols)
+        pf_col_idxs, pf_col_lens = pf_col_map
+        pf_af = portfolio_nb.asset_flow_nb(pf_target_shape, nb_or, pf_col_map, 2)
+        pf_assets = portfolio_nb.assets_nb(pf_af)
+        pf_cf = portfolio_nb.cash_flow_nb(pf_target_shape, nb_or, pf_col_map, False)
+        pf_cash = portfolio_nb.cash_nb(pf_cf, pf_init_cash)
+        pf_av = portfolio_nb.asset_value_nb(pf_close, pf_assets)
+
+        portfolio_cases = [
+            BenchmarkCase(
+                "portfolio.simulate_from_orders",
+                lambda: portfolio_nb.simulate_from_orders_nb(
+                    pf_target_shape,
+                    pf_group_lens,
+                    pf_init_cash.copy(),
+                    pf_call_seq.copy(),
+                    pf_size,
+                    pf_close,
+                    pf_size_type,
+                    pf_direction,
+                    pf_fees,
+                    pf_fixed_fees,
+                    pf_slippage,
+                    pf_min_size,
+                    pf_max_size,
+                    pf_size_gran,
+                    pf_reject_prob,
+                    pf_lock_cash,
+                    pf_allow_partial,
+                    pf_raise_reject,
+                    pf_log,
+                    pf_val_price,
+                    pf_close,
+                    False,
+                    True,
+                    False,
+                    max_orders,
+                    0,
+                    True,
+                ),
+                (),
+                lambda: rust_portfolio.simulate_from_orders_rs(
+                    pf_target_shape,
+                    pf_group_lens,
+                    pf_init_cash.copy(),
+                    pf_call_seq.copy(),
+                    pf_size,
+                    pf_close,
+                    pf_size_type,
+                    pf_direction,
+                    pf_fees,
+                    pf_fixed_fees,
+                    pf_slippage,
+                    pf_min_size,
+                    pf_max_size,
+                    pf_size_gran,
+                    pf_reject_prob,
+                    pf_lock_cash,
+                    pf_allow_partial,
+                    pf_raise_reject,
+                    pf_log,
+                    pf_val_price,
+                    pf_close,
+                    auto_call_seq=False,
+                    ffill_val_price=True,
+                    update_value=False,
+                    max_orders=max_orders,
+                    max_logs=0,
+                ),
+                (),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.asset_flow",
+                portfolio_nb.asset_flow_nb,
+                (pf_target_shape, nb_or, pf_col_map, 2),
+                rust_portfolio.asset_flow_rs,
+                (nb_or, pf_col_idxs, pf_col_lens, pf_target_shape, 2),
+            ),
+            BenchmarkCase(
+                "portfolio.cash_flow",
+                portfolio_nb.cash_flow_nb,
+                (pf_target_shape, nb_or, pf_col_map, False),
+                rust_portfolio.cash_flow_rs,
+                (nb_or, pf_col_idxs, pf_col_lens, pf_target_shape, False),
+            ),
+            BenchmarkCase(
+                "portfolio.total_profit",
+                portfolio_nb.total_profit_nb,
+                (pf_target_shape, pf_close, nb_or, pf_col_map),
+                rust_portfolio.total_profit_rs,
+                (pf_target_shape, pf_close, nb_or, pf_col_idxs, pf_col_lens),
+            ),
+            BenchmarkCase(
+                "portfolio.asset_value",
+                portfolio_nb.asset_value_nb,
+                (pf_close, pf_assets),
+                rust_portfolio.asset_value_rs,
+                (pf_close, pf_assets),
+            ),
+            BenchmarkCase(
+                "portfolio.value",
+                portfolio_nb.value_nb,
+                (pf_cash, pf_av),
+                rust_portfolio.value_rs,
+                (pf_cash, pf_av),
+            ),
+            BenchmarkCase(
+                "portfolio.gross_exposure",
+                portfolio_nb.gross_exposure_nb,
+                (pf_av, pf_cash),
+                rust_portfolio.gross_exposure_rs,
+                (pf_av, pf_cash),
+            ),
+            BenchmarkCase(
+                "portfolio.get_entry_trades",
+                portfolio_nb.get_entry_trades_nb,
+                (nb_or, pf_close, pf_col_map),
+                rust_portfolio.get_entry_trades_rs,
+                (nb_or, pf_close, pf_col_idxs, pf_col_lens),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.get_exit_trades",
+                portfolio_nb.get_exit_trades_nb,
+                (nb_or, pf_close, pf_col_map),
+                rust_portfolio.get_exit_trades_rs,
+                (nb_or, pf_close, pf_col_idxs, pf_col_lens),
+                check=False,
+            ),
+        ]
+
+    cases.extend(portfolio_cases)
     return cases
 
 

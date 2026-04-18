@@ -488,7 +488,7 @@ from vectorbt import _typing as tp
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array
 from vectorbt.generic.ranges import Ranges
-from vectorbt.portfolio import nb
+from vectorbt.portfolio import dispatch, nb
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbt.portfolio.orders import Orders
 from vectorbt.records.decorators import attach_fields, override_field_config
@@ -1400,7 +1400,9 @@ class EntryTrades(Trades):
         """Build `EntryTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        trade_records_arr = nb.get_entry_trades_nb(orders.values, to_2d_array(close), orders.col_mapper.col_map)
+        trade_records_arr = dispatch.get_entry_trades(
+            orders.values, to_2d_array(close), orders.col_mapper.col_map
+        )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
 
@@ -1436,7 +1438,9 @@ class ExitTrades(Trades):
         """Build `ExitTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        trade_records_arr = nb.get_exit_trades_nb(orders.values, to_2d_array(close), orders.col_mapper.col_map)
+        trade_records_arr = dispatch.get_exit_trades(
+            orders.values, to_2d_array(close), orders.col_mapper.col_map
+        )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
 
@@ -1480,5 +1484,5 @@ class Positions(Trades):
         """Build `Positions` from `Trades`."""
         if close is None:
             close = trades.close
-        position_records_arr = nb.get_positions_nb(trades.values, trades.col_mapper.col_map)
+        position_records_arr = dispatch.get_positions(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)

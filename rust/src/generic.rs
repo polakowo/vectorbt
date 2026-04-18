@@ -134,6 +134,19 @@ pub(crate) fn array1_as_slice_cow<'py, T: Copy + Element>(
     }
 }
 
+pub(crate) fn array2_as_slice_cow<'py, T: Copy + Element>(
+    a: &'py PyReadonlyArray2<'py, T>,
+) -> Cow<'py, [T]> {
+    // Only borrow if C-contiguous (standard layout); F-order as_slice returns column-major data
+    if a.as_array().is_standard_layout() {
+        if let Ok(slice) = a.as_slice() {
+            return Cow::Borrowed(slice);
+        }
+    }
+    // Fallback: iterate in logical (row-major) order
+    Cow::Owned(a.as_array().iter().copied().collect())
+}
+
 pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
     if len1 == len2 || len2 == 1 {
         Ok(len1)

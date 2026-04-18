@@ -17,6 +17,8 @@ from vectorbt.records import dispatch as records_dispatch
 from vectorbt.records import nb as records_nb
 from vectorbt.signals import dispatch as signal_dispatch
 from vectorbt.signals import nb as signal_nb
+from vectorbt.portfolio import dispatch
+from vectorbt.portfolio import nb as portfolio_nb
 
 
 def teardown_module():
@@ -1694,3 +1696,312 @@ class TestRecordsRustParity:
         nb_idxs, nb_lens = records_nb.col_map_nb(col_arr, 1)
         np.testing.assert_array_equal(rust_idxs, nb_idxs)
         np.testing.assert_array_equal(rust_lens, nb_lens)
+
+
+@pytest.mark.skipif(not _backend.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+class TestPortfolioRustParity:
+    """Test that portfolio dispatch functions produce identical results via Rust and Numba."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up common test data."""
+        np.random.seed(42)
+        self.close = np.array(
+            [[10.0, 50.0, 100.0], [11.0, 48.0, 105.0], [9.0, 52.0, 95.0], [12.0, 47.0, 110.0], [10.5, 51.0, 108.0]],
+            dtype=np.float64,
+        )
+        self.size = np.array(
+            [[1.0, -1.0, 0.5], [-0.5, 0.5, -0.5], [1.0, -1.0, 1.0], [-1.0, 1.0, -1.0], [0.0, 0.0, 0.0]],
+            dtype=np.float64,
+        )
+        self.target_shape = (5, 3)
+        self.group_lens = np.array([2, 1], dtype=np.int64)
+        self.group_lens_ungrouped = np.array([1, 1, 1], dtype=np.int64)
+        self.init_cash = np.array([100.0, 100.0, 100.0], dtype=np.float64)
+        self.init_cash_grouped = np.array([200.0, 100.0], dtype=np.float64)
+        self.call_seq = np.zeros(self.target_shape, dtype=np.int64)
+        self.call_seq[:, 1] = 1
+        self.call_seq[:, 2] = 0
+
+    def _run_sim(self, backend, **kwargs):
+        """Run simulate_from_orders with given backend."""
+        call_seq = self.call_seq.copy()
+        return dispatch.simulate_from_orders(
+            self.target_shape,
+            self.group_lens_ungrouped,
+            self.init_cash.copy(),
+            call_seq,
+            size=self.size.copy(),
+            price=self.close.copy(),
+            close=self.close.copy(),
+            fees=np.full(self.target_shape, 0.001, dtype=np.float64),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=True,
+            backend=backend,
+            **kwargs,
+        )
+
+    def test_simulate_from_orders_parity(self):
+        """Core simulation produces identical order records."""
+        or_rust, _ = self._run_sim("rust")
+        or_nb, _ = self._run_sim("numba")
+        assert len(or_rust) == len(or_nb)
+        for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
+            np.testing.assert_allclose(or_rust[field], or_nb[field], err_msg=f"Mismatch in {field}")
+
+    def test_simulate_from_orders_auto_call_seq(self):
+        """auto_call_seq produces identical results."""
+        or_rust, _ = self._run_sim("rust", auto_call_seq=True)
+        or_nb, _ = self._run_sim("numba", auto_call_seq=True)
+        assert len(or_rust) == len(or_nb)
+        for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
+            np.testing.assert_allclose(or_rust[field], or_nb[field], err_msg=f"Mismatch in {field}")
+
+    def test_simulate_from_orders_cash_sharing(self):
+        """Cash sharing simulation parity."""
+        call_seq_cs = portfolio_nb.build_call_seq(self.target_shape, self.group_lens, call_seq_type=0)
+        for backend in ("rust", "numba"):
+            or_res, _ = dispatch.simulate_from_orders(
+                self.target_shape,
+                self.group_lens,
+                self.init_cash_grouped.copy(),
+                call_seq_cs.copy(),
+                size=self.size.copy(),
+                price=self.close.copy(),
+                close=self.close.copy(),
+                fees=np.full(self.target_shape, 0.001, dtype=np.float64),
+                max_orders=self.target_shape[0] * self.target_shape[1],
+                max_logs=0,
+                flex_2d=True,
+                backend=backend,
+            )
+            if backend == "rust":
+                or_rust = or_res
+            else:
+                or_nb_res = or_res
+        assert len(or_rust) == len(or_nb_res)
+        for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
+            np.testing.assert_allclose(or_rust[field], or_nb_res[field], err_msg=f"Mismatch in {field}")
+
+    def test_asset_flow_parity(self):
+        """asset_flow dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        for direction in (0, 1, 2):
+            rust = dispatch.asset_flow(self.target_shape, or_nb, col_map, direction, backend="rust")
+            numba = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, direction)
+            np.testing.assert_allclose(rust, numba, err_msg=f"asset_flow mismatch dir={direction}")
+
+    def test_assets_parity(self):
+        """assets dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        af = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, 2)
+        np.testing.assert_allclose(
+            dispatch.assets(af, backend="rust"),
+            portfolio_nb.assets_nb(af),
+        )
+
+    def test_cash_flow_parity(self):
+        """cash_flow dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        for free in (True, False):
+            rust = dispatch.cash_flow(self.target_shape, or_nb, col_map, free, backend="rust")
+            numba = portfolio_nb.cash_flow_nb(self.target_shape, or_nb, col_map, free)
+            np.testing.assert_allclose(rust, numba, err_msg=f"cash_flow mismatch free={free}")
+
+    def test_cash_parity(self):
+        """cash dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        cf = portfolio_nb.cash_flow_nb(self.target_shape, or_nb, col_map, False)
+        np.testing.assert_allclose(
+            dispatch.cash(cf, self.init_cash, backend="rust"),
+            portfolio_nb.cash_nb(cf, self.init_cash),
+        )
+
+    def test_asset_value_parity(self):
+        """asset_value dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        af = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, 2)
+        assets = portfolio_nb.assets_nb(af)
+        np.testing.assert_allclose(
+            dispatch.asset_value(self.close, assets, backend="rust"),
+            portfolio_nb.asset_value_nb(self.close, assets),
+        )
+
+    def test_value_parity(self):
+        """value dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        cf = portfolio_nb.cash_flow_nb(self.target_shape, or_nb, col_map, False)
+        cash = portfolio_nb.cash_nb(cf, self.init_cash)
+        af = portfolio_nb.asset_flow_nb(self.target_shape, or_nb, col_map, 2)
+        assets = portfolio_nb.assets_nb(af)
+        av = portfolio_nb.asset_value_nb(self.close, assets)
+        np.testing.assert_allclose(
+            dispatch.value(cash, av, backend="rust"),
+            portfolio_nb.value_nb(cash, av),
+        )
+
+    def test_total_profit_parity(self):
+        """total_profit dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        np.testing.assert_allclose(
+            dispatch.total_profit(self.target_shape, self.close, or_nb, col_map, backend="rust"),
+            portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map),
+        )
+
+    def test_final_value_parity(self):
+        """final_value dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        tp_ = portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map)
+        np.testing.assert_allclose(
+            dispatch.final_value(tp_, self.init_cash, backend="rust"),
+            portfolio_nb.final_value_nb(tp_, self.init_cash),
+        )
+
+    def test_total_return_parity(self):
+        """total_return dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        tp_ = portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map)
+        np.testing.assert_allclose(
+            dispatch.total_return(tp_, self.init_cash, backend="rust"),
+            portfolio_nb.total_return_nb(tp_, self.init_cash),
+        )
+
+    def test_benchmark_value_parity(self):
+        """benchmark_value dispatch matches numba."""
+        np.testing.assert_allclose(
+            dispatch.benchmark_value(self.close, self.init_cash, backend="rust"),
+            portfolio_nb.benchmark_value_nb(self.close, self.init_cash),
+        )
+
+    def test_gross_exposure_parity(self):
+        """gross_exposure dispatch matches numba."""
+        av = np.random.rand(5, 3).astype(np.float64) * 10
+        cash = np.random.rand(5, 3).astype(np.float64) * 100
+        np.testing.assert_allclose(
+            dispatch.gross_exposure(av, cash, backend="rust"),
+            portfolio_nb.gross_exposure_nb(av, cash),
+        )
+
+    def test_asset_returns_parity(self):
+        """asset_returns dispatch matches numba."""
+        cf = np.random.randn(5, 3).astype(np.float64)
+        av = np.abs(np.random.randn(5, 3).astype(np.float64)) * 10 + 1
+        np.testing.assert_allclose(
+            dispatch.asset_returns(cf, av, backend="rust"),
+            portfolio_nb.asset_returns_nb(cf, av),
+        )
+
+    def test_get_entry_trades_parity(self):
+        """get_entry_trades dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        rust = dispatch.get_entry_trades(or_nb, self.close, col_map, backend="rust")
+        numba = portfolio_nb.get_entry_trades_nb(or_nb, self.close, col_map)
+        assert len(rust) == len(numba)
+        for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
+            np.testing.assert_allclose(rust[field], numba[field], err_msg=f"entry_trades mismatch: {field}")
+
+    def test_get_exit_trades_parity(self):
+        """get_exit_trades dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        rust = dispatch.get_exit_trades(or_nb, self.close, col_map, backend="rust")
+        numba = portfolio_nb.get_exit_trades_nb(or_nb, self.close, col_map)
+        assert len(rust) == len(numba)
+        for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
+            np.testing.assert_allclose(rust[field], numba[field], err_msg=f"exit_trades mismatch: {field}")
+
+    def test_get_positions_parity(self):
+        """get_positions dispatch matches numba."""
+        or_nb, _ = self._run_sim("numba")
+        col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])
+        trades = portfolio_nb.get_exit_trades_nb(or_nb, self.close, col_map)
+        trade_col_map = records_nb.col_map_nb(trades["col"], self.target_shape[1])
+        rust = dispatch.get_positions(trades, trade_col_map, backend="rust")
+        numba = portfolio_nb.get_positions_nb(trades, trade_col_map)
+        assert len(rust) == len(numba)
+        for field in ["id", "col", "size", "entry_idx", "entry_price", "exit_idx", "exit_price", "pnl", "direction"]:
+            np.testing.assert_allclose(rust[field], numba[field], err_msg=f"positions mismatch: {field}")
+
+    def test_grouped_functions_parity(self):
+        """Grouped helper functions match numba."""
+        a = np.random.rand(5, 3).astype(np.float64)
+        gl = np.array([2, 1], dtype=np.int64)
+        np.testing.assert_allclose(
+            dispatch.sum_grouped(a, gl, backend="rust"),
+            portfolio_nb.sum_grouped_nb(a, gl),
+        )
+        np.testing.assert_allclose(
+            dispatch.cash_flow_grouped(a, gl, backend="rust"),
+            portfolio_nb.cash_flow_grouped_nb(a, gl),
+        )
+        np.testing.assert_allclose(
+            dispatch.asset_value_grouped(a, gl, backend="rust"),
+            portfolio_nb.asset_value_grouped_nb(a, gl),
+        )
+        np.testing.assert_allclose(
+            dispatch.init_cash_grouped(self.init_cash, gl, True, backend="rust"),
+            portfolio_nb.init_cash_grouped_nb(self.init_cash, gl, True),
+        )
+        np.testing.assert_allclose(
+            dispatch.init_cash_fn(self.init_cash, gl, False, backend="rust"),
+            portfolio_nb.init_cash_nb(self.init_cash, gl, False),
+        )
+        np.testing.assert_allclose(
+            dispatch.total_profit_grouped(self.init_cash, gl, backend="rust"),
+            portfolio_nb.total_profit_grouped_nb(self.init_cash, gl),
+        )
+        np.testing.assert_allclose(
+            dispatch.benchmark_value_grouped(self.close, gl, self.init_cash_grouped, backend="rust"),
+            portfolio_nb.benchmark_value_grouped_nb(self.close, gl, self.init_cash_grouped),
+        )
+
+    def test_build_call_seq_parity(self):
+        """build_call_seq dispatch matches numba."""
+        for cst in (0, 1):
+            np.testing.assert_array_equal(
+                dispatch.build_call_seq(self.target_shape, self.group_lens, cst, backend="rust"),
+                portfolio_nb.build_call_seq_nb(self.target_shape, self.group_lens, cst),
+            )
+
+    def test_fallback_auto(self):
+        """auto backend falls back to numba for non-float64 arrays."""
+        int32_close = self.close.astype(np.int32)
+        result = dispatch.assets(int32_close, backend="auto")
+        assert result is not None
+
+    def test_f_order_arrays(self):
+        """Rust handles F-order arrays correctly."""
+        close_f = np.asfortranarray(self.close)
+        assets = np.asfortranarray(np.ones_like(self.close))
+        rust = dispatch.asset_value(close_f, assets, backend="rust")
+        numba = portfolio_nb.asset_value_nb(close_f, assets)
+        np.testing.assert_allclose(rust, numba)
+
+    def test_portfolio_end_to_end(self):
+        """Full Portfolio.from_orders workflow produces consistent results."""
+        price = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 5.0], "b": [5.0, 4.0, 3.0, 2.0, 1.0]})
+        size = pd.Series([1.0, -1.0, 1.0, -1.0, 0.0])
+
+        pf = vbt.Portfolio.from_orders(price, size, fees=0.01)
+        assert len(pf.orders.values) == 8
+        assert pf.total_profit().shape == (2,)
+        assert pf.final_value().shape == (2,)
+        assert pf.value().shape == (5, 2)
+        assert pf.returns().shape == (5, 2)
+        assert pf.asset_returns().shape == (5, 2)
+        assert pf.benchmark_value().shape == (5, 2)
+        assert pf.gross_exposure().shape == (5, 2)
+        assert len(pf.entry_trades.values) > 0
+        assert len(pf.exit_trades.values) > 0
+        assert len(pf.positions.values) > 0

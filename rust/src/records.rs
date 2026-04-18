@@ -207,7 +207,7 @@ pub fn col_map_select_rs<'py>(
 }
 
 /// Helper: create an empty numpy array with the given dtype and length.
-fn numpy_empty<'py>(
+pub(crate) fn numpy_empty<'py>(
     py: Python<'py>,
     n: usize,
     dtype: &Bound<'py, pyo3::PyAny>,
@@ -226,7 +226,7 @@ fn numpy_empty<'py>(
 /// # Safety
 /// The caller must ensure the array is contiguous and the returned pointer
 /// is only used while the array is alive.
-unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, usize, usize)> {
+pub(crate) unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, usize, usize)> {
     let arr_obj = arr.as_array_ptr() as *mut numpy::npyffi::PyArrayObject;
     let data = (*arr_obj).data as *mut u8;
     let dtype = arr.getattr("dtype")?;
@@ -235,14 +235,14 @@ unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, us
     Ok((data, itemsize, n))
 }
 
-fn record_col_offset(records: &Bound<'_, pyo3::PyAny>) -> PyResult<usize> {
+pub(crate) fn record_col_offset(records: &Bound<'_, pyo3::PyAny>) -> PyResult<usize> {
     let dtype = records.getattr("dtype")?;
     let fields = dtype.getattr("fields")?;
     let col_field = fields.get_item("col")?;
     col_field.get_item(1)?.extract()
 }
 
-trait AsArrayPtr {
+pub(crate) trait AsArrayPtr {
     fn as_array_ptr(&self) -> *mut pyo3::ffi::PyObject;
 }
 
