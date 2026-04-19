@@ -14,7 +14,6 @@ from vectorbt.signals.factory import SignalFactory
 from vectorbt.utils.config import Config
 from vectorbt.utils.figure import make_figure
 
-
 # ############# RAND ############# #
 
 RAND = SignalFactory(

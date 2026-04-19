@@ -68,12 +68,52 @@ class TestEngineResolution:
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
         assert _engine.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported
 
+        f32_support = _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float32))
+        assert f32_support.supported
+        assert f32_support.requires_conversion
+        assert f32_support.conversions[0].dtype == np.dtype(np.float64)
+
         int_support = _engine.array_compatible_with_rust(np.array([1, 2], dtype=np.int64))
         assert not int_support.supported
-        assert "float64" in int_support.reason
+        assert "cannot be safely cast" in int_support.reason
+
+        int32_support = _engine.array_compatible_with_rust(
+            np.array([1, 2], dtype=np.int32),
+            dtype=np.int64,
+        )
+        assert int32_support.supported
+        assert int32_support.requires_conversion
+
+        unsafe_support = _engine.array_compatible_with_rust(
+            np.array([1.0, 2.0], dtype=np.float64),
+            dtype=np.int64,
+        )
+        assert not unsafe_support.supported
+        assert "cannot be safely cast" in unsafe_support.reason
 
         strided_support = _engine.array_compatible_with_rust(np.array([1.0, 2.0, 3.0])[::2])
         assert strided_support.supported
+
+        exact_support = _engine.exact_array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float32))
+        assert not exact_support.supported
+        assert "exact float64" in exact_support.reason
+
+        assert _engine.array_shape_compatible_with_rust("a", np.ones((2, 3)), (2, 3)).supported
+        shape_support = _engine.array_shape_compatible_with_rust("a", np.ones((3,)), (2, 3))
+        assert not shape_support.supported
+        assert "shape (2, 3)" in shape_support.reason
+
+    def test_prepare_array_for_rust(self):
+        f64_arr = np.array([1.0, 2.0], dtype=np.float64)
+        assert _engine.prepare_array_for_rust(f64_arr, dtype=np.float64) is f64_arr
+
+        f32_arr = np.array([1.0, 2.0], dtype=np.float32)
+        prepared = _engine.prepare_array_for_rust(f32_arr, dtype=np.float64)
+        assert prepared.dtype == np.dtype(np.float64)
+        assert prepared.tolist() == [1.0, 2.0]
+
+        with pytest.raises(ValueError, match="cannot be safely cast"):
+            _engine.prepare_array_for_rust(np.array([1, 2], dtype=np.int64), dtype=np.float64)
 
     def test_global_rust_support_helpers(self):
         assert _engine.combine_rust_support(_engine.RustSupport(True), _engine.RustSupport(True)).supported
@@ -130,6 +170,34 @@ class TestEngineResolution:
 
         with pytest.raises(ValueError, match="callback-accepting"):
             dispatch.apply(np.ones((2, 2)), lambda col, a: a, engine="rust")
+
+    @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+    def test_explicit_rust_accepts_safe_cast_array_inputs(self):
+        f32_arr = np.array([[1.0, np.nan], [3.0, 4.0]], dtype=np.float32)
+
+        np.testing.assert_array_equal(
+            dispatch.fillna(f32_arr, 0, engine="rust"),
+            dispatch.fillna(f32_arr, 0, engine="numba"),
+        )
+
+        np.testing.assert_allclose(
+            returns_dispatch.cum_returns(f32_arr, 1, engine="rust"),
+            returns_dispatch.cum_returns(f32_arr, 1, engine="numba"),
+        )
+
+        np.testing.assert_allclose(dispatch.nansum(f32_arr, engine="rust"), dispatch.nansum(f32_arr, engine="numba"))
+        np.testing.assert_allclose(
+            dispatch.dd_drawdown(
+                np.array([10.0, 8.0], dtype=np.float32),
+                np.array([5.0, 4.0], dtype=np.float32),
+                engine="rust",
+            ),
+            dispatch.dd_drawdown(
+                np.array([10.0, 8.0], dtype=np.float32),
+                np.array([5.0, 4.0], dtype=np.float32),
+                engine="numba",
+            ),
+        )
 
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
@@ -834,6 +902,48 @@ class TestSignalsRustParity:
         assert rust.shape == auto.shape
         np.testing.assert_array_equal(rust.sum(axis=0), n)
 
+    def test_direct_random_dispatch_validates_rust_shapes(self):
+        shape = (8, 2)
+        with pytest.raises(ValueError, match="shape \\(2,\\)"):
+            signal_dispatch.generate_rand(shape, np.array([2, 3, 4], dtype=np.int64), seed=42, engine="rust")
+        with pytest.raises(ValueError, match="shape \\(8, 2\\)"):
+            signal_dispatch.generate_rand_by_prob(
+                shape,
+                np.array([0.2, 0.3], dtype=np.float64),
+                True,
+                True,
+                seed=42,
+                engine="rust",
+            )
+
+    def test_ohlc_stop_requires_exact_mutable_output_dtypes(self):
+        entries = np.array([[True, False], [False, False]], dtype=np.bool_)
+        price = np.array([[1.0, 1.0], [2.0, 2.0]], dtype=np.float64)
+        stop_price_out = np.full(entries.shape, np.nan, dtype=np.float32)
+        stop_type_out = np.full(entries.shape, -1, dtype=np.int64)
+
+        with pytest.raises(ValueError, match="exact float64"):
+            signal_dispatch.generate_ohlc_stop_ex(
+                entries,
+                price,
+                price,
+                price,
+                price,
+                stop_price_out,
+                stop_type_out,
+                np.full(entries.shape, np.nan, dtype=np.float64),
+                np.full(entries.shape, False, dtype=np.bool_),
+                np.full(entries.shape, np.nan, dtype=np.float64),
+                np.full(entries.shape, False, dtype=np.bool_),
+                True,
+                1,
+                True,
+                False,
+                True,
+                True,
+                engine="rust",
+            )
+
     def test_dispatch_matches_numba_for_masks(self):
         entries = np.array(
             [
@@ -1208,6 +1318,38 @@ class TestIndicatorRustParity:
             equal_nan=True,
         )
 
+    def test_dispatch_accepts_safe_cast_secondary_arrays(self):
+        close = np.array(
+            [
+                [1.0, 2.0],
+                [2.0, 3.0],
+                [3.0, 2.0],
+                [4.0, 5.0],
+            ],
+            dtype=np.float32,
+        )
+        high = close.astype(np.float64) * 1.1
+        low = close * np.float32(0.9)
+
+        stoch_cache = indicator_dispatch.stoch_cache(
+            high, low, close, [2], [2], [False], False, engine="rust"
+        )
+        stoch_cache_nb = indicator_nb.stoch_cache_nb(high, low, close, [2], [2], [False], False)
+        for actual, expected in zip(
+            indicator_dispatch.stoch_apply(high, low, close, 2, 2, False, False, stoch_cache, engine="rust"),
+            indicator_nb.stoch_apply_nb(high, low, close, 2, 2, False, False, stoch_cache_nb),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+
+        atr_cache = indicator_dispatch.atr_cache(high, low, close, [2], [False], False, engine="rust")
+        atr_cache_nb = indicator_nb.atr_cache_nb(high, low, close, [2], [False], False)
+        tr = atr_cache[0].astype(np.float32)
+        for actual, expected in zip(
+            indicator_dispatch.atr_apply(high, low, close, 2, False, False, tr, atr_cache[1], engine="rust"),
+            indicator_nb.atr_apply_nb(high, low, close, 2, False, False, tr, atr_cache_nb[1]),
+        ):
+            np.testing.assert_allclose(actual, expected, equal_nan=True)
+
     def test_basic_indicators_match_numba(self):
         close = pd.Series([1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0])
         high = close * 1.1
@@ -1496,6 +1638,28 @@ class TestLabelsRustParity:
         with pytest.raises(ValueError, match="same shape"):
             labels_dispatch.bn_trend_labels(close, local_extrema, engine="rust")
 
+    def test_dispatch_accepts_safe_cast_label_arrays(self):
+        close = np.array(
+            [
+                [1.0, 3.0],
+                [2.0, 2.0],
+                [3.0, 1.0],
+                [2.0, 2.0],
+            ],
+            dtype=np.float32,
+        )
+        local_extrema = labels_dispatch.local_extrema_apply(close, 0.1, 0.1, True, engine="numba").astype(np.int32)
+
+        np.testing.assert_array_equal(
+            labels_dispatch.local_extrema_apply(close, 0.1, 0.1, True, engine="rust"),
+            labels_nb.local_extrema_apply_nb(close, 0.1, 0.1, True),
+        )
+        np.testing.assert_allclose(
+            labels_dispatch.bn_cont_sat_trend_labels(close, local_extrema, 0.1, 0.1, True, engine="rust"),
+            labels_nb.bn_cont_sat_trend_labels_nb(close, local_extrema, 0.1, 0.1, True),
+            equal_nan=True,
+        )
+
     def test_basic_labels_match_numba(self):
         close = pd.DataFrame(
             {
@@ -1712,16 +1876,30 @@ class TestRecordsRustParity:
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
         )
 
-    def test_dispatch_auto_falls_back_for_unsupported_array(self):
+    def test_dispatch_accepts_safe_cast_array(self):
         col_arr_int32 = np.array([0, 0, 1, 1, 2], dtype=np.int32)
-        # auto should fall back to numba
         np.testing.assert_array_equal(
             records_dispatch.col_range(col_arr_int32, 3, engine="auto"),
             records_nb.col_range_nb(col_arr_int32, 3),
         )
-        # explicit rust should raise
-        with pytest.raises(ValueError, match="int64"):
-            records_dispatch.col_range(col_arr_int32, 3, engine="rust")
+        np.testing.assert_array_equal(
+            records_dispatch.col_range(col_arr_int32, 3, engine="rust"),
+            records_nb.col_range_nb(col_arr_int32, 3),
+        )
+
+        col_map_int32 = records_nb.col_map_nb(col_arr_int32, 3)
+        new_cols_int32 = np.array([2, 0], dtype=np.int32)
+        rust_idxs, rust_cols = records_dispatch.col_map_select(col_map_int32, new_cols_int32, engine="rust")
+        nb_idxs, nb_cols = records_nb.col_map_select_nb(col_map_int32, new_cols_int32)
+        np.testing.assert_array_equal(rust_idxs, nb_idxs)
+        np.testing.assert_array_equal(rust_cols, nb_cols)
+
+        mapped_float32 = np.array([10.0, 20.0, 30.0, 40.0, 50.0], dtype=np.float32)
+        np.testing.assert_allclose(
+            records_dispatch.stack_expand_mapped(mapped_float32, col_map_int32, np.nan, engine="rust"),
+            records_nb.stack_expand_mapped_nb(mapped_float32, col_map_int32, np.nan),
+            equal_nan=True,
+        )
 
     def test_empty_arrays(self):
         col_arr = np.array([], dtype=np.int64)
@@ -1901,6 +2079,103 @@ class TestPortfolioRustParity:
         assert len(or_rust) == len(or_nb)
         for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
             np.testing.assert_allclose(or_rust[field], or_nb[field], err_msg=f"Mismatch in {field}")
+
+    def test_simulate_from_orders_prepares_readonly_base_arrays(self):
+        call_seq_rust = self.call_seq.copy()
+        rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
+            self.target_shape,
+            self.group_lens_ungrouped.astype(np.int32),
+            self.init_cash.astype(np.float32),
+            call_seq_rust,
+            size=self.size.astype(np.float32),
+            price=self.close.astype(np.float32),
+            close=self.close.astype(np.float32),
+            fees=np.full(self.target_shape, 0.001, dtype=np.float32),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=True,
+            engine="rust",
+        )
+        numba_orders, numba_logs = portfolio_dispatch.simulate_from_orders(
+            self.target_shape,
+            self.group_lens_ungrouped.astype(np.int32),
+            self.init_cash.astype(np.float32),
+            self.call_seq.copy(),
+            size=self.size.astype(np.float32),
+            price=self.close.astype(np.float32),
+            close=self.close.astype(np.float32),
+            fees=np.full(self.target_shape, 0.001, dtype=np.float32),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=True,
+            engine="numba",
+        )
+        record_arrays_close(rust_orders, numba_orders)
+        record_arrays_close(rust_logs, numba_logs)
+
+    def test_simulate_from_orders_requires_exact_mutable_call_seq_dtype(self):
+        with pytest.raises(ValueError, match="exact int64"):
+            portfolio_dispatch.simulate_from_orders(
+                self.target_shape,
+                self.group_lens_ungrouped,
+                self.init_cash.copy(),
+                self.call_seq.astype(np.int32),
+                size=self.size.copy(),
+                price=self.close.copy(),
+                close=self.close.copy(),
+                max_orders=self.target_shape[0] * self.target_shape[1],
+                max_logs=0,
+                flex_2d=True,
+                engine="rust",
+            )
+
+    def test_simulate_from_orders_validates_flexible_inputs_before_rust(self):
+        with pytest.raises(ValueError, match="`size` to broadcast"):
+            portfolio_dispatch.simulate_from_orders(
+                self.target_shape,
+                self.group_lens_ungrouped,
+                self.init_cash.copy(),
+                self.call_seq.copy(),
+                size=np.ones((2, 2), dtype=np.float64),
+                price=self.close.copy(),
+                close=self.close.copy(),
+                max_orders=self.target_shape[0] * self.target_shape[1],
+                max_logs=0,
+                flex_2d=True,
+                engine="rust",
+            )
+
+        with pytest.raises(ValueError, match="`size` to be float64-compatible"):
+            portfolio_dispatch.simulate_from_orders(
+                self.target_shape,
+                self.group_lens_ungrouped,
+                self.init_cash.copy(),
+                self.call_seq.copy(),
+                size=np.full(self.target_shape, "x"),
+                price=self.close.copy(),
+                close=self.close.copy(),
+                max_orders=self.target_shape[0] * self.target_shape[1],
+                max_logs=0,
+                flex_2d=True,
+                engine="rust",
+            )
+
+    def test_simulate_from_signals_validates_flexible_inputs_before_rust(self):
+        with pytest.raises(ValueError, match="`entries` to broadcast"):
+            portfolio_dispatch.simulate_from_signals(
+                self.target_shape,
+                self.group_lens_ungrouped,
+                self.init_cash.copy(),
+                self.call_seq.copy(),
+                entries=np.ones((2, 2), dtype=np.bool_),
+                exits=np.zeros(self.target_shape, dtype=np.bool_),
+                price=self.close.copy(),
+                close=self.close.copy(),
+                max_orders=self.target_shape[0] * self.target_shape[1],
+                max_logs=0,
+                flex_2d=True,
+                engine="rust",
+            )
 
     def test_simulate_from_orders_auto_call_seq(self):
         """auto_call_seq produces identical results."""

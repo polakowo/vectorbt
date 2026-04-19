@@ -8,13 +8,13 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt._engine import (
     array_compatible_with_rust,
+    prepare_array_for_rust,
     combine_rust_support,
     flex_broadcast_to_shape,
     matching_shape_compatible_with_rust,
     non_neg_int_compatible_with_rust,
     resolve_engine,
 )
-from vectorbt.labels.enums import TrendMode
 
 
 def future_mean_apply(
@@ -37,6 +37,7 @@ def future_mean_apply(
     if eng == "rust":
         from vectorbt_rust.labels import future_mean_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return future_mean_apply_rs(close, window, ewm, wait, adjust)
     from vectorbt.labels.nb import future_mean_apply_nb
 
@@ -65,6 +66,7 @@ def future_std_apply(
     if eng == "rust":
         from vectorbt_rust.labels import future_std_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return future_std_apply_rs(close, window, ewm, wait, adjust, ddof)
     from vectorbt.labels.nb import future_std_apply_nb
 
@@ -89,6 +91,7 @@ def future_min_apply(
     if eng == "rust":
         from vectorbt_rust.labels import future_min_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return future_min_apply_rs(close, window, wait)
     from vectorbt.labels.nb import future_min_apply_nb
 
@@ -113,6 +116,7 @@ def future_max_apply(
     if eng == "rust":
         from vectorbt_rust.labels import future_max_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return future_max_apply_rs(close, window, wait)
     from vectorbt.labels.nb import future_max_apply_nb
 
@@ -135,6 +139,7 @@ def fixed_labels_apply(
     if eng == "rust":
         from vectorbt_rust.labels import fixed_labels_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return fixed_labels_apply_rs(close, n)
     from vectorbt.labels.nb import fixed_labels_apply_nb
 
@@ -161,6 +166,7 @@ def mean_labels_apply(
     if eng == "rust":
         from vectorbt_rust.labels import mean_labels_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return mean_labels_apply_rs(close, window, ewm, wait, adjust)
     from vectorbt.labels.nb import mean_labels_apply_nb
 
@@ -184,6 +190,7 @@ def local_extrema_apply(
 
         pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
         neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return local_extrema_apply_rs(close, pos_th, neg_th)
     from vectorbt.labels.nb import local_extrema_apply_nb
 
@@ -207,6 +214,8 @@ def bn_trend_labels(
     if eng == "rust":
         from vectorbt_rust.labels import bn_trend_labels_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        local_extrema = prepare_array_for_rust(local_extrema, dtype=np.int64)
         return bn_trend_labels_rs(close, local_extrema)
     from vectorbt.labels.nb import bn_trend_labels_nb
 
@@ -230,6 +239,8 @@ def bn_cont_trend_labels(
     if eng == "rust":
         from vectorbt_rust.labels import bn_cont_trend_labels_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        local_extrema = prepare_array_for_rust(local_extrema, dtype=np.int64)
         return bn_cont_trend_labels_rs(close, local_extrema)
     from vectorbt.labels.nb import bn_cont_trend_labels_nb
 
@@ -258,6 +269,8 @@ def bn_cont_sat_trend_labels(
 
         pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
         neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        local_extrema = prepare_array_for_rust(local_extrema, dtype=np.int64)
         return bn_cont_sat_trend_labels_rs(close, local_extrema, pos_th, neg_th)
     from vectorbt.labels.nb import bn_cont_sat_trend_labels_nb
 
@@ -282,6 +295,8 @@ def pct_trend_labels(
     if eng == "rust":
         from vectorbt_rust.labels import pct_trend_labels_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        local_extrema = prepare_array_for_rust(local_extrema, dtype=np.int64)
         return pct_trend_labels_rs(close, local_extrema, normalize)
     from vectorbt.labels.nb import pct_trend_labels_nb
 
@@ -306,6 +321,7 @@ def trend_labels_apply(
 
         pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
         neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return trend_labels_apply_rs(close, pos_th, neg_th, int(mode))
     from vectorbt.labels.nb import trend_labels_apply_nb
 
@@ -335,6 +351,7 @@ def breakout_labels(
 
         pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
         neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return breakout_labels_rs(close, window, pos_th, neg_th, wait)
     from vectorbt.labels.nb import breakout_labels_nb
 

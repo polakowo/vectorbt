@@ -16,6 +16,17 @@ _rust_status: tp.Optional[bool] = None
 
 
 @dataclass(frozen=True)
+class RustConversion:
+    """Array conversion required before calling the Rust engine."""
+
+    dtype: np.dtype = field()
+    """Target NumPy dtype expected by Rust."""
+
+    n_elements: int = field()
+    """Number of array elements to be converted."""
+
+
+@dataclass(frozen=True)
 class RustSupport:
     """Rust support result for an engine-neutral function call."""
 
@@ -24,6 +35,14 @@ class RustSupport:
 
     reason: str = field(default="")
     """Reason shown when this function call cannot use the Rust engine."""
+
+    conversions: tp.Tuple[RustConversion, ...] = field(default_factory=tuple)
+    """Soft array conversions required before calling Rust."""
+
+    @property
+    def requires_conversion(self) -> bool:
+        """Whether this call needs any soft conversion before Rust dispatch."""
+        return len(self.conversions) > 0
 
     def __bool__(self) -> bool:
         return self.supported
@@ -68,12 +87,14 @@ def callback_unsupported_with_rust() -> RustSupport:
 
 def combine_rust_support(*support_results: RustSupport) -> RustSupport:
     """Return the first unsupported Rust support result."""
+    conversions = []
     for support in support_results:
         if not isinstance(support, RustSupport):
             raise TypeError("Each support result must be a RustSupport instance.")
         if not support.supported:
             return support
-    return RustSupport(True)
+        conversions.extend(support.conversions)
+    return RustSupport(True, conversions=tuple(conversions))
 
 
 def non_neg_int_compatible_with_rust(name: str, value: tp.Optional[int]) -> RustSupport:
@@ -87,11 +108,46 @@ def array_compatible_with_rust(a: tp.Any, dtype: tp.Any = np.float64) -> RustSup
     """Return whether the array is compatible with the Rust engine."""
     if not isinstance(a, np.ndarray):
         return RustSupport(False, "Rust engine requires a NumPy array.")
+    dtype = np.dtype(dtype)
     if a.dtype != dtype:
-        return RustSupport(False, f"Rust engine requires {np.dtype(dtype).name} arrays.")
+        same_kind = a.dtype.kind == dtype.kind or (a.dtype.kind in "iu" and dtype.kind in "iu")
+        if not same_kind or not np.can_cast(a.dtype, dtype, casting="safe"):
+            return RustSupport(
+                False,
+                f"Rust engine requires {dtype.name} arrays and `{a.dtype.name}` cannot be safely cast.",
+            )
+        if a.ndim not in (1, 2):
+            return RustSupport(False, "Rust engine requires 1D or 2D arrays.")
+        return RustSupport(True, conversions=(RustConversion(dtype, a.size),))
     if a.ndim not in (1, 2):
         return RustSupport(False, "Rust engine requires 1D or 2D arrays.")
     return RustSupport(True)
+
+
+def exact_array_compatible_with_rust(a: tp.Any, dtype: tp.Any = np.float64) -> RustSupport:
+    """Return whether the array already has the exact dtype expected by Rust."""
+    support = array_compatible_with_rust(a, dtype=dtype)
+    if not support.supported:
+        return support
+    if support.requires_conversion:
+        dtype = np.dtype(dtype)
+        return RustSupport(False, f"Rust engine requires exact {dtype.name} arrays for mutable arguments.")
+    return support
+
+
+def prepare_array_for_rust(a: tp.Any, dtype: tp.Any = np.float64) -> tp.Array:
+    """Return `a` as the exact dtype expected by Rust.
+
+    Exact dtype arrays are returned unchanged. Other arrays are accepted only
+    when NumPy considers the cast safe.
+    """
+    support = array_compatible_with_rust(a, dtype=dtype)
+    if not support.supported:
+        raise ValueError(support.reason)
+    dtype = np.dtype(dtype)
+    if a.dtype == dtype:
+        return a
+    return np.asarray(a, dtype=dtype)
 
 
 def matching_shape_compatible_with_rust(name: str, a: tp.Any, other: tp.Any) -> RustSupport:
@@ -101,6 +157,51 @@ def matching_shape_compatible_with_rust(name: str, a: tp.Any, other: tp.Any) -> 
     if a.shape != other.shape:
         return RustSupport(False, f"Rust engine requires `{name}` to have the same shape as input.")
     return RustSupport(True)
+
+
+def array_shape_compatible_with_rust(name: str, a: tp.Any, shape: tp.Shape) -> RustSupport:
+    """Return whether an array has the exact shape required by Rust."""
+    if not isinstance(a, np.ndarray):
+        return RustSupport(False, f"Rust engine requires `{name}` to be a NumPy array.")
+    if a.shape != tuple(shape):
+        return RustSupport(False, f"Rust engine requires `{name}` to have shape {tuple(shape)}.")
+    return RustSupport(True)
+
+
+def flex_array_compatible_with_rust(
+    name: str,
+    a: tp.Any,
+    shape: tp.Shape,
+    dtype: tp.Any = np.float64,
+    flex_2d: bool = True,
+) -> RustSupport:
+    """Return whether an array-like can be broadcast and cast before Rust dispatch."""
+    arr = np.asarray(a)
+    dtype = np.dtype(dtype)
+    if arr.ndim == 0:
+        try:
+            np.asarray(a, dtype=dtype)
+        except (TypeError, ValueError):
+            return RustSupport(False, f"Rust engine requires `{name}` to be convertible to {dtype.name}.")
+        support = RustSupport(True)
+        if arr.dtype != dtype:
+            support = RustSupport(True, conversions=(RustConversion(dtype, 1),))
+    else:
+        support = array_compatible_with_rust(arr, dtype=dtype)
+        if not support.supported:
+            return RustSupport(False, f"Rust engine requires `{name}` to be {dtype.name}-compatible.")
+    try:
+        if arr.ndim == 1 and len(shape) == 2:
+            if flex_2d:
+                arr = arr.reshape(1, -1)
+            else:
+                arr = arr.reshape(-1, 1)
+        else:
+            arr = reshape_fns.to_2d_array(arr)
+        np.broadcast_to(arr, shape)
+    except ValueError:
+        return RustSupport(False, f"Rust engine requires `{name}` to broadcast to shape {tuple(shape)}.")
+    return support
 
 
 def scalar_compatible_with_rust(name: str, value: tp.Any) -> RustSupport:
@@ -162,11 +263,9 @@ def col_range_compatible_with_rust(col_range: tp.Any) -> RustSupport:
     """Return whether a ColRange (2D int64 array) is compatible with the Rust engine."""
     if not isinstance(col_range, np.ndarray):
         return RustSupport(False, "Rust engine requires `col_range` to be a NumPy array.")
-    if col_range.dtype != np.int64:
-        return RustSupport(False, "Rust engine requires `col_range` to be int64.")
     if col_range.ndim != 2 or col_range.shape[1] != 2:
         return RustSupport(False, "Rust engine requires `col_range` to have shape (n_cols, 2).")
-    return RustSupport(True)
+    return array_compatible_with_rust(col_range, dtype=np.int64)
 
 
 def col_map_compatible_with_rust(col_map: tp.Any) -> RustSupport:

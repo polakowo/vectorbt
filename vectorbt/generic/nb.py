@@ -29,8 +29,8 @@ array([nan, 1.5, 2.5, 3.5])
 
 import numpy as np
 from numba import njit
-from numba.extending import overload
 from numba.core.types import Type, Omitted
+from numba.extending import overload
 from numba.np.numpy_support import as_dtype
 from numba.typed import Dict
 

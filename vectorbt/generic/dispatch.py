@@ -6,10 +6,10 @@
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
 from vectorbt._engine import (
     array_and_non_neg_int_compatible_with_rust,
     array_compatible_with_rust,
+    prepare_array_for_rust,
     callback_unsupported_with_rust,
     col_map_compatible_with_rust,
     combine_rust_support,
@@ -23,6 +23,7 @@ from vectorbt._engine import (
     rolling_compatible_with_rust,
     scalar_compatible_with_rust,
 )
+from vectorbt.utils import checks
 
 
 def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, engine: tp.Optional[str] = None) -> tp.Array1d:
@@ -42,6 +43,7 @@ def shuffle_1d(a: tp.Array1d, seed: tp.Optional[int] = None, engine: tp.Optional
     if eng == "rust":
         from vectorbt_rust.generic import shuffle_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return shuffle_1d_rs(a, seed)
     from vectorbt.generic.nb import shuffle_1d_nb
 
@@ -65,6 +67,7 @@ def shuffle(a: tp.Array2d, seed: tp.Optional[int] = None, engine: tp.Optional[st
     if eng == "rust":
         from vectorbt_rust.generic import shuffle_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return shuffle_rs(a, seed)
     from vectorbt.generic.nb import shuffle_nb
 
@@ -88,6 +91,8 @@ def set_by_mask_1d(
     if eng == "rust":
         from vectorbt_rust.generic import set_by_mask_1d_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
+        mask = prepare_array_for_rust(mask, dtype=np.bool_)
         return set_by_mask_1d_rs(arr, mask, value)
     from vectorbt.generic.nb import set_by_mask_1d_nb
 
@@ -111,6 +116,8 @@ def set_by_mask(
     if eng == "rust":
         from vectorbt_rust.generic import set_by_mask_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
+        mask = prepare_array_for_rust(mask, dtype=np.bool_)
         return set_by_mask_rs(arr, mask, value)
     from vectorbt.generic.nb import set_by_mask_nb
 
@@ -128,6 +135,9 @@ def set_by_mask_mult_1d(
     if eng == "rust":
         from vectorbt_rust.generic import set_by_mask_mult_1d_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
+        mask = prepare_array_for_rust(mask, dtype=np.bool_)
+        values = prepare_array_for_rust(values, dtype=np.float64)
         return set_by_mask_mult_1d_rs(arr, mask, values)
     from vectorbt.generic.nb import set_by_mask_mult_1d_nb
 
@@ -145,6 +155,9 @@ def set_by_mask_mult(
     if eng == "rust":
         from vectorbt_rust.generic import set_by_mask_mult_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
+        mask = prepare_array_for_rust(mask, dtype=np.bool_)
+        values = prepare_array_for_rust(values, dtype=np.float64)
         return set_by_mask_mult_rs(arr, mask, values)
     from vectorbt.generic.nb import set_by_mask_mult_nb
 
@@ -163,6 +176,7 @@ def fillna_1d(a: tp.Array1d, value: tp.Scalar, engine: tp.Optional[str] = None) 
     if eng == "rust":
         from vectorbt_rust.generic import fillna_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return fillna_1d_rs(a, value)
     from vectorbt.generic.nb import fillna_1d_nb
 
@@ -181,6 +195,7 @@ def fillna(a: tp.Array2d, value: tp.Scalar, engine: tp.Optional[str] = None) -> 
     if eng == "rust":
         from vectorbt_rust.generic import fillna_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return fillna_rs(a, value)
     from vectorbt.generic.nb import fillna_nb
 
@@ -204,6 +219,7 @@ def bshift_1d(
     if eng == "rust":
         from vectorbt_rust.generic import bshift_1d_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return bshift_1d_rs(arr, n, fill_value)
     from vectorbt.generic.nb import bshift_1d_nb
 
@@ -227,6 +243,7 @@ def bshift(
     if eng == "rust":
         from vectorbt_rust.generic import bshift_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return bshift_rs(arr, n, fill_value)
     from vectorbt.generic.nb import bshift_nb
 
@@ -250,6 +267,7 @@ def fshift_1d(
     if eng == "rust":
         from vectorbt_rust.generic import fshift_1d_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return fshift_1d_rs(arr, n, fill_value)
     from vectorbt.generic.nb import fshift_1d_nb
 
@@ -273,6 +291,7 @@ def fshift(
     if eng == "rust":
         from vectorbt_rust.generic import fshift_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return fshift_rs(arr, n, fill_value)
     from vectorbt.generic.nb import fshift_nb
 
@@ -285,6 +304,7 @@ def diff_1d(a: tp.Array1d, n: int = 1, engine: tp.Optional[str] = None) -> tp.Ar
     if eng == "rust":
         from vectorbt_rust.generic import diff_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return diff_1d_rs(a, n)
     from vectorbt.generic.nb import diff_1d_nb
 
@@ -297,6 +317,7 @@ def diff(a: tp.Array2d, n: int = 1, engine: tp.Optional[str] = None) -> tp.Array
     if eng == "rust":
         from vectorbt_rust.generic import diff_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return diff_rs(a, n)
     from vectorbt.generic.nb import diff_nb
 
@@ -309,6 +330,7 @@ def pct_change_1d(a: tp.Array1d, n: int = 1, engine: tp.Optional[str] = None) ->
     if eng == "rust":
         from vectorbt_rust.generic import pct_change_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return pct_change_1d_rs(a, n)
     from vectorbt.generic.nb import pct_change_1d_nb
 
@@ -321,6 +343,7 @@ def pct_change(a: tp.Array2d, n: int = 1, engine: tp.Optional[str] = None) -> tp
     if eng == "rust":
         from vectorbt_rust.generic import pct_change_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return pct_change_rs(a, n)
     from vectorbt.generic.nb import pct_change_nb
 
@@ -333,6 +356,7 @@ def bfill_1d(a: tp.Array1d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import bfill_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return bfill_1d_rs(a)
     from vectorbt.generic.nb import bfill_1d_nb
 
@@ -345,6 +369,7 @@ def bfill(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
     if eng == "rust":
         from vectorbt_rust.generic import bfill_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return bfill_rs(a)
     from vectorbt.generic.nb import bfill_nb
 
@@ -357,6 +382,7 @@ def ffill_1d(a: tp.Array1d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import ffill_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ffill_1d_rs(a)
     from vectorbt.generic.nb import ffill_1d_nb
 
@@ -369,6 +395,7 @@ def ffill(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
     if eng == "rust":
         from vectorbt_rust.generic import ffill_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ffill_rs(a)
     from vectorbt.generic.nb import ffill_nb
 
@@ -381,6 +408,7 @@ def nanprod(arr: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nanprod_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return nanprod_rs(arr)
     from vectorbt.generic.nb import nanprod_nb
 
@@ -393,6 +421,7 @@ def nancumsum(arr: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
     if eng == "rust":
         from vectorbt_rust.generic import nancumsum_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return nancumsum_rs(arr)
     from vectorbt.generic.nb import nancumsum_nb
 
@@ -405,6 +434,7 @@ def nancumprod(arr: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
     if eng == "rust":
         from vectorbt_rust.generic import nancumprod_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return nancumprod_rs(arr)
     from vectorbt.generic.nb import nancumprod_nb
 
@@ -417,6 +447,7 @@ def nansum(arr: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nansum_rs
 
+        arr = prepare_array_for_rust(arr, dtype=np.float64)
         return nansum_rs(arr)
     from vectorbt.generic.nb import nansum_nb
 
@@ -429,6 +460,7 @@ def nancnt(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nancnt_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nancnt_rs(a)
     from vectorbt.generic.nb import nancnt_nb
 
@@ -441,6 +473,7 @@ def nanmin(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nanmin_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanmin_rs(a)
     from vectorbt.generic.nb import nanmin_nb
 
@@ -453,6 +486,7 @@ def nanmax(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nanmax_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanmax_rs(a)
     from vectorbt.generic.nb import nanmax_nb
 
@@ -465,6 +499,7 @@ def nanmean(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nanmean_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanmean_rs(a)
     from vectorbt.generic.nb import nanmean_nb
 
@@ -477,6 +512,7 @@ def nanmedian(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
     if eng == "rust":
         from vectorbt_rust.generic import nanmedian_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanmedian_rs(a)
     from vectorbt.generic.nb import nanmedian_nb
 
@@ -495,6 +531,7 @@ def nanstd_1d(a: tp.Array1d, ddof: int = 0, engine: tp.Optional[str] = None) -> 
     if eng == "rust":
         from vectorbt_rust.generic import nanstd_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanstd_1d_rs(a, ddof)
     from vectorbt.generic.nb import nanstd_1d_nb
 
@@ -513,6 +550,7 @@ def nanstd(a: tp.Array2d, ddof: int = 0, engine: tp.Optional[str] = None) -> tp.
     if eng == "rust":
         from vectorbt_rust.generic import nanstd_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nanstd_rs(a, ddof)
     from vectorbt.generic.nb import nanstd_nb
 
@@ -533,6 +571,7 @@ def rolling_min_1d(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_min_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_min_1d_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_min_1d_nb
 
@@ -550,6 +589,7 @@ def rolling_min(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_min_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_min_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_min_nb
 
@@ -567,6 +607,7 @@ def rolling_max_1d(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_max_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_max_1d_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_max_1d_nb
 
@@ -584,6 +625,7 @@ def rolling_max(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_max_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_max_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_max_nb
 
@@ -601,6 +643,7 @@ def rolling_mean_1d(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_mean_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_mean_1d_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_mean_1d_nb
 
@@ -618,6 +661,7 @@ def rolling_mean(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_mean_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_mean_rs(a, window, minp)
     from vectorbt.generic.nb import rolling_mean_nb
 
@@ -642,6 +686,7 @@ def rolling_std_1d(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_std_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_std_1d_rs(a, window, minp, ddof)
     from vectorbt.generic.nb import rolling_std_1d_nb
 
@@ -666,6 +711,7 @@ def rolling_std(
     if eng == "rust":
         from vectorbt_rust.generic import rolling_std_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return rolling_std_rs(a, window, minp, ddof)
     from vectorbt.generic.nb import rolling_std_nb
 
@@ -693,6 +739,7 @@ def ewm_mean_1d(
     if eng == "rust":
         from vectorbt_rust.generic import ewm_mean_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ewm_mean_1d_rs(a, span, minp, adjust)
     from vectorbt.generic.nb import ewm_mean_1d_nb
 
@@ -720,6 +767,7 @@ def ewm_mean(
     if eng == "rust":
         from vectorbt_rust.generic import ewm_mean_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ewm_mean_rs(a, span, minp, adjust)
     from vectorbt.generic.nb import ewm_mean_nb
 
@@ -749,6 +797,7 @@ def ewm_std_1d(
     if eng == "rust":
         from vectorbt_rust.generic import ewm_std_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ewm_std_1d_rs(a, span, minp, adjust, ddof)
     from vectorbt.generic.nb import ewm_std_1d_nb
 
@@ -778,6 +827,7 @@ def ewm_std(
     if eng == "rust":
         from vectorbt_rust.generic import ewm_std_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ewm_std_rs(a, span, minp, adjust, ddof)
     from vectorbt.generic.nb import ewm_std_nb
 
@@ -799,6 +849,7 @@ def expanding_min_1d(a: tp.Array1d, minp: int = 1, engine: tp.Optional[str] = No
     if eng == "rust":
         from vectorbt_rust.generic import expanding_min_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_min_1d_rs(a, minp)
     from vectorbt.generic.nb import expanding_min_1d_nb
 
@@ -817,6 +868,7 @@ def expanding_min(a: tp.Array2d, minp: int = 1, engine: tp.Optional[str] = None)
     if eng == "rust":
         from vectorbt_rust.generic import expanding_min_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_min_rs(a, minp)
     from vectorbt.generic.nb import expanding_min_nb
 
@@ -835,6 +887,7 @@ def expanding_max_1d(a: tp.Array1d, minp: int = 1, engine: tp.Optional[str] = No
     if eng == "rust":
         from vectorbt_rust.generic import expanding_max_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_max_1d_rs(a, minp)
     from vectorbt.generic.nb import expanding_max_1d_nb
 
@@ -853,6 +906,7 @@ def expanding_max(a: tp.Array2d, minp: int = 1, engine: tp.Optional[str] = None)
     if eng == "rust":
         from vectorbt_rust.generic import expanding_max_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_max_rs(a, minp)
     from vectorbt.generic.nb import expanding_max_nb
 
@@ -871,6 +925,7 @@ def expanding_mean_1d(a: tp.Array1d, minp: int = 1, engine: tp.Optional[str] = N
     if eng == "rust":
         from vectorbt_rust.generic import expanding_mean_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_mean_1d_rs(a, minp)
     from vectorbt.generic.nb import expanding_mean_1d_nb
 
@@ -889,6 +944,7 @@ def expanding_mean(a: tp.Array2d, minp: int = 1, engine: tp.Optional[str] = None
     if eng == "rust":
         from vectorbt_rust.generic import expanding_mean_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_mean_rs(a, minp)
     from vectorbt.generic.nb import expanding_mean_nb
 
@@ -913,6 +969,7 @@ def expanding_std_1d(
     if eng == "rust":
         from vectorbt_rust.generic import expanding_std_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_std_1d_rs(a, minp, ddof)
     from vectorbt.generic.nb import expanding_std_1d_nb
 
@@ -937,6 +994,7 @@ def expanding_std(
     if eng == "rust":
         from vectorbt_rust.generic import expanding_std_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return expanding_std_rs(a, minp, ddof)
     from vectorbt.generic.nb import expanding_std_nb
 
@@ -1174,6 +1232,7 @@ def flatten_forder(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d
     if eng == "rust":
         from vectorbt_rust.generic import flatten_forder_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return flatten_forder_rs(a)
     from vectorbt.generic.nb import flatten_forder_nb
 
@@ -1296,6 +1355,8 @@ def flatten_grouped(
     if eng == "rust":
         from vectorbt_rust.generic import flatten_grouped_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return flatten_grouped_rs(a, group_lens, in_c_order)
     from vectorbt.generic.nb import flatten_grouped_nb
 
@@ -1319,6 +1380,8 @@ def flatten_uniform_grouped(
     if eng == "rust":
         from vectorbt_rust.generic import flatten_uniform_grouped_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return flatten_uniform_grouped_rs(a, group_lens, in_c_order)
     from vectorbt.generic.nb import flatten_uniform_grouped_nb
 
@@ -1334,6 +1397,7 @@ def nth_reduce(col: int, a: tp.Array1d, n: int, engine: tp.Optional[str] = None)
     if eng == "rust":
         from vectorbt_rust.generic import nth_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nth_reduce_rs(a, n)
     from vectorbt.generic.nb import nth_reduce_nb
 
@@ -1346,6 +1410,7 @@ def nth_index_reduce(col: int, a: tp.Array1d, n: int, engine: tp.Optional[str] =
     if eng == "rust":
         from vectorbt_rust.generic import nth_index_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return nth_index_reduce_rs(a, n)
     from vectorbt.generic.nb import nth_index_reduce_nb
 
@@ -1358,6 +1423,7 @@ def min_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> floa
     if eng == "rust":
         from vectorbt_rust.generic import min_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return min_reduce_rs(a)
     from vectorbt.generic.nb import min_reduce_nb
 
@@ -1370,6 +1436,7 @@ def max_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> floa
     if eng == "rust":
         from vectorbt_rust.generic import max_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return max_reduce_rs(a)
     from vectorbt.generic.nb import max_reduce_nb
 
@@ -1382,6 +1449,7 @@ def mean_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> flo
     if eng == "rust":
         from vectorbt_rust.generic import mean_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return mean_reduce_rs(a)
     from vectorbt.generic.nb import mean_reduce_nb
 
@@ -1394,6 +1462,7 @@ def median_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> f
     if eng == "rust":
         from vectorbt_rust.generic import median_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return median_reduce_rs(a)
     from vectorbt.generic.nb import median_reduce_nb
 
@@ -1412,6 +1481,7 @@ def std_reduce(col: int, a: tp.Array1d, ddof: int, engine: tp.Optional[str] = No
     if eng == "rust":
         from vectorbt_rust.generic import std_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return std_reduce_rs(a, ddof)
     from vectorbt.generic.nb import std_reduce_nb
 
@@ -1424,6 +1494,7 @@ def sum_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> floa
     if eng == "rust":
         from vectorbt_rust.generic import sum_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return sum_reduce_rs(a)
     from vectorbt.generic.nb import sum_reduce_nb
 
@@ -1436,6 +1507,7 @@ def count_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> in
     if eng == "rust":
         from vectorbt_rust.generic import count_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return count_reduce_rs(a)
     from vectorbt.generic.nb import count_reduce_nb
 
@@ -1448,6 +1520,7 @@ def argmin_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> i
     if eng == "rust":
         from vectorbt_rust.generic import argmin_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return argmin_reduce_rs(a)
     from vectorbt.generic.nb import argmin_reduce_nb
 
@@ -1460,6 +1533,7 @@ def argmax_reduce(col: int, a: tp.Array1d, engine: tp.Optional[str] = None) -> i
     if eng == "rust":
         from vectorbt_rust.generic import argmax_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return argmax_reduce_rs(a)
     from vectorbt.generic.nb import argmax_reduce_nb
 
@@ -1485,6 +1559,8 @@ def describe_reduce(
     if eng == "rust":
         from vectorbt_rust.generic import describe_reduce_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
+        perc = prepare_array_for_rust(perc, dtype=np.float64)
         return describe_reduce_rs(a, perc, ddof)
     from vectorbt.generic.nb import describe_reduce_nb
 
@@ -1512,6 +1588,8 @@ def value_counts(
     if eng == "rust":
         from vectorbt_rust.generic import value_counts_rs
 
+        codes = prepare_array_for_rust(codes, dtype=np.int64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return value_counts_rs(codes, n_uniques, group_lens)
     from vectorbt.generic.nb import value_counts_nb
 
@@ -1527,6 +1605,7 @@ def min_squeeze(col: int, group: int, a: tp.Array1d, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.generic import min_squeeze_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return min_squeeze_rs(a)
     from vectorbt.generic.nb import min_squeeze_nb
 
@@ -1539,6 +1618,7 @@ def max_squeeze(col: int, group: int, a: tp.Array1d, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.generic import max_squeeze_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return max_squeeze_rs(a)
     from vectorbt.generic.nb import max_squeeze_nb
 
@@ -1551,6 +1631,7 @@ def sum_squeeze(col: int, group: int, a: tp.Array1d, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.generic import sum_squeeze_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return sum_squeeze_rs(a)
     from vectorbt.generic.nb import sum_squeeze_nb
 
@@ -1563,6 +1644,7 @@ def any_squeeze(col: int, group: int, a: tp.Array1d, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.generic import any_squeeze_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return any_squeeze_rs(a)
     from vectorbt.generic.nb import any_squeeze_nb
 
@@ -1584,6 +1666,7 @@ def find_ranges(ts: tp.Array2d, gap_value: tp.Scalar, engine: tp.Optional[str] =
     if eng == "rust":
         from vectorbt_rust.generic import find_ranges_rs
 
+        ts = prepare_array_for_rust(ts, dtype=np.float64)
         return find_ranges_rs(ts, gap_value)
     from vectorbt.generic.nb import find_ranges_nb
 
@@ -1608,6 +1691,9 @@ def range_duration(
     if eng == "rust":
         from vectorbt_rust.generic import range_duration_rs
 
+        start_idx_arr = prepare_array_for_rust(start_idx_arr, dtype=np.int64)
+        end_idx_arr = prepare_array_for_rust(end_idx_arr, dtype=np.int64)
+        status_arr = prepare_array_for_rust(status_arr, dtype=np.int64)
         return range_duration_rs(start_idx_arr, end_idx_arr, status_arr)
     from vectorbt.generic.nb import range_duration_nb
 
@@ -1638,7 +1724,15 @@ def range_coverage(
     if eng == "rust":
         from vectorbt_rust.generic import range_coverage_rs
 
-        return range_coverage_rs(start_idx_arr, end_idx_arr, status_arr, col_map, index_lens, overlapping, normalize)
+        start_idx_arr = prepare_array_for_rust(start_idx_arr, dtype=np.int64)
+        end_idx_arr = prepare_array_for_rust(end_idx_arr, dtype=np.int64)
+        status_arr = prepare_array_for_rust(status_arr, dtype=np.int64)
+        col_idxs = prepare_array_for_rust(col_map[0], dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_map[1], dtype=np.int64)
+        index_lens = prepare_array_for_rust(index_lens, dtype=np.int64)
+        return range_coverage_rs(
+            start_idx_arr, end_idx_arr, status_arr, (col_idxs, col_lens), index_lens, overlapping, normalize
+        )
     from vectorbt.generic.nb import range_coverage_nb
 
     return range_coverage_nb(start_idx_arr, end_idx_arr, status_arr, col_map, index_lens, overlapping, normalize)
@@ -1666,7 +1760,12 @@ def ranges_to_mask(
     if eng == "rust":
         from vectorbt_rust.generic import ranges_to_mask_rs
 
-        return ranges_to_mask_rs(start_idx_arr, end_idx_arr, status_arr, col_map, index_len)
+        start_idx_arr = prepare_array_for_rust(start_idx_arr, dtype=np.int64)
+        end_idx_arr = prepare_array_for_rust(end_idx_arr, dtype=np.int64)
+        status_arr = prepare_array_for_rust(status_arr, dtype=np.int64)
+        col_idxs = prepare_array_for_rust(col_map[0], dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_map[1], dtype=np.int64)
+        return ranges_to_mask_rs(start_idx_arr, end_idx_arr, status_arr, (col_idxs, col_lens), index_len)
     from vectorbt.generic.nb import ranges_to_mask_nb
 
     return ranges_to_mask_nb(start_idx_arr, end_idx_arr, status_arr, col_map, index_len)
@@ -1681,6 +1780,7 @@ def get_drawdowns(ts: tp.Array2d, engine: tp.Optional[str] = None) -> tp.RecordA
     if eng == "rust":
         from vectorbt_rust.generic import get_drawdowns_rs
 
+        ts = prepare_array_for_rust(ts, dtype=np.float64)
         return get_drawdowns_rs(ts)
     from vectorbt.generic.nb import get_drawdowns_nb
 
@@ -1699,6 +1799,8 @@ def dd_drawdown(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d, engine: tp
     if eng == "rust":
         from vectorbt_rust.generic import dd_drawdown_rs
 
+        peak_val_arr = prepare_array_for_rust(peak_val_arr, dtype=np.float64)
+        valley_val_arr = prepare_array_for_rust(valley_val_arr, dtype=np.float64)
         return dd_drawdown_rs(peak_val_arr, valley_val_arr)
     from vectorbt.generic.nb import dd_drawdown_nb
 
@@ -1721,6 +1823,8 @@ def dd_decline_duration(
     if eng == "rust":
         from vectorbt_rust.generic import dd_decline_duration_rs
 
+        start_idx_arr = prepare_array_for_rust(start_idx_arr, dtype=np.int64)
+        valley_idx_arr = prepare_array_for_rust(valley_idx_arr, dtype=np.int64)
         return dd_decline_duration_rs(start_idx_arr, valley_idx_arr)
     from vectorbt.generic.nb import dd_decline_duration_nb
 
@@ -1743,6 +1847,8 @@ def dd_recovery_duration(
     if eng == "rust":
         from vectorbt_rust.generic import dd_recovery_duration_rs
 
+        valley_idx_arr = prepare_array_for_rust(valley_idx_arr, dtype=np.int64)
+        end_idx_arr = prepare_array_for_rust(end_idx_arr, dtype=np.int64)
         return dd_recovery_duration_rs(valley_idx_arr, end_idx_arr)
     from vectorbt.generic.nb import dd_recovery_duration_nb
 
@@ -1767,6 +1873,9 @@ def dd_recovery_duration_ratio(
     if eng == "rust":
         from vectorbt_rust.generic import dd_recovery_duration_ratio_rs
 
+        start_idx_arr = prepare_array_for_rust(start_idx_arr, dtype=np.int64)
+        valley_idx_arr = prepare_array_for_rust(valley_idx_arr, dtype=np.int64)
+        end_idx_arr = prepare_array_for_rust(end_idx_arr, dtype=np.int64)
         return dd_recovery_duration_ratio_rs(start_idx_arr, valley_idx_arr, end_idx_arr)
     from vectorbt.generic.nb import dd_recovery_duration_ratio_nb
 
@@ -1789,6 +1898,8 @@ def dd_recovery_return(
     if eng == "rust":
         from vectorbt_rust.generic import dd_recovery_return_rs
 
+        valley_val_arr = prepare_array_for_rust(valley_val_arr, dtype=np.float64)
+        end_val_arr = prepare_array_for_rust(end_val_arr, dtype=np.float64)
         return dd_recovery_return_rs(valley_val_arr, end_val_arr)
     from vectorbt.generic.nb import dd_recovery_return_nb
 
@@ -1812,6 +1923,8 @@ def crossed_above_1d(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, engine: 
     if eng == "rust":
         from vectorbt_rust.generic import crossed_above_1d_rs
 
+        arr1 = prepare_array_for_rust(arr1, dtype=np.float64)
+        arr2 = prepare_array_for_rust(arr2, dtype=np.float64)
         return crossed_above_1d_rs(arr1, arr2, wait)
     from vectorbt.generic.nb import crossed_above_1d_nb
 
@@ -1832,6 +1945,8 @@ def crossed_above(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, engine: tp.
     if eng == "rust":
         from vectorbt_rust.generic import crossed_above_rs
 
+        arr1 = prepare_array_for_rust(arr1, dtype=np.float64)
+        arr2 = prepare_array_for_rust(arr2, dtype=np.float64)
         return crossed_above_rs(arr1, arr2, wait)
     from vectorbt.generic.nb import crossed_above_nb
 

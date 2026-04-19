@@ -8,6 +8,7 @@ import numpy as np
 from vectorbt import _typing as tp
 from vectorbt._engine import (
     array_compatible_with_rust,
+    prepare_array_for_rust,
     col_map_compatible_with_rust,
     col_range_compatible_with_rust,
     combine_rust_support,
@@ -28,6 +29,7 @@ def col_range(col_arr: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None)
     if eng == "rust":
         from vectorbt_rust.records import col_range_rs
 
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
         return col_range_rs(col_arr, n_cols)
     from vectorbt.records.nb import col_range_nb
 
@@ -50,6 +52,8 @@ def col_range_select(
     if eng == "rust":
         from vectorbt_rust.records import col_range_select_rs
 
+        col_range = prepare_array_for_rust(col_range, dtype=np.int64)
+        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
         return col_range_select_rs(col_range, new_cols)
     from vectorbt.records.nb import col_range_select_nb
 
@@ -65,6 +69,7 @@ def col_map(col_arr: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None) -
     if eng == "rust":
         from vectorbt_rust.records import col_map_rs
 
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
         return col_map_rs(col_arr, n_cols)
     from vectorbt.records.nb import col_map_nb
 
@@ -88,6 +93,9 @@ def col_map_select(
         from vectorbt_rust.records import col_map_select_rs
 
         col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
+        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
         return col_map_select_rs(col_idxs, col_lens, new_cols)
     from vectorbt.records.nb import col_map_select_nb
 
@@ -132,6 +140,8 @@ def record_col_range_select(
     if eng == "rust":
         from vectorbt_rust.records import record_col_range_select_rs
 
+        col_range = prepare_array_for_rust(col_range, dtype=np.int64)
+        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
         return record_col_range_select_rs(records, col_range, new_cols)
     from vectorbt.records.nb import record_col_range_select_nb
 
@@ -157,6 +167,9 @@ def record_col_map_select(
         from vectorbt_rust.records import record_col_map_select_rs
 
         col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
+        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
         return record_col_map_select_rs(records, col_idxs, col_lens, new_cols)
     from vectorbt.records.nb import record_col_map_select_nb
 
@@ -175,6 +188,7 @@ def is_col_sorted(col_arr: tp.Array1d, engine: tp.Optional[str] = None) -> bool:
     if eng == "rust":
         from vectorbt_rust.records import is_col_sorted_rs
 
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
         return is_col_sorted_rs(col_arr)
     from vectorbt.records.nb import is_col_sorted_nb
 
@@ -197,6 +211,8 @@ def is_col_idx_sorted(
     if eng == "rust":
         from vectorbt_rust.records import is_col_idx_sorted_rs
 
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
+        id_arr = prepare_array_for_rust(id_arr, dtype=np.int64)
         return is_col_idx_sorted_rs(col_arr, id_arr)
     from vectorbt.records.nb import is_col_idx_sorted_nb
 
@@ -223,6 +239,8 @@ def is_mapped_expandable(
     if eng == "rust":
         from vectorbt_rust.records import is_mapped_expandable_rs
 
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
+        idx_arr = prepare_array_for_rust(idx_arr, dtype=np.int64)
         return is_mapped_expandable_rs(col_arr, idx_arr, target_shape)
     from vectorbt.records.nb import is_mapped_expandable_nb
 
@@ -250,6 +268,9 @@ def expand_mapped(
     if eng == "rust":
         from vectorbt_rust.records import expand_mapped_rs
 
+        mapped_arr = prepare_array_for_rust(mapped_arr, dtype=np.float64)
+        col_arr = prepare_array_for_rust(col_arr, dtype=np.int64)
+        idx_arr = prepare_array_for_rust(idx_arr, dtype=np.int64)
         return expand_mapped_rs(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
     from vectorbt.records.nb import expand_mapped_nb
 
@@ -275,6 +296,9 @@ def stack_expand_mapped(
         from vectorbt_rust.records import stack_expand_mapped_rs
 
         col_idxs, col_lens = col_map
+        mapped_arr = prepare_array_for_rust(mapped_arr, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return stack_expand_mapped_rs(mapped_arr, col_idxs, col_lens, fill_value)
     from vectorbt.records.nb import stack_expand_mapped_nb
 
@@ -302,6 +326,9 @@ def mapped_value_counts(
         from vectorbt_rust.records import mapped_value_counts_rs
 
         col_idxs, col_lens = col_map
+        codes = prepare_array_for_rust(codes, dtype=np.int64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return mapped_value_counts_rs(codes, n_uniques, col_idxs, col_lens)
     from vectorbt.records.nb import mapped_value_counts_nb
 
@@ -332,6 +359,9 @@ def top_n_mapped_mask(
         from vectorbt_rust.records import top_n_mapped_mask_rs
 
         col_idxs, col_lens = col_map
+        mapped_arr = prepare_array_for_rust(mapped_arr, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return top_n_mapped_mask_rs(mapped_arr, col_idxs, col_lens, n)
     from vectorbt.records.nb import mapped_to_mask_nb, top_n_inout_map_nb
 
@@ -359,6 +389,9 @@ def bottom_n_mapped_mask(
         from vectorbt_rust.records import bottom_n_mapped_mask_rs
 
         col_idxs, col_lens = col_map
+        mapped_arr = prepare_array_for_rust(mapped_arr, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return bottom_n_mapped_mask_rs(mapped_arr, col_idxs, col_lens, n)
     from vectorbt.records.nb import bottom_n_inout_map_nb, mapped_to_mask_nb
 

@@ -3,7 +3,6 @@
 
 """Utilities for working with dates and time."""
 
-import copy
 from datetime import datetime, timezone, timedelta, tzinfo, time
 
 import dateparser

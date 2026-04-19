@@ -355,7 +355,6 @@ Name: first, dtype: object
 """
 
 import numpy as np
-import packaging.version
 import pandas as pd
 
 from vectorbt import _typing as tp

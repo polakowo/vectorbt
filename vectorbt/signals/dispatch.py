@@ -7,7 +7,10 @@ import numpy as np
 
 from vectorbt import _typing as tp
 from vectorbt._engine import (
+    array_shape_compatible_with_rust,
     array_compatible_with_rust,
+    exact_array_compatible_with_rust,
+    prepare_array_for_rust,
     flex_broadcast_to_shape,
     callback_unsupported_with_rust,
     combine_rust_support,
@@ -97,6 +100,8 @@ def clean_enex_1d(
     if eng == "rust":
         from vectorbt_rust.signals import clean_enex_1d_rs
 
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        exits = prepare_array_for_rust(exits, dtype=np.bool_)
         return clean_enex_1d_rs(entries, exits, entry_first)
     from vectorbt.signals.nb import clean_enex_1d_nb
 
@@ -121,6 +126,8 @@ def clean_enex(
     if eng == "rust":
         from vectorbt_rust.signals import clean_enex_rs
 
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        exits = prepare_array_for_rust(exits, dtype=np.bool_)
         return clean_enex_rs(entries, exits, entry_first)
     from vectorbt.signals.nb import clean_enex_nb
 
@@ -141,11 +148,15 @@ def generate_rand(
         return generate_rand_nb(shape, n, seed=seed)
     eng = resolve_engine(
         engine,
-        supports_rust=non_neg_array_compatible_with_rust("n", n),
+        supports_rust=combine_rust_support(
+            non_neg_array_compatible_with_rust("n", n),
+            array_shape_compatible_with_rust("n", n, (shape[1],)),
+        ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_rs
 
+        n = prepare_array_for_rust(n, dtype=np.int64)
         return generate_rand_rs(shape[0], shape[1], n, seed=seed)
     from vectorbt.signals.nb import generate_rand_nb
 
@@ -168,11 +179,15 @@ def generate_rand_by_prob(
         return generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
     eng = resolve_engine(
         engine,
-        supports_rust=array_compatible_with_rust(prob, dtype=np.float64),
+        supports_rust=combine_rust_support(
+            array_compatible_with_rust(prob, dtype=np.float64),
+            array_shape_compatible_with_rust("prob", prob, shape),
+        ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_by_prob_rs
 
+        prob = prepare_array_for_rust(prob, dtype=np.float64)
         return generate_rand_by_prob_rs(shape[0], shape[1], prob, pick_first, seed=seed)
     from vectorbt.signals.nb import generate_rand_by_prob_nb
 
@@ -200,6 +215,7 @@ def generate_rand_ex(
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_ex_rs
 
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
         return generate_rand_ex_rs(entries, wait, until_next, skip_until_exit, seed=seed)
     from vectorbt.signals.nb import generate_rand_ex_nb
 
@@ -241,14 +257,9 @@ def generate_rand_ex_by_prob(
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_ex_by_prob_rs
 
-        return generate_rand_ex_by_prob_rs(
-            entries,
-            prob,
-            wait,
-            until_next,
-            skip_until_exit,
-            seed=seed,
-        )
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        prob = prepare_array_for_rust(prob, dtype=np.float64)
+        return generate_rand_ex_by_prob_rs(entries, prob, wait, until_next, skip_until_exit, seed=seed)
     from vectorbt.signals.nb import generate_rand_ex_by_prob_nb
 
     return generate_rand_ex_by_prob_nb(
@@ -278,11 +289,15 @@ def generate_rand_enex(
         return generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
     eng = resolve_engine(
         engine,
-        supports_rust=non_neg_array_compatible_with_rust("n", n),
+        supports_rust=combine_rust_support(
+            non_neg_array_compatible_with_rust("n", n),
+            array_shape_compatible_with_rust("n", n, (shape[1],)),
+        ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_enex_rs
 
+        n = prepare_array_for_rust(n, dtype=np.int64)
         return generate_rand_enex_rs(shape[0], shape[1], n, entry_wait, exit_wait, seed=seed)
     from vectorbt.signals.nb import generate_rand_enex_nb
 
@@ -322,12 +337,16 @@ def generate_rand_enex_by_prob(
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entry_prob, dtype=np.float64),
             array_compatible_with_rust(exit_prob, dtype=np.float64),
+            array_shape_compatible_with_rust("entry_prob", entry_prob, shape),
+            array_shape_compatible_with_rust("exit_prob", exit_prob, shape),
             matching_shape_compatible_with_rust("exit_prob", entry_prob, exit_prob),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_enex_by_prob_rs
 
+        entry_prob = prepare_array_for_rust(entry_prob, dtype=np.float64)
+        exit_prob = prepare_array_for_rust(exit_prob, dtype=np.float64)
         return generate_rand_enex_by_prob_rs(
             shape[0],
             shape[1],
@@ -382,16 +401,11 @@ def generate_stop_ex(
     if eng == "rust":
         from vectorbt_rust.signals import generate_stop_ex_rs
 
-        return generate_stop_ex_rs(
-            entries,
-            ts,
-            stop,
-            trailing,
-            wait,
-            until_next,
-            skip_until_exit,
-            pick_first,
-        )
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        ts = prepare_array_for_rust(ts, dtype=np.float64)
+        stop = prepare_array_for_rust(stop, dtype=np.float64)
+        trailing = prepare_array_for_rust(trailing, dtype=np.bool_)
+        return generate_stop_ex_rs(entries, ts, stop, trailing, wait, until_next, skip_until_exit, pick_first)
     from vectorbt.signals.nb import generate_stop_ex_nb
 
     return generate_stop_ex_nb(
@@ -434,15 +448,11 @@ def generate_stop_enex(
     if eng == "rust":
         from vectorbt_rust.signals import generate_stop_enex_rs
 
-        return generate_stop_enex_rs(
-            entries,
-            ts,
-            stop,
-            trailing,
-            entry_wait,
-            exit_wait,
-            pick_first,
-        )
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        ts = prepare_array_for_rust(ts, dtype=np.float64)
+        stop = prepare_array_for_rust(stop, dtype=np.float64)
+        trailing = prepare_array_for_rust(trailing, dtype=np.bool_)
+        return generate_stop_enex_rs(entries, ts, stop, trailing, entry_wait, exit_wait, pick_first)
     from vectorbt.signals.nb import generate_stop_enex_nb
 
     return generate_stop_enex_nb(
@@ -486,8 +496,8 @@ def generate_ohlc_stop_ex(
             array_compatible_with_rust(high, dtype=np.float64),
             array_compatible_with_rust(low, dtype=np.float64),
             array_compatible_with_rust(close, dtype=np.float64),
-            array_compatible_with_rust(stop_price_out, dtype=np.float64),
-            array_compatible_with_rust(stop_type_out, dtype=np.int64),
+            exact_array_compatible_with_rust(stop_price_out, dtype=np.float64),
+            exact_array_compatible_with_rust(stop_type_out, dtype=np.int64),
             array_compatible_with_rust(sl_stop, dtype=np.float64),
             array_compatible_with_rust(sl_trail, dtype=np.bool_),
             array_compatible_with_rust(tp_stop, dtype=np.float64),
@@ -507,6 +517,15 @@ def generate_ohlc_stop_ex(
     if eng == "rust":
         from vectorbt_rust.signals import generate_ohlc_stop_ex_rs
 
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        open = prepare_array_for_rust(open, dtype=np.float64)
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        sl_stop = prepare_array_for_rust(sl_stop, dtype=np.float64)
+        sl_trail = prepare_array_for_rust(sl_trail, dtype=np.bool_)
+        tp_stop = prepare_array_for_rust(tp_stop, dtype=np.float64)
+        reverse = prepare_array_for_rust(reverse, dtype=np.bool_)
         return generate_ohlc_stop_ex_rs(
             entries,
             open,
@@ -576,8 +595,8 @@ def generate_ohlc_stop_enex(
             array_compatible_with_rust(high, dtype=np.float64),
             array_compatible_with_rust(low, dtype=np.float64),
             array_compatible_with_rust(close, dtype=np.float64),
-            array_compatible_with_rust(stop_price_out, dtype=np.float64),
-            array_compatible_with_rust(stop_type_out, dtype=np.int64),
+            exact_array_compatible_with_rust(stop_price_out, dtype=np.float64),
+            exact_array_compatible_with_rust(stop_type_out, dtype=np.int64),
             array_compatible_with_rust(sl_stop, dtype=np.float64),
             array_compatible_with_rust(sl_trail, dtype=np.bool_),
             array_compatible_with_rust(tp_stop, dtype=np.float64),
@@ -597,6 +616,15 @@ def generate_ohlc_stop_enex(
     if eng == "rust":
         from vectorbt_rust.signals import generate_ohlc_stop_enex_rs
 
+        entries = prepare_array_for_rust(entries, dtype=np.bool_)
+        open = prepare_array_for_rust(open, dtype=np.float64)
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        sl_stop = prepare_array_for_rust(sl_stop, dtype=np.float64)
+        sl_trail = prepare_array_for_rust(sl_trail, dtype=np.bool_)
+        tp_stop = prepare_array_for_rust(tp_stop, dtype=np.float64)
+        reverse = prepare_array_for_rust(reverse, dtype=np.bool_)
         return generate_ohlc_stop_enex_rs(
             entries,
             open,
@@ -762,8 +790,8 @@ def rand_enex_by_prob_apply(
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.RPROBNX`."""
     engine = resolve_random_engine(engine)
-    entry_prob = flex_broadcast_to_shape(entry_prob, input_shape, np.float64)
-    exit_prob = flex_broadcast_to_shape(exit_prob, input_shape, np.float64)
+    entry_prob = flex_broadcast_to_shape(entry_prob, input_shape, np.float64, flex_2d=flex_2d)
+    exit_prob = flex_broadcast_to_shape(exit_prob, input_shape, np.float64, flex_2d=flex_2d)
     return generate_rand_enex_by_prob(
         input_shape,
         entry_prob,
@@ -1028,6 +1056,7 @@ def between_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.RecordA
     if eng == "rust":
         from vectorbt_rust.signals import between_ranges_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return between_ranges_rs(a)
     from vectorbt.signals.nb import between_ranges_nb
 
@@ -1052,6 +1081,8 @@ def between_two_ranges(
     if eng == "rust":
         from vectorbt_rust.signals import between_two_ranges_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
+        b = prepare_array_for_rust(b, dtype=np.bool_)
         return between_two_ranges_rs(a, b, from_other=from_other)
     from vectorbt.signals.nb import between_two_ranges_nb
 
@@ -1064,6 +1095,7 @@ def partition_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Recor
     if eng == "rust":
         from vectorbt_rust.signals import partition_ranges_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return partition_ranges_rs(a)
     from vectorbt.signals.nb import partition_ranges_nb
 
@@ -1076,6 +1108,7 @@ def between_partition_ranges(a: tp.Array2d, engine: tp.Optional[str] = None) -> 
     if eng == "rust":
         from vectorbt_rust.signals import between_partition_ranges_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return between_partition_ranges_rs(a)
     from vectorbt.signals.nb import between_partition_ranges_nb
 
@@ -1119,6 +1152,9 @@ def sig_pos_rank(
     if eng == "rust":
         from vectorbt_rust.signals import sig_pos_rank_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
+        if reset_by is not None:
+            reset_by = prepare_array_for_rust(reset_by, dtype=np.bool_)
         return sig_pos_rank_rs(a, reset_by, after_false, allow_gaps)
     from vectorbt.signals.nb import rank_nb, sig_pos_rank_nb
 
@@ -1137,6 +1173,9 @@ def part_pos_rank(
     if eng == "rust":
         from vectorbt_rust.signals import part_pos_rank_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
+        if reset_by is not None:
+            reset_by = prepare_array_for_rust(reset_by, dtype=np.bool_)
         return part_pos_rank_rs(a, reset_by, after_false)
     from vectorbt.signals.nb import rank_nb, part_pos_rank_nb
 
@@ -1150,6 +1189,7 @@ def nth_index_1d(a: tp.Array1d, n: int, engine: tp.Optional[str] = None) -> int:
     if eng == "rust":
         from vectorbt_rust.signals import nth_index_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return nth_index_1d_rs(a, n)
     from vectorbt.signals.nb import nth_index_1d_nb
 
@@ -1162,6 +1202,7 @@ def nth_index(a: tp.Array2d, n: int, engine: tp.Optional[str] = None) -> tp.Arra
     if eng == "rust":
         from vectorbt_rust.signals import nth_index_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return nth_index_rs(a, n)
     from vectorbt.signals.nb import nth_index_nb
 
@@ -1174,6 +1215,7 @@ def norm_avg_index_1d(a: tp.Array1d, engine: tp.Optional[str] = None) -> float:
     if eng == "rust":
         from vectorbt_rust.signals import norm_avg_index_1d_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return norm_avg_index_1d_rs(a)
     from vectorbt.signals.nb import norm_avg_index_1d_nb
 
@@ -1186,6 +1228,7 @@ def norm_avg_index(a: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d
     if eng == "rust":
         from vectorbt_rust.signals import norm_avg_index_rs
 
+        a = prepare_array_for_rust(a, dtype=np.bool_)
         return norm_avg_index_rs(a)
     from vectorbt.signals.nb import norm_avg_index_nb
 

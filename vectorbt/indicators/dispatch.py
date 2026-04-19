@@ -3,9 +3,12 @@
 
 """Engine-neutral dispatch wrappers for indicator functions."""
 
+import numpy as np
+
 from vectorbt import _typing as tp
 from vectorbt._engine import (
     array_compatible_with_rust,
+    prepare_array_for_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
     resolve_engine,
@@ -24,6 +27,7 @@ def ma(
     if eng == "rust":
         from vectorbt_rust.indicators import ma_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return ma_rs(a, window, ewm, adjust)
     from vectorbt.indicators.nb import ma_nb
 
@@ -43,6 +47,7 @@ def mstd(
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
         return mstd_rs(a, window, ewm, adjust, ddof)
     from vectorbt.indicators.nb import mstd_nb
 
@@ -61,6 +66,7 @@ def ma_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import ma_cache_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return ma_cache_rs(close, windows, ewms, adjust)
     from vectorbt.indicators.nb import ma_cache_nb
 
@@ -80,6 +86,7 @@ def ma_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import ma_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return ma_apply_rs(close, window, ewm, adjust, cache_dict)
     from vectorbt.indicators.nb import ma_apply_nb
 
@@ -99,6 +106,7 @@ def mstd_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_cache_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return mstd_cache_rs(close, windows, ewms, adjust, ddof)
     from vectorbt.indicators.nb import mstd_cache_nb
 
@@ -119,6 +127,7 @@ def mstd_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import mstd_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return mstd_apply_rs(close, window, ewm, adjust, ddof, cache_dict)
     from vectorbt.indicators.nb import mstd_apply_nb
 
@@ -139,6 +148,7 @@ def bb_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import bb_cache_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return bb_cache_rs(close, windows, ewms, alphas, adjust, ddof)
     from vectorbt.indicators.nb import bb_cache_nb
 
@@ -161,6 +171,7 @@ def bb_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import bb_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return bb_apply_rs(close, window, ewm, alpha, adjust, ddof, ma_cache_dict, mstd_cache_dict)
     from vectorbt.indicators.nb import bb_apply_nb
 
@@ -179,6 +190,7 @@ def rsi_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import rsi_cache_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return rsi_cache_rs(close, windows, ewms, adjust)
     from vectorbt.indicators.nb import rsi_cache_nb
 
@@ -198,6 +210,7 @@ def rsi_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import rsi_apply_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return rsi_apply_rs(close, window, ewm, adjust, cache_dict)
     from vectorbt.indicators.nb import rsi_apply_nb
 
@@ -228,6 +241,9 @@ def stoch_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import stoch_cache_rs
 
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return stoch_cache_rs(high, low, close, k_windows, d_windows, d_ewms, adjust)
     from vectorbt.indicators.nb import stoch_cache_nb
 
@@ -259,6 +275,9 @@ def stoch_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import stoch_apply_rs
 
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return stoch_apply_rs(high, low, close, k_window, d_window, d_ewm, adjust, cache_dict)
     from vectorbt.indicators.nb import stoch_apply_nb
 
@@ -280,6 +299,7 @@ def macd_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import macd_cache_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return macd_cache_rs(close, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms, adjust)
     from vectorbt.indicators.nb import macd_cache_nb
 
@@ -302,16 +322,8 @@ def macd_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import macd_apply_rs
 
-        return macd_apply_rs(
-            close,
-            fast_window,
-            slow_window,
-            signal_window,
-            macd_ewm,
-            signal_ewm,
-            adjust,
-            cache_dict,
-        )
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        return macd_apply_rs(close, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, adjust, cache_dict)
     from vectorbt.indicators.nb import macd_apply_nb
 
     return macd_apply_nb(
@@ -346,6 +358,9 @@ def true_range(
     if eng == "rust":
         from vectorbt_rust.indicators import true_range_rs
 
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return true_range_rs(high, low, close)
     from vectorbt.indicators.nb import true_range_nb
 
@@ -375,6 +390,9 @@ def atr_cache(
     if eng == "rust":
         from vectorbt_rust.indicators import atr_cache_rs
 
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
         return atr_cache_rs(high, low, close, windows, ewms, adjust)
     from vectorbt.indicators.nb import atr_cache_nb
 
@@ -408,6 +426,10 @@ def atr_apply(
     if eng == "rust":
         from vectorbt_rust.indicators import atr_apply_rs
 
+        high = prepare_array_for_rust(high, dtype=np.float64)
+        low = prepare_array_for_rust(low, dtype=np.float64)
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        tr = prepare_array_for_rust(tr, dtype=np.float64)
         return atr_apply_rs(high, low, close, window, ewm, adjust, tr, cache_dict)
     from vectorbt.indicators.nb import atr_apply_nb
 
@@ -431,6 +453,8 @@ def obv_custom(
     if eng == "rust":
         from vectorbt_rust.indicators import obv_custom_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        volume_ts = prepare_array_for_rust(volume_ts, dtype=np.float64)
         return obv_custom_rs(close, volume_ts)
     from vectorbt.indicators.nb import obv_custom_nb
 

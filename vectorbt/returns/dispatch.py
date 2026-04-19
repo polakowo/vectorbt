@@ -3,10 +3,13 @@
 
 """Engine-neutral dispatch wrappers for returns functions."""
 
+import numpy as np
+
 from vectorbt import _typing as tp
 from vectorbt._engine import (
     RustSupport,
     array_compatible_with_rust,
+    prepare_array_for_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
     non_neg_int_compatible_with_rust,
@@ -64,6 +67,7 @@ def returns_1d(value: tp.Array1d, init_value: float, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.returns import returns_1d_rs
 
+        value = prepare_array_for_rust(value, dtype=np.float64)
         return returns_1d_rs(value, init_value)
     from vectorbt.returns.nb import returns_1d_nb
 
@@ -76,6 +80,8 @@ def returns(value: tp.Array2d, init_value: tp.Array1d, engine: tp.Optional[str] 
     if eng == "rust":
         from vectorbt_rust.returns import returns_rs
 
+        value = prepare_array_for_rust(value, dtype=np.float64)
+        init_value = prepare_array_for_rust(init_value, dtype=np.float64)
         return returns_rs(value, init_value)
     from vectorbt.returns.nb import returns_nb
 
@@ -94,6 +100,7 @@ def cum_returns_1d(returns: tp.Array1d, start_value: float, engine: tp.Optional[
     if eng == "rust":
         from vectorbt_rust.returns import cum_returns_1d_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return cum_returns_1d_rs(returns, start_value)
     from vectorbt.returns.nb import cum_returns_1d_nb
 
@@ -112,6 +119,7 @@ def cum_returns(returns: tp.Array2d, start_value: float, engine: tp.Optional[str
     if eng == "rust":
         from vectorbt_rust.returns import cum_returns_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return cum_returns_rs(returns, start_value)
     from vectorbt.returns.nb import cum_returns_nb
 
@@ -134,6 +142,7 @@ def cum_returns_final_1d(
     if eng == "rust":
         from vectorbt_rust.returns import cum_returns_final_1d_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return cum_returns_final_1d_rs(returns, start_value)
     from vectorbt.returns.nb import cum_returns_final_1d_nb
 
@@ -156,6 +165,7 @@ def cum_returns_final(
     if eng == "rust":
         from vectorbt_rust.returns import cum_returns_final_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return cum_returns_final_rs(returns, start_value)
     from vectorbt.returns.nb import cum_returns_final_nb
 
@@ -174,6 +184,7 @@ def annualized_return(returns: tp.Array2d, ann_factor: float, engine: tp.Optiona
     if eng == "rust":
         from vectorbt_rust.returns import annualized_return_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return annualized_return_rs(returns, ann_factor)
     from vectorbt.returns.nb import annualized_return_nb
 
@@ -200,6 +211,7 @@ def annualized_volatility(
     if eng == "rust":
         from vectorbt_rust.returns import annualized_volatility_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return annualized_volatility_rs(returns, ann_factor, levy_alpha, ddof)
     from vectorbt.returns.nb import annualized_volatility_nb
 
@@ -212,6 +224,7 @@ def drawdown(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d
     if eng == "rust":
         from vectorbt_rust.returns import drawdown_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return drawdown_rs(returns)
     from vectorbt.returns.nb import drawdown_nb
 
@@ -224,6 +237,7 @@ def max_drawdown(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Arr
     if eng == "rust":
         from vectorbt_rust.returns import max_drawdown_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return max_drawdown_rs(returns)
     from vectorbt.returns.nb import max_drawdown_nb
 
@@ -242,6 +256,7 @@ def calmar_ratio(returns: tp.Array2d, ann_factor: float, engine: tp.Optional[str
     if eng == "rust":
         from vectorbt_rust.returns import calmar_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return calmar_ratio_rs(returns, ann_factor)
     from vectorbt.returns.nb import calmar_ratio_nb
 
@@ -268,6 +283,7 @@ def omega_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import omega_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return omega_ratio_rs(returns, ann_factor, risk_free, required_return)
     from vectorbt.returns.nb import omega_ratio_nb
 
@@ -294,6 +310,7 @@ def sharpe_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import sharpe_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return sharpe_ratio_rs(returns, ann_factor, risk_free, ddof)
     from vectorbt.returns.nb import sharpe_ratio_nb
 
@@ -318,6 +335,7 @@ def downside_risk(
     if eng == "rust":
         from vectorbt_rust.returns import downside_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return downside_risk_rs(returns, ann_factor, required_return)
     from vectorbt.returns.nb import downside_risk_nb
 
@@ -342,6 +360,7 @@ def sortino_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import sortino_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return sortino_ratio_rs(returns, ann_factor, required_return)
     from vectorbt.returns.nb import sortino_ratio_nb
 
@@ -367,6 +386,8 @@ def information_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import information_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return information_ratio_rs(returns, benchmark_rets, ddof)
     from vectorbt.returns.nb import information_ratio_nb
 
@@ -386,6 +407,8 @@ def beta(returns: tp.Array2d, benchmark_rets: tp.Array2d, engine: tp.Optional[st
     if eng == "rust":
         from vectorbt_rust.returns import beta_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return beta_rs(returns, benchmark_rets)
     from vectorbt.returns.nb import beta_nb
 
@@ -413,6 +436,8 @@ def alpha(
     if eng == "rust":
         from vectorbt_rust.returns import alpha_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return alpha_rs(returns, benchmark_rets, ann_factor, risk_free)
     from vectorbt.returns.nb import alpha_nb
 
@@ -425,6 +450,7 @@ def tail_ratio(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array
     if eng == "rust":
         from vectorbt_rust.returns import tail_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return tail_ratio_rs(returns)
     from vectorbt.returns.nb import tail_ratio_nb
 
@@ -447,6 +473,7 @@ def value_at_risk(
     if eng == "rust":
         from vectorbt_rust.returns import value_at_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return value_at_risk_rs(returns, cutoff)
     from vectorbt.returns.nb import value_at_risk_nb
 
@@ -469,6 +496,7 @@ def cond_value_at_risk(
     if eng == "rust":
         from vectorbt_rust.returns import cond_value_at_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return cond_value_at_risk_rs(returns, cutoff)
     from vectorbt.returns.nb import cond_value_at_risk_nb
 
@@ -494,6 +522,8 @@ def capture(
     if eng == "rust":
         from vectorbt_rust.returns import capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return capture_rs(returns, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import capture_nb
 
@@ -519,6 +549,8 @@ def up_capture(
     if eng == "rust":
         from vectorbt_rust.returns import up_capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return up_capture_rs(returns, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import up_capture_nb
 
@@ -544,6 +576,8 @@ def down_capture(
     if eng == "rust":
         from vectorbt_rust.returns import down_capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return down_capture_rs(returns, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import down_capture_nb
 
@@ -568,6 +602,7 @@ def rolling_cum_returns_final(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_cum_returns_final_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_cum_returns_final_rs(returns, window, minp, start_value)
     from vectorbt.returns.nb import rolling_cum_returns_final_nb
 
@@ -592,6 +627,7 @@ def rolling_annualized_return(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_annualized_return_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_annualized_return_rs(returns, window, minp, ann_factor)
     from vectorbt.returns.nb import rolling_annualized_return_nb
 
@@ -620,6 +656,7 @@ def rolling_annualized_volatility(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_annualized_volatility_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_annualized_volatility_rs(returns, window, minp, ann_factor, levy_alpha, ddof)
     from vectorbt.returns.nb import rolling_annualized_volatility_nb
 
@@ -637,6 +674,7 @@ def rolling_max_drawdown(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_max_drawdown_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_max_drawdown_rs(returns, window, minp)
     from vectorbt.returns.nb import rolling_max_drawdown_nb
 
@@ -661,6 +699,7 @@ def rolling_calmar_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_calmar_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_calmar_ratio_rs(returns, window, minp, ann_factor)
     from vectorbt.returns.nb import rolling_calmar_ratio_nb
 
@@ -689,6 +728,7 @@ def rolling_omega_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_omega_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_omega_ratio_rs(returns, window, minp, ann_factor, risk_free, required_return)
     from vectorbt.returns.nb import rolling_omega_ratio_nb
 
@@ -717,6 +757,7 @@ def rolling_sharpe_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_sharpe_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_sharpe_ratio_rs(returns, window, minp, ann_factor, risk_free, ddof)
     from vectorbt.returns.nb import rolling_sharpe_ratio_nb
 
@@ -743,6 +784,7 @@ def rolling_downside_risk(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_downside_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_downside_risk_rs(returns, window, minp, ann_factor, required_return)
     from vectorbt.returns.nb import rolling_downside_risk_nb
 
@@ -769,6 +811,7 @@ def rolling_sortino_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_sortino_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_sortino_ratio_rs(returns, window, minp, ann_factor, required_return)
     from vectorbt.returns.nb import rolling_sortino_ratio_nb
 
@@ -796,6 +839,8 @@ def rolling_information_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_information_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_information_ratio_rs(returns, window, minp, benchmark_rets, ddof)
     from vectorbt.returns.nb import rolling_information_ratio_nb
 
@@ -821,6 +866,8 @@ def rolling_beta(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_beta_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_beta_rs(returns, window, minp, benchmark_rets)
     from vectorbt.returns.nb import rolling_beta_nb
 
@@ -850,6 +897,8 @@ def rolling_alpha(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_alpha_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_alpha_rs(returns, window, minp, benchmark_rets, ann_factor, risk_free)
     from vectorbt.returns.nb import rolling_alpha_nb
 
@@ -867,6 +916,7 @@ def rolling_tail_ratio(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_tail_ratio_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_tail_ratio_rs(returns, window, minp)
     from vectorbt.returns.nb import rolling_tail_ratio_nb
 
@@ -891,6 +941,7 @@ def rolling_value_at_risk(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_value_at_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_value_at_risk_rs(returns, window, minp, cutoff)
     from vectorbt.returns.nb import rolling_value_at_risk_nb
 
@@ -915,6 +966,7 @@ def rolling_cond_value_at_risk(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_cond_value_at_risk_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
         return rolling_cond_value_at_risk_rs(returns, window, minp, cutoff)
     from vectorbt.returns.nb import rolling_cond_value_at_risk_nb
 
@@ -942,6 +994,8 @@ def rolling_capture(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_capture_rs(returns, window, minp, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import rolling_capture_nb
 
@@ -969,6 +1023,8 @@ def rolling_up_capture(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_up_capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_up_capture_rs(returns, window, minp, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import rolling_up_capture_nb
 
@@ -996,6 +1052,8 @@ def rolling_down_capture(
     if eng == "rust":
         from vectorbt_rust.returns import rolling_down_capture_rs
 
+        returns = prepare_array_for_rust(returns, dtype=np.float64)
+        benchmark_rets = prepare_array_for_rust(benchmark_rets, dtype=np.float64)
         return rolling_down_capture_rs(returns, window, minp, benchmark_rets, ann_factor)
     from vectorbt.returns.nb import rolling_down_capture_nb
 

@@ -9,15 +9,37 @@ from vectorbt import _typing as tp
 from vectorbt._engine import (
     RustSupport,
     array_compatible_with_rust,
+    exact_array_compatible_with_rust,
+    prepare_array_for_rust,
     col_map_compatible_with_rust,
     combine_rust_support,
     flex_broadcast_to_shape,
-    non_neg_int_compatible_with_rust,
+    flex_array_compatible_with_rust,
     resolve_engine,
     resolve_random_engine,
-    scalar_compatible_with_rust,
 )
+from vectorbt.portfolio.enums import order_dt, trade_dt
 from vectorbt.records.dispatch import record_array_compatible_with_rust
+
+
+def order_record_array_compatible_with_rust(records: tp.Any) -> RustSupport:
+    """Return whether order records have the exact Rust-compatible dtype."""
+    support = record_array_compatible_with_rust(records)
+    if not support.supported:
+        return support
+    if records.dtype != order_dt:
+        return RustSupport(False, "Rust engine requires order records to have `order_dt` dtype.")
+    return RustSupport(True)
+
+
+def trade_record_array_compatible_with_rust(records: tp.Any) -> RustSupport:
+    """Return whether trade records have the exact Rust-compatible dtype."""
+    support = record_array_compatible_with_rust(records)
+    if not support.supported:
+        return support
+    if records.dtype != trade_dt:
+        return RustSupport(False, "Rust engine requires trade records to have `trade_dt` dtype.")
+    return RustSupport(True)
 
 
 # ############# Core order functions ############# #
@@ -173,12 +195,24 @@ def update_value(
         from vectorbt_rust.portfolio import update_value_rs
 
         return update_value_rs(
-            cash_before, cash_now, position_before, position_now, val_price_before, order_price, value_before
+            cash_before,
+            cash_now,
+            position_before,
+            position_now,
+            val_price_before,
+            order_price,
+            value_before,
         )
     from vectorbt.portfolio.nb import update_value_nb
 
     return update_value_nb(
-        cash_before, cash_now, position_before, position_now, val_price_before, order_price, value_before
+        cash_before,
+        cash_now,
+        position_before,
+        position_now,
+        val_price_before,
+        order_price,
+        value_before,
     )
 
 
@@ -311,7 +345,10 @@ def raise_rejected_order(order_result, engine: tp.Optional[str] = None):
     """Engine-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
     eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
-        from vectorbt_rust.portfolio import OrderResult as RustOrderResult, raise_rejected_order_rs
+        from vectorbt_rust.portfolio import (
+            OrderResult as RustOrderResult,
+            raise_rejected_order_rs,
+        )
 
         if not isinstance(order_result, RustOrderResult):
             order_result = RustOrderResult(
@@ -340,6 +377,7 @@ def check_group_lens(group_lens: tp.Array1d, n_cols: int, engine: tp.Optional[st
     if eng == "rust":
         from vectorbt_rust.portfolio import check_group_lens_rs
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return check_group_lens_rs(group_lens, n_cols)
     from vectorbt.portfolio.nb import check_group_lens_nb
 
@@ -364,6 +402,8 @@ def check_group_init_cash(
     if eng == "rust":
         from vectorbt_rust.portfolio import check_group_init_cash_rs
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return check_group_init_cash_rs(group_lens, n_cols, init_cash, cash_sharing)
     from vectorbt.portfolio.nb import check_group_init_cash_nb
 
@@ -379,6 +419,7 @@ def is_grouped(group_lens: tp.Array1d, engine: tp.Optional[str] = None) -> bool:
     if eng == "rust":
         from vectorbt_rust.portfolio import is_grouped_rs
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return is_grouped_rs(group_lens)
     from vectorbt.portfolio.nb import is_grouped_nb
 
@@ -405,6 +446,7 @@ def build_call_seq(
     if eng == "rust":
         from vectorbt_rust.portfolio import build_call_seq_rs
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return build_call_seq_rs(target_shape, group_lens, call_seq_type)
     from vectorbt.portfolio.nb import build_call_seq_nb
 
@@ -426,13 +468,14 @@ def shuffle_call_seq(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            array_compatible_with_rust(call_seq, dtype=np.int64),
+            exact_array_compatible_with_rust(call_seq, dtype=np.int64),
             array_compatible_with_rust(group_lens, dtype=np.int64),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.portfolio import shuffle_call_seq_rs
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return shuffle_call_seq_rs(call_seq, group_lens, seed)
     from vectorbt.portfolio.nb import shuffle_call_seq_nb
 
@@ -480,6 +523,8 @@ def get_group_value(
     if eng == "rust":
         from vectorbt_rust.portfolio import get_group_value_rs
 
+        last_position = prepare_array_for_rust(last_position, dtype=np.float64)
+        last_val_price = prepare_array_for_rust(last_val_price, dtype=np.float64)
         return get_group_value_rs(from_col, to_col, cash_now, last_position, last_val_price)
     from vectorbt.portfolio.nb import get_group_value_nb
 
@@ -560,7 +605,24 @@ def simulate_from_orders(
         supports_rust=combine_rust_support(
             array_compatible_with_rust(group_lens, dtype=np.int64),
             array_compatible_with_rust(init_cash),
-            array_compatible_with_rust(call_seq, dtype=np.int64),
+            exact_array_compatible_with_rust(call_seq, dtype=np.int64),
+            flex_array_compatible_with_rust("size", size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("price", price, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("size_type", size_type, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("direction", direction, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("fees", fees, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("fixed_fees", fixed_fees, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("slippage", slippage, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("min_size", min_size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("max_size", max_size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("size_granularity", size_granularity, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("reject_prob", reject_prob, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("lock_cash", lock_cash, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("allow_partial", allow_partial, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("raise_reject", raise_reject, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("log", log, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("val_price", val_price, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("close", close, target_shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
@@ -584,6 +646,8 @@ def simulate_from_orders(
         val_price_2d = flex_broadcast_to_shape(val_price, target_shape, np.float64, flex_2d)
         close_2d = flex_broadcast_to_shape(close, target_shape, np.float64, flex_2d)
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return simulate_from_orders_rs(
             target_shape,
             group_lens,
@@ -761,7 +825,63 @@ def simulate_from_signals(
         supports_rust=combine_rust_support(
             array_compatible_with_rust(group_lens, dtype=np.int64),
             array_compatible_with_rust(init_cash),
-            array_compatible_with_rust(call_seq, dtype=np.int64),
+            exact_array_compatible_with_rust(call_seq, dtype=np.int64),
+            flex_array_compatible_with_rust("entries", entries, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("exits", exits, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("direction", direction, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("long_entries", long_entries, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("long_exits", long_exits, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("short_entries", short_entries, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("short_exits", short_exits, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("size", size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("price", price, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("size_type", size_type, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("fees", fees, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("fixed_fees", fixed_fees, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("slippage", slippage, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("min_size", min_size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("max_size", max_size, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("size_granularity", size_granularity, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("reject_prob", reject_prob, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("lock_cash", lock_cash, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("allow_partial", allow_partial, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("raise_reject", raise_reject, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("log", log, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("accumulate", accumulate, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust(
+                "upon_long_conflict",
+                upon_long_conflict,
+                target_shape,
+                np.int64,
+                flex_2d,
+            ),
+            flex_array_compatible_with_rust(
+                "upon_short_conflict",
+                upon_short_conflict,
+                target_shape,
+                np.int64,
+                flex_2d,
+            ),
+            flex_array_compatible_with_rust("upon_dir_conflict", upon_dir_conflict, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust(
+                "upon_opposite_entry",
+                upon_opposite_entry,
+                target_shape,
+                np.int64,
+                flex_2d,
+            ),
+            flex_array_compatible_with_rust("val_price", val_price, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("open", open, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("high", high, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("low", low, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("close", close, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("sl_stop", sl_stop, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("sl_trail", sl_trail, target_shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("tp_stop", tp_stop, target_shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("stop_entry_price", stop_entry_price, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("stop_exit_price", stop_exit_price, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("upon_stop_exit", upon_stop_exit, target_shape, np.int64, flex_2d),
+            flex_array_compatible_with_rust("upon_stop_update", upon_stop_update, target_shape, np.int64, flex_2d),
         ),
     )
     if eng == "rust":
@@ -806,6 +926,8 @@ def simulate_from_signals(
         upon_stop_exit_2d = flex_broadcast_to_shape(upon_stop_exit, target_shape, np.int64, flex_2d)
         upon_stop_update_2d = flex_broadcast_to_shape(upon_stop_update, target_shape, np.int64, flex_2d)
 
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return simulate_from_signals_rs(
             target_shape,
             group_lens,
@@ -992,7 +1114,7 @@ def asset_flow(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(order_records),
+            order_record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
         ),
     )
@@ -1000,6 +1122,8 @@ def asset_flow(
         from vectorbt_rust.portfolio import asset_flow_rs
 
         col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return asset_flow_rs(order_records, col_idxs, col_lens, target_shape, direction)
     from vectorbt.portfolio.nb import asset_flow_nb
 
@@ -1015,6 +1139,7 @@ def assets(asset_flow: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2
     if eng == "rust":
         from vectorbt_rust.portfolio import assets_rs
 
+        asset_flow = prepare_array_for_rust(asset_flow, dtype=np.float64)
         return assets_rs(asset_flow)
     from vectorbt.portfolio.nb import assets_nb
 
@@ -1035,7 +1160,7 @@ def cash_flow(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(order_records),
+            order_record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
         ),
     )
@@ -1043,6 +1168,8 @@ def cash_flow(
         from vectorbt_rust.portfolio import cash_flow_rs
 
         col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return cash_flow_rs(order_records, col_idxs, col_lens, target_shape, free)
     from vectorbt.portfolio.nb import cash_flow_nb
 
@@ -1061,6 +1188,8 @@ def sum_grouped(a: tp.Array2d, group_lens: tp.Array1d, engine: tp.Optional[str] 
     if eng == "rust":
         from vectorbt_rust.portfolio import sum_grouped_rs
 
+        a = prepare_array_for_rust(a, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return sum_grouped_rs(a, group_lens)
     from vectorbt.portfolio.nb import sum_grouped_nb
 
@@ -1083,6 +1212,8 @@ def cash_flow_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import cash_flow_grouped_rs
 
+        cash_flow = prepare_array_for_rust(cash_flow, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return cash_flow_grouped_rs(cash_flow, group_lens)
     from vectorbt.portfolio.nb import cash_flow_grouped_nb
 
@@ -1106,6 +1237,8 @@ def init_cash_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import init_cash_grouped_rs
 
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return init_cash_grouped_rs(init_cash, group_lens, cash_sharing)
     from vectorbt.portfolio.nb import init_cash_grouped_nb
 
@@ -1129,6 +1262,8 @@ def init_cash(
     if eng == "rust":
         from vectorbt_rust.portfolio import init_cash_rs
 
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return init_cash_rs(init_cash, group_lens, cash_sharing)
     from vectorbt.portfolio.nb import init_cash_nb
 
@@ -1147,6 +1282,8 @@ def cash(cash_flow: tp.Array2d, init_cash: tp.Array1d, engine: tp.Optional[str] 
     if eng == "rust":
         from vectorbt_rust.portfolio import cash_rs
 
+        cash_flow = prepare_array_for_rust(cash_flow, dtype=np.float64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return cash_rs(cash_flow, init_cash)
     from vectorbt.portfolio.nb import cash_nb
 
@@ -1173,6 +1310,10 @@ def cash_in_sim_order(
     if eng == "rust":
         from vectorbt_rust.portfolio import cash_in_sim_order_rs
 
+        cash_flow = prepare_array_for_rust(cash_flow, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash_grouped = prepare_array_for_rust(init_cash_grouped, dtype=np.float64)
+        call_seq = prepare_array_for_rust(call_seq, dtype=np.int64)
         return cash_in_sim_order_rs(cash_flow, group_lens, init_cash_grouped, call_seq)
     from vectorbt.portfolio.nb import cash_in_sim_order_nb
 
@@ -1198,6 +1339,9 @@ def cash_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import cash_grouped_rs
 
+        cash_flow_grouped = prepare_array_for_rust(cash_flow_grouped, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash_grouped = prepare_array_for_rust(init_cash_grouped, dtype=np.float64)
         return cash_grouped_rs(target_shape, cash_flow_grouped, group_lens, init_cash_grouped)
     from vectorbt.portfolio.nb import cash_grouped_nb
 
@@ -1219,6 +1363,8 @@ def asset_value(close: tp.Array2d, assets: tp.Array2d, engine: tp.Optional[str] 
     if eng == "rust":
         from vectorbt_rust.portfolio import asset_value_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        assets = prepare_array_for_rust(assets, dtype=np.float64)
         return asset_value_rs(close, assets)
     from vectorbt.portfolio.nb import asset_value_nb
 
@@ -1241,6 +1387,8 @@ def asset_value_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import asset_value_grouped_rs
 
+        asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return asset_value_grouped_rs(asset_value, group_lens)
     from vectorbt.portfolio.nb import asset_value_grouped_nb
 
@@ -1267,6 +1415,10 @@ def value_in_sim_order(
     if eng == "rust":
         from vectorbt_rust.portfolio import value_in_sim_order_rs
 
+        cash = prepare_array_for_rust(cash, dtype=np.float64)
+        asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        call_seq = prepare_array_for_rust(call_seq, dtype=np.int64)
         return value_in_sim_order_rs(cash, asset_value, group_lens, call_seq)
     from vectorbt.portfolio.nb import value_in_sim_order_nb
 
@@ -1285,6 +1437,8 @@ def value(cash: tp.Array2d, asset_value: tp.Array2d, engine: tp.Optional[str] = 
     if eng == "rust":
         from vectorbt_rust.portfolio import value_rs
 
+        cash = prepare_array_for_rust(cash, dtype=np.float64)
+        asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
         return value_rs(cash, asset_value)
     from vectorbt.portfolio.nb import value_nb
 
@@ -1302,7 +1456,7 @@ def total_profit(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(order_records),
+            order_record_array_compatible_with_rust(order_records),
             col_map_compatible_with_rust(col_map),
             array_compatible_with_rust(close),
         ),
@@ -1311,6 +1465,9 @@ def total_profit(
         from vectorbt_rust.portfolio import total_profit_rs
 
         col_idxs, col_lens = col_map
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return total_profit_rs(target_shape, close, order_records, col_idxs, col_lens)
     from vectorbt.portfolio.nb import total_profit_nb
 
@@ -1333,6 +1490,8 @@ def total_profit_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import total_profit_grouped_rs
 
+        total_profit = prepare_array_for_rust(total_profit, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         return total_profit_grouped_rs(total_profit, group_lens)
     from vectorbt.portfolio.nb import total_profit_grouped_nb
 
@@ -1355,6 +1514,8 @@ def final_value(
     if eng == "rust":
         from vectorbt_rust.portfolio import final_value_rs
 
+        total_profit = prepare_array_for_rust(total_profit, dtype=np.float64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return final_value_rs(total_profit, init_cash)
     from vectorbt.portfolio.nb import final_value_nb
 
@@ -1377,6 +1538,8 @@ def total_return(
     if eng == "rust":
         from vectorbt_rust.portfolio import total_return_rs
 
+        total_profit = prepare_array_for_rust(total_profit, dtype=np.float64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return total_return_rs(total_profit, init_cash)
     from vectorbt.portfolio.nb import total_return_nb
 
@@ -1403,6 +1566,10 @@ def returns_in_sim_order(
     if eng == "rust":
         from vectorbt_rust.portfolio import returns_in_sim_order_rs
 
+        value_iso = prepare_array_for_rust(value_iso, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash_grouped = prepare_array_for_rust(init_cash_grouped, dtype=np.float64)
+        call_seq = prepare_array_for_rust(call_seq, dtype=np.int64)
         return returns_in_sim_order_rs(value_iso, group_lens, init_cash_grouped, call_seq)
     from vectorbt.portfolio.nb import returns_in_sim_order_nb
 
@@ -1425,6 +1592,8 @@ def asset_returns(
     if eng == "rust":
         from vectorbt_rust.portfolio import asset_returns_rs
 
+        cash_flow = prepare_array_for_rust(cash_flow, dtype=np.float64)
+        asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
         return asset_returns_rs(cash_flow, asset_value)
     from vectorbt.portfolio.nb import asset_returns_nb
 
@@ -1447,6 +1616,8 @@ def benchmark_value(
     if eng == "rust":
         from vectorbt_rust.portfolio import benchmark_value_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
         return benchmark_value_rs(close, init_cash)
     from vectorbt.portfolio.nb import benchmark_value_nb
 
@@ -1471,6 +1642,9 @@ def benchmark_value_grouped(
     if eng == "rust":
         from vectorbt_rust.portfolio import benchmark_value_grouped_rs
 
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        init_cash_grouped = prepare_array_for_rust(init_cash_grouped, dtype=np.float64)
         return benchmark_value_grouped_rs(close, group_lens, init_cash_grouped)
     from vectorbt.portfolio.nb import benchmark_value_grouped_nb
 
@@ -1489,6 +1663,7 @@ def total_benchmark_return(
     if eng == "rust":
         from vectorbt_rust.portfolio import total_benchmark_return_rs
 
+        benchmark_value = prepare_array_for_rust(benchmark_value, dtype=np.float64)
         return total_benchmark_return_rs(benchmark_value)
     from vectorbt.portfolio.nb import total_benchmark_return_nb
 
@@ -1511,6 +1686,8 @@ def gross_exposure(
     if eng == "rust":
         from vectorbt_rust.portfolio import gross_exposure_rs
 
+        asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
+        cash = prepare_array_for_rust(cash, dtype=np.float64)
         return gross_exposure_rs(asset_value, cash)
     from vectorbt.portfolio.nb import gross_exposure_nb
 
@@ -1530,7 +1707,7 @@ def get_entry_trades(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(order_records),
+            order_record_array_compatible_with_rust(order_records),
             array_compatible_with_rust(close),
             col_map_compatible_with_rust(col_map),
         ),
@@ -1539,6 +1716,9 @@ def get_entry_trades(
         from vectorbt_rust.portfolio import get_entry_trades_rs
 
         col_idxs, col_lens = col_map
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return get_entry_trades_rs(order_records, close, col_idxs, col_lens)
     from vectorbt.portfolio.nb import get_entry_trades_nb
 
@@ -1555,7 +1735,7 @@ def get_exit_trades(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(order_records),
+            order_record_array_compatible_with_rust(order_records),
             array_compatible_with_rust(close),
             col_map_compatible_with_rust(col_map),
         ),
@@ -1564,6 +1744,9 @@ def get_exit_trades(
         from vectorbt_rust.portfolio import get_exit_trades_rs
 
         col_idxs, col_lens = col_map
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return get_exit_trades_rs(order_records, close, col_idxs, col_lens)
     from vectorbt.portfolio.nb import get_exit_trades_nb
 
@@ -1577,7 +1760,7 @@ def trade_winning_streak(
     """Engine-neutral `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
     eng = resolve_engine(
         engine,
-        supports_rust=record_array_compatible_with_rust(records),
+        supports_rust=trade_record_array_compatible_with_rust(records),
     )
     if eng == "rust":
         from vectorbt_rust.portfolio import trade_winning_streak_rs
@@ -1595,7 +1778,7 @@ def trade_losing_streak(
     """Engine-neutral `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
     eng = resolve_engine(
         engine,
-        supports_rust=record_array_compatible_with_rust(records),
+        supports_rust=trade_record_array_compatible_with_rust(records),
     )
     if eng == "rust":
         from vectorbt_rust.portfolio import trade_losing_streak_rs
@@ -1615,7 +1798,7 @@ def get_positions(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(trade_records),
+            trade_record_array_compatible_with_rust(trade_records),
             col_map_compatible_with_rust(col_map),
         ),
     )
@@ -1623,6 +1806,8 @@ def get_positions(
         from vectorbt_rust.portfolio import get_positions_rs
 
         col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
         return get_positions_rs(trade_records, col_idxs, col_lens)
     from vectorbt.portfolio.nb import get_positions_nb
 

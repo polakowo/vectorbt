@@ -207,7 +207,6 @@ from vectorbt.generic.ranges import Ranges
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.signals import dispatch
-from vectorbt.signals import nb
 from vectorbt.utils import checks
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.config import merge_dicts, Config
