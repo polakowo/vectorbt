@@ -646,6 +646,272 @@ def simulate_from_orders(
     )
 
 
+def simulate_from_signals(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    init_cash: tp.Array1d,
+    call_seq: tp.Array2d,
+    entries: tp.ArrayLike = np.asarray(False),
+    exits: tp.ArrayLike = np.asarray(False),
+    direction: tp.ArrayLike = np.asarray(0),
+    long_entries: tp.ArrayLike = np.asarray(False),
+    long_exits: tp.ArrayLike = np.asarray(False),
+    short_entries: tp.ArrayLike = np.asarray(False),
+    short_exits: tp.ArrayLike = np.asarray(False),
+    size: tp.ArrayLike = np.asarray(np.inf),
+    price: tp.ArrayLike = np.asarray(np.inf),
+    size_type: tp.ArrayLike = np.asarray(0),
+    fees: tp.ArrayLike = np.asarray(0.0),
+    fixed_fees: tp.ArrayLike = np.asarray(0.0),
+    slippage: tp.ArrayLike = np.asarray(0.0),
+    min_size: tp.ArrayLike = np.asarray(0.0),
+    max_size: tp.ArrayLike = np.asarray(np.inf),
+    size_granularity: tp.ArrayLike = np.asarray(np.nan),
+    reject_prob: tp.ArrayLike = np.asarray(0.0),
+    lock_cash: tp.ArrayLike = np.asarray(False),
+    allow_partial: tp.ArrayLike = np.asarray(True),
+    raise_reject: tp.ArrayLike = np.asarray(False),
+    log: tp.ArrayLike = np.asarray(False),
+    accumulate: tp.ArrayLike = np.asarray(0),
+    upon_long_conflict: tp.ArrayLike = np.asarray(0),
+    upon_short_conflict: tp.ArrayLike = np.asarray(0),
+    upon_dir_conflict: tp.ArrayLike = np.asarray(0),
+    upon_opposite_entry: tp.ArrayLike = np.asarray(4),
+    val_price: tp.ArrayLike = np.asarray(np.inf),
+    open: tp.ArrayLike = np.asarray(np.nan),
+    high: tp.ArrayLike = np.asarray(np.nan),
+    low: tp.ArrayLike = np.asarray(np.nan),
+    close: tp.ArrayLike = np.asarray(np.nan),
+    sl_stop: tp.ArrayLike = np.asarray(np.nan),
+    sl_trail: tp.ArrayLike = np.asarray(False),
+    tp_stop: tp.ArrayLike = np.asarray(np.nan),
+    stop_entry_price: tp.ArrayLike = np.asarray(3),
+    stop_exit_price: tp.ArrayLike = np.asarray(0),
+    upon_stop_exit: tp.ArrayLike = np.asarray(0),
+    upon_stop_update: tp.ArrayLike = np.asarray(1),
+    use_stops: bool = True,
+    auto_call_seq: bool = False,
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    max_orders: tp.Optional[int] = None,
+    max_logs: int = 0,
+    flex_2d: bool = True,
+    seed: tp.Optional[int] = None,
+    engine: tp.Optional[str] = None,
+) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+    """Engine-neutral `vectorbt.portfolio.nb.simulate_from_signals_nb`."""
+    if np.any(np.asarray(reject_prob) > 0):
+        eng = resolve_random_engine(engine)
+        if eng == "numba":
+            from vectorbt.portfolio.nb import simulate_from_signals_nb
+
+            return simulate_from_signals_nb(
+                target_shape,
+                group_lens,
+                init_cash,
+                call_seq,
+                entries,
+                exits,
+                direction,
+                long_entries,
+                long_exits,
+                short_entries,
+                short_exits,
+                size,
+                price,
+                size_type,
+                fees,
+                fixed_fees,
+                slippage,
+                min_size,
+                max_size,
+                size_granularity,
+                reject_prob,
+                lock_cash,
+                allow_partial,
+                raise_reject,
+                log,
+                accumulate,
+                upon_long_conflict,
+                upon_short_conflict,
+                upon_dir_conflict,
+                upon_opposite_entry,
+                val_price,
+                open,
+                high,
+                low,
+                close,
+                sl_stop,
+                sl_trail,
+                tp_stop,
+                stop_entry_price,
+                stop_exit_price,
+                upon_stop_exit,
+                upon_stop_update,
+                use_stops=use_stops,
+                auto_call_seq=auto_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=flex_2d,
+            )
+    eng = resolve_engine(
+        engine,
+        supports_rust=combine_rust_support(
+            array_compatible_with_rust(group_lens, dtype=np.int64),
+            array_compatible_with_rust(init_cash),
+            array_compatible_with_rust(call_seq, dtype=np.int64),
+        ),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import simulate_from_signals_rs
+
+        entries_2d = flex_broadcast_to_shape(entries, target_shape, np.bool_, flex_2d)
+        exits_2d = flex_broadcast_to_shape(exits, target_shape, np.bool_, flex_2d)
+        direction_2d = flex_broadcast_to_shape(direction, target_shape, np.int64, flex_2d)
+        long_entries_2d = flex_broadcast_to_shape(long_entries, target_shape, np.bool_, flex_2d)
+        long_exits_2d = flex_broadcast_to_shape(long_exits, target_shape, np.bool_, flex_2d)
+        short_entries_2d = flex_broadcast_to_shape(short_entries, target_shape, np.bool_, flex_2d)
+        short_exits_2d = flex_broadcast_to_shape(short_exits, target_shape, np.bool_, flex_2d)
+        size_2d = flex_broadcast_to_shape(size, target_shape, np.float64, flex_2d)
+        price_2d = flex_broadcast_to_shape(price, target_shape, np.float64, flex_2d)
+        size_type_2d = flex_broadcast_to_shape(size_type, target_shape, np.int64, flex_2d)
+        fees_2d = flex_broadcast_to_shape(fees, target_shape, np.float64, flex_2d)
+        fixed_fees_2d = flex_broadcast_to_shape(fixed_fees, target_shape, np.float64, flex_2d)
+        slippage_2d = flex_broadcast_to_shape(slippage, target_shape, np.float64, flex_2d)
+        min_size_2d = flex_broadcast_to_shape(min_size, target_shape, np.float64, flex_2d)
+        max_size_2d = flex_broadcast_to_shape(max_size, target_shape, np.float64, flex_2d)
+        size_granularity_2d = flex_broadcast_to_shape(size_granularity, target_shape, np.float64, flex_2d)
+        reject_prob_2d = flex_broadcast_to_shape(reject_prob, target_shape, np.float64, flex_2d)
+        lock_cash_2d = flex_broadcast_to_shape(lock_cash, target_shape, np.bool_, flex_2d)
+        allow_partial_2d = flex_broadcast_to_shape(allow_partial, target_shape, np.bool_, flex_2d)
+        raise_reject_2d = flex_broadcast_to_shape(raise_reject, target_shape, np.bool_, flex_2d)
+        log_2d = flex_broadcast_to_shape(log, target_shape, np.bool_, flex_2d)
+        accumulate_2d = flex_broadcast_to_shape(accumulate, target_shape, np.int64, flex_2d)
+        upon_long_conflict_2d = flex_broadcast_to_shape(upon_long_conflict, target_shape, np.int64, flex_2d)
+        upon_short_conflict_2d = flex_broadcast_to_shape(upon_short_conflict, target_shape, np.int64, flex_2d)
+        upon_dir_conflict_2d = flex_broadcast_to_shape(upon_dir_conflict, target_shape, np.int64, flex_2d)
+        upon_opposite_entry_2d = flex_broadcast_to_shape(upon_opposite_entry, target_shape, np.int64, flex_2d)
+        val_price_2d = flex_broadcast_to_shape(val_price, target_shape, np.float64, flex_2d)
+        open_2d = flex_broadcast_to_shape(open, target_shape, np.float64, flex_2d)
+        high_2d = flex_broadcast_to_shape(high, target_shape, np.float64, flex_2d)
+        low_2d = flex_broadcast_to_shape(low, target_shape, np.float64, flex_2d)
+        close_2d = flex_broadcast_to_shape(close, target_shape, np.float64, flex_2d)
+        sl_stop_2d = flex_broadcast_to_shape(sl_stop, target_shape, np.float64, flex_2d)
+        sl_trail_2d = flex_broadcast_to_shape(sl_trail, target_shape, np.bool_, flex_2d)
+        tp_stop_2d = flex_broadcast_to_shape(tp_stop, target_shape, np.float64, flex_2d)
+        stop_entry_price_2d = flex_broadcast_to_shape(stop_entry_price, target_shape, np.int64, flex_2d)
+        stop_exit_price_2d = flex_broadcast_to_shape(stop_exit_price, target_shape, np.int64, flex_2d)
+        upon_stop_exit_2d = flex_broadcast_to_shape(upon_stop_exit, target_shape, np.int64, flex_2d)
+        upon_stop_update_2d = flex_broadcast_to_shape(upon_stop_update, target_shape, np.int64, flex_2d)
+
+        return simulate_from_signals_rs(
+            target_shape,
+            group_lens,
+            init_cash,
+            call_seq,
+            entries_2d,
+            exits_2d,
+            direction_2d,
+            long_entries_2d,
+            long_exits_2d,
+            short_entries_2d,
+            short_exits_2d,
+            size_2d,
+            price_2d,
+            size_type_2d,
+            fees_2d,
+            fixed_fees_2d,
+            slippage_2d,
+            min_size_2d,
+            max_size_2d,
+            size_granularity_2d,
+            reject_prob_2d,
+            lock_cash_2d,
+            allow_partial_2d,
+            raise_reject_2d,
+            log_2d,
+            accumulate_2d,
+            upon_long_conflict_2d,
+            upon_short_conflict_2d,
+            upon_dir_conflict_2d,
+            upon_opposite_entry_2d,
+            val_price_2d,
+            open_2d,
+            high_2d,
+            low_2d,
+            close_2d,
+            sl_stop_2d,
+            sl_trail_2d,
+            tp_stop_2d,
+            stop_entry_price_2d,
+            stop_exit_price_2d,
+            upon_stop_exit_2d,
+            upon_stop_update_2d,
+            use_stops=use_stops,
+            auto_call_seq=auto_call_seq,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            max_orders=max_orders,
+            max_logs=max_logs,
+            seed=seed,
+        )
+    from vectorbt.portfolio.nb import simulate_from_signals_nb
+
+    return simulate_from_signals_nb(
+        target_shape,
+        group_lens,
+        init_cash,
+        call_seq,
+        entries,
+        exits,
+        direction,
+        long_entries,
+        long_exits,
+        short_entries,
+        short_exits,
+        size,
+        price,
+        size_type,
+        fees,
+        fixed_fees,
+        slippage,
+        min_size,
+        max_size,
+        size_granularity,
+        reject_prob,
+        lock_cash,
+        allow_partial,
+        raise_reject,
+        log,
+        accumulate,
+        upon_long_conflict,
+        upon_short_conflict,
+        upon_dir_conflict,
+        upon_opposite_entry,
+        val_price,
+        open,
+        high,
+        low,
+        close,
+        sl_stop,
+        sl_trail,
+        tp_stop,
+        stop_entry_price,
+        stop_exit_price,
+        upon_stop_exit,
+        upon_stop_update,
+        use_stops=use_stops,
+        auto_call_seq=auto_call_seq,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        max_orders=max_orders,
+        max_logs=max_logs,
+        flex_2d=flex_2d,
+    )
+
+
 # ############# Scalar helpers ############# #
 
 

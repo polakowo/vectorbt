@@ -1399,7 +1399,155 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         pf_raise_reject = np.zeros(pf_target_shape, dtype=np.bool_)
         pf_log = np.zeros(pf_target_shape, dtype=np.bool_)
         pf_val_price = np.full(pf_target_shape, np.inf, dtype=np.float64)
+        pf_signal_size = np.ones(pf_target_shape, dtype=np.float64)
+        pf_entries = np.ascontiguousarray(signal_grid % 11 == 0)
+        pf_exits = np.ascontiguousarray(signal_grid % 13 == 0)
+        pf_false = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_long_entries = np.ascontiguousarray(signal_grid % 11 == 0)
+        pf_long_exits = np.ascontiguousarray(signal_grid % 13 == 0)
+        pf_short_entries = np.ascontiguousarray(signal_grid % 17 == 0)
+        pf_short_exits = np.ascontiguousarray(signal_grid % 19 == 0)
+        pf_long_only_direction = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_accumulate = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_long_conflict = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_short_conflict = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_dir_conflict = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_opposite_entry = np.full(pf_target_shape, 4, dtype=np.int64)
+        pf_open = pf_close
+        pf_high = pf_close
+        pf_low = pf_close
+        pf_sl_stop = np.full(pf_target_shape, np.nan, dtype=np.float64)
+        pf_sl_trail = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_tp_stop = np.full(pf_target_shape, np.nan, dtype=np.float64)
+        pf_stop_entry_price = np.full(pf_target_shape, 3, dtype=np.int64)
+        pf_stop_exit_price = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_stop_exit = np.zeros(pf_target_shape, dtype=np.int64)
+        pf_upon_stop_update = np.ones(pf_target_shape, dtype=np.int64)
         max_orders = rows * cols
+        max_signal_orders = rows * cols * 2
+
+        def simulate_signals_nb(
+            init_cash: np.ndarray,
+            entries: np.ndarray,
+            exits: np.ndarray,
+            direction: np.ndarray,
+            long_entries: np.ndarray,
+            long_exits: np.ndarray,
+            short_entries: np.ndarray,
+            short_exits: np.ndarray,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            return portfolio_nb.simulate_from_signals_nb(
+                pf_target_shape,
+                pf_group_lens,
+                init_cash.copy(),
+                pf_call_seq.copy(),
+                entries,
+                exits,
+                direction,
+                long_entries,
+                long_exits,
+                short_entries,
+                short_exits,
+                pf_signal_size,
+                pf_close,
+                pf_size_type,
+                pf_fees,
+                pf_fixed_fees,
+                pf_slippage,
+                pf_min_size,
+                pf_max_size,
+                pf_size_gran,
+                pf_reject_prob,
+                pf_lock_cash,
+                pf_allow_partial,
+                pf_raise_reject,
+                pf_log,
+                pf_accumulate,
+                pf_upon_long_conflict,
+                pf_upon_short_conflict,
+                pf_upon_dir_conflict,
+                pf_upon_opposite_entry,
+                pf_val_price,
+                pf_open,
+                pf_high,
+                pf_low,
+                pf_close,
+                pf_sl_stop,
+                pf_sl_trail,
+                pf_tp_stop,
+                pf_stop_entry_price,
+                pf_stop_exit_price,
+                pf_upon_stop_exit,
+                pf_upon_stop_update,
+                False,
+                False,
+                True,
+                False,
+                max_signal_orders,
+                0,
+                True,
+            )
+
+        def simulate_signals_rs(
+            init_cash: np.ndarray,
+            entries: np.ndarray,
+            exits: np.ndarray,
+            direction: np.ndarray,
+            long_entries: np.ndarray,
+            long_exits: np.ndarray,
+            short_entries: np.ndarray,
+            short_exits: np.ndarray,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            return rust_portfolio.simulate_from_signals_rs(
+                pf_target_shape,
+                pf_group_lens,
+                init_cash.copy(),
+                pf_call_seq.copy(),
+                entries,
+                exits,
+                direction,
+                long_entries,
+                long_exits,
+                short_entries,
+                short_exits,
+                pf_signal_size,
+                pf_close,
+                pf_size_type,
+                pf_fees,
+                pf_fixed_fees,
+                pf_slippage,
+                pf_min_size,
+                pf_max_size,
+                pf_size_gran,
+                pf_reject_prob,
+                pf_lock_cash,
+                pf_allow_partial,
+                pf_raise_reject,
+                pf_log,
+                pf_accumulate,
+                pf_upon_long_conflict,
+                pf_upon_short_conflict,
+                pf_upon_dir_conflict,
+                pf_upon_opposite_entry,
+                pf_val_price,
+                pf_open,
+                pf_high,
+                pf_low,
+                pf_close,
+                pf_sl_stop,
+                pf_sl_trail,
+                pf_tp_stop,
+                pf_stop_entry_price,
+                pf_stop_exit_price,
+                pf_upon_stop_exit,
+                pf_upon_stop_update,
+                use_stops=False,
+                auto_call_seq=False,
+                ffill_val_price=True,
+                update_value=False,
+                max_orders=max_signal_orders,
+                max_logs=0,
+            )
 
         # Pre-run Numba to get order records for post-sim benchmarks
         nb_or, _ = portfolio_nb.simulate_from_orders_nb(
@@ -1543,6 +1691,58 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                     max_logs=0,
                 ),
                 (),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.simulate_from_signals",
+                simulate_signals_nb,
+                (
+                    pf_init_cash,
+                    pf_entries,
+                    pf_exits,
+                    pf_long_only_direction,
+                    pf_false,
+                    pf_false,
+                    pf_false,
+                    pf_false,
+                ),
+                simulate_signals_rs,
+                (
+                    pf_init_cash,
+                    pf_entries,
+                    pf_exits,
+                    pf_long_only_direction,
+                    pf_false,
+                    pf_false,
+                    pf_false,
+                    pf_false,
+                ),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.simulate_from_signals_ls",
+                simulate_signals_nb,
+                (
+                    pf_init_cash,
+                    pf_false,
+                    pf_false,
+                    pf_long_only_direction,
+                    pf_long_entries,
+                    pf_long_exits,
+                    pf_short_entries,
+                    pf_short_exits,
+                ),
+                simulate_signals_rs,
+                (
+                    pf_init_cash,
+                    pf_false,
+                    pf_false,
+                    pf_long_only_direction,
+                    pf_long_entries,
+                    pf_long_exits,
+                    pf_short_entries,
+                    pf_short_exits,
+                ),
                 check=False,
             ),
             BenchmarkCase(

@@ -10,7 +10,7 @@ from numba.typed import List
 import vectorbt as vbt
 from tests.utils import record_arrays_close
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt.portfolio import nb
+from vectorbt.portfolio import dispatch, nb
 from vectorbt.portfolio.enums import *
 from vectorbt.utils.random_ import set_seed
 
@@ -2431,6 +2431,48 @@ class TestFromSignals:
             upon_opposite_entry="ignore",
         )
         record_arrays_close(pf_base.order_records, pf.order_records)
+
+    def test_ls_mode_routes_entries_and_exits_as_long_signals(self):
+        pf = vbt.Portfolio.from_signals(
+            pd.Series([1.0, 2.0, 3.0]),
+            entries=pd.Series([True, False, False]),
+            exits=pd.Series([False, True, False]),
+            short_entries=pd.Series([False, False, False]),
+            size=1,
+        )
+        record_arrays_close(
+            pf.order_records,
+            np.array(
+                [(0, 0, 0, 1.0, 1.0, 0.0, 0), (1, 0, 1, 1.0, 2.0, 0.0, 1)],
+                dtype=order_dt,
+            ),
+        )
+
+    @pytest.mark.parametrize("simulate_func", [dispatch.simulate_from_signals, nb.simulate_from_signals_nb])
+    def test_static_signal_default_direction_is_longonly(self, simulate_func):
+        kwargs = dict(
+            entries=np.array([[True], [False], [False]]),
+            exits=np.array([[False], [True], [False]]),
+            size=np.asarray(1.0),
+            price=np.array([[1.0], [2.0], [3.0]]),
+            max_orders=3,
+        )
+        if simulate_func is dispatch.simulate_from_signals:
+            kwargs["engine"] = "numba"
+        order_records, _ = simulate_func(
+            (3, 1),
+            np.array([1]),
+            np.array([100.0]),
+            np.array([[0], [0], [0]]),
+            **kwargs,
+        )
+        record_arrays_close(
+            order_records,
+            np.array(
+                [(0, 0, 0, 1.0, 1.0, 0.0, 0), (1, 0, 1, 1.0, 2.0, 0.0, 1)],
+                dtype=order_dt,
+            ),
+        )
 
     def test_amount(self):
         record_arrays_close(

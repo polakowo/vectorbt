@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 import vectorbt as vbt
+from tests.utils import record_arrays_close
 from vectorbt import _engine
 from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
@@ -1767,6 +1768,113 @@ class TestPortfolioRustParity:
         self.call_seq[:, 1] = 1
         self.call_seq[:, 2] = 0
 
+    def test_from_orders_parity(self):
+        price = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0],
+                "b": [5.0, 4.0, 3.0, 2.0, 1.0],
+                "c": [2.0, 3.0, 2.5, 3.5, 4.0],
+            }
+        )
+        size = pd.Series([1.0, -1.0, np.nan, 2.0, -2.0])
+        kwargs = dict(
+            close=price,
+            size=size,
+            direction="both",
+            init_cash="auto",
+            fees=0.01,
+            fixed_fees=0.1,
+            slippage=0.01,
+            min_size=0.0,
+            max_size=10.0,
+            size_granularity=0.5,
+            log=True,
+        )
+        pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+        pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+        record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+        record_arrays_close(pf_rust.log_records, pf_numba.log_records)
+        pd.testing.assert_series_equal(pf_rust.init_cash, pf_numba.init_cash)
+
+    def test_from_orders_error_parity(self):
+        price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
+        size = pd.Series([1.0, -1.0, np.nan, 1.0, -1.0])
+        for engine in ("numba", "rust"):
+            with pytest.raises(ValueError, match="order.fees must be finite"):
+                _ = vbt.Portfolio.from_orders(
+                    price,
+                    size,
+                    direction="both",
+                    fees=np.inf,
+                    engine=engine,
+                ).order_records
+
+    def test_from_signals_parity(self):
+        price = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0],
+                "b": [5.0, 4.0, 3.0, 2.0, 1.0],
+                "c": [2.0, 3.0, 2.5, 3.5, 4.0],
+            }
+        )
+        entries = pd.Series([True, False, False, True, False])
+        exits = pd.Series([False, True, False, False, True])
+        kwargs = dict(
+            close=price,
+            entries=entries,
+            exits=exits,
+            direction="both",
+            init_cash="auto",
+            size=1.0,
+            fees=0.01,
+            fixed_fees=0.1,
+            slippage=0.01,
+            max_size=10.0,
+            size_granularity=0.5,
+            log=True,
+        )
+        pf_numba = vbt.Portfolio.from_signals(engine="numba", **kwargs)
+        pf_rust = vbt.Portfolio.from_signals(engine="rust", **kwargs)
+        record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+        record_arrays_close(pf_rust.log_records, pf_numba.log_records)
+        pd.testing.assert_series_equal(pf_rust.init_cash, pf_numba.init_cash)
+
+    def test_from_signals_auto_init_cash_and_infinite_size(self):
+        price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
+        entries = pd.Series([True, False, False, False, False])
+        exits = pd.Series([False, True, False, False, False])
+
+        pf_numba = vbt.Portfolio.from_signals(
+            price,
+            entries,
+            exits,
+            direction="both",
+            size=1.0,
+            init_cash="auto",
+            engine="numba",
+        )
+        pf_rust = vbt.Portfolio.from_signals(
+            price,
+            entries,
+            exits,
+            direction="both",
+            size=1.0,
+            init_cash="auto",
+            engine="rust",
+        )
+        record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+        assert pf_rust.init_cash == pf_numba.init_cash
+
+        with pytest.raises(ValueError, match="Attempt to go in long direction infinitely"):
+            _ = vbt.Portfolio.from_signals(
+                price,
+                entries,
+                exits,
+                direction="both",
+                init_cash=np.inf,
+                engine="rust",
+            ).order_records
+
     def _run_sim(self, engine, **kwargs):
         """Run simulate_from_orders with given engine."""
         call_seq = self.call_seq.copy()
@@ -2196,14 +2304,15 @@ class TestPortfolioRustParity:
             engine="auto",
         )
         np.random.seed(42)
-        numba_orders = portfolio_nb.simulate_from_orders_nb(
+        numba_orders, _ = portfolio_dispatch.simulate_from_orders(
             shape,
             group_lens,
             init_cash,
             call_seq.copy(),
             close=close,
             reject_prob=reject_prob,
-        )[0]
+            engine="numba",
+        )
         rust_orders, _ = portfolio_dispatch.simulate_from_orders(
             shape,
             group_lens,

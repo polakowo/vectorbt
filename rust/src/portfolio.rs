@@ -165,6 +165,56 @@ const CALL_SEQ_DEFAULT: i64 = 0;
 const CALL_SEQ_REVERSED: i64 = 1;
 const CALL_SEQ_RANDOM: i64 = 2;
 
+// AccumulationMode
+const ACCUMULATION_DISABLED: i64 = 0;
+const ACCUMULATION_BOTH: i64 = 1;
+const ACCUMULATION_ADD_ONLY: i64 = 2;
+const ACCUMULATION_REMOVE_ONLY: i64 = 3;
+
+// ConflictMode
+const CONFLICT_IGNORE: i64 = 0;
+const CONFLICT_ENTRY: i64 = 1;
+const CONFLICT_EXIT: i64 = 2;
+const CONFLICT_ADJACENT: i64 = 3;
+const CONFLICT_OPPOSITE: i64 = 4;
+
+// DirectionConflictMode
+const DIR_CONFLICT_IGNORE: i64 = 0;
+const DIR_CONFLICT_LONG: i64 = 1;
+const DIR_CONFLICT_SHORT: i64 = 2;
+const DIR_CONFLICT_ADJACENT: i64 = 3;
+const DIR_CONFLICT_OPPOSITE: i64 = 4;
+
+// OppositeEntryMode
+const OPPOSITE_ENTRY_IGNORE: i64 = 0;
+const OPPOSITE_ENTRY_CLOSE: i64 = 1;
+const OPPOSITE_ENTRY_CLOSE_REDUCE: i64 = 2;
+const OPPOSITE_ENTRY_REVERSE: i64 = 3;
+const OPPOSITE_ENTRY_REVERSE_REDUCE: i64 = 4;
+
+// StopEntryPrice
+const STOP_ENTRY_VAL_PRICE: i64 = 0;
+const STOP_ENTRY_PRICE: i64 = 1;
+const STOP_ENTRY_FILL_PRICE: i64 = 2;
+const STOP_ENTRY_CLOSE: i64 = 3;
+
+// StopExitPrice
+const STOP_EXIT_STOP_LIMIT: i64 = 0;
+const STOP_EXIT_STOP_MARKET: i64 = 1;
+const STOP_EXIT_PRICE: i64 = 2;
+const STOP_EXIT_CLOSE: i64 = 3;
+
+// StopExitMode
+const STOP_MODE_CLOSE: i64 = 0;
+const STOP_MODE_CLOSE_REDUCE: i64 = 1;
+const STOP_MODE_REVERSE: i64 = 2;
+const STOP_MODE_REVERSE_REDUCE: i64 = 3;
+
+// StopUpdateMode
+const STOP_UPDATE_KEEP: i64 = 0;
+const STOP_UPDATE_OVERRIDE: i64 = 1;
+const STOP_UPDATE_OVERRIDE_NAN: i64 = 2;
+
 // ############# Core structs ############# //
 
 #[pyclass(get_all, set_all)]
@@ -498,6 +548,7 @@ unsafe impl Element for TradeRecord {
 // ############# Helpers for record field access ############# //
 
 enum PortfolioSimError {
+    ValueError(&'static str),
     RejectedOrder(&'static str),
     OrderRecordsOutOfRange,
     LogRecordsOutOfRange,
@@ -505,6 +556,7 @@ enum PortfolioSimError {
 
 fn portfolio_sim_error_to_pyerr(py: Python<'_>, err: PortfolioSimError) -> PyErr {
     match err {
+        PortfolioSimError::ValueError(msg) => PyValueError::new_err(msg),
         PortfolioSimError::RejectedOrder(msg) => {
             match py
                 .import_bound("vectorbt.portfolio.enums")
@@ -737,7 +789,7 @@ fn buy(
     lock_cash: bool,
     allow_partial: bool,
     percent: f64,
-) -> (ExecuteOrderState, OrderResult) {
+) -> Result<(ExecuteOrderState, OrderResult), PortfolioSimError> {
     // Get price adjusted with slippage
     let adj_price = price * (1.0 + slippage);
 
@@ -772,19 +824,21 @@ fn buy(
 
     if direction == DIRECTION_LONG_ONLY || direction == DIRECTION_BOTH {
         if cash_limit == 0.0 {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_NO_CASH_LONG),
-            );
+            ));
         }
         if size.is_infinite() && cash_limit.is_infinite() {
-            panic!("Attempt to go in long direction infinitely");
+            return Err(PortfolioSimError::ValueError(
+                "Attempt to go in long direction infinitely",
+            ));
         }
     } else if exec_state.position == 0.0 {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_NO_OPEN_POSITION),
-        );
+        ));
     }
 
     // Get optimal order size
@@ -795,18 +849,18 @@ fn buy(
     };
 
     if adj_size == 0.0 {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_SIZE_ZERO),
-        );
+        ));
     }
 
     if adj_size > max_size {
         if !allow_partial {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MAX_SIZE_EXCEEDED),
-            );
+            ));
         }
         adj_size = max_size;
     }
@@ -830,10 +884,10 @@ fn buy(
         // Insufficient cash
         let max_req_cash = add(cash_limit, -fixed_fees) / (1.0 + fees);
         if max_req_cash <= 0.0 {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_CANT_COVER_FEES),
-            );
+            ));
         }
 
         let max_acq_size = max_req_cash / adj_price;
@@ -851,27 +905,27 @@ fn buy(
     }
 
     if is_close(adj_size, 0.0) {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_SIZE_ZERO),
-        );
+        ));
     }
 
     if is_less(final_size, min_size) {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(
                 ORDER_STATUS_REJECTED,
                 ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
             ),
-        );
+        ));
     }
 
     if size.is_finite() && is_less(final_size, size) && !allow_partial {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_PARTIAL_FILL),
-        );
+        ));
     }
 
     // Update state
@@ -908,7 +962,7 @@ fn buy(
         debt: new_debt,
         free_cash: new_free_cash,
     };
-    (new_state, result)
+    Ok((new_state, result))
 }
 
 fn sell(
@@ -925,7 +979,7 @@ fn sell(
     lock_cash: bool,
     allow_partial: bool,
     percent: f64,
-) -> (ExecuteOrderState, OrderResult) {
+) -> Result<(ExecuteOrderState, OrderResult), PortfolioSimError> {
     // Get price adjusted with slippage
     let adj_price = price * (1.0 - slippage);
 
@@ -944,20 +998,20 @@ fn sell(
         let max_size_limit;
         if total_free_cash <= 0.0 {
             if exec_state.position <= 0.0 {
-                return (
+                return Ok((
                     exec_state,
                     order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_NO_CASH_SHORT),
-                );
+                ));
             }
             max_size_limit = long_size;
         } else {
             let max_short_size = add(total_free_cash, -fixed_fees) / (adj_price * (1.0 + fees));
             max_size_limit = add(long_size, max_short_size);
             if max_size_limit <= 0.0 {
-                return (
+                return Ok((
                     exec_state,
                     order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_CANT_COVER_FEES),
-                );
+                ));
             }
         }
 
@@ -985,23 +1039,25 @@ fn sell(
 
     if size_limit > max_size {
         if !allow_partial {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MAX_SIZE_EXCEEDED),
-            );
+            ));
         }
         size_limit = max_size;
     }
 
     if direction == DIRECTION_SHORT_ONLY || direction == DIRECTION_BOTH {
         if size_limit.is_infinite() {
-            panic!("Attempt to go in short direction infinitely");
+            return Err(PortfolioSimError::ValueError(
+                "Attempt to go in short direction infinitely",
+            ));
         }
     } else if exec_state.position == 0.0 {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_NO_OPEN_POSITION),
-        );
+        ));
     }
 
     // Adjust granularity
@@ -1010,27 +1066,27 @@ fn sell(
     }
 
     if is_close(size_limit, 0.0) {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_SIZE_ZERO),
-        );
+        ));
     }
 
     if is_less(size_limit, min_size) {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(
                 ORDER_STATUS_REJECTED,
                 ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
             ),
-        );
+        ));
     }
 
     if size.is_finite() && is_less(size_limit, size) && !allow_partial {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_PARTIAL_FILL),
-        );
+        ));
     }
 
     // Get acquired cash
@@ -1038,10 +1094,10 @@ fn sell(
     let fees_paid = acq_cash * fees + fixed_fees;
     let final_acq_cash = add(acq_cash, -fees_paid);
     if final_acq_cash < 0.0 {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_CANT_COVER_FEES),
-        );
+        ));
     }
 
     // Update state
@@ -1078,14 +1134,14 @@ fn sell(
         debt: new_debt,
         free_cash: new_free_cash,
     };
-    (new_state, result)
+    Ok((new_state, result))
 }
 
 fn execute_order(
     state: &ProcessOrderState,
     order: &Order,
     rng: &mut impl Rng,
-) -> (ExecuteOrderState, OrderResult) {
+) -> Result<(ExecuteOrderState, OrderResult), PortfolioSimError> {
     // Numerical stability
     let mut cash = state.cash;
     if is_close(cash, 0.0) {
@@ -1121,82 +1177,93 @@ fn execute_order(
 
     // Ignore order
     if order.size.is_nan() {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_SIZE_NAN),
-        );
+        ));
     }
     if order.price.is_nan() {
-        return (
+        return Ok((
             exec_state,
             order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_PRICE_NAN),
-        );
+        ));
     }
 
     // Check execution state
-    assert!(
-        !cash.is_nan() && cash >= 0.0,
-        "cash cannot be NaN and must be greater than 0"
-    );
-    assert!(position.is_finite(), "position must be finite");
-    assert!(
-        debt.is_finite() && debt >= 0.0,
-        "debt must be finite and 0 or greater"
-    );
-    assert!(!free_cash.is_nan(), "free_cash cannot be NaN");
+    if cash.is_nan() || cash < 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "cash cannot be NaN and must be greater than 0",
+        ));
+    }
+    if !position.is_finite() {
+        return Err(PortfolioSimError::ValueError("position must be finite"));
+    }
+    if !debt.is_finite() || debt < 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "debt must be finite and 0 or greater",
+        ));
+    }
+    if free_cash.is_nan() {
+        return Err(PortfolioSimError::ValueError("free_cash cannot be NaN"));
+    }
 
     // Check order
-    assert!(
-        order.price.is_finite() && order.price > 0.0,
-        "order.price must be finite and greater than 0"
-    );
-    assert!(
-        order.size_type >= 0 && order.size_type < 6,
-        "order.size_type is invalid"
-    );
-    assert!(
-        order.direction >= 0 && order.direction < 3,
-        "order.direction is invalid"
-    );
-    assert!(
-        !(order.direction == DIRECTION_LONG_ONLY && position < 0.0),
-        "position is negative but order.direction is Direction.LongOnly"
-    );
-    assert!(
-        !(order.direction == DIRECTION_SHORT_ONLY && position > 0.0),
-        "position is positive but order.direction is Direction.ShortOnly"
-    );
-    assert!(order.fees.is_finite(), "order.fees must be finite");
-    assert!(
-        order.fixed_fees.is_finite(),
-        "order.fixed_fees must be finite"
-    );
-    assert!(
-        order.slippage.is_finite() && order.slippage >= 0.0,
-        "order.slippage must be finite and 0 or greater"
-    );
-    assert!(
-        order.min_size.is_finite() && order.min_size >= 0.0,
-        "order.min_size must be finite and 0 or greater"
-    );
-    assert!(
-        !order.max_size.is_nan() && order.max_size > 0.0,
-        "order.max_size must be greater than 0"
-    );
-    assert!(
-        order.size_granularity.is_infinite() == false || order.size_granularity.is_nan(),
-        "order.size_granularity must be either NaN or finite and greater than 0"
-    );
-    if !order.size_granularity.is_nan() {
-        assert!(
-            order.size_granularity > 0.0,
-            "order.size_granularity must be either NaN or finite and greater than 0"
-        );
+    if !order.price.is_finite() || order.price <= 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "order.price must be finite and greater than 0",
+        ));
     }
-    assert!(
-        order.reject_prob.is_finite() && order.reject_prob >= 0.0 && order.reject_prob <= 1.0,
-        "order.reject_prob must be between 0 and 1"
-    );
+    if order.size_type < 0 || order.size_type >= 6 {
+        return Err(PortfolioSimError::ValueError("order.size_type is invalid"));
+    }
+    if order.direction < 0 || order.direction >= 3 {
+        return Err(PortfolioSimError::ValueError("order.direction is invalid"));
+    }
+    if order.direction == DIRECTION_LONG_ONLY && position < 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "position is negative but order.direction is Direction.LongOnly",
+        ));
+    }
+    if order.direction == DIRECTION_SHORT_ONLY && position > 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "position is positive but order.direction is Direction.ShortOnly",
+        ));
+    }
+    if !order.fees.is_finite() {
+        return Err(PortfolioSimError::ValueError("order.fees must be finite"));
+    }
+    if !order.fixed_fees.is_finite() {
+        return Err(PortfolioSimError::ValueError(
+            "order.fixed_fees must be finite",
+        ));
+    }
+    if !order.slippage.is_finite() || order.slippage < 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "order.slippage must be finite and 0 or greater",
+        ));
+    }
+    if !order.min_size.is_finite() || order.min_size < 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "order.min_size must be finite and 0 or greater",
+        ));
+    }
+    if order.max_size.is_nan() || order.max_size <= 0.0 {
+        return Err(PortfolioSimError::ValueError(
+            "order.max_size must be greater than 0",
+        ));
+    }
+    if order.size_granularity.is_infinite()
+        || (!order.size_granularity.is_nan() && order.size_granularity <= 0.0)
+    {
+        return Err(PortfolioSimError::ValueError(
+            "order.size_granularity must be either NaN or finite and greater than 0",
+        ));
+    }
+    if !order.reject_prob.is_finite() || order.reject_prob < 0.0 || order.reject_prob > 1.0 {
+        return Err(PortfolioSimError::ValueError(
+            "order.reject_prob must be between 0 and 1",
+        ));
+    }
 
     let mut order_size = order.size;
     let mut order_size_type = order.size_type;
@@ -1207,16 +1274,16 @@ fn execute_order(
 
     if order_size_type == SIZE_TYPE_TARGET_PERCENT {
         if value.is_nan() {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_VALUE_NAN),
-            );
+            ));
         }
         if value <= 0.0 {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_VALUE_ZERO_NEG),
-            );
+            ));
         }
         order_size *= value;
         order_size_type = SIZE_TYPE_TARGET_VALUE;
@@ -1224,13 +1291,15 @@ fn execute_order(
 
     if order_size_type == SIZE_TYPE_VALUE || order_size_type == SIZE_TYPE_TARGET_VALUE {
         if val_price.is_nan() {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_IGNORED, ORDER_STATUS_INFO_VAL_PRICE_NAN),
-            );
+            ));
         }
         if val_price.is_infinite() || val_price <= 0.0 {
-            panic!("val_price_now must be finite and greater than 0");
+            return Err(PortfolioSimError::ValueError(
+                "val_price_now must be finite and greater than 0",
+            ));
         }
         order_size /= val_price;
         if order_size_type == SIZE_TYPE_VALUE {
@@ -1275,7 +1344,7 @@ fn execute_order(
             order.lock_cash,
             order.allow_partial,
             percent,
-        )
+        )?
     } else {
         sell(
             exec_state,
@@ -1291,19 +1360,19 @@ fn execute_order(
             order.lock_cash,
             order.allow_partial,
             percent,
-        )
+        )?
     };
 
     if order.reject_prob > 0.0 {
         if rng.gen::<f64>() < order.reject_prob {
-            return (
+            return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_RANDOM_EVENT),
-            );
+            ));
         }
     }
 
-    (new_exec_state, order_result)
+    Ok((new_exec_state, order_result))
 }
 
 fn update_value(
@@ -1425,7 +1494,7 @@ fn process_order(
     log_data: Option<(*mut u8, &LogFieldOffsets, usize)>,
     rng: &mut impl Rng,
 ) -> Result<(OrderResult, ProcessOrderState), PortfolioSimError> {
-    let (exec_state, order_result) = execute_order(state, order, rng);
+    let (exec_state, order_result) = execute_order(state, order, rng)?;
 
     // Raise if rejected
     let is_rejected = order_result.status == ORDER_STATUS_REJECTED;
@@ -1623,6 +1692,7 @@ pub fn order_not_filled_py(status: i64, status_info: i64) -> OrderResult {
     percent = f64::NAN,
 ))]
 pub fn buy_py(
+    py: Python<'_>,
     exec_state: ExecuteOrderState,
     size: f64,
     price: f64,
@@ -1636,7 +1706,7 @@ pub fn buy_py(
     lock_cash: bool,
     allow_partial: bool,
     percent: f64,
-) -> (ExecuteOrderState, OrderResult) {
+) -> PyResult<(ExecuteOrderState, OrderResult)> {
     buy(
         exec_state,
         size,
@@ -1652,6 +1722,7 @@ pub fn buy_py(
         allow_partial,
         percent,
     )
+    .map_err(|err| portfolio_sim_error_to_pyerr(py, err))
 }
 
 #[pyfunction]
@@ -1672,6 +1743,7 @@ pub fn buy_py(
     percent = f64::NAN,
 ))]
 pub fn sell_py(
+    py: Python<'_>,
     exec_state: ExecuteOrderState,
     size: f64,
     price: f64,
@@ -1685,7 +1757,7 @@ pub fn sell_py(
     lock_cash: bool,
     allow_partial: bool,
     percent: f64,
-) -> (ExecuteOrderState, OrderResult) {
+) -> PyResult<(ExecuteOrderState, OrderResult)> {
     sell(
         exec_state,
         size,
@@ -1701,16 +1773,18 @@ pub fn sell_py(
         allow_partial,
         percent,
     )
+    .map_err(|err| portfolio_sim_error_to_pyerr(py, err))
 }
 
 #[pyfunction]
 #[pyo3(name = "execute_order_rs")]
 pub fn execute_order_py(
+    py: Python<'_>,
     state: ProcessOrderState,
     order: Order,
-) -> (ExecuteOrderState, OrderResult) {
+) -> PyResult<(ExecuteOrderState, OrderResult)> {
     let mut rng = rand::thread_rng();
-    execute_order(&state, &order, &mut rng)
+    execute_order(&state, &order, &mut rng).map_err(|err| portfolio_sim_error_to_pyerr(py, err))
 }
 
 #[pyfunction]
@@ -2682,7 +2756,11 @@ fn simulate_from_orders_inner(
                         call_seq
                     };
                     let col_i = call_seq_ref[i * ncols + col] as usize;
-                    assert!(col_i < group_len, "Call index exceeds bounds of the group");
+                    if col_i >= group_len {
+                        return Err(PortfolioSimError::ValueError(
+                            "Call index exceeds bounds of the group",
+                        ));
+                    }
                     col = from_col + col_i;
                 }
 
@@ -2776,6 +2854,1666 @@ fn simulate_from_orders_inner(
     Ok((order_records, lidx as usize, call_seq_mut))
 }
 
+// ############# Signal processing helpers ############# //
+
+/// Generate stop signal and change accumulation if needed.
+fn generate_stop_signal(
+    position_now: f64,
+    upon_stop_exit: i64,
+    accumulate: i64,
+) -> (bool, bool, bool, bool, i64) {
+    let mut is_long_entry = false;
+    let mut is_long_exit = false;
+    let mut is_short_entry = false;
+    let mut is_short_exit = false;
+    let mut accumulate = accumulate;
+    if position_now > 0.0 {
+        if upon_stop_exit == STOP_MODE_CLOSE {
+            is_long_exit = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else if upon_stop_exit == STOP_MODE_CLOSE_REDUCE {
+            is_long_exit = true;
+        } else if upon_stop_exit == STOP_MODE_REVERSE {
+            is_short_entry = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else {
+            is_short_entry = true;
+        }
+    } else if position_now < 0.0 {
+        if upon_stop_exit == STOP_MODE_CLOSE {
+            is_short_exit = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else if upon_stop_exit == STOP_MODE_CLOSE_REDUCE {
+            is_short_exit = true;
+        } else if upon_stop_exit == STOP_MODE_REVERSE {
+            is_long_entry = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else {
+            is_long_entry = true;
+        }
+    }
+    (
+        is_long_entry,
+        is_long_exit,
+        is_short_entry,
+        is_short_exit,
+        accumulate,
+    )
+}
+
+/// Resolve price and slippage of a stop order.
+fn resolve_stop_price_and_slippage(
+    stop_price: f64,
+    price: f64,
+    close: f64,
+    slippage: f64,
+    stop_exit_price: i64,
+) -> (f64, f64) {
+    if stop_exit_price == STOP_EXIT_STOP_MARKET {
+        (stop_price, slippage)
+    } else if stop_exit_price == STOP_EXIT_STOP_LIMIT {
+        (stop_price, 0.0)
+    } else if stop_exit_price == STOP_EXIT_CLOSE {
+        (close, slippage)
+    } else {
+        (price, slippage)
+    }
+}
+
+/// Resolve any conflict between an entry and an exit.
+fn resolve_signal_conflict(
+    position_now: f64,
+    mut is_entry: bool,
+    mut is_exit: bool,
+    direction: i64,
+    conflict_mode: i64,
+) -> (bool, bool) {
+    if is_entry && is_exit {
+        if conflict_mode == CONFLICT_ENTRY {
+            is_exit = false;
+        } else if conflict_mode == CONFLICT_EXIT {
+            is_entry = false;
+        } else if conflict_mode == CONFLICT_ADJACENT {
+            if position_now == 0.0 {
+                is_entry = false;
+                is_exit = false;
+            } else if direction == DIRECTION_BOTH {
+                if position_now > 0.0 {
+                    is_exit = false;
+                } else if position_now < 0.0 {
+                    is_entry = false;
+                }
+            } else {
+                is_exit = false;
+            }
+        } else if conflict_mode == CONFLICT_OPPOSITE {
+            if position_now == 0.0 {
+                is_entry = false;
+                is_exit = false;
+            } else if direction == DIRECTION_BOTH {
+                if position_now > 0.0 {
+                    is_entry = false;
+                } else if position_now < 0.0 {
+                    is_exit = false;
+                }
+            } else {
+                is_entry = false;
+            }
+        } else {
+            // Ignore
+            is_entry = false;
+            is_exit = false;
+        }
+    }
+    (is_entry, is_exit)
+}
+
+/// Resolve any direction conflict between a long entry and a short entry.
+fn resolve_dir_conflict(
+    position_now: f64,
+    mut is_long_entry: bool,
+    mut is_short_entry: bool,
+    upon_dir_conflict: i64,
+) -> (bool, bool) {
+    if is_long_entry && is_short_entry {
+        if upon_dir_conflict == DIR_CONFLICT_LONG {
+            is_short_entry = false;
+        } else if upon_dir_conflict == DIR_CONFLICT_SHORT {
+            is_long_entry = false;
+        } else if upon_dir_conflict == DIR_CONFLICT_ADJACENT {
+            if position_now > 0.0 {
+                is_short_entry = false;
+            } else if position_now < 0.0 {
+                is_long_entry = false;
+            } else {
+                is_long_entry = false;
+                is_short_entry = false;
+            }
+        } else if upon_dir_conflict == DIR_CONFLICT_OPPOSITE {
+            if position_now > 0.0 {
+                is_long_entry = false;
+            } else if position_now < 0.0 {
+                is_short_entry = false;
+            } else {
+                is_long_entry = false;
+                is_short_entry = false;
+            }
+        } else {
+            // Ignore
+            is_long_entry = false;
+            is_short_entry = false;
+        }
+    }
+    (is_long_entry, is_short_entry)
+}
+
+/// Resolve opposite entry.
+fn resolve_opposite_entry(
+    position_now: f64,
+    mut is_long_entry: bool,
+    mut is_long_exit: bool,
+    mut is_short_entry: bool,
+    mut is_short_exit: bool,
+    upon_opposite_entry: i64,
+    mut accumulate: i64,
+) -> (bool, bool, bool, bool, i64) {
+    if position_now > 0.0 && is_short_entry {
+        if upon_opposite_entry == OPPOSITE_ENTRY_IGNORE {
+            is_short_entry = false;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_CLOSE {
+            is_short_entry = false;
+            is_long_exit = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_CLOSE_REDUCE {
+            is_short_entry = false;
+            is_long_exit = true;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_REVERSE {
+            accumulate = ACCUMULATION_DISABLED;
+        }
+    }
+    if position_now < 0.0 && is_long_entry {
+        if upon_opposite_entry == OPPOSITE_ENTRY_IGNORE {
+            is_long_entry = false;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_CLOSE {
+            is_long_entry = false;
+            is_short_exit = true;
+            accumulate = ACCUMULATION_DISABLED;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_CLOSE_REDUCE {
+            is_long_entry = false;
+            is_short_exit = true;
+        } else if upon_opposite_entry == OPPOSITE_ENTRY_REVERSE {
+            accumulate = ACCUMULATION_DISABLED;
+        }
+    }
+    (
+        is_long_entry,
+        is_long_exit,
+        is_short_entry,
+        is_short_exit,
+        accumulate,
+    )
+}
+
+/// Translate direction-aware signals into size, size type, and direction.
+fn signals_to_size(
+    position_now: f64,
+    is_long_entry: bool,
+    is_long_exit: bool,
+    is_short_entry: bool,
+    is_short_exit: bool,
+    size: f64,
+    mut size_type: i64,
+    accumulate: i64,
+    val_price_now: f64,
+) -> Result<(f64, i64, i64), PortfolioSimError> {
+    if size_type != SIZE_TYPE_AMOUNT
+        && size_type != SIZE_TYPE_VALUE
+        && size_type != SIZE_TYPE_PERCENT
+    {
+        return Err(PortfolioSimError::RejectedOrder(
+            "Only SizeType.Amount, SizeType.Value, and SizeType.Percent are supported",
+        ));
+    }
+    let mut order_size: f64 = 0.0;
+    let mut direction = DIRECTION_BOTH;
+    let abs_position_now = position_now.abs();
+    if is_less(size, 0.0) {
+        return Err(PortfolioSimError::RejectedOrder(
+            "Negative size is not allowed. You must express direction using signals.",
+        ));
+    }
+
+    if position_now > 0.0 {
+        if is_short_entry {
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_REMOVE_ONLY {
+                order_size = -size;
+            } else {
+                order_size = -abs_position_now;
+                if !size.is_nan() {
+                    if size_type == SIZE_TYPE_PERCENT {
+                        return Err(PortfolioSimError::RejectedOrder(
+                            "SizeType.Percent does not support position reversal using signals",
+                        ));
+                    }
+                    if size_type == SIZE_TYPE_VALUE {
+                        order_size -= size / val_price_now;
+                    } else {
+                        order_size -= size;
+                    }
+                }
+                size_type = SIZE_TYPE_AMOUNT;
+            }
+        } else if is_long_exit {
+            direction = DIRECTION_LONG_ONLY;
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_REMOVE_ONLY {
+                order_size = -size;
+            } else {
+                order_size = -abs_position_now;
+                size_type = SIZE_TYPE_AMOUNT;
+            }
+        } else if is_long_entry {
+            direction = DIRECTION_LONG_ONLY;
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_ADD_ONLY {
+                order_size = size;
+            }
+        }
+    } else if position_now < 0.0 {
+        if is_long_entry {
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_REMOVE_ONLY {
+                order_size = size;
+            } else {
+                order_size = abs_position_now;
+                if !size.is_nan() {
+                    if size_type == SIZE_TYPE_PERCENT {
+                        return Err(PortfolioSimError::RejectedOrder(
+                            "SizeType.Percent does not support position reversal using signals",
+                        ));
+                    }
+                    if size_type == SIZE_TYPE_VALUE {
+                        order_size += size / val_price_now;
+                    } else {
+                        order_size += size;
+                    }
+                }
+                size_type = SIZE_TYPE_AMOUNT;
+            }
+        } else if is_short_exit {
+            direction = DIRECTION_SHORT_ONLY;
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_REMOVE_ONLY {
+                order_size = size;
+            } else {
+                order_size = abs_position_now;
+                size_type = SIZE_TYPE_AMOUNT;
+            }
+        } else if is_short_entry {
+            direction = DIRECTION_SHORT_ONLY;
+            if accumulate == ACCUMULATION_BOTH || accumulate == ACCUMULATION_ADD_ONLY {
+                order_size = -size;
+            }
+        }
+    } else {
+        if is_long_entry {
+            order_size = size;
+        } else if is_short_entry {
+            order_size = -size;
+        }
+    }
+
+    Ok((order_size, size_type, direction))
+}
+
+/// Get stop price. If hit before open, returns open.
+fn get_stop_price_rs(
+    position_now: f64,
+    stop_price: f64,
+    stop: f64,
+    open: f64,
+    low: f64,
+    high: f64,
+    hit_below: bool,
+) -> Result<f64, PortfolioSimError> {
+    if stop < 0.0 {
+        return Err(PortfolioSimError::RejectedOrder(
+            "Stop value must be 0 or greater",
+        ));
+    }
+    if (position_now > 0.0 && hit_below) || (position_now < 0.0 && !hit_below) {
+        let sp = stop_price * (1.0 - stop);
+        if open <= sp {
+            return Ok(open);
+        }
+        if low <= sp && sp <= high {
+            return Ok(sp);
+        }
+        return Ok(f64::NAN);
+    }
+    if (position_now < 0.0 && hit_below) || (position_now > 0.0 && !hit_below) {
+        let sp = stop_price * (1.0 + stop);
+        if sp <= open {
+            return Ok(open);
+        }
+        if low <= sp && sp <= high {
+            return Ok(sp);
+        }
+        return Ok(f64::NAN);
+    }
+    Ok(f64::NAN)
+}
+
+/// Whether to update stop.
+fn should_update_stop(stop: f64, upon_stop_update: i64) -> bool {
+    if upon_stop_update == STOP_UPDATE_OVERRIDE || upon_stop_update == STOP_UPDATE_OVERRIDE_NAN {
+        if !stop.is_nan() || upon_stop_update == STOP_UPDATE_OVERRIDE_NAN {
+            return true;
+        }
+    }
+    false
+}
+
+/// Read signals from arrays and merge direction mode with LS mode.
+#[inline(always)]
+fn read_signals(
+    entry: bool,
+    exit: bool,
+    dir: i64,
+    long_entry: bool,
+    long_exit: bool,
+    short_entry: bool,
+    short_exit: bool,
+) -> (bool, bool, bool, bool) {
+    if entry || exit {
+        if dir == DIRECTION_LONG_ONLY {
+            (
+                entry || long_entry,
+                exit || long_exit,
+                short_entry,
+                short_exit,
+            )
+        } else if dir == DIRECTION_SHORT_ONLY {
+            (
+                long_entry,
+                long_exit,
+                entry || short_entry,
+                exit || short_exit,
+            )
+        } else {
+            // DIRECTION_BOTH
+            (
+                entry || long_entry,
+                long_exit,
+                exit || short_entry,
+                short_exit,
+            )
+        }
+    } else {
+        (long_entry, long_exit, short_entry, short_exit)
+    }
+}
+
+// ############# simulate_from_signals_rs ############# //
+
+#[pyfunction]
+#[pyo3(name = "simulate_from_signals_rs")]
+#[pyo3(signature = (
+    target_shape,
+    group_lens,
+    init_cash,
+    call_seq,
+    entries,
+    exits,
+    direction,
+    long_entries,
+    long_exits,
+    short_entries,
+    short_exits,
+    size,
+    price,
+    size_type,
+    fees,
+    fixed_fees,
+    slippage,
+    min_size,
+    max_size,
+    size_granularity,
+    reject_prob,
+    lock_cash,
+    allow_partial,
+    raise_reject,
+    log,
+    accumulate,
+    upon_long_conflict,
+    upon_short_conflict,
+    upon_dir_conflict,
+    upon_opposite_entry,
+    val_price,
+    open,
+    high,
+    low,
+    close,
+    sl_stop,
+    sl_trail,
+    tp_stop,
+    stop_entry_price,
+    stop_exit_price,
+    upon_stop_exit,
+    upon_stop_update,
+    use_stops = true,
+    auto_call_seq = false,
+    ffill_val_price = true,
+    update_value = false,
+    max_orders = None,
+    max_logs = 0,
+    seed = None,
+))]
+pub fn simulate_from_signals_py<'py>(
+    py: Python<'py>,
+    target_shape: (usize, usize),
+    group_lens: PyReadonlyArray1<'py, i64>,
+    init_cash: PyReadonlyArray1<'py, f64>,
+    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
+    // Signal arrays - pre-broadcast 2D
+    entries: PyReadonlyArray2<'py, bool>,
+    exits: PyReadonlyArray2<'py, bool>,
+    direction: PyReadonlyArray2<'py, i64>,
+    long_entries: PyReadonlyArray2<'py, bool>,
+    long_exits: PyReadonlyArray2<'py, bool>,
+    short_entries: PyReadonlyArray2<'py, bool>,
+    short_exits: PyReadonlyArray2<'py, bool>,
+    // Order params
+    size: PyReadonlyArray2<'py, f64>,
+    price: PyReadonlyArray2<'py, f64>,
+    size_type: PyReadonlyArray2<'py, i64>,
+    fees: PyReadonlyArray2<'py, f64>,
+    fixed_fees: PyReadonlyArray2<'py, f64>,
+    slippage: PyReadonlyArray2<'py, f64>,
+    min_size: PyReadonlyArray2<'py, f64>,
+    max_size: PyReadonlyArray2<'py, f64>,
+    size_granularity: PyReadonlyArray2<'py, f64>,
+    reject_prob: PyReadonlyArray2<'py, f64>,
+    lock_cash: PyReadonlyArray2<'py, bool>,
+    allow_partial: PyReadonlyArray2<'py, bool>,
+    raise_reject: PyReadonlyArray2<'py, bool>,
+    log: PyReadonlyArray2<'py, bool>,
+    // Signal conflict/resolution params
+    accumulate: PyReadonlyArray2<'py, i64>,
+    upon_long_conflict: PyReadonlyArray2<'py, i64>,
+    upon_short_conflict: PyReadonlyArray2<'py, i64>,
+    upon_dir_conflict: PyReadonlyArray2<'py, i64>,
+    upon_opposite_entry: PyReadonlyArray2<'py, i64>,
+    // Price/valuation
+    val_price: PyReadonlyArray2<'py, f64>,
+    open: PyReadonlyArray2<'py, f64>,
+    high: PyReadonlyArray2<'py, f64>,
+    low: PyReadonlyArray2<'py, f64>,
+    close: PyReadonlyArray2<'py, f64>,
+    // Stop params
+    sl_stop: PyReadonlyArray2<'py, f64>,
+    sl_trail: PyReadonlyArray2<'py, bool>,
+    tp_stop: PyReadonlyArray2<'py, f64>,
+    stop_entry_price: PyReadonlyArray2<'py, i64>,
+    stop_exit_price: PyReadonlyArray2<'py, i64>,
+    upon_stop_exit: PyReadonlyArray2<'py, i64>,
+    upon_stop_update: PyReadonlyArray2<'py, i64>,
+    // Scalar flags
+    use_stops: bool,
+    auto_call_seq: bool,
+    ffill_val_price: bool,
+    update_value: bool,
+    max_orders: Option<usize>,
+    max_logs: usize,
+    seed: Option<u64>,
+) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
+    let (nrows, ncols) = target_shape;
+
+    let gl_cow = array1_as_slice_cow(&group_lens);
+    let ic_cow = array1_as_slice_cow(&init_cash);
+    let cs_cow = {
+        let cs_view = call_seq.as_array();
+        if cs_view.is_standard_layout() {
+            Cow::Borrowed(call_seq.as_slice().unwrap())
+        } else {
+            Cow::Owned(cs_view.iter().copied().collect())
+        }
+    };
+
+    // Signal arrays
+    let entries_cow = array2_as_slice_cow(&entries);
+    let exits_cow = array2_as_slice_cow(&exits);
+    let dir_cow = array2_as_slice_cow(&direction);
+    let le_cow = array2_as_slice_cow(&long_entries);
+    let lx_cow = array2_as_slice_cow(&long_exits);
+    let se_cow = array2_as_slice_cow(&short_entries);
+    let sx_cow = array2_as_slice_cow(&short_exits);
+
+    // Order arrays
+    let size_cow = array2_as_slice_cow(&size);
+    let price_cow = array2_as_slice_cow(&price);
+    let st_cow = array2_as_slice_cow(&size_type);
+    let fees_cow = array2_as_slice_cow(&fees);
+    let ff_cow = array2_as_slice_cow(&fixed_fees);
+    let slip_cow = array2_as_slice_cow(&slippage);
+    let mins_cow = array2_as_slice_cow(&min_size);
+    let maxs_cow = array2_as_slice_cow(&max_size);
+    let sg_cow = array2_as_slice_cow(&size_granularity);
+    let rp_cow = array2_as_slice_cow(&reject_prob);
+    let lc_cow = array2_as_slice_cow(&lock_cash);
+    let ap_cow = array2_as_slice_cow(&allow_partial);
+    let rr_cow = array2_as_slice_cow(&raise_reject);
+    let log_cow = array2_as_slice_cow(&log);
+
+    // Conflict arrays
+    let acc_cow = array2_as_slice_cow(&accumulate);
+    let ulc_cow = array2_as_slice_cow(&upon_long_conflict);
+    let usc_cow = array2_as_slice_cow(&upon_short_conflict);
+    let udc_cow = array2_as_slice_cow(&upon_dir_conflict);
+    let uoe_cow = array2_as_slice_cow(&upon_opposite_entry);
+
+    // Price arrays
+    let vp_cow = array2_as_slice_cow(&val_price);
+    let open_cow = array2_as_slice_cow(&open);
+    let high_cow = array2_as_slice_cow(&high);
+    let low_cow = array2_as_slice_cow(&low);
+    let close_cow = array2_as_slice_cow(&close);
+
+    // Stop arrays
+    let sls_cow = array2_as_slice_cow(&sl_stop);
+    let slt_cow = array2_as_slice_cow(&sl_trail);
+    let tps_cow = array2_as_slice_cow(&tp_stop);
+    let sep_cow = array2_as_slice_cow(&stop_entry_price);
+    let sxp_cow = array2_as_slice_cow(&stop_exit_price);
+    let use_cow = array2_as_slice_cow(&upon_stop_exit);
+    let usu_cow = array2_as_slice_cow(&upon_stop_update);
+
+    // Validate
+    let cash_sharing = gl_cow.iter().any(|&g| g > 1);
+    let total_cols: i64 = gl_cow.iter().sum();
+    if total_cols != ncols as i64 {
+        return Err(PyValueError::new_err(
+            "group_lens has incorrect total number of columns",
+        ));
+    }
+    if cash_sharing {
+        if ic_cow.len() != gl_cow.len() {
+            return Err(PyValueError::new_err(
+                "If cash sharing is enabled, init_cash must match the number of groups",
+            ));
+        }
+    } else if ic_cow.len() != ncols {
+        return Err(PyValueError::new_err(
+            "If cash sharing is disabled, init_cash must match the number of columns",
+        ));
+    }
+
+    let log_dt = py
+        .import_bound("vectorbt.portfolio.enums")?
+        .getattr("log_dt")?;
+    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
+    let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
+    let log_offsets = log_record_offsets(&log_arr)?;
+    let (log_data, _log_itemsize, _) = unsafe { array_raw_parts(&log_arr)? };
+    let log_data_usize = ptr_to_usize(log_data);
+
+    let max_ord = max_orders.unwrap_or(nrows * ncols);
+
+    let (order_records, lidx, call_seq_out) = py
+        .allow_threads(|| {
+            if !cash_sharing && !auto_call_seq {
+                let (order_records, lidx) = simulate_from_signals_non_shared_inner(
+                    nrows,
+                    ncols,
+                    ic_cow.as_ref(),
+                    entries_cow.as_ref(),
+                    exits_cow.as_ref(),
+                    dir_cow.as_ref(),
+                    le_cow.as_ref(),
+                    lx_cow.as_ref(),
+                    se_cow.as_ref(),
+                    sx_cow.as_ref(),
+                    size_cow.as_ref(),
+                    price_cow.as_ref(),
+                    st_cow.as_ref(),
+                    fees_cow.as_ref(),
+                    ff_cow.as_ref(),
+                    slip_cow.as_ref(),
+                    mins_cow.as_ref(),
+                    maxs_cow.as_ref(),
+                    sg_cow.as_ref(),
+                    rp_cow.as_ref(),
+                    lc_cow.as_ref(),
+                    ap_cow.as_ref(),
+                    rr_cow.as_ref(),
+                    log_cow.as_ref(),
+                    acc_cow.as_ref(),
+                    ulc_cow.as_ref(),
+                    usc_cow.as_ref(),
+                    udc_cow.as_ref(),
+                    uoe_cow.as_ref(),
+                    vp_cow.as_ref(),
+                    open_cow.as_ref(),
+                    high_cow.as_ref(),
+                    low_cow.as_ref(),
+                    close_cow.as_ref(),
+                    sls_cow.as_ref(),
+                    slt_cow.as_ref(),
+                    tps_cow.as_ref(),
+                    sep_cow.as_ref(),
+                    sxp_cow.as_ref(),
+                    use_cow.as_ref(),
+                    usu_cow.as_ref(),
+                    use_stops,
+                    ffill_val_price,
+                    update_value,
+                    max_ord,
+                    effective_max_logs,
+                    usize_to_mut_ptr(log_data_usize),
+                    &log_offsets,
+                    seed,
+                )?;
+                return Ok((order_records, lidx, None));
+            }
+            simulate_from_signals_inner(
+                nrows,
+                ncols,
+                gl_cow.as_ref(),
+                ic_cow.as_ref(),
+                cs_cow.as_ref(),
+                entries_cow.as_ref(),
+                exits_cow.as_ref(),
+                dir_cow.as_ref(),
+                le_cow.as_ref(),
+                lx_cow.as_ref(),
+                se_cow.as_ref(),
+                sx_cow.as_ref(),
+                size_cow.as_ref(),
+                price_cow.as_ref(),
+                st_cow.as_ref(),
+                fees_cow.as_ref(),
+                ff_cow.as_ref(),
+                slip_cow.as_ref(),
+                mins_cow.as_ref(),
+                maxs_cow.as_ref(),
+                sg_cow.as_ref(),
+                rp_cow.as_ref(),
+                lc_cow.as_ref(),
+                ap_cow.as_ref(),
+                rr_cow.as_ref(),
+                log_cow.as_ref(),
+                acc_cow.as_ref(),
+                ulc_cow.as_ref(),
+                usc_cow.as_ref(),
+                udc_cow.as_ref(),
+                uoe_cow.as_ref(),
+                vp_cow.as_ref(),
+                open_cow.as_ref(),
+                high_cow.as_ref(),
+                low_cow.as_ref(),
+                close_cow.as_ref(),
+                sls_cow.as_ref(),
+                slt_cow.as_ref(),
+                tps_cow.as_ref(),
+                sep_cow.as_ref(),
+                sxp_cow.as_ref(),
+                use_cow.as_ref(),
+                usu_cow.as_ref(),
+                use_stops,
+                auto_call_seq,
+                ffill_val_price,
+                update_value,
+                max_ord,
+                effective_max_logs,
+                usize_to_mut_ptr(log_data_usize),
+                &log_offsets,
+                seed,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+    drop(cs_cow);
+
+    if let Some(call_seq_out) = call_seq_out {
+        let mut cs_view = call_seq.as_array_mut();
+        for i in 0..nrows {
+            for col in 0..ncols {
+                cs_view[(i, col)] = call_seq_out[i * ncols + col];
+            }
+        }
+    }
+
+    let order_arr = PyArray1::from_vec_bound(py, order_records);
+
+    let log_arr_sliced = if lidx < effective_max_logs {
+        log_arr.call_method1(
+            "__getitem__",
+            (pyo3::types::PySlice::new_bound(py, 0, lidx as isize, 1),),
+        )?
+    } else {
+        log_arr
+    };
+
+    Ok((order_arr, log_arr_sliced))
+}
+
+/// Process signals for a single (i, col) and return (is_long_entry, is_long_exit, is_short_entry, is_short_exit, accumulate, price, slippage).
+/// Also updates stop trailing state in-place.
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn process_signals_at(
+    idx: usize,
+    i: usize,
+    position_now: f64,
+    order_price: f64,
+    slippage_val: f64,
+    // Signal arrays
+    entries_s: &[bool],
+    exits_s: &[bool],
+    direction_s: &[i64],
+    long_entries_s: &[bool],
+    long_exits_s: &[bool],
+    short_entries_s: &[bool],
+    short_exits_s: &[bool],
+    // Conflict params
+    accumulate_s: &[i64],
+    upon_long_conflict_s: &[i64],
+    upon_short_conflict_s: &[i64],
+    upon_dir_conflict_s: &[i64],
+    upon_opposite_entry_s: &[i64],
+    // OHLC
+    open_s: &[f64],
+    high_s: &[f64],
+    low_s: &[f64],
+    close_s: &[f64],
+    // Stop params
+    upon_stop_exit_s: &[i64],
+    stop_exit_price_s: &[i64],
+    // Stop state (mutable)
+    use_stops: bool,
+    sl_curr_stop: f64,
+    sl_curr_price: f64,
+    sl_curr_trail: bool,
+    sl_curr_i: &mut i64,
+    sl_curr_price_mut: &mut f64,
+    tp_curr_stop: f64,
+    tp_init_price: f64,
+) -> Result<(bool, bool, bool, bool, i64, f64, f64), PortfolioSimError> {
+    let mut price_out = order_price;
+    let mut slippage_out = slippage_val;
+    let mut accumulate_val = accumulate_s[idx];
+
+    // Check stops
+    let mut stop_price = f64::NAN;
+    if use_stops {
+        if !sl_curr_stop.is_nan() || !tp_curr_stop.is_nan() {
+            let open_val = open_s[idx];
+            let high_val = high_s[idx];
+            let low_val = low_s[idx];
+            let close_val = close_s[idx];
+            let o = if open_val.is_nan() {
+                close_val
+            } else {
+                open_val
+            };
+            let l = if low_val.is_nan() {
+                o.min(close_val)
+            } else {
+                low_val
+            };
+            let h = if high_val.is_nan() {
+                o.max(close_val)
+            } else {
+                high_val
+            };
+
+            if !sl_curr_stop.is_nan() {
+                stop_price =
+                    get_stop_price_rs(position_now, sl_curr_price, sl_curr_stop, o, l, h, true)?;
+            }
+            if stop_price.is_nan() && !tp_curr_stop.is_nan() {
+                stop_price =
+                    get_stop_price_rs(position_now, tp_init_price, tp_curr_stop, o, l, h, false)?;
+            }
+
+            // Update trailing stop
+            if !sl_curr_stop.is_nan() && sl_curr_trail {
+                if position_now > 0.0 {
+                    if h > *sl_curr_price_mut {
+                        *sl_curr_i = i as i64;
+                        *sl_curr_price_mut = h;
+                    }
+                } else if position_now < 0.0 {
+                    if l < *sl_curr_price_mut {
+                        *sl_curr_i = i as i64;
+                        *sl_curr_price_mut = l;
+                    }
+                }
+            }
+        }
+    }
+
+    let (mut is_long_entry, mut is_long_exit, mut is_short_entry, mut is_short_exit);
+
+    if use_stops && !stop_price.is_nan() {
+        let upon_stop = upon_stop_exit_s[idx];
+        let result = generate_stop_signal(position_now, upon_stop, accumulate_val);
+        is_long_entry = result.0;
+        is_long_exit = result.1;
+        is_short_entry = result.2;
+        is_short_exit = result.3;
+        accumulate_val = result.4;
+
+        let close_val = close_s[idx];
+        let sxp = stop_exit_price_s[idx];
+        let (p, s) =
+            resolve_stop_price_and_slippage(stop_price, price_out, close_val, slippage_out, sxp);
+        price_out = p;
+        slippage_out = s;
+    } else {
+        let signals = read_signals(
+            entries_s[idx],
+            exits_s[idx],
+            direction_s[idx],
+            long_entries_s[idx],
+            long_exits_s[idx],
+            short_entries_s[idx],
+            short_exits_s[idx],
+        );
+        is_long_entry = signals.0;
+        is_long_exit = signals.1;
+        is_short_entry = signals.2;
+        is_short_exit = signals.3;
+
+        // Resolve signal conflicts
+        if is_long_entry || is_short_entry {
+            let r = resolve_signal_conflict(
+                position_now,
+                is_long_entry,
+                is_long_exit,
+                DIRECTION_LONG_ONLY,
+                upon_long_conflict_s[idx],
+            );
+            is_long_entry = r.0;
+            is_long_exit = r.1;
+            let r = resolve_signal_conflict(
+                position_now,
+                is_short_entry,
+                is_short_exit,
+                DIRECTION_SHORT_ONLY,
+                upon_short_conflict_s[idx],
+            );
+            is_short_entry = r.0;
+            is_short_exit = r.1;
+
+            let r = resolve_dir_conflict(
+                position_now,
+                is_long_entry,
+                is_short_entry,
+                upon_dir_conflict_s[idx],
+            );
+            is_long_entry = r.0;
+            is_short_entry = r.1;
+
+            let r = resolve_opposite_entry(
+                position_now,
+                is_long_entry,
+                is_long_exit,
+                is_short_entry,
+                is_short_exit,
+                upon_opposite_entry_s[idx],
+                accumulate_val,
+            );
+            is_long_entry = r.0;
+            is_long_exit = r.1;
+            is_short_entry = r.2;
+            is_short_exit = r.3;
+            accumulate_val = r.4;
+        }
+    }
+
+    Ok((
+        is_long_entry,
+        is_long_exit,
+        is_short_entry,
+        is_short_exit,
+        accumulate_val,
+        price_out,
+        slippage_out,
+    ))
+}
+
+fn simulate_from_signals_non_shared_inner(
+    nrows: usize,
+    ncols: usize,
+    init_cash: &[f64],
+    entries_s: &[bool],
+    exits_s: &[bool],
+    direction_s: &[i64],
+    long_entries_s: &[bool],
+    long_exits_s: &[bool],
+    short_entries_s: &[bool],
+    short_exits_s: &[bool],
+    size_s: &[f64],
+    price_s: &[f64],
+    size_type_s: &[i64],
+    fees_s: &[f64],
+    fixed_fees_s: &[f64],
+    slippage_s: &[f64],
+    min_size_s: &[f64],
+    max_size_s: &[f64],
+    size_granularity_s: &[f64],
+    reject_prob_s: &[f64],
+    lock_cash_s: &[bool],
+    allow_partial_s: &[bool],
+    raise_reject_s: &[bool],
+    log_s: &[bool],
+    accumulate_s: &[i64],
+    upon_long_conflict_s: &[i64],
+    upon_short_conflict_s: &[i64],
+    upon_dir_conflict_s: &[i64],
+    upon_opposite_entry_s: &[i64],
+    val_price_s: &[f64],
+    open_s: &[f64],
+    high_s: &[f64],
+    low_s: &[f64],
+    close_s: &[f64],
+    sl_stop_s: &[f64],
+    sl_trail_s: &[bool],
+    tp_stop_s: &[f64],
+    stop_entry_price_s: &[i64],
+    stop_exit_price_s: &[i64],
+    upon_stop_exit_s: &[i64],
+    upon_stop_update_s: &[i64],
+    use_stops: bool,
+    ffill_val_price: bool,
+    do_update_value: bool,
+    max_orders: usize,
+    max_logs: usize,
+    log_data: *mut u8,
+    log_offsets: &LogFieldOffsets,
+    seed: Option<u64>,
+) -> Result<(Vec<OrderRecord>, usize), PortfolioSimError> {
+    let mut rng = match seed {
+        Some(s) => ChaCha8Rng::seed_from_u64(s),
+        None => ChaCha8Rng::seed_from_u64(rand::random()),
+    };
+
+    let mut order_records: Vec<OrderRecord> = Vec::with_capacity(max_orders.min(nrows * ncols));
+    let mut oidx: i64 = 0;
+    let mut lidx: i64 = 0;
+
+    for col in 0..ncols {
+        let mut cash_now = init_cash[col];
+        let mut free_cash_now = init_cash[col];
+        let mut last_position = 0.0f64;
+        let mut last_debt = 0.0f64;
+        let mut last_val_price = f64::NAN;
+
+        // Stop state per column
+        let mut sl_init_i: i64 = -1;
+        let mut sl_init_price = f64::NAN;
+        let mut sl_curr_i: i64 = -1;
+        let mut sl_curr_price = f64::NAN;
+        let mut sl_curr_stop = f64::NAN;
+        let mut sl_curr_trail = false;
+        let mut tp_init_i: i64 = -1;
+        let mut tp_init_price = f64::NAN;
+        let mut tp_curr_stop = f64::NAN;
+
+        for i in 0..nrows {
+            let idx = i * ncols + col;
+
+            // Resolve order price
+            let mut order_price = price_s[idx];
+            if order_price.is_infinite() {
+                if order_price > 0.0 {
+                    order_price = close_s[idx];
+                } else {
+                    let open_val = open_s[idx];
+                    if !open_val.is_nan() {
+                        order_price = open_val;
+                    } else if i > 0 {
+                        order_price = close_s[(i - 1) * ncols + col];
+                    } else {
+                        order_price = f64::NAN;
+                    }
+                }
+            }
+
+            // Resolve valuation price
+            let mut val_price_now = val_price_s[idx];
+            if val_price_now.is_infinite() {
+                if val_price_now > 0.0 {
+                    val_price_now = order_price;
+                } else if i > 0 {
+                    val_price_now = close_s[(i - 1) * ncols + col];
+                } else {
+                    val_price_now = f64::NAN;
+                }
+            }
+            if !val_price_now.is_nan() || !ffill_val_price {
+                last_val_price = val_price_now;
+            }
+
+            let position_now = last_position;
+            let slippage_val = slippage_s[idx];
+
+            // Process signals
+            let (
+                is_long_entry,
+                is_long_exit,
+                is_short_entry,
+                is_short_exit,
+                accumulate_val,
+                final_price,
+                final_slippage,
+            ) = process_signals_at(
+                idx,
+                i,
+                position_now,
+                order_price,
+                slippage_val,
+                entries_s,
+                exits_s,
+                direction_s,
+                long_entries_s,
+                long_exits_s,
+                short_entries_s,
+                short_exits_s,
+                accumulate_s,
+                upon_long_conflict_s,
+                upon_short_conflict_s,
+                upon_dir_conflict_s,
+                upon_opposite_entry_s,
+                open_s,
+                high_s,
+                low_s,
+                close_s,
+                upon_stop_exit_s,
+                stop_exit_price_s,
+                use_stops,
+                sl_curr_stop,
+                sl_curr_price,
+                sl_curr_trail,
+                &mut sl_curr_i,
+                &mut sl_curr_price,
+                tp_curr_stop,
+                tp_init_price,
+            )?;
+
+            // Convert signals to size
+            let (mut order_size, final_size_type, final_direction) = signals_to_size(
+                last_position,
+                is_long_entry,
+                is_long_exit,
+                is_short_entry,
+                is_short_exit,
+                size_s[idx],
+                size_type_s[idx],
+                accumulate_val,
+                last_val_price,
+            )?;
+
+            if order_size != 0.0 {
+                // Apply ShortOnly size sign flip
+                if order_size > 0.0 {
+                    if final_direction == DIRECTION_SHORT_ONLY {
+                        order_size *= -1.0;
+                    }
+                } else if final_direction == DIRECTION_SHORT_ONLY {
+                    order_size *= -1.0;
+                }
+
+                let order = Order {
+                    size: order_size,
+                    price: final_price,
+                    size_type: final_size_type,
+                    direction: final_direction,
+                    fees: fees_s[idx],
+                    fixed_fees: fixed_fees_s[idx],
+                    slippage: final_slippage,
+                    min_size: min_size_s[idx],
+                    max_size: max_size_s[idx],
+                    size_granularity: size_granularity_s[idx],
+                    reject_prob: reject_prob_s[idx],
+                    lock_cash: lock_cash_s[idx],
+                    allow_partial: allow_partial_s[idx],
+                    raise_reject: raise_reject_s[idx],
+                    log: log_s[idx],
+                };
+
+                let mut value_now = cash_now;
+                if last_position != 0.0 {
+                    value_now += last_position * last_val_price;
+                }
+
+                let state = ProcessOrderState {
+                    cash: cash_now,
+                    position: last_position,
+                    debt: last_debt,
+                    free_cash: free_cash_now,
+                    val_price: last_val_price,
+                    value: value_now,
+                    oidx,
+                    lidx,
+                };
+
+                let log_info = if max_logs > 0 {
+                    Some((log_data, log_offsets as &LogFieldOffsets, max_logs))
+                } else {
+                    None
+                };
+
+                let (order_result, new_state) = process_order(
+                    i as i64,
+                    col as i64,
+                    col as i64,
+                    &state,
+                    do_update_value,
+                    &order,
+                    &mut order_records,
+                    log_info,
+                    &mut rng,
+                )?;
+
+                cash_now = new_state.cash;
+                free_cash_now = new_state.free_cash;
+                oidx = new_state.oidx;
+                lidx = new_state.lidx;
+                last_position = new_state.position;
+                last_debt = new_state.debt;
+                if !new_state.val_price.is_nan() || !ffill_val_price {
+                    last_val_price = new_state.val_price;
+                }
+
+                // Update stop state after fill
+                if use_stops && order_result.status == ORDER_STATUS_FILLED {
+                    if last_position == 0.0 {
+                        sl_curr_i = -1;
+                        sl_init_i = -1;
+                        sl_curr_price = f64::NAN;
+                        sl_init_price = f64::NAN;
+                        sl_curr_stop = f64::NAN;
+                        sl_curr_trail = false;
+                        tp_init_i = -1;
+                        tp_init_price = f64::NAN;
+                        tp_curr_stop = f64::NAN;
+                    } else {
+                        let sep = stop_entry_price_s[idx];
+                        let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
+                            new_state.val_price
+                        } else if sep == STOP_ENTRY_PRICE {
+                            order.price
+                        } else if sep == STOP_ENTRY_FILL_PRICE {
+                            order_result.price
+                        } else {
+                            close_s[idx]
+                        };
+                        let usu = upon_stop_update_s[idx];
+                        let new_sl_stop = sl_stop_s[idx];
+                        let new_sl_trail = sl_trail_s[idx];
+                        let new_tp_stop = tp_stop_s[idx];
+
+                        if state.position == 0.0
+                            || last_position.signum() != state.position.signum()
+                        {
+                            sl_curr_i = i as i64;
+                            sl_init_i = i as i64;
+                            sl_curr_price = new_init_price;
+                            sl_init_price = new_init_price;
+                            sl_curr_stop = new_sl_stop;
+                            sl_curr_trail = new_sl_trail;
+                            tp_init_i = i as i64;
+                            tp_init_price = new_init_price;
+                            tp_curr_stop = new_tp_stop;
+                        } else if last_position.abs() > state.position.abs() {
+                            if should_update_stop(new_sl_stop, usu) {
+                                sl_curr_i = i as i64;
+                                sl_init_i = i as i64;
+                                sl_curr_price = new_init_price;
+                                sl_init_price = new_init_price;
+                                sl_curr_stop = new_sl_stop;
+                                sl_curr_trail = new_sl_trail;
+                            }
+                            if should_update_stop(new_tp_stop, usu) {
+                                tp_init_i = i as i64;
+                                tp_init_price = new_init_price;
+                                tp_curr_stop = new_tp_stop;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    order_records.truncate(oidx as usize);
+    Ok((order_records, lidx as usize))
+}
+
+/// Inner simulation function for shared cash / auto call seq.
+#[allow(clippy::too_many_arguments)]
+fn simulate_from_signals_inner(
+    nrows: usize,
+    ncols: usize,
+    group_lens: &[i64],
+    init_cash: &[f64],
+    call_seq: &[i64],
+    entries_s: &[bool],
+    exits_s: &[bool],
+    direction_s: &[i64],
+    long_entries_s: &[bool],
+    long_exits_s: &[bool],
+    short_entries_s: &[bool],
+    short_exits_s: &[bool],
+    size_s: &[f64],
+    price_s: &[f64],
+    size_type_s: &[i64],
+    fees_s: &[f64],
+    fixed_fees_s: &[f64],
+    slippage_s: &[f64],
+    min_size_s: &[f64],
+    max_size_s: &[f64],
+    size_granularity_s: &[f64],
+    reject_prob_s: &[f64],
+    lock_cash_s: &[bool],
+    allow_partial_s: &[bool],
+    raise_reject_s: &[bool],
+    log_s: &[bool],
+    accumulate_s: &[i64],
+    upon_long_conflict_s: &[i64],
+    upon_short_conflict_s: &[i64],
+    upon_dir_conflict_s: &[i64],
+    upon_opposite_entry_s: &[i64],
+    val_price_s: &[f64],
+    open_s: &[f64],
+    high_s: &[f64],
+    low_s: &[f64],
+    close_s: &[f64],
+    sl_stop_s: &[f64],
+    sl_trail_s: &[bool],
+    tp_stop_s: &[f64],
+    stop_entry_price_s: &[i64],
+    stop_exit_price_s: &[i64],
+    upon_stop_exit_s: &[i64],
+    upon_stop_update_s: &[i64],
+    use_stops: bool,
+    auto_call_seq: bool,
+    ffill_val_price: bool,
+    do_update_value: bool,
+    max_orders: usize,
+    max_logs: usize,
+    log_data: *mut u8,
+    log_offsets: &LogFieldOffsets,
+    seed: Option<u64>,
+) -> Result<(Vec<OrderRecord>, usize, Option<Vec<i64>>), PortfolioSimError> {
+    let mut rng = match seed {
+        Some(s) => ChaCha8Rng::seed_from_u64(s),
+        None => ChaCha8Rng::seed_from_u64(rand::random()),
+    };
+
+    let mut order_records: Vec<OrderRecord> = Vec::with_capacity(max_orders.min(nrows * ncols));
+    let mut last_position = vec![0.0f64; ncols];
+    let mut last_debt = vec![0.0f64; ncols];
+    let mut last_val_price = vec![f64::NAN; ncols];
+    let mut price_arr = vec![f64::NAN; ncols];
+    let mut size_arr = vec![0.0f64; ncols];
+    let mut size_type_arr = vec![0i64; ncols];
+    let mut slippage_arr = vec![0.0f64; ncols];
+    let mut direction_arr = vec![0i64; ncols];
+
+    // Stop tracking arrays
+    let mut sl_init_i_arr = vec![-1i64; ncols];
+    let mut sl_init_price_arr = vec![f64::NAN; ncols];
+    let mut sl_curr_i_arr = vec![-1i64; ncols];
+    let mut sl_curr_price_arr = vec![f64::NAN; ncols];
+    let mut sl_curr_stop_arr = vec![f64::NAN; ncols];
+    let mut sl_curr_trail_arr = vec![false; ncols];
+    let mut tp_init_i_arr = vec![-1i64; ncols];
+    let mut tp_init_price_arr = vec![f64::NAN; ncols];
+    let mut tp_curr_stop_arr = vec![f64::NAN; ncols];
+
+    let cash_sharing_global = group_lens.iter().any(|&g| g > 1);
+    let mut temp_order_value = if cash_sharing_global && auto_call_seq {
+        vec![0.0f64; ncols]
+    } else {
+        Vec::new()
+    };
+    let mut call_seq_mut = if auto_call_seq {
+        Some(call_seq.to_vec())
+    } else {
+        None
+    };
+
+    let mut oidx: i64 = 0;
+    let mut lidx: i64 = 0;
+
+    let mut from_col: usize = 0;
+    for group in 0..group_lens.len() {
+        let group_len = group_lens[group] as usize;
+        let to_col = from_col + group_len;
+        let mut cash_now = init_cash[group];
+        let mut free_cash_now = init_cash[group];
+
+        for i in 0..nrows {
+            // Phase 1: Resolve prices
+            for k in 0..group_len {
+                let col = from_col + k;
+                let idx = i * ncols + col;
+
+                let mut order_price = price_s[idx];
+                if order_price.is_infinite() {
+                    if order_price > 0.0 {
+                        order_price = close_s[idx];
+                    } else {
+                        let open_val = open_s[idx];
+                        if !open_val.is_nan() {
+                            order_price = open_val;
+                        } else if i > 0 {
+                            order_price = close_s[(i - 1) * ncols + col];
+                        } else {
+                            order_price = f64::NAN;
+                        }
+                    }
+                }
+
+                let mut val_price_now = val_price_s[idx];
+                if val_price_now.is_infinite() {
+                    if val_price_now > 0.0 {
+                        val_price_now = order_price;
+                    } else if i > 0 {
+                        val_price_now = close_s[(i - 1) * ncols + col];
+                    } else {
+                        val_price_now = f64::NAN;
+                    }
+                }
+                if !val_price_now.is_nan() || !ffill_val_price {
+                    last_val_price[col] = val_price_now;
+                }
+                price_arr[col] = order_price;
+            }
+
+            // Phase 2: Process signals for each column
+            for k in 0..group_len {
+                let col = from_col + k;
+                let idx = i * ncols + col;
+                let position_now = last_position[col];
+                let slippage_val = slippage_s[idx];
+
+                let (
+                    is_long_entry,
+                    is_long_exit,
+                    is_short_entry,
+                    is_short_exit,
+                    accumulate_val,
+                    final_price,
+                    final_slippage,
+                ) = process_signals_at(
+                    idx,
+                    i,
+                    position_now,
+                    price_arr[col],
+                    slippage_val,
+                    entries_s,
+                    exits_s,
+                    direction_s,
+                    long_entries_s,
+                    long_exits_s,
+                    short_entries_s,
+                    short_exits_s,
+                    accumulate_s,
+                    upon_long_conflict_s,
+                    upon_short_conflict_s,
+                    upon_dir_conflict_s,
+                    upon_opposite_entry_s,
+                    open_s,
+                    high_s,
+                    low_s,
+                    close_s,
+                    upon_stop_exit_s,
+                    stop_exit_price_s,
+                    use_stops,
+                    sl_curr_stop_arr[col],
+                    sl_curr_price_arr[col],
+                    sl_curr_trail_arr[col],
+                    &mut sl_curr_i_arr[col],
+                    &mut sl_curr_price_arr[col],
+                    tp_curr_stop_arr[col],
+                    tp_init_price_arr[col],
+                )?;
+
+                let (order_size, final_size_type, final_direction) = signals_to_size(
+                    last_position[col],
+                    is_long_entry,
+                    is_long_exit,
+                    is_short_entry,
+                    is_short_exit,
+                    size_s[idx],
+                    size_type_s[idx],
+                    accumulate_val,
+                    last_val_price[col],
+                )?;
+
+                price_arr[col] = final_price;
+                slippage_arr[col] = final_slippage;
+                size_arr[col] = order_size;
+                size_type_arr[col] = final_size_type;
+                direction_arr[col] = final_direction;
+
+                if cash_sharing_global && auto_call_seq {
+                    if order_size == 0.0 {
+                        temp_order_value[k] = 0.0;
+                    } else {
+                        if final_size_type == SIZE_TYPE_AMOUNT {
+                            temp_order_value[k] = order_size * last_val_price[col];
+                        } else if final_size_type == SIZE_TYPE_VALUE {
+                            temp_order_value[k] = order_size;
+                        } else {
+                            // Percent
+                            if order_size >= 0.0 {
+                                temp_order_value[k] = order_size * cash_now;
+                            } else {
+                                let asset_value_now = last_position[col] * last_val_price[col];
+                                if final_direction == DIRECTION_LONG_ONLY {
+                                    temp_order_value[k] = order_size * asset_value_now;
+                                } else {
+                                    let max_exposure =
+                                        2.0 * asset_value_now.max(0.0) + free_cash_now.max(0.0);
+                                    temp_order_value[k] = order_size * max_exposure;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Phase 2.5: Sort and compute value
+            if cash_sharing_global {
+                if auto_call_seq {
+                    let cs = call_seq_mut.as_mut().unwrap();
+                    insert_argsort(
+                        &mut temp_order_value[..group_len],
+                        &mut cs[i * ncols + from_col..i * ncols + to_col],
+                    );
+                }
+
+                // Skipped: value_now computed below per column
+            }
+            let mut value_now = cash_now;
+            if cash_sharing_global {
+                for k in 0..group_len {
+                    let col = from_col + k;
+                    if last_position[col] != 0.0 {
+                        value_now += last_position[col] * last_val_price[col];
+                    }
+                }
+            }
+
+            // Phase 3: Execute orders
+            for k in 0..group_len {
+                let col;
+                if cash_sharing_global {
+                    let cs = call_seq_mut.as_ref().map_or(call_seq, |v| v.as_slice());
+                    let col_i = cs[i * ncols + from_col + k] as usize;
+                    if col_i >= group_len {
+                        return Err(PortfolioSimError::RejectedOrder(
+                            "Call index exceeds bounds of the group",
+                        ));
+                    }
+                    col = from_col + col_i;
+                } else {
+                    col = from_col + k;
+                }
+
+                let idx = i * ncols + col;
+                let position_now = last_position[col];
+                let debt_now = last_debt[col];
+                let val_price_now = last_val_price[col];
+                if !cash_sharing_global {
+                    value_now = cash_now;
+                    if position_now != 0.0 {
+                        value_now += position_now * val_price_now;
+                    }
+                }
+
+                let mut order_size = size_arr[col];
+                let final_direction = direction_arr[col];
+
+                if order_size != 0.0 {
+                    if order_size > 0.0 {
+                        if final_direction == DIRECTION_SHORT_ONLY {
+                            order_size *= -1.0;
+                        }
+                    } else if final_direction == DIRECTION_SHORT_ONLY {
+                        order_size *= -1.0;
+                    }
+
+                    let order = Order {
+                        size: order_size,
+                        price: price_arr[col],
+                        size_type: size_type_arr[col],
+                        direction: final_direction,
+                        fees: fees_s[idx],
+                        fixed_fees: fixed_fees_s[idx],
+                        slippage: slippage_arr[col],
+                        min_size: min_size_s[idx],
+                        max_size: max_size_s[idx],
+                        size_granularity: size_granularity_s[idx],
+                        reject_prob: reject_prob_s[idx],
+                        lock_cash: lock_cash_s[idx],
+                        allow_partial: allow_partial_s[idx],
+                        raise_reject: raise_reject_s[idx],
+                        log: log_s[idx],
+                    };
+
+                    let state = ProcessOrderState {
+                        cash: cash_now,
+                        position: position_now,
+                        debt: debt_now,
+                        free_cash: free_cash_now,
+                        val_price: val_price_now,
+                        value: value_now,
+                        oidx,
+                        lidx,
+                    };
+
+                    let log_info = if max_logs > 0 {
+                        Some((log_data, log_offsets as &LogFieldOffsets, max_logs))
+                    } else {
+                        None
+                    };
+
+                    let (order_result, new_state) = process_order(
+                        i as i64,
+                        col as i64,
+                        group as i64,
+                        &state,
+                        do_update_value,
+                        &order,
+                        &mut order_records,
+                        log_info,
+                        &mut rng,
+                    )?;
+
+                    cash_now = new_state.cash;
+                    free_cash_now = new_state.free_cash;
+                    oidx = new_state.oidx;
+                    lidx = new_state.lidx;
+                    let new_position = new_state.position;
+                    last_position[col] = new_position;
+                    last_debt[col] = new_state.debt;
+                    if !new_state.val_price.is_nan() || !ffill_val_price {
+                        last_val_price[col] = new_state.val_price;
+                    }
+                    value_now = new_state.value;
+
+                    // Update stop state
+                    if use_stops && order_result.status == ORDER_STATUS_FILLED {
+                        if new_position == 0.0 {
+                            sl_curr_i_arr[col] = -1;
+                            sl_init_i_arr[col] = -1;
+                            sl_curr_price_arr[col] = f64::NAN;
+                            sl_init_price_arr[col] = f64::NAN;
+                            sl_curr_stop_arr[col] = f64::NAN;
+                            sl_curr_trail_arr[col] = false;
+                            tp_init_i_arr[col] = -1;
+                            tp_init_price_arr[col] = f64::NAN;
+                            tp_curr_stop_arr[col] = f64::NAN;
+                        } else {
+                            let sep = stop_entry_price_s[idx];
+                            let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
+                                new_state.val_price
+                            } else if sep == STOP_ENTRY_PRICE {
+                                order.price
+                            } else if sep == STOP_ENTRY_FILL_PRICE {
+                                order_result.price
+                            } else {
+                                close_s[idx]
+                            };
+                            let usu = upon_stop_update_s[idx];
+                            let new_sl_stop = sl_stop_s[idx];
+                            let new_sl_trail = sl_trail_s[idx];
+                            let new_tp_stop = tp_stop_s[idx];
+
+                            if position_now == 0.0 || new_position.signum() != position_now.signum()
+                            {
+                                sl_curr_i_arr[col] = i as i64;
+                                sl_init_i_arr[col] = i as i64;
+                                sl_curr_price_arr[col] = new_init_price;
+                                sl_init_price_arr[col] = new_init_price;
+                                sl_curr_stop_arr[col] = new_sl_stop;
+                                sl_curr_trail_arr[col] = new_sl_trail;
+                                tp_init_i_arr[col] = i as i64;
+                                tp_init_price_arr[col] = new_init_price;
+                                tp_curr_stop_arr[col] = new_tp_stop;
+                            } else if new_position.abs() > position_now.abs() {
+                                if should_update_stop(new_sl_stop, usu) {
+                                    sl_curr_i_arr[col] = i as i64;
+                                    sl_init_i_arr[col] = i as i64;
+                                    sl_curr_price_arr[col] = new_init_price;
+                                    sl_init_price_arr[col] = new_init_price;
+                                    sl_curr_stop_arr[col] = new_sl_stop;
+                                    sl_curr_trail_arr[col] = new_sl_trail;
+                                }
+                                if should_update_stop(new_tp_stop, usu) {
+                                    tp_init_i_arr[col] = i as i64;
+                                    tp_init_price_arr[col] = new_init_price;
+                                    tp_curr_stop_arr[col] = new_tp_stop;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // No order - still update last state
+                    last_position[col] = position_now;
+                    last_debt[col] = debt_now;
+                }
+            }
+        }
+
+        from_col = to_col;
+    }
+
+    order_records.truncate(oidx as usize);
+    Ok((order_records, lidx as usize, call_seq_mut))
+}
+
 // ############# Post-simulation: Asset flow ############# //
 
 #[pyfunction]
@@ -2795,17 +4533,19 @@ pub fn asset_flow_py<'py>(
     let cl_cow = array1_as_slice_cow(&col_lens);
     let (nrows, ncols) = target_shape;
 
-    let result = py.allow_threads(|| {
-        asset_flow_inner(
-            usize_to_ptr(src_send),
-            &offsets,
-            ci_cow.as_ref(),
-            cl_cow.as_ref(),
-            nrows,
-            ncols,
-            direction,
-        )
-    });
+    let result = py
+        .allow_threads(|| {
+            asset_flow_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                nrows,
+                ncols,
+                direction,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -2819,7 +4559,7 @@ fn asset_flow_inner(
     nrows: usize,
     ncols: usize,
     direction: i64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, PortfolioSimError> {
     let n_cols = col_lens.len();
     let col_start_idxs = col_start_idxs_usize(col_lens);
     let mut out = vec![0.0f64; nrows * ncols];
@@ -2840,7 +4580,11 @@ fn asset_flow_inner(
             let side = unsafe { *(base.add(offsets.side) as *const i64) };
             let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
 
-            assert!(id >= last_id, "id must come in ascending order per column");
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
             last_id = id;
 
             if side == ORDER_SIDE_SELL {
@@ -2858,7 +4602,7 @@ fn asset_flow_inner(
             position_now = new_position_now;
         }
     }
-    out
+    Ok(out)
 }
 
 #[pyfunction]
@@ -2910,17 +4654,19 @@ pub fn cash_flow_py<'py>(
     let cl_cow = array1_as_slice_cow(&col_lens);
     let (nrows, ncols) = target_shape;
 
-    let result = py.allow_threads(|| {
-        cash_flow_inner(
-            usize_to_ptr(src_send),
-            &offsets,
-            ci_cow.as_ref(),
-            cl_cow.as_ref(),
-            nrows,
-            ncols,
-            free,
-        )
-    });
+    let result = py
+        .allow_threads(|| {
+            cash_flow_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                nrows,
+                ncols,
+                free,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -2934,7 +4680,7 @@ fn cash_flow_inner(
     nrows: usize,
     ncols: usize,
     free: bool,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, PortfolioSimError> {
     let n_cols = col_lens.len();
     let col_start_idxs = col_start_idxs_usize(col_lens);
     let mut out = vec![0.0f64; nrows * ncols];
@@ -2959,7 +4705,11 @@ fn cash_flow_inner(
                 let price = unsafe { *(base.add(offsets.price) as *const f64) };
                 let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
 
-                assert!(id >= last_id, "id must come in ascending order per column");
+                if id < last_id {
+                    return Err(PortfolioSimError::ValueError(
+                        "id must come in ascending order per column",
+                    ));
+                }
                 last_id = id;
 
                 if side == ORDER_SIDE_SELL {
@@ -2981,7 +4731,11 @@ fn cash_flow_inner(
             let price = unsafe { *(base.add(offsets.price) as *const f64) };
             let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
 
-            assert!(id >= last_id, "id must come in ascending order per column");
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
             last_id = id;
 
             if side == ORDER_SIDE_SELL {
@@ -2995,7 +4749,7 @@ fn cash_flow_inner(
             position_now = new_position_now;
         }
     }
-    out
+    Ok(out)
 }
 
 #[pyfunction]
@@ -3387,57 +5141,63 @@ pub fn total_profit_py<'py>(
     let cl_cow = array1_as_slice_cow(&col_lens);
     let close_cow = array2_as_slice_cow(&close);
 
-    let result = py.allow_threads(|| {
-        let src_data = usize_to_ptr(src_send);
-        let n_cols = cl_cow.len();
-        let col_start_idxs = col_start_idxs_usize(cl_cow.as_ref());
+    let result = py
+        .allow_threads(|| {
+            let src_data = usize_to_ptr(src_send);
+            let n_cols = cl_cow.len();
+            let col_start_idxs = col_start_idxs_usize(cl_cow.as_ref());
 
-        let mut assets = vec![0.0f64; ncols];
-        let mut cash = vec![0.0f64; ncols];
-        let mut zero_mask = vec![false; ncols];
+            let mut assets = vec![0.0f64; ncols];
+            let mut cash = vec![0.0f64; ncols];
+            let mut zero_mask = vec![false; ncols];
 
-        for col in 0..n_cols {
-            let col_len = cl_cow[col] as usize;
-            if col_len == 0 {
-                zero_mask[col] = true;
-                continue;
-            }
-            let mut last_id: i64 = -1;
+            for col in 0..n_cols {
+                let col_len = cl_cow[col] as usize;
+                if col_len == 0 {
+                    zero_mask[col] = true;
+                    continue;
+                }
+                let mut last_id: i64 = -1;
 
-            for c in 0..col_len {
-                let oidx = ci_cow[col_start_idxs[col] + c] as usize;
-                let base = unsafe { src_data.add(oidx * offsets.itemsize) };
-                let id = unsafe { *(base.add(offsets.id) as *const i64) };
-                let side = unsafe { *(base.add(offsets.side) as *const i64) };
-                let size = unsafe { *(base.add(offsets.size) as *const f64) };
-                let price = unsafe { *(base.add(offsets.price) as *const f64) };
-                let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
+                for c in 0..col_len {
+                    let oidx = ci_cow[col_start_idxs[col] + c] as usize;
+                    let base = unsafe { src_data.add(oidx * offsets.itemsize) };
+                    let id = unsafe { *(base.add(offsets.id) as *const i64) };
+                    let side = unsafe { *(base.add(offsets.side) as *const i64) };
+                    let size = unsafe { *(base.add(offsets.size) as *const f64) };
+                    let price = unsafe { *(base.add(offsets.price) as *const f64) };
+                    let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
 
-                assert!(id >= last_id, "id must come in ascending order per column");
-                last_id = id;
+                    if id < last_id {
+                        return Err(PortfolioSimError::ValueError(
+                            "id must come in ascending order per column",
+                        ));
+                    }
+                    last_id = id;
 
-                if side == ORDER_SIDE_BUY {
-                    assets[col] = add(assets[col], size);
-                    let order_cash = size * price + fees;
-                    cash[col] = add(cash[col], -order_cash);
-                } else {
-                    assets[col] = add(assets[col], -size);
-                    let order_cash = size * price - fees;
-                    cash[col] = add(cash[col], order_cash);
+                    if side == ORDER_SIDE_BUY {
+                        assets[col] = add(assets[col], size);
+                        let order_cash = size * price + fees;
+                        cash[col] = add(cash[col], -order_cash);
+                    } else {
+                        assets[col] = add(assets[col], -size);
+                        let order_cash = size * price - fees;
+                        cash[col] = add(cash[col], order_cash);
+                    }
                 }
             }
-        }
 
-        let mut out = vec![0.0f64; ncols];
-        for col in 0..ncols {
-            if zero_mask[col] {
-                out[col] = 0.0;
-            } else {
-                out[col] = cash[col] + assets[col] * close_cow[(nrows - 1) * ncols + col];
+            let mut out = vec![0.0f64; ncols];
+            for col in 0..ncols {
+                if zero_mask[col] {
+                    out[col] = 0.0;
+                } else {
+                    out[col] = cash[col] + assets[col] * close_cow[(nrows - 1) * ncols + col];
+                }
             }
-        }
-        out
-    });
+            Ok(out)
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     Ok(PyArray1::from_vec_bound(py, result))
 }
@@ -3714,18 +5474,20 @@ pub fn get_entry_trades_py<'py>(
     let ncols = close.shape()[1];
     let close_cow = array2_as_slice_cow(&close);
 
-    let trades = py.allow_threads(|| {
-        get_entry_trades_inner(
-            usize_to_ptr(src_send),
-            &offsets,
-            ci_cow.as_ref(),
-            cl_cow.as_ref(),
-            close_cow.as_ref(),
-            nrows,
-            ncols,
-            n_records,
-        )
-    });
+    let trades = py
+        .allow_threads(|| {
+            get_entry_trades_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                close_cow.as_ref(),
+                nrows,
+                ncols,
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     Ok(PyArray1::from_vec_bound(py, trades))
 }
@@ -3739,7 +5501,7 @@ fn get_entry_trades_inner(
     nrows: usize,
     ncols: usize,
     n_records: usize,
-) -> Vec<TradeRecord> {
+) -> Result<Vec<TradeRecord>, PortfolioSimError> {
     let n_cols = col_lens.len();
     let col_start_idxs = col_start_idxs_usize(col_lens);
 
@@ -3774,10 +5536,20 @@ fn get_entry_trades_inner(
             let order_fees = unsafe { *(base.add(offsets.fees) as *const f64) };
             let order_side = unsafe { *(base.add(offsets.side) as *const i64) };
 
-            assert!(id >= last_id, "id must come in ascending order per column");
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
             last_id = id;
-            assert!(order_size > 0.0, "size must be greater than 0");
-            assert!(order_price > 0.0, "price must be greater than 0");
+            if order_size <= 0.0 {
+                return Err(PortfolioSimError::ValueError("size must be greater than 0"));
+            }
+            if order_price <= 0.0 {
+                return Err(PortfolioSimError::ValueError(
+                    "price must be greater than 0",
+                ));
+            }
 
             if !in_position {
                 first_c = c;
@@ -3916,7 +5688,7 @@ fn get_entry_trades_inner(
         }
     }
 
-    records
+    Ok(records)
 }
 
 fn fill_entry_trades_in_position(
@@ -4011,18 +5783,20 @@ pub fn get_exit_trades_py<'py>(
     let ncols = close.shape()[1];
     let close_cow = array2_as_slice_cow(&close);
 
-    let trades = py.allow_threads(|| {
-        get_exit_trades_inner(
-            usize_to_ptr(src_send),
-            &offsets,
-            ci_cow.as_ref(),
-            cl_cow.as_ref(),
-            close_cow.as_ref(),
-            nrows,
-            ncols,
-            n_records,
-        )
-    });
+    let trades = py
+        .allow_threads(|| {
+            get_exit_trades_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                close_cow.as_ref(),
+                nrows,
+                ncols,
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     Ok(PyArray1::from_vec_bound(py, trades))
 }
@@ -4036,7 +5810,7 @@ fn get_exit_trades_inner(
     nrows: usize,
     ncols: usize,
     n_records: usize,
-) -> Vec<TradeRecord> {
+) -> Result<Vec<TradeRecord>, PortfolioSimError> {
     let n_cols = col_lens.len();
     let col_start_idxs = col_start_idxs_usize(col_lens);
 
@@ -4066,10 +5840,20 @@ fn get_exit_trades_inner(
             let order_fees = unsafe { *(base.add(offsets.fees) as *const f64) };
             let order_side = unsafe { *(base.add(offsets.side) as *const i64) };
 
-            assert!(id >= last_id, "id must come in ascending order per column");
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
             last_id = id;
-            assert!(order_size > 0.0, "size must be greater than 0");
-            assert!(order_price > 0.0, "price must be greater than 0");
+            if order_size <= 0.0 {
+                return Err(PortfolioSimError::ValueError("size must be greater than 0"));
+            }
+            if order_price <= 0.0 {
+                return Err(PortfolioSimError::ValueError(
+                    "price must be greater than 0",
+                ));
+            }
 
             if !in_position {
                 in_position = true;
@@ -4236,7 +6020,7 @@ fn get_exit_trades_inner(
         }
     }
 
-    records
+    Ok(records)
 }
 
 #[pyfunction]
@@ -4313,15 +6097,17 @@ pub fn get_positions_py<'py>(
     let ci_cow = array1_as_slice_cow(&col_idxs);
     let cl_cow = array1_as_slice_cow(&col_lens);
 
-    let positions = py.allow_threads(|| {
-        get_positions_inner(
-            usize_to_ptr(src_send),
-            &toffsets,
-            ci_cow.as_ref(),
-            cl_cow.as_ref(),
-            n_records,
-        )
-    });
+    let positions = py
+        .allow_threads(|| {
+            get_positions_inner(
+                usize_to_ptr(src_send),
+                &toffsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
 
     Ok(PyArray1::from_vec_bound(py, positions))
 }
@@ -4332,7 +6118,7 @@ fn get_positions_inner(
     col_idxs: &[i64],
     col_lens: &[i64],
     n_records: usize,
-) -> Vec<TradeRecord> {
+) -> Result<Vec<TradeRecord>, PortfolioSimError> {
     let n_cols = col_lens.len();
     let mut col_start_idxs = vec![0i64; n_cols];
     let mut cumsum: i64 = 0;
@@ -4358,7 +6144,11 @@ fn get_positions_inner(
             let id = unsafe { *(base.add(offsets.id) as *const i64) };
             let parent_id = unsafe { *(base.add(offsets.parent_id) as *const i64) };
 
-            assert!(id >= last_id, "id must come in ascending order per column");
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
             last_id = id;
 
             if parent_id != last_position_id {
@@ -4400,7 +6190,7 @@ fn get_positions_inner(
         records.push(pos);
     }
 
-    records
+    Ok(records)
 }
 
 fn aggregate_position(
@@ -4550,6 +6340,7 @@ pub fn register(m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
 
     // Simulation
     m.add_function(wrap_pyfunction!(simulate_from_orders_py, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_from_signals_py, m)?)?;
 
     // Asset flow
     m.add_function(wrap_pyfunction!(asset_flow_py, m)?)?;
