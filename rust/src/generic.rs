@@ -323,6 +323,10 @@ pub(crate) fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> 
     let src = a
         .as_slice()
         .expect("standard-layout array must be sliceable");
+    if ncols == 1 {
+        return Array2::from_shape_vec((nrows, 1), bshift_1d(src, n, fill_value))
+            .expect("1-column output shape must match");
+    }
     let mut out = Array2::<f64>::zeros((nrows, ncols));
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for row in 0..nrows {
@@ -343,6 +347,10 @@ pub(crate) fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> 
     let src = a
         .as_slice()
         .expect("standard-layout array must be sliceable");
+    if ncols == 1 {
+        return Array2::from_shape_vec((nrows, 1), fshift_1d(src, n, fill_value))
+            .expect("1-column output shape must match");
+    }
     let mut out = Array2::<f64>::zeros((nrows, ncols));
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for row in 0..nrows {
@@ -363,6 +371,10 @@ pub(crate) fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let src = a
         .as_slice()
         .expect("standard-layout array must be sliceable");
+    if ncols == 1 {
+        return Array2::from_shape_vec((nrows, 1), diff_1d(src, n))
+            .expect("1-column output shape must match");
+    }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for row in n..nrows {
@@ -380,6 +392,10 @@ pub(crate) fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let src = a
         .as_slice()
         .expect("standard-layout array must be sliceable");
+    if ncols == 1 {
+        return Array2::from_shape_vec((nrows, 1), pct_change_1d(src, n))
+            .expect("1-column output shape must match");
+    }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for row in n..nrows {
@@ -1652,6 +1668,51 @@ pub(crate) fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRe
     let (nrows, ncols) = a.dim();
     let mut out = Vec::<RangeRecord>::with_capacity(nrows * ncols);
     let mut ridx = 0i64;
+    let gap_is_nan = gap_value.is_nan();
+    if a.is_standard_layout() {
+        let src = a
+            .as_slice()
+            .expect("standard-layout array must be sliceable");
+        for col in 0..ncols {
+            let mut range_started = false;
+            let mut start_idx = -1i64;
+            for i in 0..nrows {
+                let cur_val = unsafe { *src.get_unchecked(i * ncols + col) };
+                let is_gap = if gap_is_nan {
+                    cur_val.is_nan()
+                } else {
+                    cur_val == gap_value
+                };
+                if is_gap {
+                    if range_started {
+                        out.push(RangeRecord {
+                            id: ridx,
+                            col: col as i64,
+                            start_idx,
+                            end_idx: i as i64,
+                            status: RANGE_CLOSED,
+                        });
+                        ridx += 1;
+                        range_started = false;
+                    }
+                } else if !range_started {
+                    start_idx = i as i64;
+                    range_started = true;
+                }
+            }
+            if range_started {
+                out.push(RangeRecord {
+                    id: ridx,
+                    col: col as i64,
+                    start_idx,
+                    end_idx: nrows.saturating_sub(1) as i64,
+                    status: RANGE_OPEN,
+                });
+                ridx += 1;
+            }
+        }
+        return out;
+    }
     for col in 0..ncols {
         let col_view = a.column(col);
         let mut range_started = false;
@@ -1661,7 +1722,7 @@ pub(crate) fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRe
         let mut status = -1i64;
         for i in 0..nrows {
             let cur_val = col_view[i];
-            if cur_val == gap_value || (cur_val.is_nan() && gap_value.is_nan()) {
+            if cur_val == gap_value || (cur_val.is_nan() && gap_is_nan) {
                 if range_started {
                     end_idx = i as i64;
                     range_started = false;
@@ -1800,6 +1861,71 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
         return out;
     }
     let mut ddidx = 0i64;
+    if a.is_standard_layout() {
+        let src = a
+            .as_slice()
+            .expect("standard-layout array must be sliceable");
+        for col in 0..ncols {
+            let mut drawdown_started = false;
+            let mut peak_idx = -1i64;
+            let mut valley_idx = -1i64;
+            let mut peak_val = unsafe { *src.get_unchecked(col) };
+            let mut valley_val = peak_val;
+            for i in 0..nrows {
+                let cur_val = unsafe { *src.get_unchecked(i * ncols + col) };
+                if !cur_val.is_nan() {
+                    if peak_val.is_nan() || cur_val >= peak_val {
+                        if !drawdown_started {
+                            peak_val = cur_val;
+                            peak_idx = i as i64;
+                        } else {
+                            out.push(DrawdownRecord {
+                                id: ddidx,
+                                col: col as i64,
+                                peak_idx,
+                                start_idx: peak_idx + 1,
+                                valley_idx,
+                                end_idx: i as i64,
+                                peak_val,
+                                valley_val,
+                                end_val: cur_val,
+                                status: DRAWDOWN_RECOVERED,
+                            });
+                            ddidx += 1;
+                            drawdown_started = false;
+                            peak_idx = i as i64;
+                            valley_idx = i as i64;
+                            peak_val = cur_val;
+                            valley_val = cur_val;
+                        }
+                    } else if !drawdown_started {
+                        drawdown_started = true;
+                        valley_val = cur_val;
+                        valley_idx = i as i64;
+                    } else if cur_val < valley_val {
+                        valley_val = cur_val;
+                        valley_idx = i as i64;
+                    }
+                    if i == nrows - 1 && drawdown_started {
+                        out.push(DrawdownRecord {
+                            id: ddidx,
+                            col: col as i64,
+                            peak_idx,
+                            start_idx: peak_idx + 1,
+                            valley_idx,
+                            end_idx: i as i64,
+                            peak_val,
+                            valley_val,
+                            end_val: cur_val,
+                            status: DRAWDOWN_ACTIVE,
+                        });
+                        ddidx += 1;
+                    }
+                }
+            }
+        }
+        return out;
+    }
     for col in 0..ncols {
         let col_view = a.column(col);
         let mut drawdown_started = false;
@@ -1928,6 +2054,21 @@ pub fn set_by_mask_rs<'py>(
     let mask_arr = mask.as_array();
     let (nrows, ncols) = a_arr.dim();
     let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout() && mask_arr.is_standard_layout() {
+            let a_slice = a_arr
+                .as_slice()
+                .expect("standard-layout array must be sliceable");
+            let mask_slice = mask_arr
+                .as_slice()
+                .expect("standard-layout array must be sliceable");
+            let out = a_slice
+                .iter()
+                .zip(mask_slice.iter())
+                .map(|(&v, &m)| if m { value } else { v })
+                .collect::<Vec<_>>();
+            return Array2::from_shape_vec((nrows, ncols), out)
+                .expect("flat output shape must match");
+        }
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         for row in 0..nrows {
             for col in 0..ncols {
@@ -1975,6 +2116,28 @@ pub fn set_by_mask_mult_rs<'py>(
     let values_arr = values.as_array();
     let (nrows, ncols) = a_arr.dim();
     let result = py.allow_threads(|| {
+        if a_arr.is_standard_layout()
+            && mask_arr.is_standard_layout()
+            && values_arr.is_standard_layout()
+        {
+            let a_slice = a_arr
+                .as_slice()
+                .expect("standard-layout array must be sliceable");
+            let mask_slice = mask_arr
+                .as_slice()
+                .expect("standard-layout array must be sliceable");
+            let values_slice = values_arr
+                .as_slice()
+                .expect("standard-layout array must be sliceable");
+            let out = a_slice
+                .iter()
+                .zip(mask_slice.iter())
+                .zip(values_slice.iter())
+                .map(|((&v, &m), &new_v)| if m { new_v } else { v })
+                .collect::<Vec<_>>();
+            return Array2::from_shape_vec((nrows, ncols), out)
+                .expect("flat output shape must match");
+        }
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         for row in 0..nrows {
             for col in 0..ncols {

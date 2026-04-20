@@ -75,6 +75,27 @@ class BenchmarkCase:
     rs_func: Callable
     rs_args: tuple
     check: bool = True
+    tags: tuple[str, ...] = ()
+
+
+LAYOUT_CONTIGUOUS = "contiguous"
+LAYOUT_VIEW = "view"
+LAYOUT_COPY_INCLUDED = "copy-included"
+LAYOUT_CHOICES = (LAYOUT_CONTIGUOUS, LAYOUT_VIEW, LAYOUT_COPY_INCLUDED)
+
+SUITE_CORE = "core"
+SUITE_EXTENDED = "extended"
+SUITE_CHOICES = (SUITE_CORE, SUITE_EXTENDED)
+CORE_EXCLUDED_TAGS = {"scalar", "o1", "fixed_input", "cache_lookup", "metadata", "extended_only"}
+
+
+def filter_cases_by_suite(cases: list[BenchmarkCase], suite: str) -> list[BenchmarkCase]:
+    """Filter benchmark cases for the selected suite."""
+    if suite == SUITE_EXTENDED:
+        return cases
+    if suite == SUITE_CORE:
+        return [case for case in cases if CORE_EXCLUDED_TAGS.isdisjoint(case.tags)]
+    raise ValueError(f"Unknown benchmark suite: {suite}")
 
 
 def make_array(rows: int, cols: int, nan_ratio: float, seed: int) -> np.ndarray:
@@ -86,18 +107,68 @@ def make_array(rows: int, cols: int, nan_ratio: float, seed: int) -> np.ndarray:
     return a
 
 
-def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
+def select_col_1d(a: np.ndarray, layout: str) -> np.ndarray:
+    """Select the first column according to the requested benchmark layout."""
+    col = a[:, 0]
+    if layout == LAYOUT_CONTIGUOUS:
+        return np.ascontiguousarray(col)
+    return col
+
+
+def as_timed_contiguous(arg):
+    """Copy non-contiguous 1D arrays while preserving argument structure."""
+    if isinstance(arg, np.ndarray):
+        if arg.ndim == 1 and not arg.flags.c_contiguous:
+            return np.ascontiguousarray(arg)
+        return arg
+    if isinstance(arg, tuple):
+        return tuple(as_timed_contiguous(item) for item in arg)
+    if isinstance(arg, list):
+        return [as_timed_contiguous(item) for item in arg]
+    return arg
+
+
+def has_non_contiguous_1d(arg) -> bool:
+    """Return whether an argument structure contains a non-contiguous 1D array."""
+    if isinstance(arg, np.ndarray):
+        return arg.ndim == 1 and not arg.flags.c_contiguous
+    if isinstance(arg, tuple) or isinstance(arg, list):
+        return any(has_non_contiguous_1d(item) for item in arg)
+    return False
+
+
+def effective_layout_for_args(args: tuple, layout: str) -> str:
+    """Avoid adding copy-included overhead to cases without strided 1D inputs."""
+    if layout == LAYOUT_COPY_INCLUDED and not any(has_non_contiguous_1d(arg) for arg in args):
+        return LAYOUT_VIEW
+    return layout
+
+
+def prepare_timed_args(args: tuple, layout: str) -> tuple:
+    """Prepare call arguments for the selected benchmark layout."""
+    if layout != LAYOUT_COPY_INCLUDED:
+        return args
+    return tuple(as_timed_contiguous(arg) for arg in args)
+
+
+def make_cases(
+    a: np.ndarray,
+    window: int,
+    seed: int,
+    layout: str = LAYOUT_VIEW,
+    suite: str = SUITE_CORE,
+) -> list[BenchmarkCase]:
     """Create all benchmark cases with available Rust counterparts."""
     if rust_generic is None:
         return []
 
-    a_1d = np.ascontiguousarray(a[:, 0])
+    a_1d = select_col_1d(a, layout)
     other = np.full(a.shape, 0.15, dtype=np.float64)
-    other_1d = np.ascontiguousarray(other[:, 0])
+    other_1d = select_col_1d(other, layout)
     mask = np.isfinite(a)
-    mask_1d = np.ascontiguousarray(mask[:, 0])
+    mask_1d = select_col_1d(mask, layout)
     values = np.arange(a.size, dtype=np.float64).reshape(a.shape)
-    values_1d = np.ascontiguousarray(values[:, 0])
+    values_1d = select_col_1d(values, layout)
     group_lens = np.array([max(1, a.shape[1] // 2), a.shape[1] - max(1, a.shape[1] // 2)], dtype=np.int64)
     if group_lens[-1] == 0:
         group_lens = np.array([a.shape[1]], dtype=np.int64)
@@ -121,9 +192,9 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     volume = np.nan_to_num(np.abs(a) * 100.0 + 1.0, nan=1.0).astype(np.float64)
     signal_grid = np.arange(a.size, dtype=np.int64).reshape(a.shape)
     signal_mask = np.ascontiguousarray(signal_grid % 17 == 0)
-    signal_mask_1d = np.ascontiguousarray(signal_mask[:, 0])
+    signal_mask_1d = select_col_1d(signal_mask, layout)
     other_signal_mask = np.ascontiguousarray(signal_grid % 19 == 0)
-    other_signal_mask_1d = np.ascontiguousarray(other_signal_mask[:, 0])
+    other_signal_mask_1d = select_col_1d(other_signal_mask, layout)
     signal_n = np.full(a.shape[1], max(1, min(a.shape[0] // 20, a.shape[0] // 2)), dtype=np.int64)
     signal_prob = np.full(a.shape, 0.05, dtype=np.float64)
     exit_prob = np.full(a.shape, 0.07, dtype=np.float64)
@@ -136,8 +207,8 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
     signal_close = signal_ts + np.nan_to_num(a, nan=0.0) * 0.01
     returns_init_value = np.full(a.shape[1], np.nan, dtype=np.float64)
     returns_data = returns_nb.returns_nb(signal_close, returns_init_value)
-    returns_value_1d = np.ascontiguousarray(signal_close[:, 0])
-    returns_data_1d = np.ascontiguousarray(returns_data[:, 0])
+    returns_value_1d = select_col_1d(signal_close, layout)
+    returns_data_1d = select_col_1d(returns_data, layout)
     benchmark_rets = (np.nan_to_num(a, nan=0.0) * 0.01).astype(np.float64)
     sl_stop = np.full(a.shape, 0.02, dtype=np.float64)
     sl_trail = np.ones(a.shape, dtype=np.bool_)
@@ -242,6 +313,9 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
 
     indicator_cases = []
     if rust_indicators is not None:
+        high_1d = select_col_1d(high, layout)
+        low_1d = select_col_1d(low, layout)
+        close_1d = select_col_1d(close, layout)
         windows = [max(2, window // 2), window]
         ewms = [False, True]
         alphas = [2.0, 3.0]
@@ -310,6 +384,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (close, window, True, False, nb_ma_cache),
                 rust_indicators.ma_apply_rs,
                 (close, window, True, False, rs_ma_cache),
+                tags=("cache_lookup",),
             ),
             BenchmarkCase(
                 "indicators.mstd_cache",
@@ -324,6 +399,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (close, window, True, False, 0, nb_mstd_cache),
                 rust_indicators.mstd_apply_rs,
                 (close, window, True, False, 0, rs_mstd_cache),
+                tags=("cache_lookup",),
             ),
             BenchmarkCase(
                 "indicators.bb_cache",
@@ -389,6 +465,14 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (high, low, close),
             ),
             BenchmarkCase(
+                "indicators.true_range_1d",
+                lambda h, l, c: indicator_nb.true_range_nb(h.reshape(-1, 1), l.reshape(-1, 1), c.reshape(-1, 1))[:, 0],
+                (high_1d, low_1d, close_1d),
+                rust_indicators.true_range_1d_rs,
+                (high_1d, low_1d, close_1d),
+                tags=("extended_only",),
+            ),
+            BenchmarkCase(
                 "indicators.atr_cache",
                 indicator_nb.atr_cache_nb,
                 (high, low, close, windows, ewms, False),
@@ -401,6 +485,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (high, low, close, window, True, False, *nb_atr_cache),
                 rust_indicators.atr_apply_rs,
                 (high, low, close, window, True, False, *rs_atr_cache),
+                tags=("cache_lookup",),
             ),
             BenchmarkCase(
                 "indicators.obv_custom",
@@ -476,6 +561,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (signal_mask_1d, -1),
                 rust_signals.nth_index_1d_rs,
                 (signal_mask_1d, -1),
+                tags=("o1",),
             ),
             BenchmarkCase(
                 "signals.nth_index",
@@ -483,6 +569,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (signal_mask, -1),
                 rust_signals.nth_index_rs,
                 (signal_mask, -1),
+                tags=("o1",),
             ),
             BenchmarkCase(
                 "signals.norm_avg_index_1d",
@@ -679,6 +766,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (1.0, 2.0),
                 rust_returns.get_return_rs,
                 (1.0, 2.0),
+                tags=("scalar", "o1"),
             ),
             BenchmarkCase(
                 "returns.returns_1d",
@@ -1264,9 +1352,21 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             rust_generic.flatten_uniform_grouped_rs,
             (a, uniform_group_lens, True),
         ),
-        BenchmarkCase("nth_reduce", nb.nth_reduce_nb, (0, a_1d, -1), rust_generic.nth_reduce_rs, (a_1d, -1)),
         BenchmarkCase(
-            "nth_index_reduce", nb.nth_index_reduce_nb, (0, a_1d, -1), rust_generic.nth_index_reduce_rs, (a_1d, -1)
+            "nth_reduce",
+            nb.nth_reduce_nb,
+            (0, a_1d, -1),
+            rust_generic.nth_reduce_rs,
+            (a_1d, -1),
+            tags=("o1", "metadata"),
+        ),
+        BenchmarkCase(
+            "nth_index_reduce",
+            nb.nth_index_reduce_nb,
+            (0, a_1d, -1),
+            rust_generic.nth_index_reduce_rs,
+            (a_1d, -1),
+            tags=("o1", "metadata"),
         ),
         BenchmarkCase("min_reduce", nb.min_reduce_nb, (0, a_1d), rust_generic.min_reduce_rs, (a_1d,)),
         BenchmarkCase("max_reduce", nb.max_reduce_nb, (0, a_1d), rust_generic.max_reduce_rs, (a_1d,)),
@@ -1294,7 +1394,14 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         BenchmarkCase("min_squeeze", nb.min_squeeze_nb, (0, 0, a_1d), rust_generic.min_squeeze_rs, (a_1d,)),
         BenchmarkCase("max_squeeze", nb.max_squeeze_nb, (0, 0, a_1d), rust_generic.max_squeeze_rs, (a_1d,)),
         BenchmarkCase("sum_squeeze", nb.sum_squeeze_nb, (0, 0, a_1d), rust_generic.sum_squeeze_rs, (a_1d,)),
-        BenchmarkCase("any_squeeze", nb.any_squeeze_nb, (0, 0, a_1d), rust_generic.any_squeeze_rs, (a_1d,)),
+        BenchmarkCase(
+            "any_squeeze",
+            nb.any_squeeze_nb,
+            (0, 0, a_1d),
+            rust_generic.any_squeeze_rs,
+            (a_1d,),
+            tags=("o1",),
+        ),
         BenchmarkCase("find_ranges", nb.find_ranges_nb, (a, np.nan), rust_generic.find_ranges_rs, (a, np.nan)),
         BenchmarkCase(
             "range_duration",
@@ -1302,6 +1409,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (range_start, range_end, range_status),
             rust_generic.range_duration_rs,
             (range_start, range_end, range_status),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "range_coverage",
@@ -1324,6 +1432,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (peak_val, valley_val),
             rust_generic.dd_drawdown_rs,
             (peak_val, valley_val),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "dd_decline_duration",
@@ -1331,6 +1440,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (start_idx, valley_idx),
             rust_generic.dd_decline_duration_rs,
             (start_idx, valley_idx),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "dd_recovery_duration",
@@ -1338,6 +1448,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (valley_idx, end_idx),
             rust_generic.dd_recovery_duration_rs,
             (valley_idx, end_idx),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "dd_recovery_duration_ratio",
@@ -1345,6 +1456,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (start_idx, valley_idx, end_idx),
             rust_generic.dd_recovery_duration_ratio_rs,
             (start_idx, valley_idx, end_idx),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "dd_recovery_return",
@@ -1352,6 +1464,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             (valley_val, end_val),
             rust_generic.dd_recovery_return_rs,
             (valley_val, end_val),
+            tags=("fixed_input",),
         ),
         BenchmarkCase(
             "crossed_above_1d",
@@ -1611,6 +1724,124 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
 
         portfolio_cases = [
             BenchmarkCase(
+                "portfolio.order_not_filled",
+                portfolio_nb.order_not_filled_nb,
+                (0, -1),
+                rust_portfolio.order_not_filled_rs,
+                (0, -1),
+                check=False,
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.order",
+                portfolio_nb.order_nb,
+                (),
+                rust_portfolio.order_rs,
+                (),
+                check=False,
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.close_position",
+                portfolio_nb.close_position_nb,
+                (),
+                rust_portfolio.close_position_rs,
+                (),
+                check=False,
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.order_nothing",
+                portfolio_nb.order_nothing_nb,
+                (),
+                rust_portfolio.order_nothing_rs,
+                (),
+                check=False,
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.check_group_lens",
+                portfolio_nb.check_group_lens_nb,
+                (pf_group_lens_grouped, cols),
+                rust_portfolio.check_group_lens_rs,
+                (pf_group_lens_grouped, cols),
+                check=False,
+                tags=("metadata",),
+            ),
+            BenchmarkCase(
+                "portfolio.check_group_init_cash",
+                portfolio_nb.check_group_init_cash_nb,
+                (pf_group_lens_grouped, cols, pf_init_cash_grouped, True),
+                rust_portfolio.check_group_init_cash_rs,
+                (pf_group_lens_grouped, cols, pf_init_cash_grouped, True),
+                check=False,
+                tags=("metadata",),
+            ),
+            BenchmarkCase(
+                "portfolio.is_grouped",
+                portfolio_nb.is_grouped_nb,
+                (pf_group_lens_grouped,),
+                rust_portfolio.is_grouped_rs,
+                (pf_group_lens_grouped,),
+                tags=("metadata",),
+            ),
+            BenchmarkCase(
+                "portfolio.get_group_value",
+                portfolio_nb.get_group_value_nb,
+                (0, cols, 10000.0, pf_assets[-1], pf_close[-1]),
+                rust_portfolio.get_group_value_rs,
+                (0, cols, 10000.0, pf_assets[-1], pf_close[-1]),
+                tags=("metadata",),
+            ),
+            BenchmarkCase(
+                "portfolio.approx_order_value",
+                portfolio_nb.approx_order_value_nb,
+                (1.0, 0, 2, 10000.0, 1.0, 10000.0, 100.0, 10100.0),
+                rust_portfolio.approx_order_value_rs,
+                (1.0, 0, 2, 10000.0, 1.0, 10000.0, 100.0, 10100.0),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.update_value",
+                portfolio_nb.update_value_nb,
+                (10000.0, 9900.0, 1.0, 1.5, 100.0, 101.0, 10100.0),
+                rust_portfolio.update_value_rs,
+                (10000.0, 9900.0, 1.0, 1.5, 100.0, 101.0, 10100.0),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.get_trade_stats",
+                portfolio_nb.get_trade_stats_nb,
+                (1.0, 100.0, 0.1, 110.0, 0.1, 0),
+                rust_portfolio.get_trade_stats_rs,
+                (1.0, 100.0, 0.1, 110.0, 0.1, 0),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.get_long_size",
+                portfolio_nb.get_long_size_nb,
+                (1.0, 2.0),
+                rust_portfolio.get_long_size_rs,
+                (1.0, 2.0),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.get_short_size",
+                portfolio_nb.get_short_size_nb,
+                (-1.0, -2.0),
+                rust_portfolio.get_short_size_rs,
+                (-1.0, -2.0),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
+                "portfolio.get_free_cash_diff",
+                portfolio_nb.get_free_cash_diff_nb,
+                (1.0, 2.0, 0.0, 100.0, 0.1),
+                rust_portfolio.get_free_cash_diff_rs,
+                (1.0, 2.0, 0.0, 100.0, 0.1),
+                tags=("scalar", "o1"),
+            ),
+            BenchmarkCase(
                 "portfolio.build_call_seq",
                 portfolio_nb.build_call_seq_nb,
                 (pf_target_shape, pf_group_lens_grouped, 0),
@@ -1773,6 +2004,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_init_cash, pf_group_lens_grouped, False),
                 rust_portfolio.init_cash_grouped_rs,
                 (pf_init_cash, pf_group_lens_grouped, False),
+                tags=("metadata",),
             ),
             BenchmarkCase(
                 "portfolio.init_cash",
@@ -1780,6 +2012,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_init_cash_grouped, pf_group_lens_grouped, True),
                 rust_portfolio.init_cash_rs,
                 (pf_init_cash_grouped, pf_group_lens_grouped, True),
+                tags=("metadata",),
             ),
             BenchmarkCase(
                 "portfolio.cash",
@@ -1815,6 +2048,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_init_cash, pf_group_lens_grouped),
                 rust_portfolio.total_profit_grouped_rs,
                 (pf_init_cash, pf_group_lens_grouped),
+                tags=("metadata",),
             ),
             BenchmarkCase(
                 "portfolio.final_value",
@@ -1822,6 +2056,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_init_cash, pf_init_cash),
                 rust_portfolio.final_value_rs,
                 (pf_init_cash, pf_init_cash),
+                tags=("o1",),
             ),
             BenchmarkCase(
                 "portfolio.total_return",
@@ -1829,6 +2064,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_init_cash, pf_init_cash),
                 rust_portfolio.total_return_rs,
                 (pf_init_cash, pf_init_cash),
+                tags=("o1",),
             ),
             BenchmarkCase(
                 "portfolio.asset_value",
@@ -1892,6 +2128,7 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
                 (pf_benchmark_value,),
                 rust_portfolio.total_benchmark_return_rs,
                 (pf_benchmark_value,),
+                tags=("o1",),
             ),
             BenchmarkCase(
                 "portfolio.gross_exposure",
@@ -1941,27 +2178,41 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         ]
 
     cases.extend(portfolio_cases)
-    return cases
+    return filter_cases_by_suite(cases, suite)
 
 
-def time_call(func: Callable, args: tuple, repeat: int, warmup: int) -> float:
+def call_case_func(func: Callable, args: tuple, layout: str):
+    """Call a benchmark function under the selected argument layout."""
+    return func(*prepare_timed_args(args, layout))
+
+
+def time_call(func: Callable, args: tuple, repeat: int, warmup: int, layout: str) -> float:
     """Return best runtime in seconds."""
+    layout = effective_layout_for_args(args, layout)
     for _ in range(warmup):
-        func(*args)
+        call_case_func(func, args, layout)
     best = np.inf
     for _ in range(repeat):
         start = time.perf_counter()
-        func(*args)
+        call_case_func(func, args, layout)
         best = min(best, time.perf_counter() - start)
     return best
 
 
-def assert_same(case: BenchmarkCase) -> None:
+def assert_same(case: BenchmarkCase, layout: str) -> None:
     """Verify that Rust and Numba return equivalent results."""
     if not case.check:
         return
-    nb_out = case.nb_func(*case.nb_args)
-    rs_out = case.rs_func(*case.rs_args)
+    nb_out = call_case_func(
+        case.nb_func,
+        case.nb_args,
+        effective_layout_for_args(case.nb_args, layout),
+    )
+    rs_out = call_case_func(
+        case.rs_func,
+        case.rs_args,
+        effective_layout_for_args(case.rs_args, layout),
+    )
     assert_nested_same(rs_out, nb_out)
 
 
@@ -1998,6 +2249,23 @@ def main() -> None:
     parser.add_argument("--repeat", type=int, default=5)
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--layout",
+        choices=LAYOUT_CHOICES,
+        default=LAYOUT_VIEW,
+        help=(
+            "Memory layout for 1D column inputs: 'view' passes strided column views "
+            "and is the real-world-like default; 'contiguous' copies before timing "
+            "as a best-case kernel baseline; 'copy-included' copies non-contiguous "
+            "1D arguments inside each timed call."
+        ),
+    )
+    parser.add_argument(
+        "--suite",
+        choices=SUITE_CHOICES,
+        default=SUITE_CORE,
+        help="'core' excludes scalar/O(1)/metadata/cache-lookup cases; 'extended' includes all benchmark cases.",
+    )
     parser.add_argument("--pattern", type=str, default=None, help="Only run cases whose name contains this string.")
     parser.add_argument("--check", action="store_true", help="Check Rust/Numba output parity before timing.")
     args = parser.parse_args()
@@ -2006,17 +2274,29 @@ def main() -> None:
         raise SystemExit("vectorbt-rust is not installed or version-compatible")
 
     a = make_array(args.rows, args.cols, args.nan_ratio, args.seed)
-    cases = make_cases(a, args.window, args.seed)
+    cases = make_cases(a, args.window, args.seed, args.layout, args.suite)
     if args.pattern is not None:
         cases = [case for case in cases if args.pattern in case.name]
 
     print("function,numba_s,rust_s,speedup")
     for case in cases:
         if args.check:
-            assert_same(case)
-        numba_s = time_call(case.nb_func, case.nb_args, args.repeat, args.warmup)
-        rust_s = time_call(case.rs_func, case.rs_args, args.repeat, args.warmup)
-        print(f"{case.name},{numba_s:.6f},{rust_s:.6f},{numba_s / rust_s:.3f}")
+            assert_same(case, args.layout)
+        numba_s = time_call(
+            case.nb_func,
+            case.nb_args,
+            args.repeat,
+            args.warmup,
+            args.layout,
+        )
+        rust_s = time_call(
+            case.rs_func,
+            case.rs_args,
+            args.repeat,
+            args.warmup,
+            args.layout,
+        )
+        print(f"{case.name},{numba_s:.12g},{rust_s:.12g},{numba_s / rust_s:.12g}")
 
 
 if __name__ == "__main__":
