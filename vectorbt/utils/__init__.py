@@ -11,9 +11,9 @@ from vectorbt.utils.figure import (
     make_figure,
     make_subplots,
     create_figure,
-    register_backend,
-    get_backend,
-    list_backends,
+    register_renderer,
+    get_renderer,
+    list_renderers,
 )
 from vectorbt.utils.image_ import save_animation
 from vectorbt.utils.random_ import set_seed
@@ -39,9 +39,9 @@ __all__ = [
     "make_figure",
     "make_subplots",
     "create_figure",
-    "register_backend",
-    "get_backend",
-    "list_backends",
+    "register_renderer",
+    "get_renderer",
+    "list_renderers",
     "set_seed",
     "save_animation",
     "AsyncJob",
