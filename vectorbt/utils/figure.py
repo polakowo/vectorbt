@@ -96,7 +96,7 @@ def _add_trace_kwargs(row: tp.Optional[int],
 
 class PlotlyFigureProtocolMixin:
     capabilities: tp.ClassVar[Capability] = _ALL_CAPABILITIES
-    backend_name: tp.ClassVar[str] = 'plotly'
+    renderer_name: tp.ClassVar[str] = 'plotly'
 
     @property
     def native(self) -> tp.Any:
@@ -127,7 +127,7 @@ class PlotlyFigureProtocolMixin:
                   showlegend: tp.Optional[bool] = None,
                   row: tp.Optional[int] = None,
                   col: tp.Optional[int] = None) -> Self:
-        """Plot a line trace via the backend-agnostic protocol."""
+        """Plot a line trace via the renderer-agnostic protocol."""
         trace_kwargs: tp.Kwargs = dict(x=x, y=y, mode='lines')
         if name is not None:
             trace_kwargs['name'] = name
@@ -162,7 +162,7 @@ class PlotlyFigureProtocolMixin:
                      hover_text: tp.Union[str, tp.Sequence[str], None] = None,
                      row: tp.Optional[int] = None,
                      col: tp.Optional[int] = None) -> Self:
-        """Plot a marker trace via the backend-agnostic protocol."""
+        """Plot a marker trace via the renderer-agnostic protocol."""
         trace_kwargs: tp.Kwargs = dict(x=x, y=y, mode='markers')
         if name is not None:
             trace_kwargs['name'] = name
@@ -213,7 +213,7 @@ class PlotlyFigureProtocolMixin:
                   showlegend: tp.Optional[bool] = None,
                   row: tp.Optional[int] = None,
                   col: tp.Optional[int] = None) -> Self:
-        """Plot a filled-area trace via the backend-agnostic protocol."""
+        """Plot a filled-area trace via the renderer-agnostic protocol."""
         trace_kwargs: tp.Kwargs = dict(x=x, y=y, mode='lines', fill='tozeroy')
         if name is not None:
             trace_kwargs['name'] = name
@@ -239,7 +239,7 @@ class PlotlyFigureProtocolMixin:
                   style: str = 'candlestick',
                   row: tp.Optional[int] = None,
                   col: tp.Optional[int] = None) -> Self:
-        """Plot an OHLC chart via the backend-agnostic protocol.
+        """Plot an OHLC chart via the renderer-agnostic protocol.
 
         `style='candlestick'` (default) emits `go.Candlestick`;
         `style='bars'` emits `go.Ohlc`. Both accept the same
@@ -272,7 +272,7 @@ class PlotlyFigureProtocolMixin:
                        showlegend: tp.Optional[bool] = None,
                        row: tp.Optional[int] = None,
                        col: tp.Optional[int] = None) -> Self:
-        """Plot a histogram via the backend-agnostic protocol."""
+        """Plot a histogram via the renderer-agnostic protocol."""
         trace_kwargs: tp.Kwargs = dict(x=x)
         if name is not None:
             trace_kwargs['name'] = name
@@ -294,7 +294,7 @@ class PlotlyFigureProtocolMixin:
                   showlegend: tp.Optional[bool] = None,
                   row: tp.Optional[int] = None,
                   col: tp.Optional[int] = None) -> Self:
-        """Plot a bar trace via the backend-agnostic protocol.
+        """Plot a bar trace via the renderer-agnostic protocol.
 
         `color` may be a scalar or a sequence (one color per bar). Plotly's
         `go.Bar` natively dispatches on both. `line_width=0` suppresses the
@@ -325,7 +325,7 @@ class PlotlyFigureProtocolMixin:
                    width: tp.Optional[float] = None,
                    row: tp.Optional[int] = None,
                    col: tp.Optional[int] = None) -> Self:
-        """Plot a horizontal line via the backend-agnostic protocol.
+        """Plot a horizontal line via the renderer-agnostic protocol.
 
         Matches the existing `fig.add_shape(type='line', xref='paper', ...)`
         pattern used throughout vectorbt (21 call sites), so downstream migration
@@ -459,50 +459,50 @@ _SUBPLOT_ONLY_KWARGS = frozenset({
     'column_titles', 'row_titles', 'x_title', 'y_title', 'figure',
 })
 
-BackendFactory = tp.Callable[..., FigureProtocol]
-_BACKEND_REGISTRY: tp.Dict[str, BackendFactory] = {}
+RendererFactory = tp.Callable[..., FigureProtocol]
+_RENDERER_REGISTRY: tp.Dict[str, RendererFactory] = {}
 
 
-def register_backend(name: str,
-                     factory: BackendFactory,
-                     *,
-                     override: bool = False) -> None:
-    """Register a plotting backend factory under `name`.
+def register_renderer(name: str,
+                      factory: RendererFactory,
+                      *,
+                      override: bool = False) -> None:
+    """Register a plotting renderer factory under `name`.
 
     Not thread-safe; call during application startup.
     """
     if not isinstance(name, str) or not name:
-        raise ValueError("backend name must be a non-empty string")
+        raise ValueError("renderer name must be a non-empty string")
     if not callable(factory):
         raise TypeError("factory must be callable")
-    if name in _BACKEND_REGISTRY and not override:
+    if name in _RENDERER_REGISTRY and not override:
         raise ValueError(
-            f"backend {name!r} already registered; pass override=True to replace"
+            f"renderer {name!r} already registered; pass override=True to replace"
         )
-    _BACKEND_REGISTRY[name] = factory
+    _RENDERER_REGISTRY[name] = factory
 
 
-def get_backend(name: str) -> BackendFactory:
-    """Look up a registered plotting backend factory by name."""
+def get_renderer(name: str) -> RendererFactory:
+    """Look up a registered plotting renderer factory by name."""
     try:
-        return _BACKEND_REGISTRY[name]
+        return _RENDERER_REGISTRY[name]
     except KeyError:
         raise KeyError(
-            f"unknown plotting backend {name!r}; "
-            f"registered: {sorted(_BACKEND_REGISTRY)}"
+            f"unknown plotting renderer {name!r}; "
+            f"registered: {sorted(_RENDERER_REGISTRY)}"
         )
 
 
-def list_backends() -> tp.List[str]:
-    """Return the sorted list of registered plotting backend names."""
-    return sorted(_BACKEND_REGISTRY)
+def list_renderers() -> tp.List[str]:
+    """Return the sorted list of registered plotting renderer names."""
+    return sorted(_RENDERER_REGISTRY)
 
 
 def _plotly_factory(*,
                     rows: tp.Optional[int] = None,
                     cols: tp.Optional[int] = None,
                     **kwargs) -> FigureProtocol:
-    """Built-in Plotly backend factory.
+    """Built-in Plotly renderer factory.
 
     With no `rows`/`cols` and no subplot-only kwargs, delegates to
     `make_figure()` for byte-identical output. Any explicit `rows`/`cols`
@@ -524,17 +524,23 @@ def _plotly_factory(*,
 
 
 def create_figure(*,
-                  backend: tp.Optional[str] = None,
+                  renderer: tp.Optional[str] = None,
                   rows: tp.Optional[int] = None,
                   cols: tp.Optional[int] = None,
                   **kwargs) -> FigureProtocol:
-    """Create a figure via the registered backend factory.
+    """Create a figure via the registered renderer factory.
 
-    Keyword-only. `backend=None` reads
-    `settings['plotting']['default_backend']`.
+    Keyword-only. `renderer=None` reads
+    `settings['plotting']['default_renderer']`.
+
+    Note: vectorbt's `renderer=` selects the *plotting library* (e.g.
+    `'plotly'`, `'lightweight_charts'`) that produces the figure. This is
+    distinct from Plotly's own `fig.show(renderer=...)` kwarg, which selects
+    an *output format* (`'png'`, `'svg'`, `'browser'`, ...) when displaying
+    a Plotly figure.
 
     With no `rows`/`cols` and no subplot-only kwargs, the built-in `'plotly'`
-    backend delegates to `make_figure()` — byte-identical output. Passing
+    renderer delegates to `make_figure()` — byte-identical output. Passing
     explicit `rows`/`cols` (even `rows=1, cols=1`) or any subplot-only kwarg
     (`specs`, `shared_xaxes`, ...) routes to `make_subplots()` so the
     resulting figure has real subplot metadata and `get_subplot(...)` works.
@@ -544,107 +550,107 @@ def create_figure(*,
     no positional seat for that case.
 
     Note: only code paths that go through `create_figure` honor
-    `settings['plotting']['default_backend']`. Existing plot methods built
+    `settings['plotting']['default_renderer']`. Existing plot methods built
     on `make_figure` / `make_subplots` (accessors, indicators, the
     `vbt.plotting.Gauge`/`Scatter`/... helpers, etc.) are unaffected and
     will be migrated in follow-up issues.
     """
     from vectorbt._settings import settings
-    if backend is None:
-        backend = settings['plotting']['default_backend']
-    factory = get_backend(backend)
+    if renderer is None:
+        renderer = settings['plotting']['default_renderer']
+    factory = get_renderer(renderer)
     return factory(rows=rows, cols=cols, **kwargs)
 
 
-# ############# Backend resolution helpers ############# #
+# ############# Renderer resolution helpers ############# #
 
 
-def resolve_backend_for_fig(fig: tp.Any) -> tp.Tuple[str, bool]:
-    """Return `(backend_name, is_plotly)` for an optional figure.
+def resolve_renderer_for_fig(fig: tp.Any) -> tp.Tuple[str, bool]:
+    """Return `(renderer_name, is_plotly)` for an optional figure.
 
     When `fig is None`, resolves through
-    `settings['plotting']['default_backend']`. When `fig` is a Plotly
+    `settings['plotting']['default_renderer']`. When `fig` is a Plotly
     `BaseFigure`, returns `('plotly', True)`. Otherwise looks up
-    `type(fig).backend_name` (falls back to the class name) — never hardcodes
-    a specific non-Plotly backend name at the registry layer, so future
-    third-party backends get their own name in error messages automatically.
+    `type(fig).renderer_name` (falls back to the class name) — never hardcodes
+    a specific non-Plotly renderer name at the registry layer, so future
+    third-party renderers get their own name in error messages automatically.
     """
     from vectorbt._settings import settings
     if fig is None:
-        backend = settings['plotting']['default_backend']
-        return (backend, backend == 'plotly')
+        renderer = settings['plotting']['default_renderer']
+        return (renderer, renderer == 'plotly')
     if isinstance(fig, tp.BaseFigure):
         return ('plotly', True)
-    return (getattr(type(fig), 'backend_name', type(fig).__name__), False)
+    return (getattr(type(fig), 'renderer_name', type(fig).__name__), False)
 
 
-def resolve_backend(
+def resolve_renderer(
     fig: tp.Any = None,
-    backend: tp.Optional[str] = None,
+    renderer: tp.Optional[str] = None,
 ) -> tp.Tuple[str, bool]:
-    """Return `(backend_name, is_plotly)` from an optional figure and/or backend override.
+    """Return `(renderer_name, is_plotly)` from an optional figure and/or renderer override.
 
     Precedence:
-    1. If *fig* is not None, detect from the figure object. If *backend*
+    1. If *fig* is not None, detect from the figure object. If *renderer*
        is also provided and conflicts, raise `ValueError`.
-    2. If *fig* is None and *backend* is not None, use *backend* directly.
+    2. If *fig* is None and *renderer* is not None, use *renderer* directly.
     3. If both are None, fall back to
-       ``settings['plotting']['default_backend']``.
+       ``settings['plotting']['default_renderer']``.
     """
     if fig is not None:
-        fig_backend, fig_is_plotly = resolve_backend_for_fig(fig)
-        if backend is not None and backend != fig_backend:
+        fig_renderer, fig_is_plotly = resolve_renderer_for_fig(fig)
+        if renderer is not None and renderer != fig_renderer:
             raise ValueError(
-                f"backend={backend!r} conflicts with the supplied fig, which "
-                f"is a {fig_backend!r} backend figure. Either omit backend= "
-                f"or pass a fig created with backend={backend!r}."
+                f"renderer={renderer!r} conflicts with the supplied fig, which "
+                f"is a {fig_renderer!r} renderer figure. Either omit renderer= "
+                f"or pass a fig created with renderer={renderer!r}."
             )
-        return (fig_backend, fig_is_plotly)
-    if backend is not None:
-        return (backend, backend == 'plotly')
+        return (fig_renderer, fig_is_plotly)
+    if renderer is not None:
+        return (renderer, renderer == 'plotly')
     # Both None — fall back to global default.
-    return resolve_backend_for_fig(None)
+    return resolve_renderer_for_fig(None)
 
 
-def assert_plotly_only_kwargs(is_plotly_backend: bool,
-                              resolved_backend: str,
+def assert_plotly_only_kwargs(is_plotly_renderer: bool,
+                              resolved_renderer: str,
                               forcing_kwargs: tp.List[str],
                               *,
                               method_name: str) -> None:
-    """Raise `NotImplementedError` if `forcing_kwargs` are used on a non-Plotly backend.
+    """Raise `NotImplementedError` if `forcing_kwargs` are used on a non-Plotly renderer.
 
-    No-op if `forcing_kwargs` is empty or `is_plotly_backend` is True. The
+    No-op if `forcing_kwargs` is empty or `is_plotly_renderer` is True. The
     error message mirrors the #5 inline pattern at
     `vectorbt/ohlcv_accessors.py:389-398` so users see one consistent voice.
     """
-    if forcing_kwargs and not is_plotly_backend:
+    if forcing_kwargs and not is_plotly_renderer:
         raise NotImplementedError(
             f"{method_name} cannot be called with {forcing_kwargs} on the "
-            f"{resolved_backend!r} backend. These parameters are legacy "
+            f"{resolved_renderer!r} renderer. These parameters are legacy "
             f"Plotly-specific escape hatches. Prefer first-class protocol "
             f"kwargs for portable customization, or operate on a Plotly "
             f"figure directly if you need Plotly-specific styling. To "
-            f"resolve: drop the kwarg, switch to the 'plotly' backend, or "
+            f"resolve: drop the kwarg, switch to the 'plotly' renderer, or "
             f"construct a Plotly figure yourself and pass it via `fig=`."
         )
 
 
-def assert_plotly_only_method(is_plotly_backend: bool,
-                              resolved_backend: str,
+def assert_plotly_only_method(is_plotly_renderer: bool,
+                              resolved_renderer: str,
                               *,
                               method_name: str,
                               reason: str) -> None:
     """Raise `NotImplementedError` if a permanently-Plotly-only method is called on non-Plotly.
 
     Used for methods like `plot_against` and `overlay_with_heatmap` whose
-    core behavior has no cross-backend equivalent (not a specific kwarg, the
+    core behavior has no cross-renderer equivalent (not a specific kwarg, the
     whole method).
     """
-    if not is_plotly_backend:
+    if not is_plotly_renderer:
         raise NotImplementedError(
             f"{method_name} is permanently Plotly-only: {reason} "
-            f"(current backend: {resolved_backend!r}). Switch to the "
-            f"'plotly' backend or construct a Plotly figure yourself and "
+            f"(current renderer: {resolved_renderer!r}). Switch to the "
+            f"'plotly' renderer or construct a Plotly figure yourself and "
             f"pass it via `fig=`."
         )
 
@@ -661,4 +667,4 @@ def _extract_row_col_routing(add_trace_kwargs: tp.Any) -> tp.Kwargs:
     return routing
 
 
-register_backend('plotly', _plotly_factory)
+register_renderer('plotly', _plotly_factory)

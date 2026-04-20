@@ -1,11 +1,11 @@
-"""Tests for the plotting backend registry, `create_figure` factory,
-and the `default_backend` setting.
+"""Tests for the plotting renderer registry, `create_figure` factory,
+and the `default_renderer` setting.
 
 These tests cover:
 - registry round-trip, validation, and override semantics
 - the `_plotly_factory` router (no-args -> make_figure;
   explicit rows/cols or subplot-only kwargs -> make_subplots)
-- runtime mutation of `settings['plotting']['default_backend']`
+- runtime mutation of `settings['plotting']['default_renderer']`
 - public API exposure on `vbt.plotting.*` and top-level `vbt.*`
 """
 
@@ -19,20 +19,20 @@ from vectorbt.utils.figure import (
     assert_plotly_only_kwargs,
     assert_plotly_only_method,
     create_figure,
-    get_backend,
-    list_backends,
+    get_renderer,
+    list_renderers,
     make_figure,
     make_subplots,
-    register_backend,
-    resolve_backend,
-    resolve_backend_for_fig,
+    register_renderer,
+    resolve_renderer,
+    resolve_renderer_for_fig,
 )
 from vectorbt.utils.plotting_protocol import Capability, FigureProtocol
 
 
 class _StubNonPlotlyFig:
     """Minimal non-Plotly figure for testing resolution helpers."""
-    backend_name = 'stub'
+    renderer_name = 'stub'
 
 
 def _strip_uid(node):
@@ -44,82 +44,82 @@ def _strip_uid(node):
 
 
 @pytest.fixture(autouse=True)
-def _restore_backend_state():
-    saved_registry = dict(_figure_mod._BACKEND_REGISTRY)
-    saved_default = vbt.settings['plotting']['default_backend']
+def _restore_renderer_state():
+    saved_registry = dict(_figure_mod._RENDERER_REGISTRY)
+    saved_default = vbt.settings['plotting']['default_renderer']
     saved_use_widgets = vbt.settings['plotting']['use_widgets']
     try:
         yield
     finally:
-        _figure_mod._BACKEND_REGISTRY.clear()
-        _figure_mod._BACKEND_REGISTRY.update(saved_registry)
-        vbt.settings['plotting']['default_backend'] = saved_default
+        _figure_mod._RENDERER_REGISTRY.clear()
+        _figure_mod._RENDERER_REGISTRY.update(saved_registry)
+        vbt.settings['plotting']['default_renderer'] = saved_default
         vbt.settings['plotting']['use_widgets'] = saved_use_widgets
 
 
 class TestRegistryDefaults:
-    def test_default_backend_is_plotly(self):
-        assert 'plotly' in list_backends()
-        assert vbt.settings['plotting']['default_backend'] == 'plotly'
+    def test_default_renderer_is_plotly(self):
+        assert 'plotly' in list_renderers()
+        assert vbt.settings['plotting']['default_renderer'] == 'plotly'
 
 
-class TestBackendNameAttribute:
-    def test_plotly_backend_name(self):
+class TestRendererNameAttribute:
+    def test_plotly_renderer_name(self):
         from vectorbt.utils.figure import PlotlyFigureProtocolMixin
-        assert PlotlyFigureProtocolMixin.backend_name == 'plotly'
+        assert PlotlyFigureProtocolMixin.renderer_name == 'plotly'
         fig = make_figure()
-        assert type(fig).backend_name == 'plotly'
+        assert type(fig).renderer_name == 'plotly'
 
 
-class TestResolveBackendForFig:
+class TestResolveRendererForFig:
     def test_none_defaults_to_plotly(self):
-        vbt.settings['plotting']['default_backend'] = 'plotly'
-        backend, is_plotly = resolve_backend_for_fig(None)
-        assert backend == 'plotly'
+        vbt.settings['plotting']['default_renderer'] = 'plotly'
+        renderer, is_plotly = resolve_renderer_for_fig(None)
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_none_defaults_to_custom(self):
-        vbt.settings['plotting']['default_backend'] = 'other'
-        backend, is_plotly = resolve_backend_for_fig(None)
-        assert backend == 'other'
+        vbt.settings['plotting']['default_renderer'] = 'other'
+        renderer, is_plotly = resolve_renderer_for_fig(None)
+        assert renderer == 'other'
         assert is_plotly is False
 
     def test_plotly_figure_instance(self):
         fig = make_figure()
-        backend, is_plotly = resolve_backend_for_fig(fig)
-        assert backend == 'plotly'
+        renderer, is_plotly = resolve_renderer_for_fig(fig)
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_plotly_subplots_instance(self):
         fig = make_subplots(rows=2, cols=1)
-        backend, is_plotly = resolve_backend_for_fig(fig)
-        assert backend == 'plotly'
+        renderer, is_plotly = resolve_renderer_for_fig(fig)
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_stub_figure_instance(self):
         fig = _StubNonPlotlyFig()
-        backend, is_plotly = resolve_backend_for_fig(fig)
-        assert backend == 'stub'
+        renderer, is_plotly = resolve_renderer_for_fig(fig)
+        assert renderer == 'stub'
         assert is_plotly is False
 
-    def test_third_party_backend_uses_class_attribute(self):
+    def test_third_party_renderer_uses_class_attribute(self):
         class FakeFig:
-            backend_name = 'bokeh'
-        backend, is_plotly = resolve_backend_for_fig(FakeFig())
-        assert backend == 'bokeh'
+            renderer_name = 'bokeh'
+        renderer, is_plotly = resolve_renderer_for_fig(FakeFig())
+        assert renderer == 'bokeh'
         assert is_plotly is False
 
-    def test_third_party_backend_falls_back_to_class_name(self):
+    def test_third_party_renderer_falls_back_to_class_name(self):
         class UnnamedFig:
             pass
-        backend, is_plotly = resolve_backend_for_fig(UnnamedFig())
-        assert backend == 'UnnamedFig'
+        renderer, is_plotly = resolve_renderer_for_fig(UnnamedFig())
+        assert renderer == 'UnnamedFig'
         assert is_plotly is False
 
 
 class TestAssertPlotlyOnlyKwargs:
     def test_noop_when_forcing_empty(self):
-        # No raise even on non-Plotly backend.
+        # No raise even on non-Plotly renderer.
         assert_plotly_only_kwargs(False, 'other', [], method_name='Foo.plot')
 
     def test_noop_when_plotly(self):
@@ -139,7 +139,7 @@ class TestAssertPlotlyOnlyKwargs:
         assert 'layout_kwargs' in msg
         assert 'legacy Plotly-specific escape hatches' in msg
 
-    def test_raises_mentions_third_party_backend_name(self):
+    def test_raises_mentions_third_party_renderer_name(self):
         with pytest.raises(NotImplementedError) as exc:
             assert_plotly_only_kwargs(
                 False, 'bokeh', ['trace_kwargs'],
@@ -235,7 +235,7 @@ class TestCreateFigureRouting:
 
 
 class TestRegistryAPI:
-    def test_register_backend_roundtrip(self):
+    def test_register_renderer_roundtrip(self):
         called = []
         sentinel = object()
 
@@ -243,12 +243,12 @@ class TestRegistryAPI:
             called.append((rows, cols, kw))
             return sentinel
 
-        register_backend('dummy', _dummy)
-        assert 'dummy' in list_backends()
-        assert create_figure(backend='dummy') is sentinel
+        register_renderer('dummy', _dummy)
+        assert 'dummy' in list_renderers()
+        assert create_figure(renderer='dummy') is sentinel
         assert called == [(None, None, {})]
 
-    def test_register_backend_forwards_kwargs(self):
+    def test_register_renderer_forwards_kwargs(self):
         """create_figure must forward rows, cols, and extra kwargs to the factory."""
         called = []
 
@@ -256,57 +256,57 @@ class TestRegistryAPI:
             called.append((rows, cols, kw))
             return 'dummy-figure'
 
-        register_backend('dummy', _dummy)
-        create_figure(backend='dummy', rows=3, cols=2, shared_xaxes=True)
+        register_renderer('dummy', _dummy)
+        create_figure(renderer='dummy', rows=3, cols=2, shared_xaxes=True)
         assert called == [(3, 2, {'shared_xaxes': True})]
 
-    def test_register_backend_duplicate_raises(self):
+    def test_register_renderer_duplicate_raises(self):
         with pytest.raises(ValueError, match="already registered"):
-            register_backend('plotly', lambda **kw: None)
+            register_renderer('plotly', lambda **kw: None)
 
-    def test_register_backend_override_allowed(self):
+    def test_register_renderer_override_allowed(self):
         def replacement(**kw):
             return 'replaced'
-        register_backend('plotly', replacement, override=True)
-        assert get_backend('plotly') is replacement
+        register_renderer('plotly', replacement, override=True)
+        assert get_renderer('plotly') is replacement
 
-    def test_unknown_backend_raises_keyerror(self):
+    def test_unknown_renderer_raises_keyerror(self):
         with pytest.raises(KeyError, match="nope"):
-            create_figure(backend='nope')
+            create_figure(renderer='nope')
 
-    def test_unregistered_default_backend_raises_keyerror(self):
-        """When the default_backend setting points to an unknown name,
-        create_figure() without explicit backend= must raise KeyError."""
-        vbt.settings['plotting']['default_backend'] = 'nonexistent'
+    def test_unregistered_default_renderer_raises_keyerror(self):
+        """When the default_renderer setting points to an unknown name,
+        create_figure() without explicit renderer= must raise KeyError."""
+        vbt.settings['plotting']['default_renderer'] = 'nonexistent'
         with pytest.raises(KeyError, match="nonexistent"):
             create_figure()
 
-    def test_settings_override_default_backend(self):
+    def test_settings_override_default_renderer(self):
         called = []
 
         def _dummy(*, rows, cols, **kw):
             called.append((rows, cols, kw))
             return 'dummy-figure'
 
-        register_backend('dummy', _dummy)
-        vbt.settings['plotting']['default_backend'] = 'dummy'
+        register_renderer('dummy', _dummy)
+        vbt.settings['plotting']['default_renderer'] = 'dummy'
         result = create_figure()
         assert result == 'dummy-figure'
         assert called == [(None, None, {})]
 
-    def test_register_backend_validation(self):
+    def test_register_renderer_validation(self):
         with pytest.raises(ValueError):
-            register_backend('', lambda **kw: None)
+            register_renderer('', lambda **kw: None)
         with pytest.raises(TypeError):
-            register_backend('bad', 'not-callable')
+            register_renderer('bad', 'not-callable')
 
 
 class TestPublicAPIExposure:
     def test_create_figure_exposed_via_vbt_plotting(self):
         assert vbt.plotting.create_figure is create_figure
-        assert vbt.plotting.register_backend is register_backend
-        assert vbt.plotting.get_backend is get_backend
-        assert vbt.plotting.list_backends is list_backends
+        assert vbt.plotting.register_renderer is register_renderer
+        assert vbt.plotting.get_renderer is get_renderer
+        assert vbt.plotting.list_renderers is list_renderers
         assert vbt.plotting.FigureProtocol is FigureProtocol
         assert vbt.plotting.Capability is Capability
         fig = vbt.plotting.create_figure()
@@ -314,9 +314,9 @@ class TestPublicAPIExposure:
 
     def test_create_figure_exposed_at_top_level(self):
         assert vbt.create_figure is create_figure
-        assert vbt.register_backend is register_backend
-        assert vbt.get_backend is get_backend
-        assert vbt.list_backends is list_backends
+        assert vbt.register_renderer is register_renderer
+        assert vbt.get_renderer is get_renderer
+        assert vbt.list_renderers is list_renderers
         a = vbt.create_figure()
         b = vbt.make_figure()
         assert isinstance(a, (Figure, FigureWidget))
@@ -333,56 +333,56 @@ class TestPublicAPIExposure:
         assert hasattr(vbt.plotting, 'Volume')
 
 
-class TestResolveBackend:
-    """Tests for the resolve_backend() helper."""
+class TestResolveRenderer:
+    """Tests for the resolve_renderer() helper."""
 
     def test_both_none_uses_default_plotly(self):
-        vbt.settings['plotting']['default_backend'] = 'plotly'
-        backend, is_plotly = resolve_backend(None, None)
-        assert backend == 'plotly'
+        vbt.settings['plotting']['default_renderer'] = 'plotly'
+        renderer, is_plotly = resolve_renderer(None, None)
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_both_none_uses_default_custom(self):
-        vbt.settings['plotting']['default_backend'] = 'other'
-        backend, is_plotly = resolve_backend(None, None)
-        assert backend == 'other'
+        vbt.settings['plotting']['default_renderer'] = 'other'
+        renderer, is_plotly = resolve_renderer(None, None)
+        assert renderer == 'other'
         assert is_plotly is False
 
-    def test_backend_override_alone(self):
-        backend, is_plotly = resolve_backend(None, 'other')
-        assert backend == 'other'
+    def test_renderer_override_alone(self):
+        renderer, is_plotly = resolve_renderer(None, 'other')
+        assert renderer == 'other'
         assert is_plotly is False
 
-    def test_backend_override_plotly(self):
-        vbt.settings['plotting']['default_backend'] = 'other'
-        backend, is_plotly = resolve_backend(None, 'plotly')
-        assert backend == 'plotly'
+    def test_renderer_override_plotly(self):
+        vbt.settings['plotting']['default_renderer'] = 'other'
+        renderer, is_plotly = resolve_renderer(None, 'plotly')
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_fig_alone_plotly(self):
         fig = make_figure()
-        backend, is_plotly = resolve_backend(fig, None)
-        assert backend == 'plotly'
+        renderer, is_plotly = resolve_renderer(fig, None)
+        assert renderer == 'plotly'
         assert is_plotly is True
 
     def test_fig_alone_stub(self):
         fig = _StubNonPlotlyFig()
-        backend, is_plotly = resolve_backend(fig, None)
-        assert backend == 'stub'
+        renderer, is_plotly = resolve_renderer(fig, None)
+        assert renderer == 'stub'
         assert is_plotly is False
 
-    def test_fig_and_matching_backend(self):
+    def test_fig_and_matching_renderer(self):
         fig = make_figure()
-        backend, is_plotly = resolve_backend(fig, 'plotly')
-        assert backend == 'plotly'
+        renderer, is_plotly = resolve_renderer(fig, 'plotly')
+        assert renderer == 'plotly'
         assert is_plotly is True
 
-    def test_fig_and_conflicting_backend_raises(self):
+    def test_fig_and_conflicting_renderer_raises(self):
         fig = make_figure()
         with pytest.raises(ValueError, match="conflicts"):
-            resolve_backend(fig, 'other')
+            resolve_renderer(fig, 'other')
 
-    def test_stub_fig_and_conflicting_backend_raises(self):
+    def test_stub_fig_and_conflicting_renderer_raises(self):
         fig = _StubNonPlotlyFig()
         with pytest.raises(ValueError, match="conflicts"):
-            resolve_backend(fig, 'plotly')
+            resolve_renderer(fig, 'plotly')

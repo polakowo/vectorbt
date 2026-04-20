@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Backend-agnostic figure protocol and capability flags."""
+"""Renderer-agnostic figure protocol and capability flags."""
 
 import enum
 
@@ -19,7 +19,7 @@ from vectorbt import _typing as tp
 
 
 class Capability(enum.Flag):
-    """Capability flags declaring which chart types a figure backend supports."""
+    """Capability flags declaring which chart types a figure renderer supports."""
 
     TIME_SERIES = enum.auto()
     OHLC = enum.auto()
@@ -39,10 +39,10 @@ class Capability(enum.Flag):
 
 @runtime_checkable
 class FigureProtocol(Protocol):
-    """Backend-agnostic figure interface."""
+    """Renderer-agnostic figure interface."""
 
     capabilities: tp.ClassVar[Capability]
-    backend_name: tp.ClassVar[str]
+    renderer_name: tp.ClassVar[str]
 
     @property
     def native(self) -> tp.Any:
@@ -62,7 +62,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot a line trace via the backend-agnostic protocol."""
+        """Plot a line trace via the renderer-agnostic protocol."""
 
     def plot_markers(
         self,
@@ -81,7 +81,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot a marker trace via the backend-agnostic protocol.
+        """Plot a marker trace via the renderer-agnostic protocol.
 
         `line_color` and `line_width` style the marker border. Plotly maps
         them to `marker.line.color` / `marker.line.width`. LWC's
@@ -112,7 +112,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot an OHLC chart via the backend-agnostic protocol.
+        """Plot an OHLC chart via the renderer-agnostic protocol.
 
         `style` selects the visualization:
 
@@ -120,7 +120,7 @@ class FigureProtocol(Protocol):
           emits `go.Candlestick`; LWC emits `CandlestickSeries`.
         - `'bars'`: tick-style OHLC bars (thin vertical line per period with
           open/close ticks on either side). Plotly emits `go.Ohlc`; LWC emits
-          `BarSeries`. Both backends support this natively.
+          `BarSeries`. Both renderers support this natively.
 
         Unknown `style` values raise `ValueError`.
         """
@@ -135,7 +135,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot a histogram via the backend-agnostic protocol."""
+        """Plot a histogram via the renderer-agnostic protocol."""
 
     def plot_bars(
         self,
@@ -150,7 +150,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot a bar trace via the backend-agnostic protocol.
+        """Plot a bar trace via the renderer-agnostic protocol.
 
         `color` accepts either a single color string or a sequence of per-bar
         colors (one per data point). Plotly's `go.Bar` natively dispatches on
@@ -199,7 +199,7 @@ class FigureProtocol(Protocol):
         row: tp.Optional[int] = None,
         col: tp.Optional[int] = None,
     ) -> Self:
-        """Plot a filled area trace via the backend-agnostic protocol."""
+        """Plot a filled area trace via the renderer-agnostic protocol."""
 
     def show(self, *args: tp.Any, **kwargs: tp.Any) -> None:
         """Display the figure."""

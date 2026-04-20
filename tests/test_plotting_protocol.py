@@ -1,4 +1,4 @@
-"""Tests for the backend-agnostic figure protocol and its Plotly implementation.
+"""Tests for the renderer-agnostic figure protocol and its Plotly implementation.
 
 Each protocol method is asserted to produce output byte-identical (modulo
 auto-generated trace `uid`s on widgets) to the equivalent hand-written
