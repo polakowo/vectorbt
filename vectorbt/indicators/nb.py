@@ -252,14 +252,16 @@ def macd_apply_nb(
 @njit(cache=True)
 def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
     """Calculate true range."""
-    prev_close = generic_nb.fshift_nb(close, 1)
-    tr1 = high - low
-    tr2 = np.abs(high - prev_close)
-    tr3 = np.abs(low - prev_close)
-    tr = np.empty(prev_close.shape, dtype=np.float64)
+    tr = np.empty(high.shape, dtype=np.float64)
     for col in range(tr.shape[1]):
         for i in range(tr.shape[0]):
-            tr[i, col] = max(tr1[i, col], tr2[i, col], tr3[i, col])
+            tr1 = high[i, col] - low[i, col]
+            if i == 0:
+                tr[i, col] = tr1
+            else:
+                tr2 = abs(high[i, col] - close[i - 1, col])
+                tr3 = abs(low[i, col] - close[i - 1, col])
+                tr[i, col] = max(tr1, tr2, tr3)
     return tr
 
 

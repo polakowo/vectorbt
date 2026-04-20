@@ -1090,31 +1090,37 @@ def between_two_ranges_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
-        if a_idxs.shape[0] > 0:
-            b_idxs = np.flatnonzero(b[:, col])
-            if b_idxs.shape[0] > 0:
-                if from_other:
-                    for j, to_i in enumerate(b_idxs):
-                        valid_a_idxs = a_idxs[a_idxs <= to_i]
-                        if len(valid_a_idxs) > 0:
-                            from_i = valid_a_idxs[-1]  # preceding in a
-                            range_records[ridx]["id"] = ridx
-                            range_records[ridx]["col"] = col
-                            range_records[ridx]["start_idx"] = from_i
-                            range_records[ridx]["end_idx"] = to_i
-                            range_records[ridx]["status"] = RangeStatus.Closed
-                            ridx += 1
-                else:
-                    for j, from_i in enumerate(a_idxs):
-                        valid_b_idxs = b_idxs[b_idxs >= from_i]
-                        if len(valid_b_idxs) > 0:
-                            to_i = valid_b_idxs[0]  # succeeding in b
-                            range_records[ridx]["id"] = ridx
-                            range_records[ridx]["col"] = col
-                            range_records[ridx]["start_idx"] = from_i
-                            range_records[ridx]["end_idx"] = to_i
-                            range_records[ridx]["status"] = RangeStatus.Closed
-                            ridx += 1
+        if a_idxs.shape[0] == 0:
+            continue
+        b_idxs = np.flatnonzero(b[:, col])
+        if b_idxs.shape[0] == 0:
+            continue
+        if from_other:
+            a_pos = 0
+            for to_i in b_idxs:
+                while a_pos + 1 < a_idxs.shape[0] and a_idxs[a_pos + 1] <= to_i:
+                    a_pos += 1
+                if a_idxs[a_pos] <= to_i:
+                    from_i = a_idxs[a_pos]  # preceding in a
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Closed
+                    ridx += 1
+        else:
+            b_pos = 0
+            for from_i in a_idxs:
+                while b_pos < b_idxs.shape[0] and b_idxs[b_pos] < from_i:
+                    b_pos += 1
+                if b_pos < b_idxs.shape[0]:
+                    to_i = b_idxs[b_pos]  # succeeding in b
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Closed
+                    ridx += 1
     return range_records[:ridx]
 
 

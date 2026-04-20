@@ -31,6 +31,15 @@ fn usize_to_mut_ptr(v: usize) -> *mut u8 {
     v as *mut u8
 }
 
+#[inline(always)]
+fn uninit_f64_vec(len: usize) -> Vec<f64> {
+    let mut out = Vec::with_capacity(len);
+    unsafe {
+        out.set_len(len);
+    }
+    out
+}
+
 use crate::generic::{array1_as_slice_cow, array2_as_slice_cow};
 use crate::records::{array_raw_parts, numpy_empty};
 
@@ -3888,10 +3897,7 @@ fn sum_grouped_inner(
     n_groups: usize,
 ) -> Vec<f64> {
     let group_starts = col_start_idxs_usize(group_lens);
-    let mut out = Vec::with_capacity(nrows * n_groups);
-    unsafe {
-        out.set_len(nrows * n_groups);
-    }
+    let mut out = uninit_f64_vec(nrows * n_groups);
     for group in 0..n_groups {
         let from_col = group_starts[group];
         let to_col = from_col + group_lens[group] as usize;
@@ -4658,8 +4664,7 @@ fn simulate_from_signals_inner(
 
             // Phase 3: Execute orders
             for k in 0..group_len {
-                let col;
-                if cash_sharing_global {
+                let col = if cash_sharing_global {
                     let cs = call_seq_mut.as_ref().map_or(call_seq, |v| v.as_slice());
                     let col_i = cs[i * ncols + from_col + k] as usize;
                     if col_i >= group_len {
@@ -4667,10 +4672,10 @@ fn simulate_from_signals_inner(
                             "Call index exceeds bounds of the group",
                         ));
                     }
-                    col = from_col + col_i;
+                    from_col + col_i
                 } else {
-                    col = from_col + k;
-                }
+                    from_col + k
+                };
 
                 let idx = i * ncols + col;
                 let position_now = last_position[col];
@@ -4874,10 +4879,7 @@ pub fn assets_py<'py>(
     let af_cow = array2_as_slice_cow(&asset_flow);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         for col in 0..ncols {
             let mut position_now = 0.0f64;
             for i in 0..nrows {
@@ -5058,10 +5060,7 @@ pub fn cash_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         for col in 0..ncols {
             for i in 0..nrows {
                 let cash_now = if i == 0 {
@@ -5096,10 +5095,7 @@ pub fn cash_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -5137,10 +5133,7 @@ pub fn cash_grouped_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash_grouped);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * n_groups);
-        unsafe {
-            out.set_len(nrows * n_groups);
-        }
+        let mut out = uninit_f64_vec(nrows * n_groups);
         for group in 0..gl_cow.len() {
             let mut cash_now = ic_cow[group];
             for i in 0..nrows {
@@ -5217,10 +5210,7 @@ pub fn value_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -5438,10 +5428,7 @@ pub fn returns_in_sim_order_py<'py>(
     let cs_cow = array2_as_slice_cow(&call_seq);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         let mut from_col: usize = 0;
         for group in 0..gl_cow.len() {
             let group_len = gl_cow[group] as usize;
@@ -5477,10 +5464,7 @@ pub fn asset_returns_py<'py>(
     let av_cow = array2_as_slice_cow(&asset_value);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
+        let mut out = uninit_f64_vec(nrows * ncols);
         for col in 0..ncols {
             for i in 0..nrows {
                 let input_value = if i == 0 {
@@ -5785,15 +5769,18 @@ pub fn benchmark_value_py<'py>(
     let ic_cow = array1_as_slice_cow(&init_cash);
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
+        let mut out = uninit_f64_vec(nrows * ncols);
+        if nrows == 0 {
+            return out;
+        }
+        let mut factors = Vec::with_capacity(ncols);
+        for col in 0..ncols {
+            factors.push(ic_cow[col] / c_cow[col]);
         }
         for i in 0..nrows {
             let row_offset = i * ncols;
             for col in 0..ncols {
-                let close_0 = c_cow[col]; // close[0, col]
-                out[row_offset + col] = c_cow[row_offset + col] / close_0 * ic_cow[col];
+                out[row_offset + col] = c_cow[row_offset + col] * factors[col];
             }
         }
         out
@@ -6042,10 +6029,7 @@ pub fn benchmark_value_grouped_py<'py>(
     let group_starts = col_start_idxs_usize(gl_cow.as_ref());
 
     let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * n_groups);
-        unsafe {
-            out.set_len(nrows * n_groups);
-        }
+        let mut out = uninit_f64_vec(nrows * n_groups);
         for group in 0..n_groups {
             let from_col = group_starts[group];
             let group_len = gl_cow[group] as usize;

@@ -1172,7 +1172,7 @@ pub(crate) fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> 
     let old_wt_factor = 1.0 - alpha;
     let new_wt = if adjust { 1.0 } else { alpha };
     let mut weighted_avg = a[0];
-    let mut nobs = if weighted_avg == weighted_avg {
+    let mut nobs = if !weighted_avg.is_nan() {
         1usize
     } else {
         0usize
@@ -1183,11 +1183,11 @@ pub(crate) fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> 
     let mut old_wt = 1.0;
     for i in 1..n {
         let cur = a[i];
-        let is_observation = cur == cur;
+        let is_observation = !cur.is_nan();
         if is_observation {
             nobs += 1;
         }
-        if weighted_avg == weighted_avg {
+        if !weighted_avg.is_nan() {
             old_wt *= old_wt_factor;
             if is_observation {
                 if weighted_avg != cur {
@@ -1232,7 +1232,7 @@ pub(crate) fn ewm_mean_2d_c(
     let mut nobs = vec![0usize; ncols];
     let mut old_wt = vec![1.0f64; ncols];
     for col in 0..ncols {
-        if weighted_avg[col] == weighted_avg[col] {
+        if !weighted_avg[col].is_nan() {
             nobs[col] = 1;
         }
         if nobs[col] >= minp {
@@ -1243,11 +1243,11 @@ pub(crate) fn ewm_mean_2d_c(
         let row_start = row * ncols;
         for col in 0..ncols {
             let cur = src[row_start + col];
-            let is_observation = cur == cur;
+            let is_observation = !cur.is_nan();
             if is_observation {
                 nobs[col] += 1;
             }
-            if weighted_avg[col] == weighted_avg[col] {
+            if !weighted_avg[col].is_nan() {
                 old_wt[col] *= old_wt_factor;
                 if is_observation {
                     if weighted_avg[col] != cur {
@@ -1289,7 +1289,7 @@ pub(crate) fn ewm_std_1d(
     let new_wt = if adjust { 1.0 } else { alpha };
     let mut mean_x = a[0];
     let mut mean_y = a[0];
-    let is_observation = mean_x == mean_x && mean_y == mean_y;
+    let is_observation = !mean_x.is_nan() && !mean_y.is_nan();
     let mut nobs = if is_observation { 1usize } else { 0usize };
     if !is_observation {
         mean_x = f64::NAN;
@@ -1302,11 +1302,11 @@ pub(crate) fn ewm_std_1d(
     for i in 1..n {
         let cur_x = a[i];
         let cur_y = a[i];
-        let is_observation = cur_x == cur_x && cur_y == cur_y;
+        let is_observation = !cur_x.is_nan() && !cur_y.is_nan();
         if is_observation {
             nobs += 1;
         }
-        if mean_x == mean_x {
+        if !mean_x.is_nan() {
             sum_wt *= old_wt_factor;
             sum_wt2 *= old_wt_factor * old_wt_factor;
             old_wt *= old_wt_factor;
@@ -1370,7 +1370,7 @@ pub(crate) fn ewm_std_2d_c(
     let mut mean_y = src[..ncols].to_vec();
     let mut nobs = vec![0usize; ncols];
     for col in 0..ncols {
-        let is_observation = mean_x[col] == mean_x[col] && mean_y[col] == mean_y[col];
+        let is_observation = !mean_x[col].is_nan() && !mean_y[col].is_nan();
         if is_observation {
             nobs[col] = 1;
         } else {
@@ -1387,11 +1387,11 @@ pub(crate) fn ewm_std_2d_c(
         for col in 0..ncols {
             let cur_x = src[row_start + col];
             let cur_y = cur_x;
-            let is_observation = cur_x == cur_x && cur_y == cur_y;
+            let is_observation = !cur_x.is_nan() && !cur_y.is_nan();
             if is_observation {
                 nobs[col] += 1;
             }
-            if mean_x[col] == mean_x[col] {
+            if !mean_x[col].is_nan() {
                 sum_wt[col] *= old_wt_factor;
                 sum_wt2[col] *= old_wt_factor * old_wt_factor;
                 old_wt[col] *= old_wt_factor;
@@ -1500,6 +1500,15 @@ pub(crate) fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
 
 pub(crate) fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
     let (nrows, ncols) = a.dim();
+    if nrows == 0 || ncols == 0 {
+        return Vec::new();
+    }
+    if ncols == 1 || nrows == 1 {
+        if let Some(src) = a.as_slice() {
+            return src.to_vec();
+        }
+        return a.iter().copied().collect();
+    }
     let mut out = Vec::with_capacity(nrows * ncols);
     for col in 0..ncols {
         out.extend(a.column(col).iter().copied());
