@@ -1317,8 +1317,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the mapping will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        "Changing the mapping will create a copy of this object. "
+                        "Consider setting it upon object creation to re-use existing cache.",
                         stacklevel=2,
                     )
                 for alias in reself.self_aliases:

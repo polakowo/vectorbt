@@ -773,8 +773,8 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
             if wrapper_copy.freq != self.wrapper.freq:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the frequency will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        "Changing the frequency will create a copy of this object. "
+                        "Consider setting it upon object creation to re-use existing cache.",
                         stacklevel=2,
                     )
                 self_copy = self.replace(wrapper=wrapper_copy)

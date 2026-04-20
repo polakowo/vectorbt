@@ -410,7 +410,7 @@ class BinanceData(Data):
     def download(
         cls: tp.Type[BinanceDataT],
         symbols: tp.Labels,
-        client: tp.Optional["ClientT"] = None,
+        client: tp.Optional[ClientT] = None,
         **kwargs,
     ) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
@@ -432,7 +432,7 @@ class BinanceData(Data):
     def download_symbol(
         cls,
         symbol: str,
-        client: tp.Optional["ClientT"] = None,
+        client: tp.Optional[ClientT] = None,
         interval: str = "1d",
         start: tp.DatetimeLike = 0,
         end: tp.DatetimeLike = "now UTC",
@@ -605,7 +605,7 @@ class CCXTData(Data):
     def download_symbol(
         cls,
         symbol: str,
-        exchange: tp.Union[str, "ExchangeT"] = "binance",
+        exchange: tp.Union[str, ExchangeT] = "binance",
         config: tp.Optional[dict] = None,
         timeframe: str = "1d",
         start: tp.DatetimeLike = 0,

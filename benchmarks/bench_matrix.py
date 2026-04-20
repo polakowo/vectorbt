@@ -100,6 +100,7 @@ def make_overall_table(stats: dict[str, float]) -> str:
 
 
 def main() -> None:
+    """Run all benchmark configurations and write the markdown matrix."""
     all_results: dict[str, dict[str, float]] = {}  # {label: {func: speedup}}
     all_funcs: list[str] = []
 

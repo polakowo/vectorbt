@@ -85,8 +85,6 @@ Name: group, dtype: object
 This class does not have any subplots.
 """
 
-import pandas as pd
-
 from vectorbt import _typing as tp
 from vectorbt.base.reshape_fns import to_dict
 from vectorbt.portfolio.enums import log_dt, SizeType, Direction, OrderSide, OrderStatus, OrderStatusInfo

@@ -13,6 +13,7 @@ from vectorbt._engine import (
     col_range_compatible_with_rust,
     combine_rust_support,
     resolve_engine,
+    RustSupport,
     scalar_compatible_with_rust,
 )
 
@@ -102,12 +103,10 @@ def col_map(col_arr: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None) -
     return col_map_nb(col_arr, n_cols)
 
 
-def record_array_compatible_with_rust(records: tp.Any) -> "RustSupport":
+def record_array_compatible_with_rust(records: tp.Any) -> RustSupport:
     """Return whether a structured record array is compatible with the Rust engine.
 
     Requires a NumPy structured array with int64 `id` and `col` fields."""
-    from vectorbt._engine import RustSupport
-
     if not isinstance(records, np.ndarray):
         return RustSupport(False, "Rust engine requires `records` to be a NumPy array.")
     if records.dtype.names is None:

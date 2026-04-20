@@ -507,7 +507,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         dict.__delitem__(self, k)
         if self.as_attrs_:
             del self.__dict__[k]
@@ -523,7 +523,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         if v is _RaiseKeyError:
             result = dict.pop(self, k)
@@ -537,7 +537,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         result = dict.popitem(self)
         self._clear_attrs(prior_keys)
@@ -548,7 +548,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         dict.clear(self)
         self._clear_attrs(prior_keys)

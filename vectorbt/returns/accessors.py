@@ -1139,8 +1139,8 @@ class ReturnsAccessor(GenericAccessor):
             if self_copy.year_freq != reself.year_freq:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the year frequency will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        "Changing the year frequency will create a copy of this object. "
+                        "Consider setting it upon object creation to re-use existing cache.",
                         stacklevel=2,
                     )
                 for alias in reself.self_aliases:

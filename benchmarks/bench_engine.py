@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 import tempfile
 import time
-from typing import Callable, Optional
+from typing import Callable
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "vectorbt-matplotlib"))
 os.environ.setdefault("XDG_CACHE_HOME", str(Path(tempfile.gettempdir()) / "vectorbt-cache"))
@@ -1592,13 +1592,6 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
         pf_init_cash_grouped = pf_group_lens_grouped.astype(np.float64) * 10000.0
         pf_call_seq_grouped = portfolio_nb.build_call_seq_nb(pf_target_shape, pf_group_lens_grouped, 0)
         pf_cf_grouped = portfolio_nb.cash_flow_grouped_nb(pf_cf, pf_group_lens_grouped)
-        pf_cash_grouped = portfolio_nb.cash_grouped_nb(
-            pf_target_shape,
-            pf_cf_grouped,
-            pf_group_lens_grouped,
-            pf_init_cash_grouped,
-        )
-        pf_av_grouped = portfolio_nb.asset_value_grouped_nb(pf_av, pf_group_lens_grouped)
         pf_cash_iso = portfolio_nb.cash_in_sim_order_nb(
             pf_cf,
             pf_group_lens_grouped,
@@ -1609,12 +1602,6 @@ def make_cases(a: np.ndarray, window: int, seed: int) -> list[BenchmarkCase]:
             pf_cash_iso,
             pf_av,
             pf_group_lens_grouped,
-            pf_call_seq_grouped,
-        )
-        pf_returns_iso = portfolio_nb.returns_in_sim_order_nb(
-            pf_value_iso,
-            pf_group_lens_grouped,
-            pf_init_cash_grouped,
             pf_call_seq_grouped,
         )
         pf_benchmark_value = portfolio_nb.benchmark_value_nb(pf_close, pf_init_cash)

@@ -2457,7 +2457,7 @@ class IndicatorFactory:
         # Add user-defined outputs
         for prop_name, prop in custom_output_props.items():
             if prop.__doc__ is None:
-                prop.__doc__ = f"""Custom property."""
+                prop.__doc__ = """Custom property."""
             prop.__name__ = prop_name
             prop = cached_property(prop)
             setattr(Indicator, prop_name, prop)
@@ -3491,7 +3491,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
         def apply_func(
             input_list: tp.List[tp.AnyArray],
-            in_output_tuple: tp.Tuple[tp.AnyArray, ...],
+            _in_output_tuple: tp.Tuple[tp.AnyArray, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **kwargs,
         ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
@@ -3735,7 +3735,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
         def apply_func(
             input_list: tp.List[tp.SeriesFrame],
-            in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
+            _in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **kwargs,
         ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
@@ -3916,7 +3916,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(
 
         def apply_func(
             input_list: tp.List[tp.SeriesFrame],
-            in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
+            _in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **kwargs,
         ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:

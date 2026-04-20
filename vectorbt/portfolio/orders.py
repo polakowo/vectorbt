@@ -105,7 +105,6 @@ Name: group, dtype: object
 """
 
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
