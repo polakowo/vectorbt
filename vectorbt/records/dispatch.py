@@ -60,6 +60,32 @@ def col_range_select(
     return col_range_select_nb(col_range, new_cols)
 
 
+def record_col_range_select(
+    records: tp.RecordArray,
+    col_range: tp.ColRange,
+    new_cols: tp.Array1d,
+    engine: tp.Optional[str] = None,
+) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.records.nb.record_col_range_select_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=combine_rust_support(
+            record_array_compatible_with_rust(records),
+            col_range_compatible_with_rust(col_range),
+            array_compatible_with_rust(new_cols, dtype=np.int64),
+        ),
+    )
+    if eng == "rust":
+        from vectorbt_rust.records import record_col_range_select_rs
+
+        col_range = prepare_array_for_rust(col_range, dtype=np.int64)
+        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
+        return record_col_range_select_rs(records, col_range, new_cols)
+    from vectorbt.records.nb import record_col_range_select_nb
+
+    return record_col_range_select_nb(records, col_range, new_cols)
+
+
 def col_map(col_arr: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None) -> tp.ColMap:
     """Engine-neutral `vectorbt.records.nb.col_map_nb`."""
     eng = resolve_engine(
@@ -74,6 +100,26 @@ def col_map(col_arr: tp.Array1d, n_cols: int, engine: tp.Optional[str] = None) -
     from vectorbt.records.nb import col_map_nb
 
     return col_map_nb(col_arr, n_cols)
+
+
+def record_array_compatible_with_rust(records: tp.Any) -> "RustSupport":
+    """Return whether a structured record array is compatible with the Rust engine.
+
+    Requires a NumPy structured array with int64 `id` and `col` fields."""
+    from vectorbt._engine import RustSupport
+
+    if not isinstance(records, np.ndarray):
+        return RustSupport(False, "Rust engine requires `records` to be a NumPy array.")
+    if records.dtype.names is None:
+        return RustSupport(False, "Rust engine requires `records` to be a structured array.")
+    names = records.dtype.names
+    if "id" not in names or "col" not in names:
+        return RustSupport(False, "Rust engine requires `records` to have `id` and `col` fields.")
+    id_dtype = records.dtype.fields["id"][0]
+    col_dtype = records.dtype.fields["col"][0]
+    if id_dtype != np.dtype(np.int64) or col_dtype != np.dtype(np.int64):
+        return RustSupport(False, "Rust engine requires `id` and `col` record fields to be int64.")
+    return RustSupport(True)
 
 
 def col_map_select(
@@ -100,52 +146,6 @@ def col_map_select(
     from vectorbt.records.nb import col_map_select_nb
 
     return col_map_select_nb(col_map, new_cols)
-
-
-def record_array_compatible_with_rust(records: tp.Any) -> "RustSupport":
-    """Return whether a structured record array is compatible with the Rust engine.
-
-    Requires a NumPy structured array with int64 `id` and `col` fields."""
-    from vectorbt._engine import RustSupport
-
-    if not isinstance(records, np.ndarray):
-        return RustSupport(False, "Rust engine requires `records` to be a NumPy array.")
-    if records.dtype.names is None:
-        return RustSupport(False, "Rust engine requires `records` to be a structured array.")
-    names = records.dtype.names
-    if "id" not in names or "col" not in names:
-        return RustSupport(False, "Rust engine requires `records` to have `id` and `col` fields.")
-    id_dtype = records.dtype.fields["id"][0]
-    col_dtype = records.dtype.fields["col"][0]
-    if id_dtype != np.dtype(np.int64) or col_dtype != np.dtype(np.int64):
-        return RustSupport(False, "Rust engine requires `id` and `col` record fields to be int64.")
-    return RustSupport(True)
-
-
-def record_col_range_select(
-    records: tp.RecordArray,
-    col_range: tp.ColRange,
-    new_cols: tp.Array1d,
-    engine: tp.Optional[str] = None,
-) -> tp.RecordArray:
-    """Engine-neutral `vectorbt.records.nb.record_col_range_select_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=combine_rust_support(
-            record_array_compatible_with_rust(records),
-            col_range_compatible_with_rust(col_range),
-            array_compatible_with_rust(new_cols, dtype=np.int64),
-        ),
-    )
-    if eng == "rust":
-        from vectorbt_rust.records import record_col_range_select_rs
-
-        col_range = prepare_array_for_rust(col_range, dtype=np.int64)
-        new_cols = prepare_array_for_rust(new_cols, dtype=np.int64)
-        return record_col_range_select_rs(records, col_range, new_cols)
-    from vectorbt.records.nb import record_col_range_select_nb
-
-    return record_col_range_select_nb(records, col_range, new_cols)
 
 
 def record_col_map_select(

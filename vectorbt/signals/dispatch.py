@@ -304,6 +304,27 @@ def generate_rand_enex(
     return generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
 
 
+def rand_enex_apply(
+    input_shape: tp.Shape,
+    n: tp.Array1d,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
+    seed: tp.Optional[int] = None,
+    engine: tp.Optional[str] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function used by `vectorbt.signals.generators.RANDNX`."""
+    engine = resolve_random_engine(engine)
+    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
+    return generate_rand_enex(
+        input_shape,
+        n,
+        entry_wait,
+        exit_wait,
+        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
+        engine=engine,
+    )
+
+
 def generate_rand_enex_by_prob(
     shape: tp.Shape,
     entry_prob: tp.Array2d,
@@ -567,6 +588,43 @@ def generate_ohlc_stop_ex(
     )
 
 
+def rand_apply(
+    input_shape: tp.Shape,
+    n: tp.Array1d,
+    seed: tp.Optional[int] = None,
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RAND`."""
+    engine = resolve_random_engine(engine)
+    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
+    return generate_rand(
+        input_shape,
+        n,
+        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
+        engine=engine,
+    )
+
+
+def rand_ex_apply(
+    entries: tp.Array2d,
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
+    seed: tp.Optional[int] = None,
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Apply function used by `vectorbt.signals.generators.RANDX`."""
+    engine = resolve_random_engine(engine)
+    return generate_rand_ex(
+        entries,
+        wait,
+        until_next,
+        skip_until_exit,
+        seed=seed_for_rust(seed, engine, array_compatible_with_rust(entries, dtype=np.bool_)),
+        engine=engine,
+    )
+
+
 def generate_ohlc_stop_enex(
     entries: tp.Array2d,
     open: tp.Array2d,
@@ -661,64 +719,6 @@ def generate_ohlc_stop_enex(
         exit_wait,
         pick_first,
         flex_2d,
-    )
-
-
-def rand_apply(
-    input_shape: tp.Shape,
-    n: tp.Array1d,
-    seed: tp.Optional[int] = None,
-    engine: tp.Optional[str] = None,
-) -> tp.Array2d:
-    """Apply function used by `vectorbt.signals.generators.RAND`."""
-    engine = resolve_random_engine(engine)
-    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
-    return generate_rand(
-        input_shape,
-        n,
-        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
-        engine=engine,
-    )
-
-
-def rand_ex_apply(
-    entries: tp.Array2d,
-    wait: int = 1,
-    until_next: bool = True,
-    skip_until_exit: bool = False,
-    seed: tp.Optional[int] = None,
-    engine: tp.Optional[str] = None,
-) -> tp.Array2d:
-    """Apply function used by `vectorbt.signals.generators.RANDX`."""
-    engine = resolve_random_engine(engine)
-    return generate_rand_ex(
-        entries,
-        wait,
-        until_next,
-        skip_until_exit,
-        seed=seed_for_rust(seed, engine, array_compatible_with_rust(entries, dtype=np.bool_)),
-        engine=engine,
-    )
-
-
-def rand_enex_apply(
-    input_shape: tp.Shape,
-    n: tp.Array1d,
-    entry_wait: int = 1,
-    exit_wait: int = 1,
-    seed: tp.Optional[int] = None,
-    engine: tp.Optional[str] = None,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Apply function used by `vectorbt.signals.generators.RANDNX`."""
-    engine = resolve_random_engine(engine)
-    n = np.broadcast_to(np.asarray(n, dtype=np.int64), input_shape[1])
-    return generate_rand_enex(
-        input_shape,
-        n,
-        entry_wait,
-        exit_wait,
-        seed=seed_for_rust(seed, engine, non_neg_array_compatible_with_rust("n", n)),
-        engine=engine,
     )
 
 

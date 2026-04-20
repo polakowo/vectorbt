@@ -16,6 +16,63 @@ pub(crate) const RANGE_CLOSED: i64 = 1;
 const DRAWDOWN_ACTIVE: i64 = 0;
 const DRAWDOWN_RECOVERED: i64 = 1;
 
+#[pyfunction]
+#[pyo3(signature = (a, seed=None))]
+pub fn shuffle_1d_rs<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray1<'py, f64>,
+    seed: Option<u64>,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let a_cow = array1_as_slice_cow(&a);
+    let result = py.allow_threads(|| shuffle_1d(a_cow.as_ref(), seed));
+    Ok(PyArray1::from_vec_bound(py, result))
+}
+
+#[pyfunction]
+#[pyo3(signature = (a, seed=None))]
+pub fn shuffle_rs<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'py, f64>,
+    seed: Option<u64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let a_arr = a.as_array();
+    let result = py.allow_threads(|| {
+        let (nrows, ncols) = a_arr.dim();
+        let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+        let mut col_buf = vec![0.0f64; nrows];
+        match seed {
+            Some(seed) => {
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                for col in 0..ncols {
+                    for (i, &v) in a_arr.column(col).iter().enumerate() {
+                        col_buf[i] = v;
+                    }
+                    col_buf.shuffle(&mut rng);
+                    let mut out_col = out.column_mut(col);
+                    for (i, &v) in col_buf.iter().enumerate() {
+                        out_col[i] = v;
+                    }
+                }
+            }
+            None => {
+                let mut rng = rand::thread_rng();
+                for col in 0..ncols {
+                    for (i, &v) in a_arr.column(col).iter().enumerate() {
+                        col_buf[i] = v;
+                    }
+                    col_buf.shuffle(&mut rng);
+                    let mut out_col = out.column_mut(col);
+                    for (i, &v) in col_buf.iter().enumerate() {
+                        out_col[i] = v;
+                    }
+                }
+            }
+        }
+        out
+    });
+    Ok(PyArray2::from_owned_array_bound(py, result))
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct RangeRecord {
@@ -1886,6 +1943,8 @@ pub fn set_by_mask_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
+export_1d_array!(fillna_1d_rs, fillna_1d, value: f64);
+
 #[pyfunction]
 pub fn set_by_mask_mult_1d_rs<'py>(
     py: Python<'py>,
@@ -1901,6 +1960,8 @@ pub fn set_by_mask_mult_1d_rs<'py>(
     });
     Ok(PyArray1::from_vec_bound(py, result))
 }
+
+export_1d_array!(bshift_1d_rs, bshift_1d, n: usize, fill_value: f64);
 
 #[pyfunction]
 pub fn set_by_mask_mult_rs<'py>(
@@ -1929,7 +1990,7 @@ pub fn set_by_mask_mult_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(fillna_1d_rs, fillna_1d, value: f64);
+export_1d_array!(fshift_1d_rs, fshift_1d, n: usize, fill_value: f64);
 
 #[pyfunction]
 pub fn fillna_rs<'py>(
@@ -1948,7 +2009,7 @@ pub fn fillna_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(bshift_1d_rs, bshift_1d, n: usize, fill_value: f64);
+export_1d_array!(diff_1d_rs, diff_1d, n: usize);
 
 #[pyfunction]
 pub fn bshift_rs<'py>(
@@ -1968,7 +2029,7 @@ pub fn bshift_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(fshift_1d_rs, fshift_1d, n: usize, fill_value: f64);
+export_1d_array!(pct_change_1d_rs, pct_change_1d, n: usize);
 
 #[pyfunction]
 pub fn fshift_rs<'py>(
@@ -1988,7 +2049,7 @@ pub fn fshift_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(diff_1d_rs, diff_1d, n: usize);
+export_1d_array!(bfill_1d_rs, bfill_1d);
 
 #[pyfunction]
 pub fn diff_rs<'py>(
@@ -2007,7 +2068,7 @@ pub fn diff_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(pct_change_1d_rs, pct_change_1d, n: usize);
+export_1d_array!(ffill_1d_rs, ffill_1d);
 
 #[pyfunction]
 pub fn pct_change_rs<'py>(
@@ -2026,8 +2087,6 @@ pub fn pct_change_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(bfill_1d_rs, bfill_1d);
-
 #[pyfunction]
 pub fn bfill_rs<'py>(
     py: Python<'py>,
@@ -2043,8 +2102,6 @@ pub fn bfill_rs<'py>(
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
-
-export_1d_array!(ffill_1d_rs, ffill_1d);
 
 #[pyfunction]
 pub fn ffill_rs<'py>(
@@ -2387,6 +2444,8 @@ pub fn ewm_mean_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
+export_1d_array!(expanding_min_1d_rs, expanding_min_1d, minp: usize);
+
 #[pyfunction]
 #[pyo3(signature = (a, span, minp=0, adjust=false, ddof=0))]
 pub fn ewm_std_1d_rs<'py>(
@@ -2402,6 +2461,8 @@ pub fn ewm_std_1d_rs<'py>(
     let result = py.allow_threads(|| ewm_std_1d(a_cow.as_ref(), span, minp, adjust, ddof));
     Ok(PyArray1::from_vec_bound(py, result))
 }
+
+export_1d_array!(expanding_max_1d_rs, expanding_max_1d, minp: usize);
 
 #[pyfunction]
 #[pyo3(signature = (a, span, minp=0, adjust=false, ddof=0))]
@@ -2420,8 +2481,6 @@ pub fn ewm_std_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-export_1d_array!(expanding_min_1d_rs, expanding_min_1d, minp: usize);
-
 #[pyfunction]
 pub fn expanding_min_rs<'py>(
     py: Python<'py>,
@@ -2432,8 +2491,6 @@ pub fn expanding_min_rs<'py>(
     let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| expanding_min_1d(col, minp)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
-
-export_1d_array!(expanding_max_1d_rs, expanding_max_1d, minp: usize);
 
 #[pyfunction]
 pub fn expanding_max_rs<'py>(
@@ -2500,63 +2557,6 @@ pub fn expanding_std_rs<'py>(
         } else {
             apply_2d_by_col(a_arr, |col| expanding_std_1d(col, minp, ddof))
         }
-    });
-    Ok(PyArray2::from_owned_array_bound(py, result))
-}
-
-#[pyfunction]
-#[pyo3(signature = (a, seed=None))]
-pub fn shuffle_1d_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray1<'py, f64>,
-    seed: Option<u64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| shuffle_1d(a_cow.as_ref(), seed));
-    Ok(PyArray1::from_vec_bound(py, result))
-}
-
-#[pyfunction]
-#[pyo3(signature = (a, seed=None))]
-pub fn shuffle_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-    seed: Option<u64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
-        let (nrows, ncols) = a_arr.dim();
-        let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
-        let mut col_buf = vec![0.0f64; nrows];
-        match seed {
-            Some(seed) => {
-                let mut rng = ChaCha8Rng::seed_from_u64(seed);
-                for col in 0..ncols {
-                    for (i, &v) in a_arr.column(col).iter().enumerate() {
-                        col_buf[i] = v;
-                    }
-                    col_buf.shuffle(&mut rng);
-                    let mut out_col = out.column_mut(col);
-                    for (i, &v) in col_buf.iter().enumerate() {
-                        out_col[i] = v;
-                    }
-                }
-            }
-            None => {
-                let mut rng = rand::thread_rng();
-                for col in 0..ncols {
-                    for (i, &v) in a_arr.column(col).iter().enumerate() {
-                        col_buf[i] = v;
-                    }
-                    col_buf.shuffle(&mut rng);
-                    let mut out_col = out.column_mut(col);
-                    for (i, &v) in col_buf.iter().enumerate() {
-                        out_col[i] = v;
-                    }
-                }
-            }
-        }
-        out
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -2998,23 +2998,25 @@ pub fn crossed_above_rs<'py>(
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(shuffle_1d_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(shuffle_rs, m)?)?;
     m.add_function(wrap_pyfunction!(set_by_mask_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(set_by_mask_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(set_by_mask_mult_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(set_by_mask_mult_rs, m)?)?;
     m.add_function(wrap_pyfunction!(fillna_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(fillna_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(set_by_mask_mult_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(bshift_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(bshift_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(set_by_mask_mult_rs, m)?)?;
     m.add_function(wrap_pyfunction!(fshift_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(fshift_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(fillna_rs, m)?)?;
     m.add_function(wrap_pyfunction!(diff_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(diff_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(bshift_rs, m)?)?;
     m.add_function(wrap_pyfunction!(pct_change_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(pct_change_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(fshift_rs, m)?)?;
     m.add_function(wrap_pyfunction!(bfill_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(bfill_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(diff_rs, m)?)?;
     m.add_function(wrap_pyfunction!(ffill_1d_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(pct_change_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(bfill_rs, m)?)?;
     m.add_function(wrap_pyfunction!(ffill_rs, m)?)?;
     m.add_function(wrap_pyfunction!(nanprod_rs, m)?)?;
     m.add_function(wrap_pyfunction!(nancumsum_rs, m)?)?;
@@ -3037,18 +3039,16 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rolling_std_rs, m)?)?;
     m.add_function(wrap_pyfunction!(ewm_mean_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(ewm_mean_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(ewm_std_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(ewm_std_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_min_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(expanding_min_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(ewm_std_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_max_1d_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(ewm_std_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(expanding_min_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_max_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_mean_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_mean_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_std_1d_rs, m)?)?;
     m.add_function(wrap_pyfunction!(expanding_std_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(shuffle_1d_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(shuffle_rs, m)?)?;
     m.add_function(wrap_pyfunction!(flatten_forder_rs, m)?)?;
     m.add_function(wrap_pyfunction!(flatten_grouped_rs, m)?)?;
     m.add_function(wrap_pyfunction!(flatten_uniform_grouped_rs, m)?)?;

@@ -92,13 +92,33 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.generic import nb
+from vectorbt.generic import dispatch
 from vectorbt.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbt.root_accessors import register_dataframe_vbt_accessor
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, make_subplots
 
 __pdoc__ = {}
+
+
+def first_price(ohlc: tp.Frame, engine: tp.Optional[str] = None) -> float:
+    """Return the first valid OHLC price."""
+    return dispatch.bfill_1d(ohlc.values.flatten(), engine=engine)[0]
+
+
+def last_price(ohlc: tp.Frame, engine: tp.Optional[str] = None) -> float:
+    """Return the last valid OHLC price."""
+    return dispatch.ffill_1d(ohlc.values.flatten(), engine=engine)[-1]
+
+
+def first_volume(volume: tp.Series, engine: tp.Optional[str] = None) -> float:
+    """Return the first valid volume."""
+    return dispatch.bfill_1d(volume.values, engine=engine)[0]
+
+
+def last_volume(volume: tp.Series, engine: tp.Optional[str] = None) -> float:
+    """Return the last valid volume."""
+    return dispatch.ffill_1d(volume.values, engine=engine)[-1]
 
 
 @register_dataframe_vbt_accessor("ohlc")
@@ -198,7 +218,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             first_price=dict(
                 title="First Price",
-                calc_func=lambda ohlc: nb.bfill_1d_nb(ohlc.values.flatten())[0],
+                calc_func=first_price,
                 resolve_ohlc=True,
                 tags=["ohlcv", "ohlc"],
             ),
@@ -216,13 +236,13 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             last_price=dict(
                 title="Last Price",
-                calc_func=lambda ohlc: nb.ffill_1d_nb(ohlc.values.flatten())[-1],
+                calc_func=last_price,
                 resolve_ohlc=True,
                 tags=["ohlcv", "ohlc"],
             ),
             first_volume=dict(
                 title="First Volume",
-                calc_func=lambda volume: nb.bfill_1d_nb(volume.values)[0],
+                calc_func=first_volume,
                 resolve_volume=True,
                 tags=["ohlcv", "volume"],
             ),
@@ -240,7 +260,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             last_volume=dict(
                 title="Last Volume",
-                calc_func=lambda volume: nb.ffill_1d_nb(volume.values)[-1],
+                calc_func=last_volume,
                 resolve_volume=True,
                 tags=["ohlcv", "volume"],
             ),

@@ -1788,6 +1788,15 @@ pub fn execute_order_py(
 }
 
 #[pyfunction]
+#[pyo3(name = "raise_rejected_order_rs")]
+pub fn raise_rejected_order_py(py: Python<'_>, order_result: OrderResult) -> PyResult<()> {
+    Err(portfolio_sim_error_to_pyerr(
+        py,
+        PortfolioSimError::RejectedOrder(rejected_order_message(&order_result)),
+    ))
+}
+
+#[pyfunction]
 #[pyo3(name = "update_value_rs")]
 pub fn update_value_py(
     cash_before: f64,
@@ -1810,7 +1819,7 @@ pub fn update_value_py(
 }
 
 #[pyfunction]
-#[pyo3(name = "order_nb_rs")]
+#[pyo3(name = "order_rs")]
 #[pyo3(signature = (
     size = f64::NAN,
     price = f64::INFINITY,
@@ -1919,15 +1928,6 @@ pub fn order_nothing_py() -> Order {
     NO_ORDER
 }
 
-#[pyfunction]
-#[pyo3(name = "raise_rejected_order_rs")]
-pub fn raise_rejected_order_py(py: Python<'_>, order_result: OrderResult) -> PyResult<()> {
-    Err(portfolio_sim_error_to_pyerr(
-        py,
-        PortfolioSimError::RejectedOrder(rejected_order_message(&order_result)),
-    ))
-}
-
 // ############# PyO3 exports: Validation & call sequence ############# //
 
 #[pyfunction]
@@ -1980,34 +1980,44 @@ pub fn is_grouped_py(group_lens: PyReadonlyArray1<'_, i64>) -> bool {
 }
 
 #[pyfunction]
-#[pyo3(name = "approx_order_value_rs")]
-pub fn approx_order_value_py(
-    size: f64,
-    size_type: i64,
-    direction: i64,
-    cash_now: f64,
-    position: f64,
-    free_cash: f64,
-    val_price: f64,
-    value: f64,
-) -> f64 {
-    approx_order_value(
-        size, size_type, direction, cash_now, position, free_cash, val_price, value,
-    )
-}
+#[pyo3(name = "shuffle_call_seq_rs")]
+#[pyo3(signature = (call_seq, group_lens, seed=None))]
+pub fn shuffle_call_seq_py<'py>(
+    py: Python<'py>,
+    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
+    group_lens: PyReadonlyArray1<'py, i64>,
+    seed: Option<u64>,
+) -> PyResult<()> {
+    let gl = array1_as_slice_cow(&group_lens);
+    let gl_usize = validate_group_lens_raw(&gl).map_err(PyValueError::new_err)?;
+    let nrows = call_seq.shape()[0];
+    let ncols = call_seq.shape()[1];
 
-#[pyfunction]
-#[pyo3(name = "get_group_value_rs")]
-pub fn get_group_value_py(
-    from_col: usize,
-    to_col: usize,
-    cash_now: f64,
-    last_position: PyReadonlyArray1<'_, f64>,
-    last_val_price: PyReadonlyArray1<'_, f64>,
-) -> f64 {
-    let pos = array1_as_slice_cow(&last_position);
-    let vp = array1_as_slice_cow(&last_val_price);
-    get_group_value(from_col, to_col, cash_now, pos.as_ref(), vp.as_ref())
+    let data = call_seq
+        .as_slice_mut()
+        .map_err(|_| PyValueError::new_err("call_seq must be contiguous"))?;
+
+    let mut rng: Box<dyn rand::RngCore> = match seed {
+        Some(s) => Box::new(ChaCha8Rng::seed_from_u64(s)),
+        None => Box::new(rand::thread_rng()),
+    };
+
+    let mut from_col: usize = 0;
+    for group in 0..gl_usize.len() {
+        let group_len = gl_usize[group];
+        for i in 0..nrows {
+            let start = i * ncols + from_col;
+            let slice = &mut data[start..start + group_len];
+            // Fisher-Yates shuffle
+            for j in (1..slice.len()).rev() {
+                let k = rng.gen_range(0..=j);
+                slice.swap(j, k);
+            }
+        }
+        from_col += group_len;
+    }
+
+    Ok(())
 }
 
 #[pyfunction]
@@ -2059,44 +2069,34 @@ pub fn build_call_seq_py<'py>(
 }
 
 #[pyfunction]
-#[pyo3(name = "shuffle_call_seq_rs")]
-#[pyo3(signature = (call_seq, group_lens, seed=None))]
-pub fn shuffle_call_seq_py<'py>(
-    py: Python<'py>,
-    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
-    group_lens: PyReadonlyArray1<'py, i64>,
-    seed: Option<u64>,
-) -> PyResult<()> {
-    let gl = array1_as_slice_cow(&group_lens);
-    let gl_usize = validate_group_lens_raw(&gl).map_err(PyValueError::new_err)?;
-    let nrows = call_seq.shape()[0];
-    let ncols = call_seq.shape()[1];
+#[pyo3(name = "get_group_value_rs")]
+pub fn get_group_value_py(
+    from_col: usize,
+    to_col: usize,
+    cash_now: f64,
+    last_position: PyReadonlyArray1<'_, f64>,
+    last_val_price: PyReadonlyArray1<'_, f64>,
+) -> f64 {
+    let pos = array1_as_slice_cow(&last_position);
+    let vp = array1_as_slice_cow(&last_val_price);
+    get_group_value(from_col, to_col, cash_now, pos.as_ref(), vp.as_ref())
+}
 
-    let data = call_seq
-        .as_slice_mut()
-        .map_err(|_| PyValueError::new_err("call_seq must be contiguous"))?;
-
-    let mut rng: Box<dyn rand::RngCore> = match seed {
-        Some(s) => Box::new(ChaCha8Rng::seed_from_u64(s)),
-        None => Box::new(rand::thread_rng()),
-    };
-
-    let mut from_col: usize = 0;
-    for group in 0..gl_usize.len() {
-        let group_len = gl_usize[group];
-        for i in 0..nrows {
-            let start = i * ncols + from_col;
-            let slice = &mut data[start..start + group_len];
-            // Fisher-Yates shuffle
-            for j in (1..slice.len()).rev() {
-                let k = rng.gen_range(0..=j);
-                slice.swap(j, k);
-            }
-        }
-        from_col += group_len;
-    }
-
-    Ok(())
+#[pyfunction]
+#[pyo3(name = "approx_order_value_rs")]
+pub fn approx_order_value_py(
+    size: f64,
+    size_type: i64,
+    direction: i64,
+    cash_now: f64,
+    position: f64,
+    free_cash: f64,
+    val_price: f64,
+    value: f64,
+) -> f64 {
+    approx_order_value(
+        size, size_type, direction, cash_now, position, free_cash, val_price, value,
+    )
 }
 
 fn validate_group_lens_raw(gl: &[i64]) -> Result<Vec<usize>, String> {
@@ -2111,141 +2111,6 @@ fn validate_group_lens_raw(gl: &[i64]) -> Result<Vec<usize>, String> {
 }
 
 // ############# PyO3 exports: Scalar helpers ############# //
-
-#[pyfunction]
-#[pyo3(name = "get_trade_stats_rs")]
-pub fn get_trade_stats_py(
-    size: f64,
-    entry_price: f64,
-    entry_fees: f64,
-    exit_price: f64,
-    exit_fees: f64,
-    direction: i64,
-) -> (f64, f64) {
-    get_trade_stats(
-        size,
-        entry_price,
-        entry_fees,
-        exit_price,
-        exit_fees,
-        direction,
-    )
-}
-
-fn get_trade_stats(
-    size: f64,
-    entry_price: f64,
-    entry_fees: f64,
-    exit_price: f64,
-    exit_fees: f64,
-    direction: i64,
-) -> (f64, f64) {
-    let entry_val = size * entry_price;
-    let exit_val = size * exit_price;
-    let mut val_diff = add(exit_val, -entry_val);
-    if val_diff != 0.0 && direction == TRADE_DIRECTION_SHORT {
-        val_diff *= -1.0;
-    }
-    let pnl = val_diff - entry_fees - exit_fees;
-    let ret = pnl / entry_val;
-    (pnl, ret)
-}
-
-#[pyfunction]
-#[pyo3(name = "get_long_size_rs")]
-pub fn get_long_size_py(position_before: f64, position_now: f64) -> f64 {
-    get_long_size(position_before, position_now)
-}
-
-fn get_long_size(position_before: f64, position_now: f64) -> f64 {
-    if position_before <= 0.0 && position_now <= 0.0 {
-        return 0.0;
-    }
-    if position_before >= 0.0 && position_now < 0.0 {
-        return -position_before;
-    }
-    if position_before < 0.0 && position_now >= 0.0 {
-        return position_now;
-    }
-    add(position_now, -position_before)
-}
-
-#[pyfunction]
-#[pyo3(name = "get_short_size_rs")]
-pub fn get_short_size_py(position_before: f64, position_now: f64) -> f64 {
-    get_short_size(position_before, position_now)
-}
-
-fn get_short_size(position_before: f64, position_now: f64) -> f64 {
-    if position_before >= 0.0 && position_now >= 0.0 {
-        return 0.0;
-    }
-    if position_before >= 0.0 && position_now < 0.0 {
-        return -position_now;
-    }
-    if position_before < 0.0 && position_now >= 0.0 {
-        return position_before;
-    }
-    add(position_before, -position_now)
-}
-
-#[pyfunction]
-#[pyo3(name = "get_free_cash_diff_rs")]
-pub fn get_free_cash_diff_py(
-    position_before: f64,
-    position_now: f64,
-    debt_now: f64,
-    price: f64,
-    fees: f64,
-) -> (f64, f64) {
-    get_free_cash_diff(position_before, position_now, debt_now, price, fees)
-}
-
-fn get_free_cash_diff(
-    position_before: f64,
-    position_now: f64,
-    debt_now: f64,
-    price: f64,
-    fees: f64,
-) -> (f64, f64) {
-    let size = add(position_now, -position_before);
-    let final_cash = -size * price - fees;
-    if is_close(size, 0.0) {
-        return (debt_now, 0.0);
-    }
-    if size > 0.0 {
-        if position_before < 0.0 {
-            let short_size = if position_now < 0.0 {
-                size.abs()
-            } else {
-                position_before.abs()
-            };
-            let avg_entry_price = debt_now / position_before.abs();
-            let debt_diff = short_size * avg_entry_price;
-            let new_debt = add(debt_now, -debt_diff);
-            let free_cash_diff = add(2.0 * debt_diff, final_cash);
-            (new_debt, free_cash_diff)
-        } else {
-            (debt_now, final_cash)
-        }
-    } else {
-        if position_now < 0.0 {
-            let short_size = if position_before < 0.0 {
-                size.abs()
-            } else {
-                position_now.abs()
-            };
-            let short_value = short_size * price;
-            let new_debt = debt_now + short_value;
-            let free_cash_diff = add(final_cash, -2.0 * short_value);
-            (new_debt, free_cash_diff)
-        } else {
-            (debt_now, final_cash)
-        }
-    }
-}
-
-// ############# simulate_from_orders_rs ############# //
 
 #[pyfunction]
 #[pyo3(name = "simulate_from_orders_rs")]
@@ -2464,6 +2329,569 @@ pub fn simulate_from_orders_py<'py>(
     };
 
     Ok((order_arr, log_arr_sliced))
+}
+
+fn get_trade_stats(
+    size: f64,
+    entry_price: f64,
+    entry_fees: f64,
+    exit_price: f64,
+    exit_fees: f64,
+    direction: i64,
+) -> (f64, f64) {
+    let entry_val = size * entry_price;
+    let exit_val = size * exit_price;
+    let mut val_diff = add(exit_val, -entry_val);
+    if val_diff != 0.0 && direction == TRADE_DIRECTION_SHORT {
+        val_diff *= -1.0;
+    }
+    let pnl = val_diff - entry_fees - exit_fees;
+    let ret = pnl / entry_val;
+    (pnl, ret)
+}
+#[inline(always)]
+fn read_signals(
+    entry: bool,
+    exit: bool,
+    dir: i64,
+    long_entry: bool,
+    long_exit: bool,
+    short_entry: bool,
+    short_exit: bool,
+) -> (bool, bool, bool, bool) {
+    if entry || exit {
+        if dir == DIRECTION_LONG_ONLY {
+            (
+                entry || long_entry,
+                exit || long_exit,
+                short_entry,
+                short_exit,
+            )
+        } else if dir == DIRECTION_SHORT_ONLY {
+            (
+                long_entry,
+                long_exit,
+                entry || short_entry,
+                exit || short_exit,
+            )
+        } else {
+            // DIRECTION_BOTH
+            (
+                entry || long_entry,
+                long_exit,
+                exit || short_entry,
+                short_exit,
+            )
+        }
+    } else {
+        (long_entry, long_exit, short_entry, short_exit)
+    }
+}
+
+// ############# simulate_from_signals_rs ############# //
+
+#[pyfunction]
+#[pyo3(name = "simulate_from_signals_rs")]
+#[pyo3(signature = (
+    target_shape,
+    group_lens,
+    init_cash,
+    call_seq,
+    entries,
+    exits,
+    direction,
+    long_entries,
+    long_exits,
+    short_entries,
+    short_exits,
+    size,
+    price,
+    size_type,
+    fees,
+    fixed_fees,
+    slippage,
+    min_size,
+    max_size,
+    size_granularity,
+    reject_prob,
+    lock_cash,
+    allow_partial,
+    raise_reject,
+    log,
+    accumulate,
+    upon_long_conflict,
+    upon_short_conflict,
+    upon_dir_conflict,
+    upon_opposite_entry,
+    val_price,
+    open,
+    high,
+    low,
+    close,
+    sl_stop,
+    sl_trail,
+    tp_stop,
+    stop_entry_price,
+    stop_exit_price,
+    upon_stop_exit,
+    upon_stop_update,
+    use_stops = true,
+    auto_call_seq = false,
+    ffill_val_price = true,
+    update_value = false,
+    max_orders = None,
+    max_logs = 0,
+    seed = None,
+))]
+pub fn simulate_from_signals_py<'py>(
+    py: Python<'py>,
+    target_shape: (usize, usize),
+    group_lens: PyReadonlyArray1<'py, i64>,
+    init_cash: PyReadonlyArray1<'py, f64>,
+    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
+    // Signal arrays - pre-broadcast 2D
+    entries: PyReadonlyArray2<'py, bool>,
+    exits: PyReadonlyArray2<'py, bool>,
+    direction: PyReadonlyArray2<'py, i64>,
+    long_entries: PyReadonlyArray2<'py, bool>,
+    long_exits: PyReadonlyArray2<'py, bool>,
+    short_entries: PyReadonlyArray2<'py, bool>,
+    short_exits: PyReadonlyArray2<'py, bool>,
+    // Order params
+    size: PyReadonlyArray2<'py, f64>,
+    price: PyReadonlyArray2<'py, f64>,
+    size_type: PyReadonlyArray2<'py, i64>,
+    fees: PyReadonlyArray2<'py, f64>,
+    fixed_fees: PyReadonlyArray2<'py, f64>,
+    slippage: PyReadonlyArray2<'py, f64>,
+    min_size: PyReadonlyArray2<'py, f64>,
+    max_size: PyReadonlyArray2<'py, f64>,
+    size_granularity: PyReadonlyArray2<'py, f64>,
+    reject_prob: PyReadonlyArray2<'py, f64>,
+    lock_cash: PyReadonlyArray2<'py, bool>,
+    allow_partial: PyReadonlyArray2<'py, bool>,
+    raise_reject: PyReadonlyArray2<'py, bool>,
+    log: PyReadonlyArray2<'py, bool>,
+    // Signal conflict/resolution params
+    accumulate: PyReadonlyArray2<'py, i64>,
+    upon_long_conflict: PyReadonlyArray2<'py, i64>,
+    upon_short_conflict: PyReadonlyArray2<'py, i64>,
+    upon_dir_conflict: PyReadonlyArray2<'py, i64>,
+    upon_opposite_entry: PyReadonlyArray2<'py, i64>,
+    // Price/valuation
+    val_price: PyReadonlyArray2<'py, f64>,
+    open: PyReadonlyArray2<'py, f64>,
+    high: PyReadonlyArray2<'py, f64>,
+    low: PyReadonlyArray2<'py, f64>,
+    close: PyReadonlyArray2<'py, f64>,
+    // Stop params
+    sl_stop: PyReadonlyArray2<'py, f64>,
+    sl_trail: PyReadonlyArray2<'py, bool>,
+    tp_stop: PyReadonlyArray2<'py, f64>,
+    stop_entry_price: PyReadonlyArray2<'py, i64>,
+    stop_exit_price: PyReadonlyArray2<'py, i64>,
+    upon_stop_exit: PyReadonlyArray2<'py, i64>,
+    upon_stop_update: PyReadonlyArray2<'py, i64>,
+    // Scalar flags
+    use_stops: bool,
+    auto_call_seq: bool,
+    ffill_val_price: bool,
+    update_value: bool,
+    max_orders: Option<usize>,
+    max_logs: usize,
+    seed: Option<u64>,
+) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
+    let (nrows, ncols) = target_shape;
+
+    let gl_cow = array1_as_slice_cow(&group_lens);
+    let ic_cow = array1_as_slice_cow(&init_cash);
+    let cs_cow = {
+        let cs_view = call_seq.as_array();
+        if cs_view.is_standard_layout() {
+            Cow::Borrowed(call_seq.as_slice().unwrap())
+        } else {
+            Cow::Owned(cs_view.iter().copied().collect())
+        }
+    };
+
+    // Signal arrays
+    let entries_cow = array2_as_slice_cow(&entries);
+    let exits_cow = array2_as_slice_cow(&exits);
+    let dir_cow = array2_as_slice_cow(&direction);
+    let le_cow = array2_as_slice_cow(&long_entries);
+    let lx_cow = array2_as_slice_cow(&long_exits);
+    let se_cow = array2_as_slice_cow(&short_entries);
+    let sx_cow = array2_as_slice_cow(&short_exits);
+
+    // Order arrays
+    let size_cow = array2_as_slice_cow(&size);
+    let price_cow = array2_as_slice_cow(&price);
+    let st_cow = array2_as_slice_cow(&size_type);
+    let fees_cow = array2_as_slice_cow(&fees);
+    let ff_cow = array2_as_slice_cow(&fixed_fees);
+    let slip_cow = array2_as_slice_cow(&slippage);
+    let mins_cow = array2_as_slice_cow(&min_size);
+    let maxs_cow = array2_as_slice_cow(&max_size);
+    let sg_cow = array2_as_slice_cow(&size_granularity);
+    let rp_cow = array2_as_slice_cow(&reject_prob);
+    let lc_cow = array2_as_slice_cow(&lock_cash);
+    let ap_cow = array2_as_slice_cow(&allow_partial);
+    let rr_cow = array2_as_slice_cow(&raise_reject);
+    let log_cow = array2_as_slice_cow(&log);
+
+    // Conflict arrays
+    let acc_cow = array2_as_slice_cow(&accumulate);
+    let ulc_cow = array2_as_slice_cow(&upon_long_conflict);
+    let usc_cow = array2_as_slice_cow(&upon_short_conflict);
+    let udc_cow = array2_as_slice_cow(&upon_dir_conflict);
+    let uoe_cow = array2_as_slice_cow(&upon_opposite_entry);
+
+    // Price arrays
+    let vp_cow = array2_as_slice_cow(&val_price);
+    let open_cow = array2_as_slice_cow(&open);
+    let high_cow = array2_as_slice_cow(&high);
+    let low_cow = array2_as_slice_cow(&low);
+    let close_cow = array2_as_slice_cow(&close);
+
+    // Stop arrays
+    let sls_cow = array2_as_slice_cow(&sl_stop);
+    let slt_cow = array2_as_slice_cow(&sl_trail);
+    let tps_cow = array2_as_slice_cow(&tp_stop);
+    let sep_cow = array2_as_slice_cow(&stop_entry_price);
+    let sxp_cow = array2_as_slice_cow(&stop_exit_price);
+    let use_cow = array2_as_slice_cow(&upon_stop_exit);
+    let usu_cow = array2_as_slice_cow(&upon_stop_update);
+
+    // Validate
+    let cash_sharing = gl_cow.iter().any(|&g| g > 1);
+    let total_cols: i64 = gl_cow.iter().sum();
+    if total_cols != ncols as i64 {
+        return Err(PyValueError::new_err(
+            "group_lens has incorrect total number of columns",
+        ));
+    }
+    if cash_sharing {
+        if ic_cow.len() != gl_cow.len() {
+            return Err(PyValueError::new_err(
+                "If cash sharing is enabled, init_cash must match the number of groups",
+            ));
+        }
+    } else if ic_cow.len() != ncols {
+        return Err(PyValueError::new_err(
+            "If cash sharing is disabled, init_cash must match the number of columns",
+        ));
+    }
+
+    let log_dt = py
+        .import_bound("vectorbt.portfolio.enums")?
+        .getattr("log_dt")?;
+    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
+    let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
+    let log_offsets = log_record_offsets(&log_arr)?;
+    let (log_data, _log_itemsize, _) = unsafe { array_raw_parts(&log_arr)? };
+    let log_data_usize = ptr_to_usize(log_data);
+
+    let max_ord = max_orders.unwrap_or(nrows * ncols);
+
+    let (order_records, lidx, call_seq_out) = py
+        .allow_threads(|| {
+            if !cash_sharing && !auto_call_seq {
+                let (order_records, lidx) = simulate_from_signals_non_shared_inner(
+                    nrows,
+                    ncols,
+                    ic_cow.as_ref(),
+                    entries_cow.as_ref(),
+                    exits_cow.as_ref(),
+                    dir_cow.as_ref(),
+                    le_cow.as_ref(),
+                    lx_cow.as_ref(),
+                    se_cow.as_ref(),
+                    sx_cow.as_ref(),
+                    size_cow.as_ref(),
+                    price_cow.as_ref(),
+                    st_cow.as_ref(),
+                    fees_cow.as_ref(),
+                    ff_cow.as_ref(),
+                    slip_cow.as_ref(),
+                    mins_cow.as_ref(),
+                    maxs_cow.as_ref(),
+                    sg_cow.as_ref(),
+                    rp_cow.as_ref(),
+                    lc_cow.as_ref(),
+                    ap_cow.as_ref(),
+                    rr_cow.as_ref(),
+                    log_cow.as_ref(),
+                    acc_cow.as_ref(),
+                    ulc_cow.as_ref(),
+                    usc_cow.as_ref(),
+                    udc_cow.as_ref(),
+                    uoe_cow.as_ref(),
+                    vp_cow.as_ref(),
+                    open_cow.as_ref(),
+                    high_cow.as_ref(),
+                    low_cow.as_ref(),
+                    close_cow.as_ref(),
+                    sls_cow.as_ref(),
+                    slt_cow.as_ref(),
+                    tps_cow.as_ref(),
+                    sep_cow.as_ref(),
+                    sxp_cow.as_ref(),
+                    use_cow.as_ref(),
+                    usu_cow.as_ref(),
+                    use_stops,
+                    ffill_val_price,
+                    update_value,
+                    max_ord,
+                    effective_max_logs,
+                    usize_to_mut_ptr(log_data_usize),
+                    &log_offsets,
+                    seed,
+                )?;
+                return Ok((order_records, lidx, None));
+            }
+            simulate_from_signals_inner(
+                nrows,
+                ncols,
+                gl_cow.as_ref(),
+                ic_cow.as_ref(),
+                cs_cow.as_ref(),
+                entries_cow.as_ref(),
+                exits_cow.as_ref(),
+                dir_cow.as_ref(),
+                le_cow.as_ref(),
+                lx_cow.as_ref(),
+                se_cow.as_ref(),
+                sx_cow.as_ref(),
+                size_cow.as_ref(),
+                price_cow.as_ref(),
+                st_cow.as_ref(),
+                fees_cow.as_ref(),
+                ff_cow.as_ref(),
+                slip_cow.as_ref(),
+                mins_cow.as_ref(),
+                maxs_cow.as_ref(),
+                sg_cow.as_ref(),
+                rp_cow.as_ref(),
+                lc_cow.as_ref(),
+                ap_cow.as_ref(),
+                rr_cow.as_ref(),
+                log_cow.as_ref(),
+                acc_cow.as_ref(),
+                ulc_cow.as_ref(),
+                usc_cow.as_ref(),
+                udc_cow.as_ref(),
+                uoe_cow.as_ref(),
+                vp_cow.as_ref(),
+                open_cow.as_ref(),
+                high_cow.as_ref(),
+                low_cow.as_ref(),
+                close_cow.as_ref(),
+                sls_cow.as_ref(),
+                slt_cow.as_ref(),
+                tps_cow.as_ref(),
+                sep_cow.as_ref(),
+                sxp_cow.as_ref(),
+                use_cow.as_ref(),
+                usu_cow.as_ref(),
+                use_stops,
+                auto_call_seq,
+                ffill_val_price,
+                update_value,
+                max_ord,
+                effective_max_logs,
+                usize_to_mut_ptr(log_data_usize),
+                &log_offsets,
+                seed,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+    drop(cs_cow);
+
+    if let Some(call_seq_out) = call_seq_out {
+        let mut cs_view = call_seq.as_array_mut();
+        for i in 0..nrows {
+            for col in 0..ncols {
+                cs_view[(i, col)] = call_seq_out[i * ncols + col];
+            }
+        }
+    }
+
+    let order_arr = PyArray1::from_vec_bound(py, order_records);
+
+    let log_arr_sliced = if lidx < effective_max_logs {
+        log_arr.call_method1(
+            "__getitem__",
+            (pyo3::types::PySlice::new_bound(py, 0, lidx as isize, 1),),
+        )?
+    } else {
+        log_arr
+    };
+
+    Ok((order_arr, log_arr_sliced))
+}
+
+fn get_long_size(position_before: f64, position_now: f64) -> f64 {
+    if position_before <= 0.0 && position_now <= 0.0 {
+        return 0.0;
+    }
+    if position_before >= 0.0 && position_now < 0.0 {
+        return -position_before;
+    }
+    if position_before < 0.0 && position_now >= 0.0 {
+        return position_now;
+    }
+    add(position_now, -position_before)
+}
+
+#[pyfunction]
+#[pyo3(name = "get_trade_stats_rs")]
+pub fn get_trade_stats_py(
+    size: f64,
+    entry_price: f64,
+    entry_fees: f64,
+    exit_price: f64,
+    exit_fees: f64,
+    direction: i64,
+) -> (f64, f64) {
+    get_trade_stats(
+        size,
+        entry_price,
+        entry_fees,
+        exit_price,
+        exit_fees,
+        direction,
+    )
+}
+
+fn get_short_size(position_before: f64, position_now: f64) -> f64 {
+    if position_before >= 0.0 && position_now >= 0.0 {
+        return 0.0;
+    }
+    if position_before >= 0.0 && position_now < 0.0 {
+        return -position_now;
+    }
+    if position_before < 0.0 && position_now >= 0.0 {
+        return position_before;
+    }
+    add(position_before, -position_now)
+}
+
+#[pyfunction]
+#[pyo3(name = "get_entry_trades_rs")]
+pub fn get_entry_trades_py<'py>(
+    py: Python<'py>,
+    order_records: Bound<'py, pyo3::PyAny>,
+    close: PyReadonlyArray2<'py, f64>,
+    col_idxs: PyReadonlyArray1<'py, i64>,
+    col_lens: PyReadonlyArray1<'py, i64>,
+) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
+    let offsets = order_record_offsets(&order_records)?;
+    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&order_records)? };
+    let src_send = ptr_to_usize(src_data);
+    let ci_cow = array1_as_slice_cow(&col_idxs);
+    let cl_cow = array1_as_slice_cow(&col_lens);
+    let nrows = close.shape()[0];
+    let ncols = close.shape()[1];
+    let close_cow = array2_as_slice_cow(&close);
+
+    let trades = py
+        .allow_threads(|| {
+            get_entry_trades_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                close_cow.as_ref(),
+                nrows,
+                ncols,
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+
+    Ok(PyArray1::from_vec_bound(py, trades))
+}
+
+fn get_free_cash_diff(
+    position_before: f64,
+    position_now: f64,
+    debt_now: f64,
+    price: f64,
+    fees: f64,
+) -> (f64, f64) {
+    let size = add(position_now, -position_before);
+    let final_cash = -size * price - fees;
+    if is_close(size, 0.0) {
+        return (debt_now, 0.0);
+    }
+    if size > 0.0 {
+        if position_before < 0.0 {
+            let short_size = if position_now < 0.0 {
+                size.abs()
+            } else {
+                position_before.abs()
+            };
+            let avg_entry_price = debt_now / position_before.abs();
+            let debt_diff = short_size * avg_entry_price;
+            let new_debt = add(debt_now, -debt_diff);
+            let free_cash_diff = add(2.0 * debt_diff, final_cash);
+            (new_debt, free_cash_diff)
+        } else {
+            (debt_now, final_cash)
+        }
+    } else {
+        if position_now < 0.0 {
+            let short_size = if position_before < 0.0 {
+                size.abs()
+            } else {
+                position_now.abs()
+            };
+            let short_value = short_size * price;
+            let new_debt = debt_now + short_value;
+            let free_cash_diff = add(final_cash, -2.0 * short_value);
+            (new_debt, free_cash_diff)
+        } else {
+            (debt_now, final_cash)
+        }
+    }
+}
+
+// ############# simulate_from_orders_rs ############# //
+
+#[pyfunction]
+#[pyo3(name = "get_exit_trades_rs")]
+pub fn get_exit_trades_py<'py>(
+    py: Python<'py>,
+    order_records: Bound<'py, pyo3::PyAny>,
+    close: PyReadonlyArray2<'py, f64>,
+    col_idxs: PyReadonlyArray1<'py, i64>,
+    col_lens: PyReadonlyArray1<'py, i64>,
+) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
+    let offsets = order_record_offsets(&order_records)?;
+    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&order_records)? };
+    let src_send = ptr_to_usize(src_data);
+    let ci_cow = array1_as_slice_cow(&col_idxs);
+    let cl_cow = array1_as_slice_cow(&col_lens);
+    let nrows = close.shape()[0];
+    let ncols = close.shape()[1];
+    let close_cow = array2_as_slice_cow(&close);
+
+    let trades = py
+        .allow_threads(|| {
+            get_exit_trades_inner(
+                usize_to_ptr(src_send),
+                &offsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                close_cow.as_ref(),
+                nrows,
+                ncols,
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+
+    Ok(PyArray1::from_vec_bound(py, trades))
 }
 
 fn simulate_from_orders_non_shared_inner(
@@ -3211,389 +3639,272 @@ fn should_update_stop(stop: f64, upon_stop_update: i64) -> bool {
 }
 
 /// Read signals from arrays and merge direction mode with LS mode.
-#[inline(always)]
-fn read_signals(
-    entry: bool,
-    exit: bool,
-    dir: i64,
-    long_entry: bool,
-    long_exit: bool,
-    short_entry: bool,
-    short_exit: bool,
-) -> (bool, bool, bool, bool) {
-    if entry || exit {
-        if dir == DIRECTION_LONG_ONLY {
-            (
-                entry || long_entry,
-                exit || long_exit,
-                short_entry,
-                short_exit,
-            )
-        } else if dir == DIRECTION_SHORT_ONLY {
-            (
-                long_entry,
-                long_exit,
-                entry || short_entry,
-                exit || short_exit,
-            )
-        } else {
-            // DIRECTION_BOTH
-            (
-                entry || long_entry,
-                long_exit,
-                exit || short_entry,
-                short_exit,
-            )
-        }
-    } else {
-        (long_entry, long_exit, short_entry, short_exit)
-    }
-}
-
-// ############# simulate_from_signals_rs ############# //
 
 #[pyfunction]
-#[pyo3(name = "simulate_from_signals_rs")]
-#[pyo3(signature = (
-    target_shape,
-    group_lens,
-    init_cash,
-    call_seq,
-    entries,
-    exits,
-    direction,
-    long_entries,
-    long_exits,
-    short_entries,
-    short_exits,
-    size,
-    price,
-    size_type,
-    fees,
-    fixed_fees,
-    slippage,
-    min_size,
-    max_size,
-    size_granularity,
-    reject_prob,
-    lock_cash,
-    allow_partial,
-    raise_reject,
-    log,
-    accumulate,
-    upon_long_conflict,
-    upon_short_conflict,
-    upon_dir_conflict,
-    upon_opposite_entry,
-    val_price,
-    open,
-    high,
-    low,
-    close,
-    sl_stop,
-    sl_trail,
-    tp_stop,
-    stop_entry_price,
-    stop_exit_price,
-    upon_stop_exit,
-    upon_stop_update,
-    use_stops = true,
-    auto_call_seq = false,
-    ffill_val_price = true,
-    update_value = false,
-    max_orders = None,
-    max_logs = 0,
-    seed = None,
-))]
-pub fn simulate_from_signals_py<'py>(
+#[pyo3(name = "trade_winning_streak_rs")]
+pub fn trade_winning_streak_py<'py>(
     py: Python<'py>,
-    target_shape: (usize, usize),
-    group_lens: PyReadonlyArray1<'py, i64>,
-    init_cash: PyReadonlyArray1<'py, f64>,
-    mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
-    // Signal arrays - pre-broadcast 2D
-    entries: PyReadonlyArray2<'py, bool>,
-    exits: PyReadonlyArray2<'py, bool>,
-    direction: PyReadonlyArray2<'py, i64>,
-    long_entries: PyReadonlyArray2<'py, bool>,
-    long_exits: PyReadonlyArray2<'py, bool>,
-    short_entries: PyReadonlyArray2<'py, bool>,
-    short_exits: PyReadonlyArray2<'py, bool>,
-    // Order params
-    size: PyReadonlyArray2<'py, f64>,
-    price: PyReadonlyArray2<'py, f64>,
-    size_type: PyReadonlyArray2<'py, i64>,
-    fees: PyReadonlyArray2<'py, f64>,
-    fixed_fees: PyReadonlyArray2<'py, f64>,
-    slippage: PyReadonlyArray2<'py, f64>,
-    min_size: PyReadonlyArray2<'py, f64>,
-    max_size: PyReadonlyArray2<'py, f64>,
-    size_granularity: PyReadonlyArray2<'py, f64>,
-    reject_prob: PyReadonlyArray2<'py, f64>,
-    lock_cash: PyReadonlyArray2<'py, bool>,
-    allow_partial: PyReadonlyArray2<'py, bool>,
-    raise_reject: PyReadonlyArray2<'py, bool>,
-    log: PyReadonlyArray2<'py, bool>,
-    // Signal conflict/resolution params
-    accumulate: PyReadonlyArray2<'py, i64>,
-    upon_long_conflict: PyReadonlyArray2<'py, i64>,
-    upon_short_conflict: PyReadonlyArray2<'py, i64>,
-    upon_dir_conflict: PyReadonlyArray2<'py, i64>,
-    upon_opposite_entry: PyReadonlyArray2<'py, i64>,
-    // Price/valuation
-    val_price: PyReadonlyArray2<'py, f64>,
-    open: PyReadonlyArray2<'py, f64>,
-    high: PyReadonlyArray2<'py, f64>,
-    low: PyReadonlyArray2<'py, f64>,
-    close: PyReadonlyArray2<'py, f64>,
-    // Stop params
-    sl_stop: PyReadonlyArray2<'py, f64>,
-    sl_trail: PyReadonlyArray2<'py, bool>,
-    tp_stop: PyReadonlyArray2<'py, f64>,
-    stop_entry_price: PyReadonlyArray2<'py, i64>,
-    stop_exit_price: PyReadonlyArray2<'py, i64>,
-    upon_stop_exit: PyReadonlyArray2<'py, i64>,
-    upon_stop_update: PyReadonlyArray2<'py, i64>,
-    // Scalar flags
-    use_stops: bool,
-    auto_call_seq: bool,
-    ffill_val_price: bool,
-    update_value: bool,
-    max_orders: Option<usize>,
-    max_logs: usize,
-    seed: Option<u64>,
-) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
-    let (nrows, ncols) = target_shape;
+    records: Bound<'py, pyo3::PyAny>,
+) -> PyResult<Bound<'py, PyArray1<i64>>> {
+    let toffsets = trade_record_offsets(&records)?;
+    let (src_data, _itemsize, n) = unsafe { array_raw_parts(&records)? };
+    let src_send = ptr_to_usize(src_data);
 
-    let gl_cow = array1_as_slice_cow(&group_lens);
-    let ic_cow = array1_as_slice_cow(&init_cash);
-    let cs_cow = {
-        let cs_view = call_seq.as_array();
-        if cs_view.is_standard_layout() {
-            Cow::Borrowed(call_seq.as_slice().unwrap())
-        } else {
-            Cow::Owned(cs_view.iter().copied().collect())
-        }
-    };
-
-    // Signal arrays
-    let entries_cow = array2_as_slice_cow(&entries);
-    let exits_cow = array2_as_slice_cow(&exits);
-    let dir_cow = array2_as_slice_cow(&direction);
-    let le_cow = array2_as_slice_cow(&long_entries);
-    let lx_cow = array2_as_slice_cow(&long_exits);
-    let se_cow = array2_as_slice_cow(&short_entries);
-    let sx_cow = array2_as_slice_cow(&short_exits);
-
-    // Order arrays
-    let size_cow = array2_as_slice_cow(&size);
-    let price_cow = array2_as_slice_cow(&price);
-    let st_cow = array2_as_slice_cow(&size_type);
-    let fees_cow = array2_as_slice_cow(&fees);
-    let ff_cow = array2_as_slice_cow(&fixed_fees);
-    let slip_cow = array2_as_slice_cow(&slippage);
-    let mins_cow = array2_as_slice_cow(&min_size);
-    let maxs_cow = array2_as_slice_cow(&max_size);
-    let sg_cow = array2_as_slice_cow(&size_granularity);
-    let rp_cow = array2_as_slice_cow(&reject_prob);
-    let lc_cow = array2_as_slice_cow(&lock_cash);
-    let ap_cow = array2_as_slice_cow(&allow_partial);
-    let rr_cow = array2_as_slice_cow(&raise_reject);
-    let log_cow = array2_as_slice_cow(&log);
-
-    // Conflict arrays
-    let acc_cow = array2_as_slice_cow(&accumulate);
-    let ulc_cow = array2_as_slice_cow(&upon_long_conflict);
-    let usc_cow = array2_as_slice_cow(&upon_short_conflict);
-    let udc_cow = array2_as_slice_cow(&upon_dir_conflict);
-    let uoe_cow = array2_as_slice_cow(&upon_opposite_entry);
-
-    // Price arrays
-    let vp_cow = array2_as_slice_cow(&val_price);
-    let open_cow = array2_as_slice_cow(&open);
-    let high_cow = array2_as_slice_cow(&high);
-    let low_cow = array2_as_slice_cow(&low);
-    let close_cow = array2_as_slice_cow(&close);
-
-    // Stop arrays
-    let sls_cow = array2_as_slice_cow(&sl_stop);
-    let slt_cow = array2_as_slice_cow(&sl_trail);
-    let tps_cow = array2_as_slice_cow(&tp_stop);
-    let sep_cow = array2_as_slice_cow(&stop_entry_price);
-    let sxp_cow = array2_as_slice_cow(&stop_exit_price);
-    let use_cow = array2_as_slice_cow(&upon_stop_exit);
-    let usu_cow = array2_as_slice_cow(&upon_stop_update);
-
-    // Validate
-    let cash_sharing = gl_cow.iter().any(|&g| g > 1);
-    let total_cols: i64 = gl_cow.iter().sum();
-    if total_cols != ncols as i64 {
-        return Err(PyValueError::new_err(
-            "group_lens has incorrect total number of columns",
-        ));
-    }
-    if cash_sharing {
-        if ic_cow.len() != gl_cow.len() {
-            return Err(PyValueError::new_err(
-                "If cash sharing is enabled, init_cash must match the number of groups",
-            ));
-        }
-    } else if ic_cow.len() != ncols {
-        return Err(PyValueError::new_err(
-            "If cash sharing is disabled, init_cash must match the number of columns",
-        ));
-    }
-
-    let log_dt = py
-        .import_bound("vectorbt.portfolio.enums")?
-        .getattr("log_dt")?;
-    let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
-    let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
-    let log_offsets = log_record_offsets(&log_arr)?;
-    let (log_data, _log_itemsize, _) = unsafe { array_raw_parts(&log_arr)? };
-    let log_data_usize = ptr_to_usize(log_data);
-
-    let max_ord = max_orders.unwrap_or(nrows * ncols);
-
-    let (order_records, lidx, call_seq_out) = py
-        .allow_threads(|| {
-            if !cash_sharing && !auto_call_seq {
-                let (order_records, lidx) = simulate_from_signals_non_shared_inner(
-                    nrows,
-                    ncols,
-                    ic_cow.as_ref(),
-                    entries_cow.as_ref(),
-                    exits_cow.as_ref(),
-                    dir_cow.as_ref(),
-                    le_cow.as_ref(),
-                    lx_cow.as_ref(),
-                    se_cow.as_ref(),
-                    sx_cow.as_ref(),
-                    size_cow.as_ref(),
-                    price_cow.as_ref(),
-                    st_cow.as_ref(),
-                    fees_cow.as_ref(),
-                    ff_cow.as_ref(),
-                    slip_cow.as_ref(),
-                    mins_cow.as_ref(),
-                    maxs_cow.as_ref(),
-                    sg_cow.as_ref(),
-                    rp_cow.as_ref(),
-                    lc_cow.as_ref(),
-                    ap_cow.as_ref(),
-                    rr_cow.as_ref(),
-                    log_cow.as_ref(),
-                    acc_cow.as_ref(),
-                    ulc_cow.as_ref(),
-                    usc_cow.as_ref(),
-                    udc_cow.as_ref(),
-                    uoe_cow.as_ref(),
-                    vp_cow.as_ref(),
-                    open_cow.as_ref(),
-                    high_cow.as_ref(),
-                    low_cow.as_ref(),
-                    close_cow.as_ref(),
-                    sls_cow.as_ref(),
-                    slt_cow.as_ref(),
-                    tps_cow.as_ref(),
-                    sep_cow.as_ref(),
-                    sxp_cow.as_ref(),
-                    use_cow.as_ref(),
-                    usu_cow.as_ref(),
-                    use_stops,
-                    ffill_val_price,
-                    update_value,
-                    max_ord,
-                    effective_max_logs,
-                    usize_to_mut_ptr(log_data_usize),
-                    &log_offsets,
-                    seed,
-                )?;
-                return Ok((order_records, lidx, None));
+    let result = py.allow_threads(|| {
+        let src_data = usize_to_ptr(src_send);
+        let mut out = vec![0i64; n];
+        let mut curr_rank: i64 = 0;
+        for i in 0..n {
+            let base = unsafe { src_data.add(i * toffsets.itemsize) };
+            let pnl = unsafe { *(base.add(toffsets.pnl) as *const f64) };
+            if pnl > 0.0 {
+                curr_rank += 1;
+            } else {
+                curr_rank = 0;
             }
-            simulate_from_signals_inner(
-                nrows,
-                ncols,
-                gl_cow.as_ref(),
-                ic_cow.as_ref(),
-                cs_cow.as_ref(),
-                entries_cow.as_ref(),
-                exits_cow.as_ref(),
-                dir_cow.as_ref(),
-                le_cow.as_ref(),
-                lx_cow.as_ref(),
-                se_cow.as_ref(),
-                sx_cow.as_ref(),
-                size_cow.as_ref(),
-                price_cow.as_ref(),
-                st_cow.as_ref(),
-                fees_cow.as_ref(),
-                ff_cow.as_ref(),
-                slip_cow.as_ref(),
-                mins_cow.as_ref(),
-                maxs_cow.as_ref(),
-                sg_cow.as_ref(),
-                rp_cow.as_ref(),
-                lc_cow.as_ref(),
-                ap_cow.as_ref(),
-                rr_cow.as_ref(),
-                log_cow.as_ref(),
-                acc_cow.as_ref(),
-                ulc_cow.as_ref(),
-                usc_cow.as_ref(),
-                udc_cow.as_ref(),
-                uoe_cow.as_ref(),
-                vp_cow.as_ref(),
-                open_cow.as_ref(),
-                high_cow.as_ref(),
-                low_cow.as_ref(),
-                close_cow.as_ref(),
-                sls_cow.as_ref(),
-                slt_cow.as_ref(),
-                tps_cow.as_ref(),
-                sep_cow.as_ref(),
-                sxp_cow.as_ref(),
-                use_cow.as_ref(),
-                usu_cow.as_ref(),
-                use_stops,
-                auto_call_seq,
-                ffill_val_price,
-                update_value,
-                max_ord,
-                effective_max_logs,
-                usize_to_mut_ptr(log_data_usize),
-                &log_offsets,
-                seed,
-            )
-        })
-        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
-    drop(cs_cow);
-
-    if let Some(call_seq_out) = call_seq_out {
-        let mut cs_view = call_seq.as_array_mut();
-        for i in 0..nrows {
-            for col in 0..ncols {
-                cs_view[(i, col)] = call_seq_out[i * ncols + col];
-            }
+            out[i] = curr_rank;
         }
-    }
+        out
+    });
 
-    let order_arr = PyArray1::from_vec_bound(py, order_records);
-
-    let log_arr_sliced = if lidx < effective_max_logs {
-        log_arr.call_method1(
-            "__getitem__",
-            (pyo3::types::PySlice::new_bound(py, 0, lidx as isize, 1),),
-        )?
-    } else {
-        log_arr
-    };
-
-    Ok((order_arr, log_arr_sliced))
+    Ok(PyArray1::from_vec_bound(py, result))
 }
 
 /// Process signals for a single (i, col) and return (is_long_entry, is_long_exit, is_short_entry, is_short_exit, accumulate, price, slippage).
 /// Also updates stop trailing state in-place.
+
+#[pyfunction]
+#[pyo3(name = "trade_losing_streak_rs")]
+pub fn trade_losing_streak_py<'py>(
+    py: Python<'py>,
+    records: Bound<'py, pyo3::PyAny>,
+) -> PyResult<Bound<'py, PyArray1<i64>>> {
+    let toffsets = trade_record_offsets(&records)?;
+    let (src_data, _itemsize, n) = unsafe { array_raw_parts(&records)? };
+    let src_send = ptr_to_usize(src_data);
+
+    let result = py.allow_threads(|| {
+        let src_data = usize_to_ptr(src_send);
+        let mut out = vec![0i64; n];
+        let mut curr_rank: i64 = 0;
+        for i in 0..n {
+            let base = unsafe { src_data.add(i * toffsets.itemsize) };
+            let pnl = unsafe { *(base.add(toffsets.pnl) as *const f64) };
+            if pnl < 0.0 {
+                curr_rank += 1;
+            } else {
+                curr_rank = 0;
+            }
+            out[i] = curr_rank;
+        }
+        out
+    });
+
+    Ok(PyArray1::from_vec_bound(py, result))
+}
+
+fn asset_flow_inner(
+    src_data: *const u8,
+    offsets: &RecordFieldOffsets,
+    col_idxs: &[i64],
+    col_lens: &[i64],
+    nrows: usize,
+    ncols: usize,
+    direction: i64,
+) -> Result<Vec<f64>, PortfolioSimError> {
+    let n_cols = col_lens.len();
+    let col_start_idxs = col_start_idxs_usize(col_lens);
+    let mut out = vec![0.0f64; nrows * ncols];
+
+    for col in 0..n_cols {
+        let col_len = col_lens[col] as usize;
+        if col_len == 0 {
+            continue;
+        }
+        let mut last_id: i64 = -1;
+        let mut position_now: f64 = 0.0;
+
+        for c in 0..col_len {
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
+            let base = unsafe { src_data.add(oidx * offsets.itemsize) };
+            let id = unsafe { *(base.add(offsets.id) as *const i64) };
+            let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
+            let side = unsafe { *(base.add(offsets.side) as *const i64) };
+            let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
+
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
+            last_id = id;
+
+            if side == ORDER_SIDE_SELL {
+                size *= -1.0;
+            }
+            let new_position_now = add(position_now, size);
+            let asset_flow = if direction == DIRECTION_LONG_ONLY {
+                get_long_size(position_now, new_position_now)
+            } else if direction == DIRECTION_SHORT_ONLY {
+                get_short_size(position_now, new_position_now)
+            } else {
+                size
+            };
+            out[i * ncols + col] = add(out[i * ncols + col], asset_flow);
+            position_now = new_position_now;
+        }
+    }
+    Ok(out)
+}
+
+#[pyfunction]
+#[pyo3(name = "get_positions_rs")]
+pub fn get_positions_py<'py>(
+    py: Python<'py>,
+    trade_records: Bound<'py, pyo3::PyAny>,
+    col_idxs: PyReadonlyArray1<'py, i64>,
+    col_lens: PyReadonlyArray1<'py, i64>,
+) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
+    let toffsets = trade_record_offsets(&trade_records)?;
+    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&trade_records)? };
+    let src_send = ptr_to_usize(src_data);
+    let ci_cow = array1_as_slice_cow(&col_idxs);
+    let cl_cow = array1_as_slice_cow(&col_lens);
+
+    let positions = py
+        .allow_threads(|| {
+            get_positions_inner(
+                usize_to_ptr(src_send),
+                &toffsets,
+                ci_cow.as_ref(),
+                cl_cow.as_ref(),
+                n_records,
+            )
+        })
+        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+
+    Ok(PyArray1::from_vec_bound(py, positions))
+}
+
+// ############# Post-simulation: Cash flow ############# //
+
+#[pyfunction]
+#[pyo3(name = "get_long_size_rs")]
+pub fn get_long_size_py(position_before: f64, position_now: f64) -> f64 {
+    get_long_size(position_before, position_now)
+}
+
+fn cash_flow_inner(
+    src_data: *const u8,
+    offsets: &RecordFieldOffsets,
+    col_idxs: &[i64],
+    col_lens: &[i64],
+    nrows: usize,
+    ncols: usize,
+    free: bool,
+) -> Result<Vec<f64>, PortfolioSimError> {
+    let n_cols = col_lens.len();
+    let col_start_idxs = col_start_idxs_usize(col_lens);
+    let mut out = vec![0.0f64; nrows * ncols];
+
+    for col in 0..n_cols {
+        let col_len = col_lens[col] as usize;
+        if col_len == 0 {
+            continue;
+        }
+        let mut last_id: i64 = -1;
+        let mut position_now: f64 = 0.0;
+        let mut debt_now: f64 = 0.0;
+
+        if !free {
+            for c in 0..col_len {
+                let oidx = col_idxs[col_start_idxs[col] + c] as usize;
+                let base = unsafe { src_data.add(oidx * offsets.itemsize) };
+                let id = unsafe { *(base.add(offsets.id) as *const i64) };
+                let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
+                let side = unsafe { *(base.add(offsets.side) as *const i64) };
+                let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
+                let price = unsafe { *(base.add(offsets.price) as *const f64) };
+                let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
+
+                if id < last_id {
+                    return Err(PortfolioSimError::ValueError(
+                        "id must come in ascending order per column",
+                    ));
+                }
+                last_id = id;
+
+                if side == ORDER_SIDE_SELL {
+                    size *= -1.0;
+                }
+                let cash_flow = -size * price - fees;
+                out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
+            }
+            continue;
+        }
+
+        for c in 0..col_len {
+            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
+            let base = unsafe { src_data.add(oidx * offsets.itemsize) };
+            let id = unsafe { *(base.add(offsets.id) as *const i64) };
+            let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
+            let side = unsafe { *(base.add(offsets.side) as *const i64) };
+            let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
+            let price = unsafe { *(base.add(offsets.price) as *const f64) };
+            let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
+
+            if id < last_id {
+                return Err(PortfolioSimError::ValueError(
+                    "id must come in ascending order per column",
+                ));
+            }
+            last_id = id;
+
+            if side == ORDER_SIDE_SELL {
+                size *= -1.0;
+            }
+            let new_position_now = add(position_now, size);
+            let (new_debt, cash_flow) =
+                get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
+            debt_now = new_debt;
+            out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
+            position_now = new_position_now;
+        }
+    }
+    Ok(out)
+}
+
+#[pyfunction]
+#[pyo3(name = "get_short_size_rs")]
+pub fn get_short_size_py(position_before: f64, position_now: f64) -> f64 {
+    get_short_size(position_before, position_now)
+}
+
+fn sum_grouped_inner(
+    a: &[f64],
+    group_lens: &[i64],
+    nrows: usize,
+    ncols: usize,
+    n_groups: usize,
+) -> Vec<f64> {
+    let group_starts = col_start_idxs_usize(group_lens);
+    let mut out = Vec::with_capacity(nrows * n_groups);
+    unsafe {
+        out.set_len(nrows * n_groups);
+    }
+    for group in 0..n_groups {
+        let from_col = group_starts[group];
+        let to_col = from_col + group_lens[group] as usize;
+        for i in 0..nrows {
+            let mut sum = 0.0f64;
+            for col in from_col..to_col {
+                sum += a[i * ncols + col];
+            }
+            out[i * n_groups + group] = sum;
+        }
+    }
+    out
+}
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn process_signals_at(
@@ -4551,60 +4862,6 @@ pub fn asset_flow_py<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
-fn asset_flow_inner(
-    src_data: *const u8,
-    offsets: &RecordFieldOffsets,
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    nrows: usize,
-    ncols: usize,
-    direction: i64,
-) -> Result<Vec<f64>, PortfolioSimError> {
-    let n_cols = col_lens.len();
-    let col_start_idxs = col_start_idxs_usize(col_lens);
-    let mut out = vec![0.0f64; nrows * ncols];
-
-    for col in 0..n_cols {
-        let col_len = col_lens[col] as usize;
-        if col_len == 0 {
-            continue;
-        }
-        let mut last_id: i64 = -1;
-        let mut position_now: f64 = 0.0;
-
-        for c in 0..col_len {
-            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
-            let base = unsafe { src_data.add(oidx * offsets.itemsize) };
-            let id = unsafe { *(base.add(offsets.id) as *const i64) };
-            let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
-            let side = unsafe { *(base.add(offsets.side) as *const i64) };
-            let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
-
-            if id < last_id {
-                return Err(PortfolioSimError::ValueError(
-                    "id must come in ascending order per column",
-                ));
-            }
-            last_id = id;
-
-            if side == ORDER_SIDE_SELL {
-                size *= -1.0;
-            }
-            let new_position_now = add(position_now, size);
-            let asset_flow = if direction == DIRECTION_LONG_ONLY {
-                get_long_size(position_now, new_position_now)
-            } else if direction == DIRECTION_SHORT_ONLY {
-                get_short_size(position_now, new_position_now)
-            } else {
-                size
-            };
-            out[i * ncols + col] = add(out[i * ncols + col], asset_flow);
-            position_now = new_position_now;
-        }
-    }
-    Ok(out)
-}
-
 #[pyfunction]
 #[pyo3(name = "assets_rs")]
 pub fn assets_py<'py>(
@@ -4635,7 +4892,17 @@ pub fn assets_py<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
-// ############# Post-simulation: Cash flow ############# //
+#[pyfunction]
+#[pyo3(name = "get_free_cash_diff_rs")]
+pub fn get_free_cash_diff_py(
+    position_before: f64,
+    position_now: f64,
+    debt_now: f64,
+    price: f64,
+    fees: f64,
+) -> (f64, f64) {
+    get_free_cash_diff(position_before, position_now, debt_now, price, fees)
+}
 
 #[pyfunction]
 #[pyo3(name = "cash_flow_rs")]
@@ -4672,86 +4939,6 @@ pub fn cash_flow_py<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
-fn cash_flow_inner(
-    src_data: *const u8,
-    offsets: &RecordFieldOffsets,
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    nrows: usize,
-    ncols: usize,
-    free: bool,
-) -> Result<Vec<f64>, PortfolioSimError> {
-    let n_cols = col_lens.len();
-    let col_start_idxs = col_start_idxs_usize(col_lens);
-    let mut out = vec![0.0f64; nrows * ncols];
-
-    for col in 0..n_cols {
-        let col_len = col_lens[col] as usize;
-        if col_len == 0 {
-            continue;
-        }
-        let mut last_id: i64 = -1;
-        let mut position_now: f64 = 0.0;
-        let mut debt_now: f64 = 0.0;
-
-        if !free {
-            for c in 0..col_len {
-                let oidx = col_idxs[col_start_idxs[col] + c] as usize;
-                let base = unsafe { src_data.add(oidx * offsets.itemsize) };
-                let id = unsafe { *(base.add(offsets.id) as *const i64) };
-                let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
-                let side = unsafe { *(base.add(offsets.side) as *const i64) };
-                let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
-                let price = unsafe { *(base.add(offsets.price) as *const f64) };
-                let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
-
-                if id < last_id {
-                    return Err(PortfolioSimError::ValueError(
-                        "id must come in ascending order per column",
-                    ));
-                }
-                last_id = id;
-
-                if side == ORDER_SIDE_SELL {
-                    size *= -1.0;
-                }
-                let cash_flow = -size * price - fees;
-                out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
-            }
-            continue;
-        }
-
-        for c in 0..col_len {
-            let oidx = col_idxs[col_start_idxs[col] + c] as usize;
-            let base = unsafe { src_data.add(oidx * offsets.itemsize) };
-            let id = unsafe { *(base.add(offsets.id) as *const i64) };
-            let i = unsafe { *(base.add(offsets.idx) as *const i64) } as usize;
-            let side = unsafe { *(base.add(offsets.side) as *const i64) };
-            let mut size = unsafe { *(base.add(offsets.size) as *const f64) };
-            let price = unsafe { *(base.add(offsets.price) as *const f64) };
-            let fees = unsafe { *(base.add(offsets.fees) as *const f64) };
-
-            if id < last_id {
-                return Err(PortfolioSimError::ValueError(
-                    "id must come in ascending order per column",
-                ));
-            }
-            last_id = id;
-
-            if side == ORDER_SIDE_SELL {
-                size *= -1.0;
-            }
-            let new_position_now = add(position_now, size);
-            let (new_debt, cash_flow) =
-                get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
-            debt_now = new_debt;
-            out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
-            position_now = new_position_now;
-        }
-    }
-    Ok(out)
-}
-
 #[pyfunction]
 #[pyo3(name = "sum_grouped_rs")]
 pub fn sum_grouped_py<'py>(
@@ -4771,32 +4958,6 @@ pub fn sum_grouped_py<'py>(
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-fn sum_grouped_inner(
-    a: &[f64],
-    group_lens: &[i64],
-    nrows: usize,
-    ncols: usize,
-    n_groups: usize,
-) -> Vec<f64> {
-    let group_starts = col_start_idxs_usize(group_lens);
-    let mut out = Vec::with_capacity(nrows * n_groups);
-    unsafe {
-        out.set_len(nrows * n_groups);
-    }
-    for group in 0..n_groups {
-        let from_col = group_starts[group];
-        let to_col = from_col + group_lens[group] as usize;
-        for i in 0..nrows {
-            let mut sum = 0.0f64;
-            for col in from_col..to_col {
-                sum += a[i * ncols + col];
-            }
-            out[i * n_groups + group] = sum;
-        }
-    }
-    out
 }
 
 #[pyfunction]
@@ -4819,6 +4980,8 @@ pub fn cash_flow_grouped_py<'py>(
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
+
+// ############# Post-simulation: Performance metrics ############# //
 
 #[pyfunction]
 #[pyo3(name = "init_cash_grouped_rs")]
@@ -4992,8 +5155,6 @@ pub fn cash_grouped_py<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
-// ############# Post-simulation: Performance metrics ############# //
-
 #[pyfunction]
 #[pyo3(name = "asset_value_rs")]
 pub fn asset_value_py<'py>(
@@ -5036,30 +5197,6 @@ pub fn asset_value_grouped_py<'py>(
     });
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
-    Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-#[pyfunction]
-#[pyo3(name = "value_rs")]
-pub fn value_py<'py>(
-    py: Python<'py>,
-    cash: PyReadonlyArray2<'py, f64>,
-    asset_value: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    let nrows = cash.shape()[0];
-    let ncols = cash.shape()[1];
-    let c_cow = array2_as_slice_cow(&cash);
-    let av_cow = array2_as_slice_cow(&asset_value);
-
-    let result = py.allow_threads(|| {
-        c_cow
-            .iter()
-            .zip(av_cow.iter())
-            .map(|(cash, asset_value)| cash + asset_value)
-            .collect::<Vec<f64>>()
-    });
-
-    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
@@ -5117,6 +5254,30 @@ pub fn value_in_sim_order_py<'py>(
             from_col = to_col;
         }
         out
+    });
+
+    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
+}
+
+#[pyfunction]
+#[pyo3(name = "value_rs")]
+pub fn value_py<'py>(
+    py: Python<'py>,
+    cash: PyReadonlyArray2<'py, f64>,
+    asset_value: PyReadonlyArray2<'py, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let nrows = cash.shape()[0];
+    let ncols = cash.shape()[1];
+    let c_cow = array2_as_slice_cow(&cash);
+    let av_cow = array2_as_slice_cow(&asset_value);
+
+    let result = py.allow_threads(|| {
+        c_cow
+            .iter()
+            .zip(av_cow.iter())
+            .map(|(cash, asset_value)| cash + asset_value)
+            .collect::<Vec<f64>>()
     });
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
@@ -5301,6 +5462,8 @@ pub fn returns_in_sim_order_py<'py>(
     Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
+// ############# Trade record aggregation ############# //
+
 #[pyfunction]
 #[pyo3(name = "asset_returns_rs")]
 pub fn asset_returns_py<'py>(
@@ -5334,162 +5497,6 @@ pub fn asset_returns_py<'py>(
 
     let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-#[pyfunction]
-#[pyo3(name = "benchmark_value_rs")]
-pub fn benchmark_value_py<'py>(
-    py: Python<'py>,
-    close: PyReadonlyArray2<'py, f64>,
-    init_cash: PyReadonlyArray1<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    let nrows = close.shape()[0];
-    let ncols = close.shape()[1];
-    let c_cow = array2_as_slice_cow(&close);
-    let ic_cow = array1_as_slice_cow(&init_cash);
-
-    let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        unsafe {
-            out.set_len(nrows * ncols);
-        }
-        for i in 0..nrows {
-            let row_offset = i * ncols;
-            for col in 0..ncols {
-                let close_0 = c_cow[col]; // close[0, col]
-                out[row_offset + col] = c_cow[row_offset + col] / close_0 * ic_cow[col];
-            }
-        }
-        out
-    });
-
-    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
-    Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-#[pyfunction]
-#[pyo3(name = "benchmark_value_grouped_rs")]
-pub fn benchmark_value_grouped_py<'py>(
-    py: Python<'py>,
-    close: PyReadonlyArray2<'py, f64>,
-    group_lens: PyReadonlyArray1<'py, i64>,
-    init_cash_grouped: PyReadonlyArray1<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    let nrows = close.shape()[0];
-    let ncols = close.shape()[1];
-    let c_cow = array2_as_slice_cow(&close);
-    let gl_cow = array1_as_slice_cow(&group_lens);
-    let ic_cow = array1_as_slice_cow(&init_cash_grouped);
-    let n_groups = gl_cow.len();
-    let group_starts = col_start_idxs_usize(gl_cow.as_ref());
-
-    let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * n_groups);
-        unsafe {
-            out.set_len(nrows * n_groups);
-        }
-        for group in 0..n_groups {
-            let from_col = group_starts[group];
-            let group_len = gl_cow[group] as usize;
-            let to_col = from_col + group_len;
-            let col_init_cash = ic_cow[group] / group_len as f64;
-            for i in 0..nrows {
-                let mut sum = 0.0f64;
-                for col in from_col..to_col {
-                    sum += c_cow[i * ncols + col] / c_cow[col]; // close[i,col] / close[0,col]
-                }
-                out[i * n_groups + group] = col_init_cash * sum;
-            }
-        }
-        out
-    });
-
-    let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
-    Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-#[pyfunction]
-#[pyo3(name = "total_benchmark_return_rs")]
-pub fn total_benchmark_return_py<'py>(
-    py: Python<'py>,
-    benchmark_value: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let nrows = benchmark_value.shape()[0];
-    let ncols = benchmark_value.shape()[1];
-    let bv_cow = array2_as_slice_cow(&benchmark_value);
-
-    let mut out = vec![0.0f64; ncols];
-    for col in 0..ncols {
-        out[col] = get_return(bv_cow[col], bv_cow[(nrows - 1) * ncols + col]);
-    }
-    Ok(PyArray1::from_vec_bound(py, out))
-}
-
-#[pyfunction]
-#[pyo3(name = "gross_exposure_rs")]
-pub fn gross_exposure_py<'py>(
-    py: Python<'py>,
-    asset_value: PyReadonlyArray2<'py, f64>,
-    cash: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    let nrows = asset_value.shape()[0];
-    let ncols = asset_value.shape()[1];
-    let av_cow = array2_as_slice_cow(&asset_value);
-    let c_cow = array2_as_slice_cow(&cash);
-
-    let result = py.allow_threads(|| {
-        let mut out = Vec::with_capacity(nrows * ncols);
-        for idx in 0..nrows * ncols {
-            let denom = add(av_cow[idx], c_cow[idx]);
-            out.push(if denom == 0.0 {
-                0.0
-            } else {
-                av_cow[idx] / denom
-            });
-        }
-        out
-    });
-
-    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
-    Ok(PyArray2::from_owned_array_bound(py, arr))
-}
-
-// ############# Trade record aggregation ############# //
-
-#[pyfunction]
-#[pyo3(name = "get_entry_trades_rs")]
-pub fn get_entry_trades_py<'py>(
-    py: Python<'py>,
-    order_records: Bound<'py, pyo3::PyAny>,
-    close: PyReadonlyArray2<'py, f64>,
-    col_idxs: PyReadonlyArray1<'py, i64>,
-    col_lens: PyReadonlyArray1<'py, i64>,
-) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
-    let offsets = order_record_offsets(&order_records)?;
-    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&order_records)? };
-    let src_send = ptr_to_usize(src_data);
-    let ci_cow = array1_as_slice_cow(&col_idxs);
-    let cl_cow = array1_as_slice_cow(&col_lens);
-    let nrows = close.shape()[0];
-    let ncols = close.shape()[1];
-    let close_cow = array2_as_slice_cow(&close);
-
-    let trades = py
-        .allow_threads(|| {
-            get_entry_trades_inner(
-                usize_to_ptr(src_send),
-                &offsets,
-                ci_cow.as_ref(),
-                cl_cow.as_ref(),
-                close_cow.as_ref(),
-                nrows,
-                ncols,
-                n_records,
-            )
-        })
-        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
-
-    Ok(PyArray1::from_vec_bound(py, trades))
 }
 
 fn get_entry_trades_inner(
@@ -5766,39 +5773,34 @@ fn fill_entry_trades_in_position(
 }
 
 #[pyfunction]
-#[pyo3(name = "get_exit_trades_rs")]
-pub fn get_exit_trades_py<'py>(
+#[pyo3(name = "benchmark_value_rs")]
+pub fn benchmark_value_py<'py>(
     py: Python<'py>,
-    order_records: Bound<'py, pyo3::PyAny>,
     close: PyReadonlyArray2<'py, f64>,
-    col_idxs: PyReadonlyArray1<'py, i64>,
-    col_lens: PyReadonlyArray1<'py, i64>,
-) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
-    let offsets = order_record_offsets(&order_records)?;
-    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&order_records)? };
-    let src_send = ptr_to_usize(src_data);
-    let ci_cow = array1_as_slice_cow(&col_idxs);
-    let cl_cow = array1_as_slice_cow(&col_lens);
+    init_cash: PyReadonlyArray1<'py, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let nrows = close.shape()[0];
     let ncols = close.shape()[1];
-    let close_cow = array2_as_slice_cow(&close);
+    let c_cow = array2_as_slice_cow(&close);
+    let ic_cow = array1_as_slice_cow(&init_cash);
 
-    let trades = py
-        .allow_threads(|| {
-            get_exit_trades_inner(
-                usize_to_ptr(src_send),
-                &offsets,
-                ci_cow.as_ref(),
-                cl_cow.as_ref(),
-                close_cow.as_ref(),
-                nrows,
-                ncols,
-                n_records,
-            )
-        })
-        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
+    let result = py.allow_threads(|| {
+        let mut out = Vec::with_capacity(nrows * ncols);
+        unsafe {
+            out.set_len(nrows * ncols);
+        }
+        for i in 0..nrows {
+            let row_offset = i * ncols;
+            for col in 0..ncols {
+                let close_0 = c_cow[col]; // close[0, col]
+                out[row_offset + col] = c_cow[row_offset + col] / close_0 * ic_cow[col];
+            }
+        }
+        out
+    });
 
-    Ok(PyArray1::from_vec_bound(py, trades))
+    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
 fn get_exit_trades_inner(
@@ -6024,92 +6026,90 @@ fn get_exit_trades_inner(
 }
 
 #[pyfunction]
-#[pyo3(name = "trade_winning_streak_rs")]
-pub fn trade_winning_streak_py<'py>(
+#[pyo3(name = "benchmark_value_grouped_rs")]
+pub fn benchmark_value_grouped_py<'py>(
     py: Python<'py>,
-    records: Bound<'py, pyo3::PyAny>,
-) -> PyResult<Bound<'py, PyArray1<i64>>> {
-    let toffsets = trade_record_offsets(&records)?;
-    let (src_data, _itemsize, n) = unsafe { array_raw_parts(&records)? };
-    let src_send = ptr_to_usize(src_data);
+    close: PyReadonlyArray2<'py, f64>,
+    group_lens: PyReadonlyArray1<'py, i64>,
+    init_cash_grouped: PyReadonlyArray1<'py, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let nrows = close.shape()[0];
+    let ncols = close.shape()[1];
+    let c_cow = array2_as_slice_cow(&close);
+    let gl_cow = array1_as_slice_cow(&group_lens);
+    let ic_cow = array1_as_slice_cow(&init_cash_grouped);
+    let n_groups = gl_cow.len();
+    let group_starts = col_start_idxs_usize(gl_cow.as_ref());
 
     let result = py.allow_threads(|| {
-        let src_data = usize_to_ptr(src_send);
-        let mut out = vec![0i64; n];
-        let mut curr_rank: i64 = 0;
-        for i in 0..n {
-            let base = unsafe { src_data.add(i * toffsets.itemsize) };
-            let pnl = unsafe { *(base.add(toffsets.pnl) as *const f64) };
-            if pnl > 0.0 {
-                curr_rank += 1;
-            } else {
-                curr_rank = 0;
+        let mut out = Vec::with_capacity(nrows * n_groups);
+        unsafe {
+            out.set_len(nrows * n_groups);
+        }
+        for group in 0..n_groups {
+            let from_col = group_starts[group];
+            let group_len = gl_cow[group] as usize;
+            let to_col = from_col + group_len;
+            let col_init_cash = ic_cow[group] / group_len as f64;
+            for i in 0..nrows {
+                let mut sum = 0.0f64;
+                for col in from_col..to_col {
+                    sum += c_cow[i * ncols + col] / c_cow[col]; // close[i,col] / close[0,col]
+                }
+                out[i * n_groups + group] = col_init_cash * sum;
             }
-            out[i] = curr_rank;
         }
         out
     });
 
-    Ok(PyArray1::from_vec_bound(py, result))
+    let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
 #[pyfunction]
-#[pyo3(name = "trade_losing_streak_rs")]
-pub fn trade_losing_streak_py<'py>(
+#[pyo3(name = "total_benchmark_return_rs")]
+pub fn total_benchmark_return_py<'py>(
     py: Python<'py>,
-    records: Bound<'py, pyo3::PyAny>,
-) -> PyResult<Bound<'py, PyArray1<i64>>> {
-    let toffsets = trade_record_offsets(&records)?;
-    let (src_data, _itemsize, n) = unsafe { array_raw_parts(&records)? };
-    let src_send = ptr_to_usize(src_data);
+    benchmark_value: PyReadonlyArray2<'py, f64>,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let nrows = benchmark_value.shape()[0];
+    let ncols = benchmark_value.shape()[1];
+    let bv_cow = array2_as_slice_cow(&benchmark_value);
+
+    let mut out = vec![0.0f64; ncols];
+    for col in 0..ncols {
+        out[col] = get_return(bv_cow[col], bv_cow[(nrows - 1) * ncols + col]);
+    }
+    Ok(PyArray1::from_vec_bound(py, out))
+}
+
+#[pyfunction]
+#[pyo3(name = "gross_exposure_rs")]
+pub fn gross_exposure_py<'py>(
+    py: Python<'py>,
+    asset_value: PyReadonlyArray2<'py, f64>,
+    cash: PyReadonlyArray2<'py, f64>,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let nrows = asset_value.shape()[0];
+    let ncols = asset_value.shape()[1];
+    let av_cow = array2_as_slice_cow(&asset_value);
+    let c_cow = array2_as_slice_cow(&cash);
 
     let result = py.allow_threads(|| {
-        let src_data = usize_to_ptr(src_send);
-        let mut out = vec![0i64; n];
-        let mut curr_rank: i64 = 0;
-        for i in 0..n {
-            let base = unsafe { src_data.add(i * toffsets.itemsize) };
-            let pnl = unsafe { *(base.add(toffsets.pnl) as *const f64) };
-            if pnl < 0.0 {
-                curr_rank += 1;
+        let mut out = Vec::with_capacity(nrows * ncols);
+        for idx in 0..nrows * ncols {
+            let denom = add(av_cow[idx], c_cow[idx]);
+            out.push(if denom == 0.0 {
+                0.0
             } else {
-                curr_rank = 0;
-            }
-            out[i] = curr_rank;
+                av_cow[idx] / denom
+            });
         }
         out
     });
 
-    Ok(PyArray1::from_vec_bound(py, result))
-}
-
-#[pyfunction]
-#[pyo3(name = "get_positions_rs")]
-pub fn get_positions_py<'py>(
-    py: Python<'py>,
-    trade_records: Bound<'py, pyo3::PyAny>,
-    col_idxs: PyReadonlyArray1<'py, i64>,
-    col_lens: PyReadonlyArray1<'py, i64>,
-) -> PyResult<Bound<'py, PyArray1<TradeRecord>>> {
-    let toffsets = trade_record_offsets(&trade_records)?;
-    let (src_data, _itemsize, n_records) = unsafe { array_raw_parts(&trade_records)? };
-    let src_send = ptr_to_usize(src_data);
-    let ci_cow = array1_as_slice_cow(&col_idxs);
-    let cl_cow = array1_as_slice_cow(&col_lens);
-
-    let positions = py
-        .allow_threads(|| {
-            get_positions_inner(
-                usize_to_ptr(src_send),
-                &toffsets,
-                ci_cow.as_ref(),
-                cl_cow.as_ref(),
-                n_records,
-            )
-        })
-        .map_err(|err| portfolio_sim_error_to_pyerr(py, err))?;
-
-    Ok(PyArray1::from_vec_bound(py, positions))
+    let arr = Array2::from_shape_vec((nrows, ncols), result).unwrap();
+    Ok(PyArray2::from_owned_array_bound(py, arr))
 }
 
 fn get_positions_inner(
@@ -6317,67 +6317,67 @@ pub fn register(m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(buy_py, m)?)?;
     m.add_function(wrap_pyfunction!(sell_py, m)?)?;
     m.add_function(wrap_pyfunction!(execute_order_py, m)?)?;
+    m.add_function(wrap_pyfunction!(raise_rejected_order_py, m)?)?;
     m.add_function(wrap_pyfunction!(update_value_py, m)?)?;
     m.add_function(wrap_pyfunction!(order_nb_py, m)?)?;
     m.add_function(wrap_pyfunction!(close_position_py, m)?)?;
     m.add_function(wrap_pyfunction!(order_nothing_py, m)?)?;
-    m.add_function(wrap_pyfunction!(raise_rejected_order_py, m)?)?;
 
     // Validation & call sequence
     m.add_function(wrap_pyfunction!(check_group_lens_py, m)?)?;
     m.add_function(wrap_pyfunction!(check_group_init_cash_py, m)?)?;
     m.add_function(wrap_pyfunction!(is_grouped_py, m)?)?;
-    m.add_function(wrap_pyfunction!(approx_order_value_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_group_value_py, m)?)?;
-    m.add_function(wrap_pyfunction!(build_call_seq_py, m)?)?;
     m.add_function(wrap_pyfunction!(shuffle_call_seq_py, m)?)?;
+    m.add_function(wrap_pyfunction!(build_call_seq_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_group_value_py, m)?)?;
+    m.add_function(wrap_pyfunction!(approx_order_value_py, m)?)?;
 
     // Scalar helpers
-    m.add_function(wrap_pyfunction!(get_trade_stats_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_long_size_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_short_size_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_free_cash_diff_py, m)?)?;
-
-    // Simulation
     m.add_function(wrap_pyfunction!(simulate_from_orders_py, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_from_signals_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_trade_stats_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_entry_trades_py, m)?)?;
+
+    // Simulation
+    m.add_function(wrap_pyfunction!(get_exit_trades_py, m)?)?;
+    m.add_function(wrap_pyfunction!(trade_winning_streak_py, m)?)?;
 
     // Asset flow
-    m.add_function(wrap_pyfunction!(asset_flow_py, m)?)?;
-    m.add_function(wrap_pyfunction!(assets_py, m)?)?;
+    m.add_function(wrap_pyfunction!(trade_losing_streak_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_positions_py, m)?)?;
 
     // Cash flow
+    m.add_function(wrap_pyfunction!(get_long_size_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_short_size_py, m)?)?;
+    m.add_function(wrap_pyfunction!(asset_flow_py, m)?)?;
+    m.add_function(wrap_pyfunction!(assets_py, m)?)?;
+    m.add_function(wrap_pyfunction!(get_free_cash_diff_py, m)?)?;
     m.add_function(wrap_pyfunction!(cash_flow_py, m)?)?;
     m.add_function(wrap_pyfunction!(sum_grouped_py, m)?)?;
     m.add_function(wrap_pyfunction!(cash_flow_grouped_py, m)?)?;
+
+    // Performance metrics
     m.add_function(wrap_pyfunction!(init_cash_grouped_py, m)?)?;
     m.add_function(wrap_pyfunction!(init_cash_py, m)?)?;
     m.add_function(wrap_pyfunction!(cash_py, m)?)?;
     m.add_function(wrap_pyfunction!(cash_in_sim_order_py, m)?)?;
     m.add_function(wrap_pyfunction!(cash_grouped_py, m)?)?;
-
-    // Performance metrics
     m.add_function(wrap_pyfunction!(asset_value_py, m)?)?;
     m.add_function(wrap_pyfunction!(asset_value_grouped_py, m)?)?;
-    m.add_function(wrap_pyfunction!(value_py, m)?)?;
     m.add_function(wrap_pyfunction!(value_in_sim_order_py, m)?)?;
+    m.add_function(wrap_pyfunction!(value_py, m)?)?;
     m.add_function(wrap_pyfunction!(total_profit_py, m)?)?;
     m.add_function(wrap_pyfunction!(total_profit_grouped_py, m)?)?;
     m.add_function(wrap_pyfunction!(final_value_py, m)?)?;
     m.add_function(wrap_pyfunction!(total_return_py, m)?)?;
     m.add_function(wrap_pyfunction!(returns_in_sim_order_py, m)?)?;
+
+    // Trade/position records
     m.add_function(wrap_pyfunction!(asset_returns_py, m)?)?;
     m.add_function(wrap_pyfunction!(benchmark_value_py, m)?)?;
     m.add_function(wrap_pyfunction!(benchmark_value_grouped_py, m)?)?;
     m.add_function(wrap_pyfunction!(total_benchmark_return_py, m)?)?;
     m.add_function(wrap_pyfunction!(gross_exposure_py, m)?)?;
-
-    // Trade/position records
-    m.add_function(wrap_pyfunction!(get_entry_trades_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_exit_trades_py, m)?)?;
-    m.add_function(wrap_pyfunction!(trade_winning_streak_py, m)?)?;
-    m.add_function(wrap_pyfunction!(trade_losing_streak_py, m)?)?;
-    m.add_function(wrap_pyfunction!(get_positions_py, m)?)?;
 
     Ok(())
 }

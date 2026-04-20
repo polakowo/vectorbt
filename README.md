@@ -47,7 +47,7 @@
     </a>
 </p>
 
-<h3 align="center"><b>The backtesting engine that thinks in matrices, not loops.</b></h3>
+<h3 align="center"><b><i>"The backtesting engine that thinks in matrices, not loops."</b></i></h3>
 
 <p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, compiles the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
 

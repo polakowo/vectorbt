@@ -1,3 +1,4 @@
+import ast
 import re
 from pathlib import Path
 
@@ -32,6 +33,55 @@ def teardown_module():
 
 
 class TestEngineResolution:
+    def _numba_function_order(self, repo_root, module):
+        tree = ast.parse((repo_root / "vectorbt" / module / "nb.py").read_text())
+        return [
+            node.name[:-3]
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name.endswith("_nb") and not node.name.startswith("_")
+        ]
+
+    def _dispatch_function_order(self, repo_root, module):
+        tree = ast.parse((repo_root / "vectorbt" / module / "dispatch.py").read_text())
+        return [
+            node.name
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and not node.name.startswith("_") and not node.name.endswith("_compatible_with_rust")
+        ]
+
+    def _rust_export_order(self, rust_text):
+        order = []
+        for attrs, rust_ident in re.findall(r"((?:#\[[\s\S]*?\]\s*)*)pub fn (\w+)\b", rust_text):
+            if rust_ident == "register":
+                continue
+            name_match = re.search(r'#\[pyo3\(name\s*=\s*"([^"]+)"\)\]', attrs)
+            export_name = name_match.group(1) if name_match else rust_ident
+            if export_name.endswith("_rs"):
+                order.append(export_name[:-3])
+        return order
+
+    def _rust_register_order(self, rust_text):
+        fn_to_export = {}
+        for attrs, rust_ident in re.findall(r"((?:#\[[\s\S]*?\]\s*)*)pub fn (\w+)\b", rust_text):
+            name_match = re.search(r'#\[pyo3\(name\s*=\s*"([^"]+)"\)\]', attrs)
+            export_name = name_match.group(1) if name_match else rust_ident
+            if export_name.endswith("_rs"):
+                fn_to_export[rust_ident] = export_name[:-3]
+
+        order = []
+        for match in re.finditer(r"wrap_pyfunction!\((\w+),\s*m\)", rust_text):
+            export_name = fn_to_export.get(match.group(1))
+            if export_name is not None:
+                order.append(export_name)
+        return order
+
+    def _assert_common_order_matches_numba(self, nb_order, candidate_order, label):
+        nb_names = set(nb_order)
+        candidate_names = set(candidate_order)
+        expected_order = [name for name in nb_order if name in candidate_names]
+        actual_order = [name for name in candidate_order if name in nb_names]
+        assert actual_order == expected_order, label
+
     def test_rust_exports_with_numba_counterparts_have_dispatch_functions(self):
         repo_root = Path(__file__).resolve().parents[1]
         modules = ("generic", "indicators", "labels", "portfolio", "records", "returns", "signals")
@@ -63,6 +113,25 @@ class TestEngineResolution:
                     missing_dispatch.append(f"{module}.{base_name}")
 
         assert missing_dispatch == []
+
+    def test_dispatch_function_order_matches_numba(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        modules = ("generic", "indicators", "labels", "portfolio", "records", "returns", "signals")
+
+        for module in modules:
+            nb_order = self._numba_function_order(repo_root, module)
+            dispatch_order = self._dispatch_function_order(repo_root, module)
+            self._assert_common_order_matches_numba(nb_order, dispatch_order, module)
+
+    def test_rust_export_order_matches_numba(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        modules = ("generic", "indicators", "labels", "portfolio", "records", "returns", "signals")
+
+        for module in modules:
+            nb_order = self._numba_function_order(repo_root, module)
+            rust_text = (repo_root / "rust" / "src" / f"{module}.rs").read_text()
+            self._assert_common_order_matches_numba(nb_order, self._rust_export_order(rust_text), module)
+            self._assert_common_order_matches_numba(nb_order, self._rust_register_order(rust_text), module)
 
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
@@ -164,6 +233,43 @@ class TestEngineResolution:
 
         with pytest.raises(ValueError, match="requires float64"):
             _engine.resolve_engine("rust", _engine.RustSupport(False, "Rust engine requires float64 arrays."))
+
+    def test_ohlcv_stats_use_generic_dispatch_engine(self, monkeypatch):
+        engines = []
+        orig_bfill_1d = dispatch.bfill_1d
+        orig_ffill_1d = dispatch.ffill_1d
+
+        def bfill_1d_spy(a, engine=None):
+            engines.append(engine)
+            return orig_bfill_1d(a, engine="numba")
+
+        def ffill_1d_spy(a, engine=None):
+            engines.append(engine)
+            return orig_ffill_1d(a, engine="numba")
+
+        monkeypatch.setattr(dispatch, "bfill_1d", bfill_1d_spy)
+        monkeypatch.setattr(dispatch, "ffill_1d", ffill_1d_spy)
+
+        ohlcv = pd.DataFrame(
+            {
+                "Open": [np.nan, 10.0, 11.0],
+                "High": [np.nan, 12.0, 13.0],
+                "Low": [np.nan, 9.0, 10.0],
+                "Close": [np.nan, 11.0, 12.0],
+                "Volume": [np.nan, 100.0, 200.0],
+            },
+            index=pd.date_range("2020-01-01", periods=3),
+        )
+        stats = ohlcv.vbt.ohlcv.stats(
+            metrics=["first_price", "last_price", "first_volume", "last_volume"],
+            settings=dict(engine="rust"),
+        )
+
+        assert stats["First Price"] == 10.0
+        assert stats["Last Price"] == 12.0
+        assert stats["First Volume"] == 100.0
+        assert stats["Last Volume"] == 200.0
+        assert engines == ["rust", "rust", "rust", "rust"]
 
     def test_callback_function_rejects_explicit_rust(self, monkeypatch):
         monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
@@ -840,6 +946,22 @@ class TestReturnsRustParity:
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.returns.from_value(price, engine="rust").obj,
             pd.DataFrame.vbt.returns.from_value(price, engine="numba").obj,
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.daily(engine="rust"),
+            rets.vbt.returns.daily(engine="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.annual(engine="rust"),
+            rets.vbt.returns.annual(engine="numba"),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns(engine="rust").daily(),
+            rets.vbt.returns(engine="numba").daily(),
+        )
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns(engine="rust").annual(),
+            rets.vbt.returns(engine="numba").annual(),
         )
         pd.testing.assert_frame_equal(
             rets.vbt.returns.cumulative(engine="rust"), rets.vbt.returns.cumulative(engine="numba")

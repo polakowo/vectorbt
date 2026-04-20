@@ -179,6 +179,30 @@ def execute_order(state, order, engine: tp.Optional[str] = None):
     return execute_order_nb(state, order)
 
 
+def raise_rejected_order(order_result, engine: tp.Optional[str] = None):
+    """Engine-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
+    if eng == "rust":
+        from vectorbt_rust.portfolio import (
+            OrderResult as RustOrderResult,
+            raise_rejected_order_rs,
+        )
+
+        if not isinstance(order_result, RustOrderResult):
+            order_result = RustOrderResult(
+                order_result.size,
+                order_result.price,
+                order_result.fees,
+                order_result.side,
+                order_result.status,
+                order_result.status_info,
+            )
+        return raise_rejected_order_rs(order_result)
+    from vectorbt.portfolio.nb import raise_rejected_order_nb
+
+    return raise_rejected_order_nb(order_result)
+
+
 def update_value(
     cash_before,
     cash_now,
@@ -216,7 +240,7 @@ def update_value(
     )
 
 
-def order_nb(
+def order(
     size=np.nan,
     price=np.inf,
     size_type=0,
@@ -237,9 +261,9 @@ def order_nb(
     """Engine-neutral `vectorbt.portfolio.nb.order_nb`."""
     eng = resolve_engine(engine, supports_rust=RustSupport(True))
     if eng == "rust":
-        from vectorbt_rust.portfolio import order_nb_rs
+        from vectorbt_rust.portfolio import order_rs
 
-        return order_nb_rs(
+        return order_rs(
             size,
             price,
             size_type,
@@ -341,30 +365,6 @@ def order_nothing(engine: tp.Optional[str] = None):
     return order_nothing_nb()
 
 
-def raise_rejected_order(order_result, engine: tp.Optional[str] = None):
-    """Engine-neutral `vectorbt.portfolio.nb.raise_rejected_order_nb`."""
-    eng = resolve_engine(engine, supports_rust=RustSupport(True))
-    if eng == "rust":
-        from vectorbt_rust.portfolio import (
-            OrderResult as RustOrderResult,
-            raise_rejected_order_rs,
-        )
-
-        if not isinstance(order_result, RustOrderResult):
-            order_result = RustOrderResult(
-                order_result.size,
-                order_result.price,
-                order_result.fees,
-                order_result.side,
-                order_result.status,
-                order_result.status_info,
-            )
-        return raise_rejected_order_rs(order_result)
-    from vectorbt.portfolio.nb import raise_rejected_order_nb
-
-    return raise_rejected_order_nb(order_result)
-
-
 # ############# Call sequence & validation ############# #
 
 
@@ -426,33 +426,6 @@ def is_grouped(group_lens: tp.Array1d, engine: tp.Optional[str] = None) -> bool:
     return is_grouped_nb(group_lens)
 
 
-def build_call_seq(
-    target_shape: tp.Shape,
-    group_lens: tp.Array1d,
-    call_seq_type: int = 0,
-    engine: tp.Optional[str] = None,
-) -> tp.Array2d:
-    """Engine-neutral `vectorbt.portfolio.nb.build_call_seq_nb`."""
-    if call_seq_type == 2:
-        eng = resolve_random_engine(engine)
-        if eng == "numba":
-            from vectorbt.portfolio.nb import build_call_seq_nb
-
-            return build_call_seq_nb(target_shape, group_lens, call_seq_type)
-    eng = resolve_engine(
-        engine,
-        supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import build_call_seq_rs
-
-        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
-        return build_call_seq_rs(target_shape, group_lens, call_seq_type)
-    from vectorbt.portfolio.nb import build_call_seq_nb
-
-    return build_call_seq_nb(target_shape, group_lens, call_seq_type)
-
-
 def shuffle_call_seq(
     call_seq: tp.Array2d,
     group_lens: tp.Array1d,
@@ -482,26 +455,31 @@ def shuffle_call_seq(
     return shuffle_call_seq_nb(call_seq, group_lens)
 
 
-def approx_order_value(
-    size: float,
-    size_type: int,
-    direction: int,
-    cash_now: float,
-    position: float,
-    free_cash: float,
-    val_price: float,
-    value: float,
+def build_call_seq(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq_type: int = 0,
     engine: tp.Optional[str] = None,
-) -> float:
-    """Engine-neutral `vectorbt.portfolio.nb.approx_order_value_nb`."""
-    eng = resolve_engine(engine, supports_rust=RustSupport(True))
+) -> tp.Array2d:
+    """Engine-neutral `vectorbt.portfolio.nb.build_call_seq_nb`."""
+    if call_seq_type == 2:
+        eng = resolve_random_engine(engine)
+        if eng == "numba":
+            from vectorbt.portfolio.nb import build_call_seq_nb
+
+            return build_call_seq_nb(target_shape, group_lens, call_seq_type)
+    eng = resolve_engine(
+        engine,
+        supports_rust=array_compatible_with_rust(group_lens, dtype=np.int64),
+    )
     if eng == "rust":
-        from vectorbt_rust.portfolio import approx_order_value_rs
+        from vectorbt_rust.portfolio import build_call_seq_rs
 
-        return approx_order_value_rs(size, size_type, direction, cash_now, position, free_cash, val_price, value)
-    from vectorbt.portfolio.nb import approx_order_value_nb
+        group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
+        return build_call_seq_rs(target_shape, group_lens, call_seq_type)
+    from vectorbt.portfolio.nb import build_call_seq_nb
 
-    return approx_order_value_nb(size, size_type, direction, cash_now, position, free_cash, val_price, value)
+    return build_call_seq_nb(target_shape, group_lens, call_seq_type)
 
 
 def get_group_value(
@@ -529,6 +507,28 @@ def get_group_value(
     from vectorbt.portfolio.nb import get_group_value_nb
 
     return get_group_value_nb(from_col, to_col, cash_now, last_position, last_val_price)
+
+
+def approx_order_value(
+    size: float,
+    size_type: int,
+    direction: int,
+    cash_now: float,
+    position: float,
+    free_cash: float,
+    val_price: float,
+    value: float,
+    engine: tp.Optional[str] = None,
+) -> float:
+    """Engine-neutral `vectorbt.portfolio.nb.approx_order_value_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
+    if eng == "rust":
+        from vectorbt_rust.portfolio import approx_order_value_rs
+
+        return approx_order_value_rs(size, size_type, direction, cash_now, position, free_cash, val_price, value)
+    from vectorbt.portfolio.nb import approx_order_value_nb
+
+    return approx_order_value_nb(size, size_type, direction, cash_now, position, free_cash, val_price, value)
 
 
 # ############# Simulation ############# #
@@ -1037,6 +1037,149 @@ def simulate_from_signals(
 # ############# Scalar helpers ############# #
 
 
+def get_trade_stats(
+    size: float,
+    entry_price: float,
+    entry_fees: float,
+    exit_price: float,
+    exit_fees: float,
+    direction: int,
+    engine: tp.Optional[str] = None,
+) -> tp.Tuple[float, float]:
+    """Engine-neutral `vectorbt.portfolio.nb.get_trade_stats_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
+    if eng == "rust":
+        from vectorbt_rust.portfolio import get_trade_stats_rs
+
+        return get_trade_stats_rs(size, entry_price, entry_fees, exit_price, exit_fees, direction)
+    from vectorbt.portfolio.nb import get_trade_stats_nb
+
+    return get_trade_stats_nb(size, entry_price, entry_fees, exit_price, exit_fees, direction)
+
+
+def get_entry_trades(
+    order_records: tp.RecordArray,
+    close: tp.Array2d,
+    col_map: tp.ColMap,
+    engine: tp.Optional[str] = None,
+) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.portfolio.nb.get_entry_trades_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=combine_rust_support(
+            order_record_array_compatible_with_rust(order_records),
+            array_compatible_with_rust(close),
+            col_map_compatible_with_rust(col_map),
+        ),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import get_entry_trades_rs
+
+        col_idxs, col_lens = col_map
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
+        return get_entry_trades_rs(order_records, close, col_idxs, col_lens)
+    from vectorbt.portfolio.nb import get_entry_trades_nb
+
+    return get_entry_trades_nb(order_records, close, col_map)
+
+
+def get_exit_trades(
+    order_records: tp.RecordArray,
+    close: tp.Array2d,
+    col_map: tp.ColMap,
+    engine: tp.Optional[str] = None,
+) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.portfolio.nb.get_exit_trades_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=combine_rust_support(
+            order_record_array_compatible_with_rust(order_records),
+            array_compatible_with_rust(close),
+            col_map_compatible_with_rust(col_map),
+        ),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import get_exit_trades_rs
+
+        col_idxs, col_lens = col_map
+        close = prepare_array_for_rust(close, dtype=np.float64)
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
+        return get_exit_trades_rs(order_records, close, col_idxs, col_lens)
+    from vectorbt.portfolio.nb import get_exit_trades_nb
+
+    return get_exit_trades_nb(order_records, close, col_map)
+
+
+def trade_winning_streak(
+    records: tp.RecordArray,
+    engine: tp.Optional[str] = None,
+) -> tp.Array1d:
+    """Engine-neutral `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=trade_record_array_compatible_with_rust(records),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import trade_winning_streak_rs
+
+        return trade_winning_streak_rs(records)
+    from vectorbt.portfolio.nb import trade_winning_streak_nb
+
+    return trade_winning_streak_nb(records)
+
+
+# ############# Asset flow & position ############# #
+
+
+def trade_losing_streak(
+    records: tp.RecordArray,
+    engine: tp.Optional[str] = None,
+) -> tp.Array1d:
+    """Engine-neutral `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=trade_record_array_compatible_with_rust(records),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import trade_losing_streak_rs
+
+        return trade_losing_streak_rs(records)
+    from vectorbt.portfolio.nb import trade_losing_streak_nb
+
+    return trade_losing_streak_nb(records)
+
+
+def get_positions(
+    trade_records: tp.RecordArray,
+    col_map: tp.ColMap,
+    engine: tp.Optional[str] = None,
+) -> tp.RecordArray:
+    """Engine-neutral `vectorbt.portfolio.nb.get_positions_nb`."""
+    eng = resolve_engine(
+        engine,
+        supports_rust=combine_rust_support(
+            trade_record_array_compatible_with_rust(trade_records),
+            col_map_compatible_with_rust(col_map),
+        ),
+    )
+    if eng == "rust":
+        from vectorbt_rust.portfolio import get_positions_rs
+
+        col_idxs, col_lens = col_map
+        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
+        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
+        return get_positions_rs(trade_records, col_idxs, col_lens)
+    from vectorbt.portfolio.nb import get_positions_nb
+
+    return get_positions_nb(trade_records, col_map)
+
+
+# ############# Cash flow & liquidity ############# #
+
+
 def get_long_size(position_before: float, position_now: float, engine: tp.Optional[str] = None) -> float:
     """Engine-neutral `vectorbt.portfolio.nb.get_long_size_nb`."""
     eng = resolve_engine(engine, supports_rust=RustSupport(True))
@@ -1059,48 +1202,6 @@ def get_short_size(position_before: float, position_now: float, engine: tp.Optio
     from vectorbt.portfolio.nb import get_short_size_nb
 
     return get_short_size_nb(position_before, position_now)
-
-
-def get_free_cash_diff(
-    position_before: float,
-    position_now: float,
-    debt_now: float,
-    price: float,
-    fees: float,
-    engine: tp.Optional[str] = None,
-) -> tp.Tuple[float, float]:
-    """Engine-neutral `vectorbt.portfolio.nb.get_free_cash_diff_nb`."""
-    eng = resolve_engine(engine, supports_rust=RustSupport(True))
-    if eng == "rust":
-        from vectorbt_rust.portfolio import get_free_cash_diff_rs
-
-        return get_free_cash_diff_rs(position_before, position_now, debt_now, price, fees)
-    from vectorbt.portfolio.nb import get_free_cash_diff_nb
-
-    return get_free_cash_diff_nb(position_before, position_now, debt_now, price, fees)
-
-
-def get_trade_stats(
-    size: float,
-    entry_price: float,
-    entry_fees: float,
-    exit_price: float,
-    exit_fees: float,
-    direction: int,
-    engine: tp.Optional[str] = None,
-) -> tp.Tuple[float, float]:
-    """Engine-neutral `vectorbt.portfolio.nb.get_trade_stats_nb`."""
-    eng = resolve_engine(engine, supports_rust=RustSupport(True))
-    if eng == "rust":
-        from vectorbt_rust.portfolio import get_trade_stats_rs
-
-        return get_trade_stats_rs(size, entry_price, entry_fees, exit_price, exit_fees, direction)
-    from vectorbt.portfolio.nb import get_trade_stats_nb
-
-    return get_trade_stats_nb(size, entry_price, entry_fees, exit_price, exit_fees, direction)
-
-
-# ############# Asset flow & position ############# #
 
 
 def asset_flow(
@@ -1146,7 +1247,23 @@ def assets(asset_flow: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2
     return assets_nb(asset_flow)
 
 
-# ############# Cash flow & liquidity ############# #
+def get_free_cash_diff(
+    position_before: float,
+    position_now: float,
+    debt_now: float,
+    price: float,
+    fees: float,
+    engine: tp.Optional[str] = None,
+) -> tp.Tuple[float, float]:
+    """Engine-neutral `vectorbt.portfolio.nb.get_free_cash_diff_nb`."""
+    eng = resolve_engine(engine, supports_rust=RustSupport(True))
+    if eng == "rust":
+        from vectorbt_rust.portfolio import get_free_cash_diff_rs
+
+        return get_free_cash_diff_rs(position_before, position_now, debt_now, price, fees)
+    from vectorbt.portfolio.nb import get_free_cash_diff_nb
+
+    return get_free_cash_diff_nb(position_before, position_now, debt_now, price, fees)
 
 
 def cash_flow(
@@ -1218,6 +1335,9 @@ def cash_flow_grouped(
     from vectorbt.portfolio.nb import cash_flow_grouped_nb
 
     return cash_flow_grouped_nb(cash_flow, group_lens)
+
+
+# ############# Performance metrics ############# #
 
 
 def init_cash_grouped(
@@ -1346,9 +1466,6 @@ def cash_grouped(
     from vectorbt.portfolio.nb import cash_grouped_nb
 
     return cash_grouped_nb(target_shape, cash_flow_grouped, group_lens, init_cash_grouped)
-
-
-# ############# Performance metrics ############# #
 
 
 def asset_value(close: tp.Array2d, assets: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array2d:
@@ -1576,6 +1693,9 @@ def returns_in_sim_order(
     return returns_in_sim_order_nb(value_iso, group_lens, init_cash_grouped, call_seq)
 
 
+# ############# Trade/position records ############# #
+
+
 def asset_returns(
     cash_flow: tp.Array2d,
     asset_value: tp.Array2d,
@@ -1692,123 +1812,3 @@ def gross_exposure(
     from vectorbt.portfolio.nb import gross_exposure_nb
 
     return gross_exposure_nb(asset_value, cash)
-
-
-# ############# Trade/position records ############# #
-
-
-def get_entry_trades(
-    order_records: tp.RecordArray,
-    close: tp.Array2d,
-    col_map: tp.ColMap,
-    engine: tp.Optional[str] = None,
-) -> tp.RecordArray:
-    """Engine-neutral `vectorbt.portfolio.nb.get_entry_trades_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=combine_rust_support(
-            order_record_array_compatible_with_rust(order_records),
-            array_compatible_with_rust(close),
-            col_map_compatible_with_rust(col_map),
-        ),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import get_entry_trades_rs
-
-        col_idxs, col_lens = col_map
-        close = prepare_array_for_rust(close, dtype=np.float64)
-        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
-        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
-        return get_entry_trades_rs(order_records, close, col_idxs, col_lens)
-    from vectorbt.portfolio.nb import get_entry_trades_nb
-
-    return get_entry_trades_nb(order_records, close, col_map)
-
-
-def get_exit_trades(
-    order_records: tp.RecordArray,
-    close: tp.Array2d,
-    col_map: tp.ColMap,
-    engine: tp.Optional[str] = None,
-) -> tp.RecordArray:
-    """Engine-neutral `vectorbt.portfolio.nb.get_exit_trades_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=combine_rust_support(
-            order_record_array_compatible_with_rust(order_records),
-            array_compatible_with_rust(close),
-            col_map_compatible_with_rust(col_map),
-        ),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import get_exit_trades_rs
-
-        col_idxs, col_lens = col_map
-        close = prepare_array_for_rust(close, dtype=np.float64)
-        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
-        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
-        return get_exit_trades_rs(order_records, close, col_idxs, col_lens)
-    from vectorbt.portfolio.nb import get_exit_trades_nb
-
-    return get_exit_trades_nb(order_records, close, col_map)
-
-
-def trade_winning_streak(
-    records: tp.RecordArray,
-    engine: tp.Optional[str] = None,
-) -> tp.Array1d:
-    """Engine-neutral `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=trade_record_array_compatible_with_rust(records),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import trade_winning_streak_rs
-
-        return trade_winning_streak_rs(records)
-    from vectorbt.portfolio.nb import trade_winning_streak_nb
-
-    return trade_winning_streak_nb(records)
-
-
-def trade_losing_streak(
-    records: tp.RecordArray,
-    engine: tp.Optional[str] = None,
-) -> tp.Array1d:
-    """Engine-neutral `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=trade_record_array_compatible_with_rust(records),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import trade_losing_streak_rs
-
-        return trade_losing_streak_rs(records)
-    from vectorbt.portfolio.nb import trade_losing_streak_nb
-
-    return trade_losing_streak_nb(records)
-
-
-def get_positions(
-    trade_records: tp.RecordArray,
-    col_map: tp.ColMap,
-    engine: tp.Optional[str] = None,
-) -> tp.RecordArray:
-    """Engine-neutral `vectorbt.portfolio.nb.get_positions_nb`."""
-    eng = resolve_engine(
-        engine,
-        supports_rust=combine_rust_support(
-            trade_record_array_compatible_with_rust(trade_records),
-            col_map_compatible_with_rust(col_map),
-        ),
-    )
-    if eng == "rust":
-        from vectorbt_rust.portfolio import get_positions_rs
-
-        col_idxs, col_lens = col_map
-        col_idxs = prepare_array_for_rust(col_idxs, dtype=np.int64)
-        col_lens = prepare_array_for_rust(col_lens, dtype=np.int64)
-        return get_positions_rs(trade_records, col_idxs, col_lens)
-    from vectorbt.portfolio.nb import get_positions_nb
-
-    return get_positions_nb(trade_records, col_map)

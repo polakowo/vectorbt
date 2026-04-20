@@ -138,121 +138,6 @@ fn col_map(col_arr: &[i64], n_cols: usize) -> (Vec<i64>, Vec<i64>) {
 }
 
 #[pyfunction]
-pub fn col_map_rs<'py>(
-    py: Python<'py>,
-    col_arr: PyReadonlyArray1<'py, i64>,
-    n_cols: usize,
-) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<i64>>)> {
-    let col_arr_cow = array1_as_slice_cow(&col_arr);
-    let (col_idxs, col_lens) = py.allow_threads(|| col_map(col_arr_cow.as_ref(), n_cols));
-    Ok((
-        PyArray1::from_vec_bound(py, col_idxs),
-        PyArray1::from_vec_bound(py, col_lens),
-    ))
-}
-
-fn col_map_select(col_idxs: &[i64], col_lens: &[i64], new_cols: &[i64]) -> (Vec<i64>, Vec<i64>) {
-    let n_cols = col_lens.len();
-
-    // Compute col_start_idxs
-    let mut col_start_idxs = vec![0i64; n_cols];
-    for i in 1..n_cols {
-        col_start_idxs[i] = col_start_idxs[i - 1] + col_lens[i - 1];
-    }
-
-    // Total count
-    let mut total_count: usize = 0;
-    for &nc in new_cols {
-        total_count += col_lens[nc as usize] as usize;
-    }
-
-    let mut idxs_out = vec![0i64; total_count];
-    let mut col_arr_out = vec![0i64; total_count];
-    let mut j: usize = 0;
-
-    for (new_col_i, &new_col) in new_cols.iter().enumerate() {
-        let col_len = col_lens[new_col as usize] as usize;
-        if col_len == 0 {
-            continue;
-        }
-        let col_start_idx = col_start_idxs[new_col as usize] as usize;
-        idxs_out[j..j + col_len].copy_from_slice(&col_idxs[col_start_idx..col_start_idx + col_len]);
-        col_arr_out[j..j + col_len].fill(new_col_i as i64);
-        j += col_len;
-    }
-    (idxs_out, col_arr_out)
-}
-
-#[pyfunction]
-pub fn col_map_select_rs<'py>(
-    py: Python<'py>,
-    col_idxs: PyReadonlyArray1<'py, i64>,
-    col_lens: PyReadonlyArray1<'py, i64>,
-    new_cols: PyReadonlyArray1<'py, i64>,
-) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<i64>>)> {
-    let col_idxs_cow = array1_as_slice_cow(&col_idxs);
-    let col_lens_cow = array1_as_slice_cow(&col_lens);
-    let new_cols_cow = array1_as_slice_cow(&new_cols);
-    let (idxs, col_arr) = py.allow_threads(|| {
-        col_map_select(
-            col_idxs_cow.as_ref(),
-            col_lens_cow.as_ref(),
-            new_cols_cow.as_ref(),
-        )
-    });
-    Ok((
-        PyArray1::from_vec_bound(py, idxs),
-        PyArray1::from_vec_bound(py, col_arr),
-    ))
-}
-
-/// Helper: create an empty numpy array with the given dtype and length.
-pub(crate) fn numpy_empty<'py>(
-    py: Python<'py>,
-    n: usize,
-    dtype: &Bound<'py, pyo3::PyAny>,
-) -> PyResult<Bound<'py, pyo3::PyAny>> {
-    let np = py.import_bound("numpy")?;
-    let args = PyTuple::new_bound(py, &[n.into_py(py)]);
-    np.call_method(
-        "empty",
-        (args,),
-        Some(&[("dtype", dtype)].into_py_dict_bound(py)),
-    )
-}
-
-/// Get the data pointer and itemsize from an untyped numpy array.
-///
-/// # Safety
-/// The caller must ensure the array is contiguous and the returned pointer
-/// is only used while the array is alive.
-pub(crate) unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, usize, usize)> {
-    let arr_obj = arr.as_array_ptr() as *mut numpy::npyffi::PyArrayObject;
-    let data = (*arr_obj).data as *mut u8;
-    let dtype = arr.getattr("dtype")?;
-    let itemsize: usize = dtype.getattr("itemsize")?.extract()?;
-    let n: usize = arr.len()?;
-    Ok((data, itemsize, n))
-}
-
-pub(crate) fn record_col_offset(records: &Bound<'_, pyo3::PyAny>) -> PyResult<usize> {
-    let dtype = records.getattr("dtype")?;
-    let fields = dtype.getattr("fields")?;
-    let col_field = fields.get_item("col")?;
-    col_field.get_item(1)?.extract()
-}
-
-pub(crate) trait AsArrayPtr {
-    fn as_array_ptr(&self) -> *mut pyo3::ffi::PyObject;
-}
-
-impl<'py> AsArrayPtr for Bound<'py, pyo3::PyAny> {
-    fn as_array_ptr(&self) -> *mut pyo3::ffi::PyObject {
-        self.as_ptr()
-    }
-}
-
-#[pyfunction]
 pub fn record_col_range_select_rs<'py>(
     py: Python<'py>,
     records: Bound<'py, pyo3::PyAny>,
@@ -318,6 +203,121 @@ pub fn record_col_range_select_rs<'py>(
     }
 
     Ok(out)
+}
+
+fn col_map_select(col_idxs: &[i64], col_lens: &[i64], new_cols: &[i64]) -> (Vec<i64>, Vec<i64>) {
+    let n_cols = col_lens.len();
+
+    // Compute col_start_idxs
+    let mut col_start_idxs = vec![0i64; n_cols];
+    for i in 1..n_cols {
+        col_start_idxs[i] = col_start_idxs[i - 1] + col_lens[i - 1];
+    }
+
+    // Total count
+    let mut total_count: usize = 0;
+    for &nc in new_cols {
+        total_count += col_lens[nc as usize] as usize;
+    }
+
+    let mut idxs_out = vec![0i64; total_count];
+    let mut col_arr_out = vec![0i64; total_count];
+    let mut j: usize = 0;
+
+    for (new_col_i, &new_col) in new_cols.iter().enumerate() {
+        let col_len = col_lens[new_col as usize] as usize;
+        if col_len == 0 {
+            continue;
+        }
+        let col_start_idx = col_start_idxs[new_col as usize] as usize;
+        idxs_out[j..j + col_len].copy_from_slice(&col_idxs[col_start_idx..col_start_idx + col_len]);
+        col_arr_out[j..j + col_len].fill(new_col_i as i64);
+        j += col_len;
+    }
+    (idxs_out, col_arr_out)
+}
+
+#[pyfunction]
+pub fn col_map_rs<'py>(
+    py: Python<'py>,
+    col_arr: PyReadonlyArray1<'py, i64>,
+    n_cols: usize,
+) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<i64>>)> {
+    let col_arr_cow = array1_as_slice_cow(&col_arr);
+    let (col_idxs, col_lens) = py.allow_threads(|| col_map(col_arr_cow.as_ref(), n_cols));
+    Ok((
+        PyArray1::from_vec_bound(py, col_idxs),
+        PyArray1::from_vec_bound(py, col_lens),
+    ))
+}
+
+/// Helper: create an empty numpy array with the given dtype and length.
+pub(crate) fn numpy_empty<'py>(
+    py: Python<'py>,
+    n: usize,
+    dtype: &Bound<'py, pyo3::PyAny>,
+) -> PyResult<Bound<'py, pyo3::PyAny>> {
+    let np = py.import_bound("numpy")?;
+    let args = PyTuple::new_bound(py, &[n.into_py(py)]);
+    np.call_method(
+        "empty",
+        (args,),
+        Some(&[("dtype", dtype)].into_py_dict_bound(py)),
+    )
+}
+
+/// Get the data pointer and itemsize from an untyped numpy array.
+///
+/// # Safety
+/// The caller must ensure the array is contiguous and the returned pointer
+/// is only used while the array is alive.
+pub(crate) unsafe fn array_raw_parts(arr: &Bound<'_, pyo3::PyAny>) -> PyResult<(*mut u8, usize, usize)> {
+    let arr_obj = arr.as_array_ptr() as *mut numpy::npyffi::PyArrayObject;
+    let data = (*arr_obj).data as *mut u8;
+    let dtype = arr.getattr("dtype")?;
+    let itemsize: usize = dtype.getattr("itemsize")?.extract()?;
+    let n: usize = arr.len()?;
+    Ok((data, itemsize, n))
+}
+
+pub(crate) fn record_col_offset(records: &Bound<'_, pyo3::PyAny>) -> PyResult<usize> {
+    let dtype = records.getattr("dtype")?;
+    let fields = dtype.getattr("fields")?;
+    let col_field = fields.get_item("col")?;
+    col_field.get_item(1)?.extract()
+}
+
+pub(crate) trait AsArrayPtr {
+    fn as_array_ptr(&self) -> *mut pyo3::ffi::PyObject;
+}
+
+impl<'py> AsArrayPtr for Bound<'py, pyo3::PyAny> {
+    fn as_array_ptr(&self) -> *mut pyo3::ffi::PyObject {
+        self.as_ptr()
+    }
+}
+
+#[pyfunction]
+pub fn col_map_select_rs<'py>(
+    py: Python<'py>,
+    col_idxs: PyReadonlyArray1<'py, i64>,
+    col_lens: PyReadonlyArray1<'py, i64>,
+    new_cols: PyReadonlyArray1<'py, i64>,
+) -> PyResult<(Bound<'py, PyArray1<i64>>, Bound<'py, PyArray1<i64>>)> {
+    let col_idxs_cow = array1_as_slice_cow(&col_idxs);
+    let col_lens_cow = array1_as_slice_cow(&col_lens);
+    let new_cols_cow = array1_as_slice_cow(&new_cols);
+    let (idxs, col_arr) = py.allow_threads(|| {
+        col_map_select(
+            col_idxs_cow.as_ref(),
+            col_lens_cow.as_ref(),
+            new_cols_cow.as_ref(),
+        )
+    });
+    Ok((
+        PyArray1::from_vec_bound(py, idxs),
+        PyArray1::from_vec_bound(py, col_arr),
+    ))
 }
 
 fn is_contiguous_indices(indices: &[i64]) -> bool {
@@ -786,9 +786,9 @@ pub fn bottom_n_mapped_mask_rs<'py>(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(col_range_rs, m)?)?;
     m.add_function(wrap_pyfunction!(col_range_select_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(record_col_range_select_rs, m)?)?;
     m.add_function(wrap_pyfunction!(col_map_rs, m)?)?;
     m.add_function(wrap_pyfunction!(col_map_select_rs, m)?)?;
-    m.add_function(wrap_pyfunction!(record_col_range_select_rs, m)?)?;
     m.add_function(wrap_pyfunction!(record_col_map_select_rs, m)?)?;
     m.add_function(wrap_pyfunction!(is_col_sorted_rs, m)?)?;
     m.add_function(wrap_pyfunction!(is_col_idx_sorted_rs, m)?)?;

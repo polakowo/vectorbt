@@ -145,7 +145,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.returns import dispatch, nb, metrics
+from vectorbt.returns import dispatch, metrics
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
@@ -295,21 +295,46 @@ class ReturnsAccessor(GenericAccessor):
 
         return merge_dicts(returns_defaults_cfg, self._defaults)
 
-    def daily(self, **kwargs) -> tp.SeriesFrame:
+    def resample_total_return(
+        self,
+        freq: tp.PandasFrequencyLike,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Resample returns and calculate total return through engine-neutral dispatch."""
+        engine = engine if engine is not None else self.engine
+        returns_2d = self.to_2d_array()
+        resampled = self.obj.resample(freq, **kwargs)
+        out = np.full((resampled.ngroups, returns_2d.shape[1]), np.nan)
+        for i, idxs in enumerate(resampled.indices.values()):
+            out[i] = dispatch.cum_returns_final(returns_2d[np.asarray(idxs)], 0.0, engine=engine)
+        out_obj = self.wrapper.wrap(out, group_by=False, index=list(resampled.indices.keys()))
+        resampled_arr = np.full((resampled.ngroups, returns_2d.shape[1]), np.nan)
+        resampled_obj = self.wrapper.wrap(
+            resampled_arr,
+            index=resampled.asfreq().index,
+            group_by=False,
+            **merge_dicts({}, wrap_kwargs),
+        )
+        resampled_obj.loc[out_obj.index] = out_obj.values
+        return resampled_obj
+
+    def daily(self, engine: tp.Optional[str] = None, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
         checks.assert_instance_of(self.wrapper.index, DatetimeIndexes)
 
         if self.wrapper.freq == pd.Timedelta("1D"):
             return self.obj
-        return self.resample_apply("1D", nb.total_return_apply_nb, **kwargs)
+        return self.resample_total_return("1D", engine=engine, **kwargs)
 
-    def annual(self, **kwargs) -> tp.SeriesFrame:
+    def annual(self, engine: tp.Optional[str] = None, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
         checks.assert_instance_of(self.obj.index, DatetimeIndexes)
 
         if self.wrapper.freq == self.year_freq:
             return self.obj
-        return self.resample_apply(self.year_freq, nb.total_return_apply_nb, **kwargs)
+        return self.resample_total_return(self.year_freq, engine=engine, **kwargs)
 
     def cumulative(
         self,
