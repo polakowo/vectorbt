@@ -30,7 +30,6 @@ Thumbs.db
 
 # Rust
 rust/target/
-rust/Cargo.lock
 
 # Project-specific
 apps/candlestick-patterns/data

@@ -1,9 +1,26 @@
 name: Docker
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+      prerelease:
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build. Defaults to the workflow ref."
+        required: false
+        type: string
+      prerelease:
+        description: "Skip latest tags."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,16 +40,26 @@ jobs:
             tag_suffix: ""
             latest_tag: latest
 
+          - variant: rust
+            vbt_extras: "rust"
+            tag_suffix: "-rust"
+            latest_tag: latest-rust
+
           - variant: full
             vbt_extras: "full"
             tag_suffix: "-full"
             latest_tag: latest-full
 
+          - variant: full-rust
+            vbt_extras: "full,rust"
+            tag_suffix: "-full-rust"
+            latest_tag: latest-full-rust
+
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 1
           fetch-tags: true
           filter: blob:none
@@ -58,7 +85,7 @@ jobs:
           tags: |
             type=ref,event=tag,suffix=${{ matrix.tag_suffix }}
             type=semver,pattern={{version}}${{ matrix.tag_suffix }}
-            type=raw,value=${{ matrix.latest_tag }},enable=${{ !github.event.release.prerelease }}
+            type=raw,value=${{ matrix.latest_tag }},enable=${{ !inputs.prerelease }}
 
       - name: Build and push (multi-arch) - ${{ matrix.variant }}
         uses: docker/build-push-action@v6

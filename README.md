@@ -47,13 +47,13 @@
     </a>
 </p>
 
-<h3 align="center"><b><i>"The backtesting engine that thinks in matrices, not loops."</b></i></h3>
+<h3 align="center"><b>Thinks in matrices. Backtests at scale.</b></h3>
 
-<p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, compiles the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
+<p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, accelerates the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
 
 ---
 
-Test thousands of trading ideas across assets and timeframes at scale, analyze portfolio performance down to individual trades, and visualize results interactively, all in a few lines of code. Built for both human researchers and AI agents, VectorBT combines rapid experimentation with a mature, battle-tested backtesting stack refined through years of community use.
+Explore thousands of trading ideas across assets and timeframes, analyze portfolio performance down to individual trades, and visualize results interactively, all in a few lines of code. Built for both human researchers and AI agents, VectorBT combines large-scale experimentation with a mature, battle-tested backtesting stack refined through years of community use.
 
 VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
 
@@ -78,15 +78,27 @@ VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt
 pip install -U vectorbt
 ```
 
-To install optional dependencies as well:
+To install the optional Rust engine:
+
+```sh
+pip install -U "vectorbt[rust]"
+```
+
+To install all optional integrations:
 
 ```sh
 pip install -U "vectorbt[full]"
 ```
 
+To install all optional integrations together with the Rust engine:
+
+```sh
+pip install -U "vectorbt[full,rust]"
+```
+
 ## Examples
 
-#### Invest $100 in Bitcoin since 2014
+### Invest $100 in Bitcoin since 2014
 
 ```python
 import vectorbt as vbt
@@ -102,7 +114,7 @@ print(pf.total_profit())
 19501.10906763755
 ```
 
-#### Trade a dual-SMA crossover strategy
+### Trade a dual-SMA crossover strategy
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -118,7 +130,7 @@ print(pf.total_profit())
 34417.80960086067
 ```
 
-#### Generate 1,000 random strategies
+### Generate 1,000 random strategies
 
 ```python
 import numpy as np
@@ -137,7 +149,7 @@ fig.show()
 
 ![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg)
 
-#### Test 10,000 dual-SMA window combinations
+### Test 10,000 dual-SMA window combinations
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
@@ -159,7 +171,7 @@ fig.show()
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
 
-#### Inspect any strategy configuration
+### Inspect any strategy configuration
 
 ```python
 print(pf[(10, 20, "ETH-USD")].stats())
@@ -197,7 +209,7 @@ Sortino Ratio                                   1.301377
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
-#### Plot any strategy configuration
+### Plot any strategy configuration
 
 ```python
 pf[(10, 20, "ETH-USD")].plot().show()
@@ -205,7 +217,7 @@ pf[(10, 20, "ETH-USD")].plot().show()
 
 ![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_portfolio.svg)
 
-#### Animate Bollinger Bands across multiple symbols
+### Animate Bollinger Bands across multiple symbols
 
 VectorBT goes beyond backtesting, with tools for financial data analysis and visualization:
 
