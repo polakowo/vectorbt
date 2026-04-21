@@ -2,8 +2,8 @@
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 use crate::generic::{
-    apply_2d_by_col, bshift_1d_into, ewm_mean_1d, ewm_std_1d, rolling_max_1d, rolling_mean_1d,
-    rolling_min_1d, rolling_std_1d, FlexArray,
+    apply_2d_by_col, bshift_1d_into, ewm_mean_1d, ewm_std_1d, rolling_max_1d, rolling_mean_1d, rolling_min_1d,
+    rolling_std_1d, FlexArray,
 };
 use ndarray::{Array2, ArrayView2};
 use numpy::{PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn};
@@ -21,11 +21,7 @@ fn reverse_vec(mut v: Vec<f64>) -> Vec<f64> {
     v
 }
 
-fn validate_matching_shape(
-    name: &str,
-    shape: (usize, usize),
-    other: (usize, usize),
-) -> PyResult<()> {
+fn validate_matching_shape(name: &str, shape: (usize, usize), other: (usize, usize)) -> PyResult<()> {
     if shape != other {
         return Err(PyValueError::new_err(format!(
             "`{name}` must have the same shape as `close`"
@@ -34,11 +30,7 @@ fn validate_matching_shape(
     Ok(())
 }
 
-fn future_mean_apply_rolling_c(
-    close: ArrayView2<'_, f64>,
-    window: usize,
-    wait: usize,
-) -> Option<Array2<f64>> {
+fn future_mean_apply_rolling_c(close: ArrayView2<'_, f64>, window: usize, wait: usize) -> Option<Array2<f64>> {
     let (nrows, ncols) = close.dim();
     let src = close.as_slice()?;
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
@@ -123,8 +115,7 @@ fn future_std_apply_rolling_c(
             let cnt = counts[col];
             if cnt >= window && cnt > ddof {
                 let mean = sums[col] / cnt as f64;
-                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
-                    / (cnt - ddof) as f64;
+                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
                 dst[out_start + col] = variance.abs().sqrt();
             }
         }
@@ -132,11 +123,7 @@ fn future_std_apply_rolling_c(
     Some(out)
 }
 
-fn mean_labels_apply_rolling_c(
-    close: ArrayView2<'_, f64>,
-    window: usize,
-    wait: usize,
-) -> Option<Array2<f64>> {
+fn mean_labels_apply_rolling_c(close: ArrayView2<'_, f64>, window: usize, wait: usize) -> Option<Array2<f64>> {
     let (nrows, ncols) = close.dim();
     let src = close.as_slice()?;
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
@@ -197,11 +184,7 @@ fn future_min_max_apply_rolling_c(
         }
         let out_start = i * ncols;
         for col in 0..ncols {
-            let mut value = if is_min {
-                f64::INFINITY
-            } else {
-                f64::NEG_INFINITY
-            };
+            let mut value = if is_min { f64::INFINITY } else { f64::NEG_INFINITY };
             let mut valid = true;
             for row in start..end {
                 let v = src[row * ncols + col];
@@ -291,11 +274,7 @@ pub(crate) fn future_std_apply(
     }
 }
 
-pub(crate) fn future_min_apply(
-    close: ArrayView2<'_, f64>,
-    window: usize,
-    wait: usize,
-) -> Array2<f64> {
+pub(crate) fn future_min_apply(close: ArrayView2<'_, f64>, window: usize, wait: usize) -> Array2<f64> {
     if let Some(out) = future_min_max_apply_rolling_c(close, window, wait, true) {
         return out;
     }
@@ -315,11 +294,7 @@ pub(crate) fn future_min_apply(
     }
 }
 
-pub(crate) fn future_max_apply(
-    close: ArrayView2<'_, f64>,
-    window: usize,
-    wait: usize,
-) -> Array2<f64> {
+pub(crate) fn future_max_apply(close: ArrayView2<'_, f64>, window: usize, wait: usize) -> Array2<f64> {
     if let Some(out) = future_min_max_apply_rolling_c(close, window, wait, false) {
         return out;
     }
@@ -365,11 +340,7 @@ pub(crate) fn fixed_labels_apply(close: ArrayView2<'_, f64>, n: usize) -> Array2
     for col in 0..ncols {
         for i in 0..nrows {
             let cur = close[[i, col]];
-            let future = if i + n < nrows {
-                close[[i + n, col]]
-            } else {
-                f64::NAN
-            };
+            let future = if i + n < nrows { close[[i + n, col]] } else { f64::NAN };
             out[[i, col]] = (future - cur) / cur;
         }
     }
@@ -416,9 +387,7 @@ pub(crate) fn local_extrema_apply(
 ) -> PyResult<Array2<i64>> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<i64>::from_elem((nrows, ncols), 0);
-    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
-        (pos_th.as_full_2d(), neg_th.as_full_2d())
-    {
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) = (pos_th.as_full_2d(), neg_th.as_full_2d()) {
         for col in 0..ncols {
             let mut prev_i: usize = 0;
             let mut direction: i64 = 0;
@@ -517,10 +486,7 @@ pub(crate) fn local_extrema_apply(
     Ok(out)
 }
 
-pub(crate) fn bn_trend_labels(
-    close: ArrayView2<'_, f64>,
-    local_extrema: ArrayView2<'_, i64>,
-) -> Array2<f64> {
+pub(crate) fn bn_trend_labels(close: ArrayView2<'_, f64>, local_extrema: ArrayView2<'_, i64>) -> Array2<f64> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
@@ -566,10 +532,7 @@ fn slice_min_max(close: ArrayView2<'_, f64>, col: usize, start: usize, end: usiz
     (_min, _max)
 }
 
-pub(crate) fn bn_cont_trend_labels(
-    close: ArrayView2<'_, f64>,
-    local_extrema: ArrayView2<'_, i64>,
-) -> Array2<f64> {
+pub(crate) fn bn_cont_trend_labels(close: ArrayView2<'_, f64>, local_extrema: ArrayView2<'_, i64>) -> Array2<f64> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
 
@@ -602,9 +565,7 @@ pub(crate) fn bn_cont_sat_trend_labels(
 ) -> PyResult<Array2<f64>> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
-    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
-        (pos_th.as_full_2d(), neg_th.as_full_2d())
-    {
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) = (pos_th.as_full_2d(), neg_th.as_full_2d()) {
         for col in 0..ncols {
             let mut prev_i_opt: Option<usize> = None;
             for next_i in 0..nrows {
@@ -746,9 +707,7 @@ pub(crate) fn trend_labels_apply(
     let out = match mode {
         TREND_MODE_BINARY => bn_trend_labels(close, local_extrema.view()),
         TREND_MODE_BINARY_CONT => bn_cont_trend_labels(close, local_extrema.view()),
-        TREND_MODE_BINARY_CONT_SAT => {
-            bn_cont_sat_trend_labels(close, local_extrema.view(), pos_th, neg_th)?
-        }
+        TREND_MODE_BINARY_CONT_SAT => bn_cont_sat_trend_labels(close, local_extrema.view(), pos_th, neg_th)?,
         TREND_MODE_PCT_CHANGE => pct_trend_labels(close, local_extrema.view(), false),
         TREND_MODE_PCT_CHANGE_NORM => pct_trend_labels(close, local_extrema.view(), true),
         _ => return Err(PyValueError::new_err("Trend mode is not recognized")),
@@ -765,9 +724,7 @@ pub(crate) fn breakout_labels(
 ) -> Array2<f64> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), 0.0);
-    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
-        (pos_th.as_full_2d(), neg_th.as_full_2d())
-    {
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) = (pos_th.as_full_2d(), neg_th.as_full_2d()) {
         for col in 0..ncols {
             for i in 0..nrows {
                 let _pos_th = unsafe { *pos_src.get_unchecked(i * pos_cols + col) }.abs();
@@ -958,8 +915,7 @@ pub fn bn_cont_sat_trend_labels_rs<'py>(
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
     let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
     let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
-    let result =
-        py.allow_threads(|| bn_cont_sat_trend_labels(close_arr, le_arr, &pos_flex, &neg_flex));
+    let result = py.allow_threads(|| bn_cont_sat_trend_labels(close_arr, le_arr, &pos_flex, &neg_flex));
     Ok(PyArray2::from_owned_array_bound(py, result?))
 }
 

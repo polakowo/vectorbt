@@ -2,9 +2,8 @@
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 use crate::generic::{
-    apply_2d_by_col, apply_2d_by_col_inplace, array1_as_slice_cow, diff_1d_into, ewm_mean_1d,
-    ewm_mean_2d_c, ewm_std_1d, ewm_std_2d_c, nancumsum_1d_into, rolling_max_1d, rolling_mean_1d,
-    rolling_min_1d, rolling_std_1d,
+    apply_2d_by_col, apply_2d_by_col_inplace, array1_as_slice_cow, diff_1d_into, ewm_mean_1d, ewm_mean_2d_c,
+    ewm_std_1d, ewm_std_2d_c, nancumsum_1d_into, rolling_max_1d, rolling_mean_1d, rolling_min_1d, rolling_std_1d,
 };
 use ndarray::{Array2, ArrayView2, Zip};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
@@ -19,9 +18,7 @@ pub(crate) fn tuple_hash(py: Python<'_>, window: usize, ewm: bool) -> PyResult<i
 
 pub(crate) fn validate_param_lengths(names: &str, expected: usize, actual: usize) -> PyResult<()> {
     if expected != actual {
-        return Err(PyValueError::new_err(format!(
-            "{names} must have the same length"
-        )));
+        return Err(PyValueError::new_err(format!("{names} must have the same length")));
     }
     Ok(())
 }
@@ -36,13 +33,7 @@ pub(crate) fn ma_2d(a: ArrayView2<'_, f64>, window: usize, ewm: bool, adjust: bo
     apply_2d_by_col(a, |col| rolling_mean_1d(col, window, window))
 }
 
-pub(crate) fn mstd_2d(
-    a: ArrayView2<'_, f64>,
-    window: usize,
-    ewm: bool,
-    adjust: bool,
-    ddof: usize,
-) -> Array2<f64> {
+pub(crate) fn mstd_2d(a: ArrayView2<'_, f64>, window: usize, ewm: bool, adjust: bool, ddof: usize) -> Array2<f64> {
     if ewm {
         if a.is_standard_layout() {
             return ewm_std_2d_c(a, window, window, adjust, ddof);
@@ -309,20 +300,15 @@ pub fn stoch_cache_rs<'py>(
     let high_arr = high.as_array();
     let low_arr = low.as_array();
     if high_arr.dim() != low_arr.dim() {
-        return Err(PyValueError::new_err(
-            "high and low must have the same shape",
-        ));
+        return Err(PyValueError::new_err("high and low must have the same shape"));
     }
     let cache_dict = PyDict::new_bound(py);
     for &k_window in &k_windows {
         let h = k_window as isize;
         if !cache_dict.contains(h)? {
-            let roll_min = py.allow_threads(|| {
-                apply_2d_by_col(low_arr, |col| rolling_min_1d(col, k_window, k_window))
-            });
-            let roll_max = py.allow_threads(|| {
-                apply_2d_by_col(high_arr, |col| rolling_max_1d(col, k_window, k_window))
-            });
+            let roll_min = py.allow_threads(|| apply_2d_by_col(low_arr, |col| rolling_min_1d(col, k_window, k_window)));
+            let roll_max =
+                py.allow_threads(|| apply_2d_by_col(high_arr, |col| rolling_max_1d(col, k_window, k_window)));
             cache_dict.set_item(
                 h,
                 (
@@ -385,16 +371,8 @@ pub fn macd_cache_rs<'py>(
     _signal_ewms: Vec<bool>,
     adjust: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
-    validate_param_lengths(
-        "fast_windows and macd_ewms",
-        fast_windows.len(),
-        macd_ewms.len(),
-    )?;
-    validate_param_lengths(
-        "slow_windows and macd_ewms",
-        slow_windows.len(),
-        macd_ewms.len(),
-    )?;
+    validate_param_lengths("fast_windows and macd_ewms", fast_windows.len(), macd_ewms.len())?;
+    validate_param_lengths("slow_windows and macd_ewms", slow_windows.len(), macd_ewms.len())?;
     let mut windows = fast_windows;
     windows.extend(slow_windows);
     let mut ewms = macd_ewms.clone();
@@ -474,9 +452,7 @@ pub(crate) fn true_range_2d(
     close: ArrayView2<'_, f64>,
 ) -> Array2<f64> {
     let (nrows, ncols) = high.dim();
-    if let (Some(high_src), Some(low_src), Some(close_src)) =
-        (high.as_slice(), low.as_slice(), close.as_slice())
-    {
+    if let (Some(high_src), Some(low_src), Some(close_src)) = (high.as_slice(), low.as_slice(), close.as_slice()) {
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         let dst = out.as_slice_mut().expect("owned array must be sliceable");
         if nrows == 0 {
@@ -537,9 +513,7 @@ pub fn true_range_1d_rs<'py>(
     let l = l_cow.as_ref();
     let c = c_cow.as_ref();
     if h.len() != l.len() || h.len() != c.len() {
-        return Err(PyValueError::new_err(
-            "high, low, and close must have the same length",
-        ));
+        return Err(PyValueError::new_err("high, low, and close must have the same length"));
     }
     let result = py.allow_threads(|| true_range_1d(h, l, c));
     Ok(PyArray1::from_vec_bound(py, result))
@@ -556,9 +530,7 @@ pub fn true_range_rs<'py>(
     let l_arr = low.as_array();
     let c_arr = close.as_array();
     if h_arr.dim() != l_arr.dim() || h_arr.dim() != c_arr.dim() {
-        return Err(PyValueError::new_err(
-            "high, low, and close must have the same shape",
-        ));
+        return Err(PyValueError::new_err("high, low, and close must have the same shape"));
     }
     let result = py.allow_threads(|| true_range_2d(h_arr, l_arr, c_arr));
     Ok(PyArray2::from_owned_array_bound(py, result))
@@ -579,9 +551,7 @@ pub fn atr_cache_rs<'py>(
     let l_arr = low.as_array();
     let c_arr = close.as_array();
     if h_arr.dim() != l_arr.dim() || h_arr.dim() != c_arr.dim() {
-        return Err(PyValueError::new_err(
-            "high, low, and close must have the same shape",
-        ));
+        return Err(PyValueError::new_err("high, low, and close must have the same shape"));
     }
     let tr = py.allow_threads(|| true_range_2d(h_arr, l_arr, c_arr));
     let cache_dict = PyDict::new_bound(py);
@@ -636,9 +606,7 @@ pub fn obv_custom_rs<'py>(
     let c_arr = close.as_array();
     let v_arr = volume_ts.as_array();
     if c_arr.dim() != v_arr.dim() {
-        return Err(PyValueError::new_err(
-            "close and volume_ts must have the same shape",
-        ));
+        return Err(PyValueError::new_err("close and volume_ts must have the same shape"));
     }
     let (nrows, ncols) = c_arr.dim();
     let result = py.allow_threads(|| {

@@ -259,11 +259,7 @@ pub(crate) fn numpy_empty<'py>(
 ) -> PyResult<Bound<'py, pyo3::PyAny>> {
     let np = py.import_bound("numpy")?;
     let args = PyTuple::new_bound(py, &[n.into_py(py)]);
-    np.call_method(
-        "empty",
-        (args,),
-        Some(&[("dtype", dtype)].into_py_dict_bound(py)),
-    )
+    np.call_method("empty", (args,), Some(&[("dtype", dtype)].into_py_dict_bound(py)))
 }
 
 /// Get the data pointer and itemsize from an untyped numpy array.
@@ -307,13 +303,8 @@ pub fn col_map_select_rs<'py>(
     let col_idxs_cow = array1_as_slice_cow(&col_idxs);
     let col_lens_cow = array1_as_slice_cow(&col_lens);
     let new_cols_cow = array1_as_slice_cow(&new_cols);
-    let (idxs, col_arr) = py.allow_threads(|| {
-        col_map_select(
-            col_idxs_cow.as_ref(),
-            col_lens_cow.as_ref(),
-            new_cols_cow.as_ref(),
-        )
-    });
+    let (idxs, col_arr) =
+        py.allow_threads(|| col_map_select(col_idxs_cow.as_ref(), col_lens_cow.as_ref(), new_cols_cow.as_ref()));
     Ok((
         PyArray1::from_vec_bound(py, idxs),
         PyArray1::from_vec_bound(py, col_arr),
@@ -431,10 +422,7 @@ fn is_col_sorted(col_arr: &[i64]) -> bool {
 }
 
 #[pyfunction]
-pub fn is_col_sorted_rs<'py>(
-    py: Python<'py>,
-    col_arr: PyReadonlyArray1<'py, i64>,
-) -> PyResult<bool> {
+pub fn is_col_sorted_rs<'py>(py: Python<'py>, col_arr: PyReadonlyArray1<'py, i64>) -> PyResult<bool> {
     let col_arr_cow = array1_as_slice_cow(&col_arr);
     Ok(py.allow_threads(|| is_col_sorted(col_arr_cow.as_ref())))
 }
@@ -499,9 +487,7 @@ pub fn is_mapped_expandable_rs<'py>(
     let col_arr_cow = array1_as_slice_cow(&col_arr);
     let idx_arr_cow = array1_as_slice_cow(&idx_arr);
     let (nrows, ncols) = target_shape;
-    Ok(py.allow_threads(|| {
-        is_mapped_expandable(col_arr_cow.as_ref(), idx_arr_cow.as_ref(), nrows, ncols)
-    }))
+    Ok(py.allow_threads(|| is_mapped_expandable(col_arr_cow.as_ref(), idx_arr_cow.as_ref(), nrows, ncols)))
 }
 
 fn expand_mapped(
@@ -546,12 +532,7 @@ pub fn expand_mapped_rs<'py>(
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
-fn stack_expand_mapped(
-    mapped_arr: &[f64],
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    fill_value: f64,
-) -> Array2<f64> {
+fn stack_expand_mapped(mapped_arr: &[f64], col_idxs: &[i64], col_lens: &[i64], fill_value: f64) -> Array2<f64> {
     let n_cols = col_lens.len();
 
     // Compute col_start_idxs and max_len
@@ -606,12 +587,7 @@ pub fn stack_expand_mapped_rs<'py>(
 
 // ############# Reducing #############
 
-fn mapped_value_counts(
-    codes: &[i64],
-    n_uniques: usize,
-    col_idxs: &[i64],
-    col_lens: &[i64],
-) -> Array2<i64> {
+fn mapped_value_counts(codes: &[i64], n_uniques: usize, col_idxs: &[i64], col_lens: &[i64]) -> Array2<i64> {
     let n_cols = col_lens.len();
 
     let mut col_start_idxs = vec![0usize; n_cols];
@@ -659,12 +635,7 @@ pub fn mapped_value_counts_rs<'py>(
 
 // ############# Mapping #############
 
-fn top_n_mapped_mask(
-    mapped_arr: &[f64],
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    n: usize,
-) -> Vec<bool> {
+fn top_n_mapped_mask(mapped_arr: &[f64], col_idxs: &[i64], col_lens: &[i64], n: usize) -> Vec<bool> {
     let total_len = mapped_arr.len();
     let n_cols = col_lens.len();
     let mut out = vec![false; total_len];
@@ -709,23 +680,12 @@ pub fn top_n_mapped_mask_rs<'py>(
     let mapped_cow = array1_as_slice_cow(&mapped_arr);
     let col_idxs_cow = array1_as_slice_cow(&col_idxs);
     let col_lens_cow = array1_as_slice_cow(&col_lens);
-    let result = py.allow_threads(|| {
-        top_n_mapped_mask(
-            mapped_cow.as_ref(),
-            col_idxs_cow.as_ref(),
-            col_lens_cow.as_ref(),
-            n,
-        )
-    });
+    let result =
+        py.allow_threads(|| top_n_mapped_mask(mapped_cow.as_ref(), col_idxs_cow.as_ref(), col_lens_cow.as_ref(), n));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
-fn bottom_n_mapped_mask(
-    mapped_arr: &[f64],
-    col_idxs: &[i64],
-    col_lens: &[i64],
-    n: usize,
-) -> Vec<bool> {
+fn bottom_n_mapped_mask(mapped_arr: &[f64], col_idxs: &[i64], col_lens: &[i64], n: usize) -> Vec<bool> {
     let total_len = mapped_arr.len();
     let n_cols = col_lens.len();
     let mut out = vec![false; total_len];
@@ -770,14 +730,8 @@ pub fn bottom_n_mapped_mask_rs<'py>(
     let mapped_cow = array1_as_slice_cow(&mapped_arr);
     let col_idxs_cow = array1_as_slice_cow(&col_idxs);
     let col_lens_cow = array1_as_slice_cow(&col_lens);
-    let result = py.allow_threads(|| {
-        bottom_n_mapped_mask(
-            mapped_cow.as_ref(),
-            col_idxs_cow.as_ref(),
-            col_lens_cow.as_ref(),
-            n,
-        )
-    });
+    let result =
+        py.allow_threads(|| bottom_n_mapped_mask(mapped_cow.as_ref(), col_idxs_cow.as_ref(), col_lens_cow.as_ref(), n));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 

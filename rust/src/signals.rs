@@ -3,9 +3,7 @@
 
 use crate::generic::{array1_as_slice_cow, FlexArray, RangeRecord, RANGE_CLOSED, RANGE_OPEN};
 use ndarray::{Array2, ArrayView2};
-use numpy::{
-    PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn, PyReadwriteArray2,
-};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn, PyReadwriteArray2};
 use pyo3::exceptions::{PyValueError, PyZeroDivisionError};
 use pyo3::prelude::*;
 use rand::seq::index::sample;
@@ -13,11 +11,7 @@ use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
-pub(crate) fn clean_enex_1d(
-    entries: &[bool],
-    exits: &[bool],
-    entry_first: bool,
-) -> (Vec<bool>, Vec<bool>) {
+pub(crate) fn clean_enex_1d(entries: &[bool], exits: &[bool], entry_first: bool) -> (Vec<bool>, Vec<bool>) {
     let mut entries_out = vec![false; entries.len()];
     let mut exits_out = vec![false; exits.len()];
     let mut phase = -1i64;
@@ -70,12 +64,7 @@ pub(crate) fn clean_enex_2d(
     (entries_out, exits_out)
 }
 
-pub(crate) fn generate_rand<R: Rng + ?Sized>(
-    nrows: usize,
-    ncols: usize,
-    n: &[i64],
-    rng: &mut R,
-) -> Array2<bool> {
+pub(crate) fn generate_rand<R: Rng + ?Sized>(nrows: usize, ncols: usize, n: &[i64], rng: &mut R) -> Array2<bool> {
     let mut out = Array2::<bool>::from_elem((nrows, ncols), false);
     for col in 0..ncols {
         let size = n[col].min(nrows as i64) as usize;
@@ -124,12 +113,7 @@ pub(crate) fn generate_rand_by_prob<R: Rng + ?Sized>(
     out
 }
 
-fn next_true_in_col(
-    a: ArrayView2<'_, bool>,
-    col: usize,
-    start: usize,
-    nrows: usize,
-) -> Option<usize> {
+fn next_true_in_col(a: ArrayView2<'_, bool>, col: usize, start: usize, nrows: usize) -> Option<usize> {
     (start..nrows).find(|&row| a[[row, col]])
 }
 
@@ -191,9 +175,7 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
                     };
                     if to_i > from_i {
                         for idx in from_i..to_i {
-                            if rng.gen::<f64>()
-                                < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) }
-                            {
+                            if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
                                 exits[[idx, col]] = true;
                                 last_exit_i = idx as i64;
                                 break;
@@ -250,12 +232,7 @@ fn uniform_summing_to_one<R: Rng + ?Sized>(n: usize, rng: &mut R) -> Vec<f64> {
     diffs
 }
 
-fn rescale_float_to_int<R: Rng + ?Sized>(
-    floats: &[f64],
-    int_range: (f64, f64),
-    total: f64,
-    rng: &mut R,
-) -> Vec<i64> {
+fn rescale_float_to_int<R: Rng + ?Sized>(floats: &[f64], int_range: (f64, f64), total: f64, rng: &mut R) -> Vec<i64> {
     let delta = int_range.1 - int_range.0;
     let mut ints: Vec<i64> = floats
         .iter()
@@ -281,9 +258,7 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> PyResult<(Array2<bool>, Array2<bool>)> {
     if entry_wait == 0 && exit_wait == 0 {
-        return Err(PyValueError::new_err(
-            "entry_wait and exit_wait cannot be both 0",
-        ));
+        return Err(PyValueError::new_err("entry_wait and exit_wait cannot be both 0"));
     }
     let mut entries = Array2::<bool>::from_elem((nrows, ncols), false);
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
@@ -318,9 +293,7 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
                 let min_range = entry_wait + exit_wait;
                 let min_total_range = min_range * (col_n_usize - 1);
                 if nrows < min_total_range + exit_wait + 1 {
-                    return Err(PyValueError::new_err(
-                        "Cannot take a larger sample than population",
-                    ));
+                    return Err(PyValueError::new_err("Cannot take a larger sample than population"));
                 }
                 let max_free_space = nrows - min_total_range - 1;
                 let free_space_pre = max_free_space.min(3 * nrows / (col_n_usize + 1));
@@ -331,12 +304,8 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
                 };
 
                 let rand_floats = uniform_summing_to_one(6, rng);
-                let chosen_spaces = rescale_float_to_int(
-                    &rand_floats,
-                    (0.0, free_space as f64),
-                    free_space as f64,
-                    rng,
-                );
+                let chosen_spaces =
+                    rescale_float_to_int(&rand_floats, (0.0, free_space as f64), free_space as f64, rng);
                 let first_idx = chosen_spaces[0] as usize;
                 let tail_sum: i64 = chosen_spaces[chosen_spaces.len() - 2..].iter().sum();
                 let last_idx = nrows as i64 - tail_sum - exit_wait as i64 - 1;
@@ -426,9 +395,7 @@ pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
                 let mut last_i: Option<usize> = None;
                 let mut hits: Vec<usize> = Vec::new();
                 for idx in from_i..to_i {
-                    if rng.gen::<f64>()
-                        < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) }
-                    {
+                    if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
                         if first_i.is_none() {
                             first_i = Some(idx);
                         }
@@ -678,9 +645,7 @@ pub(crate) fn generate_stop_ex(
                 };
                 if to_i > from_i {
                     if pick_first {
-                        if let Some(idx) =
-                            stop_choice_first(from_i, to_i, col, ts, stop, trailing, wait)
-                        {
+                        if let Some(idx) = stop_choice_first(from_i, to_i, col, ts, stop, trailing, wait) {
                             exits[[idx, col]] = true;
                             last_exit_i = idx as i64;
                         }
@@ -711,9 +676,7 @@ pub(crate) fn generate_stop_enex(
     pick_first: bool,
 ) -> PyResult<(Array2<bool>, Array2<bool>)> {
     if entry_wait == 0 && exit_wait == 0 {
-        return Err(PyValueError::new_err(
-            "entry_wait and exit_wait cannot be both 0",
-        ));
+        return Err(PyValueError::new_err("entry_wait and exit_wait cannot be both 0"));
     }
     let (nrows, ncols) = entries.dim();
     let mut new_entries = Array2::<bool>::from_elem((nrows, ncols), false);
@@ -755,11 +718,7 @@ pub(crate) fn generate_stop_enex(
             }
 
             let pick_first_here = if is_entry { true } else { pick_first };
-            let target: &mut Array2<bool> = if is_entry {
-                &mut new_entries
-            } else {
-                &mut exits
-            };
+            let target: &mut Array2<bool> = if is_entry { &mut new_entries } else { &mut exits };
 
             if pick_first_here {
                 if first_i >= to_i {
@@ -821,11 +780,7 @@ fn ohlc_stop_choice(
     pick_first: bool,
 ) -> PyResult<Vec<usize>> {
     let init_i_i: i64 = from_i as i64 - wait as i64;
-    let init_i = if init_i_i < 0 {
-        0usize
-    } else {
-        init_i_i as usize
-    };
+    let init_i = if init_i_i < 0 { 0usize } else { init_i_i as usize };
     let init_open = open[[init_i, col]];
     let init_sl_stop = sl_stop.get(init_i, col);
     if !init_sl_stop.is_nan() && init_sl_stop < 0.0 {
@@ -849,11 +804,7 @@ fn ohlc_stop_choice(
         if curr_open.is_nan() {
             curr_open = curr_close;
         }
-        let curr_low_raw = if _low.is_nan() {
-            curr_open.min(curr_close)
-        } else {
-            _low
-        };
+        let curr_low_raw = if _low.is_nan() { curr_open.min(curr_close) } else { _low };
         let curr_high_raw = if _high.is_nan() {
             curr_open.max(curr_close)
         } else {
@@ -1031,9 +982,7 @@ pub(crate) fn generate_ohlc_stop_enex(
     pick_first: bool,
 ) -> PyResult<(Array2<bool>, Array2<bool>)> {
     if entry_wait == 0 && exit_wait == 0 {
-        return Err(PyValueError::new_err(
-            "entry_wait and exit_wait cannot be both 0",
-        ));
+        return Err(PyValueError::new_err("entry_wait and exit_wait cannot be both 0"));
     }
     let (nrows, ncols) = entries.dim();
     let mut new_entries = Array2::<bool>::from_elem((nrows, ncols), false);
@@ -1136,13 +1085,7 @@ pub(crate) fn between_ranges(a: ArrayView2<'_, bool>) -> Vec<RangeRecord> {
         for row in 0..nrows {
             if a[[row, col]] {
                 if prev_idx >= 0 {
-                    out.push(RangeRecord::new(
-                        ridx,
-                        col as i64,
-                        prev_idx,
-                        row as i64,
-                        RANGE_CLOSED,
-                    ));
+                    out.push(RangeRecord::new(ridx, col as i64, prev_idx, row as i64, RANGE_CLOSED));
                     ridx += 1;
                 }
                 prev_idx = row as i64;
@@ -1183,13 +1126,7 @@ pub(crate) fn between_two_ranges(
                     a_pos += 1;
                 }
                 if a_idxs[a_pos] <= to_i {
-                    out.push(RangeRecord::new(
-                        ridx,
-                        col as i64,
-                        a_idxs[a_pos],
-                        to_i,
-                        RANGE_CLOSED,
-                    ));
+                    out.push(RangeRecord::new(ridx, col as i64, a_idxs[a_pos], to_i, RANGE_CLOSED));
                     ridx += 1;
                 }
             }
@@ -1200,13 +1137,7 @@ pub(crate) fn between_two_ranges(
                     b_pos += 1;
                 }
                 if b_pos < b_idxs.len() {
-                    out.push(RangeRecord::new(
-                        ridx,
-                        col as i64,
-                        from_i,
-                        b_idxs[b_pos],
-                        RANGE_CLOSED,
-                    ));
+                    out.push(RangeRecord::new(ridx, col as i64, from_i, b_idxs[b_pos], RANGE_CLOSED));
                     ridx += 1;
                 }
             }
@@ -1231,13 +1162,7 @@ pub(crate) fn partition_ranges(a: ArrayView2<'_, bool>) -> Vec<RangeRecord> {
                 }
                 is_partition = true;
             } else if is_partition {
-                out.push(RangeRecord::new(
-                    ridx,
-                    col as i64,
-                    from_i,
-                    row as i64,
-                    RANGE_CLOSED,
-                ));
+                out.push(RangeRecord::new(ridx, col as i64, from_i, row as i64, RANGE_CLOSED));
                 ridx += 1;
                 is_partition = false;
             }
@@ -1268,13 +1193,7 @@ pub(crate) fn between_partition_ranges(a: ArrayView2<'_, bool>) -> Vec<RangeReco
         for row in 0..nrows {
             if a[[row, col]] {
                 if !is_partition && from_i != -1 {
-                    out.push(RangeRecord::new(
-                        ridx,
-                        col as i64,
-                        from_i,
-                        row as i64,
-                        RANGE_CLOSED,
-                    ));
+                    out.push(RangeRecord::new(ridx, col as i64, from_i, row as i64, RANGE_CLOSED));
                     ridx += 1;
                 }
                 is_partition = true;
@@ -1529,8 +1448,7 @@ pub fn clean_enex_rs<'py>(
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     let entries_arr = entries.as_array();
     let exits_arr = exits.as_array();
-    let (entries_out, exits_out) =
-        py.allow_threads(|| clean_enex_2d(entries_arr, exits_arr, entry_first));
+    let (entries_out, exits_out) = py.allow_threads(|| clean_enex_2d(entries_arr, exits_arr, entry_first));
     Ok((
         PyArray2::from_owned_array_bound(py, entries_out),
         PyArray2::from_owned_array_bound(py, exits_out),
@@ -1569,8 +1487,7 @@ pub fn generate_rand_by_prob_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
-    let result =
-        py.allow_threads(|| generate_rand_by_prob(nrows, ncols, &prob_flex, pick_first, &mut rng));
+    let result = py.allow_threads(|| generate_rand_by_prob(nrows, ncols, &prob_flex, pick_first, &mut rng));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1586,9 +1503,7 @@ pub fn generate_rand_ex_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let entries_arr = entries.as_array();
     let mut rng = make_rng(seed);
-    let result = py.allow_threads(|| {
-        generate_rand_ex(entries_arr, wait, until_next, skip_until_exit, &mut rng)
-    });
+    let result = py.allow_threads(|| generate_rand_ex(entries_arr, wait, until_next, skip_until_exit, &mut rng));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1609,14 +1524,7 @@ pub fn generate_rand_ex_by_prob_rs<'py>(
     let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
     let result = py.allow_threads(|| {
-        generate_rand_ex_by_prob(
-            entries_arr,
-            &prob_flex,
-            wait,
-            until_next,
-            skip_until_exit,
-            &mut rng,
-        )
+        generate_rand_ex_by_prob(entries_arr, &prob_flex, wait, until_next, skip_until_exit, &mut rng)
     });
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
@@ -1638,9 +1546,8 @@ pub fn generate_rand_enex_rs<'py>(
         return Err(PyValueError::new_err("n must have length equal to ncols"));
     }
     let mut rng = make_rng(seed);
-    let (entries, exits) = py.allow_threads(|| {
-        generate_rand_enex(nrows, ncols, n_slice, entry_wait, exit_wait, &mut rng)
-    })?;
+    let (entries, exits) =
+        py.allow_threads(|| generate_rand_enex(nrows, ncols, n_slice, entry_wait, exit_wait, &mut rng))?;
     Ok((
         PyArray2::from_owned_array_bound(py, entries),
         PyArray2::from_owned_array_bound(py, exits),
@@ -1674,14 +1581,10 @@ pub fn generate_rand_enex_by_prob_rs<'py>(
     flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     if entry_wait == 0 && exit_wait == 0 {
-        return Err(PyValueError::new_err(
-            "entry_wait and exit_wait cannot be both 0",
-        ));
+        return Err(PyValueError::new_err("entry_wait and exit_wait cannot be both 0"));
     }
-    let entry_prob_flex =
-        FlexArray::from_pyarray("entry_prob", &entry_prob, nrows, ncols, flex_2d)?;
-    let exit_prob_flex =
-        FlexArray::from_pyarray("exit_prob", &exit_prob, nrows, ncols, flex_2d)?;
+    let entry_prob_flex = FlexArray::from_pyarray("entry_prob", &entry_prob, nrows, ncols, flex_2d)?;
+    let exit_prob_flex = FlexArray::from_pyarray("exit_prob", &exit_prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
     let (entries, exits) = py.allow_threads(|| {
         generate_rand_enex_by_prob(
@@ -1824,11 +1727,7 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
     let low_arr = low.as_array();
     let close_arr = close.as_array();
     let shape = entries_arr.dim();
-    if open_arr.dim() != shape
-        || high_arr.dim() != shape
-        || low_arr.dim() != shape
-        || close_arr.dim() != shape
-    {
+    if open_arr.dim() != shape || high_arr.dim() != shape || low_arr.dim() != shape || close_arr.dim() != shape {
         return Err(PyValueError::new_err("OHLC inputs must match entries shape"));
     }
     let sl_stop_flex = FlexArray::from_pyarray("sl_stop", &sl_stop, shape.0, shape.1, flex_2d)?;
@@ -1838,9 +1737,7 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
     let mut stop_price_view = stop_price_out.as_array_mut();
     let mut stop_type_view = stop_type_out.as_array_mut();
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
-        return Err(PyValueError::new_err(
-            "Output arrays must match entries shape",
-        ));
+        return Err(PyValueError::new_err("Output arrays must match entries shape"));
     }
     let result = py.allow_threads(|| {
         generate_ohlc_stop_ex(
@@ -1910,11 +1807,7 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
     let low_arr = low.as_array();
     let close_arr = close.as_array();
     let shape = entries_arr.dim();
-    if open_arr.dim() != shape
-        || high_arr.dim() != shape
-        || low_arr.dim() != shape
-        || close_arr.dim() != shape
-    {
+    if open_arr.dim() != shape || high_arr.dim() != shape || low_arr.dim() != shape || close_arr.dim() != shape {
         return Err(PyValueError::new_err("OHLC inputs must match entries shape"));
     }
     let sl_stop_flex = FlexArray::from_pyarray("sl_stop", &sl_stop, shape.0, shape.1, flex_2d)?;
@@ -1924,9 +1817,7 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
     let mut stop_price_view = stop_price_out.as_array_mut();
     let mut stop_type_view = stop_type_out.as_array_mut();
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
-        return Err(PyValueError::new_err(
-            "Output arrays must match entries shape",
-        ));
+        return Err(PyValueError::new_err("Output arrays must match entries shape"));
     }
     let (new_entries, exits) = py.allow_threads(|| {
         generate_ohlc_stop_enex(
@@ -2054,10 +1945,7 @@ pub fn norm_avg_index_1d_rs(a: PyReadonlyArray1<'_, bool>) -> PyResult<f64> {
 }
 
 #[pyfunction]
-pub fn norm_avg_index_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, bool>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn norm_avg_index_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, bool>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     if a_arr.nrows() <= 1 {
         return Err(PyZeroDivisionError::new_err("division by zero"));

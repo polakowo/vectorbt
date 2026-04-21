@@ -96,3 +96,6 @@ include = ["vectorbt*"]
 
 [tool.setuptools.package-data]
 vectorbt = ["templates/*.json"]
+
+[tool.black]
+line-length = 120

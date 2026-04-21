@@ -4,8 +4,8 @@
 #[allow(dead_code)]
 use ndarray::Array2;
 use numpy::{
-    Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2,
-    PyReadonlyArrayDyn, PyUntypedArrayMethods,
+    Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn,
+    PyUntypedArrayMethods,
 };
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
@@ -471,14 +471,7 @@ impl ProcessOrderState {
         format!(
             "ProcessOrderState(cash={}, position={}, debt={}, free_cash={}, \
              val_price={}, value={}, oidx={}, lidx={})",
-            self.cash,
-            self.position,
-            self.debt,
-            self.free_cash,
-            self.val_price,
-            self.value,
-            self.oidx,
-            self.lidx,
+            self.cash, self.position, self.debt, self.free_cash, self.val_price, self.value, self.oidx, self.lidx,
         )
     }
 }
@@ -721,20 +714,11 @@ fn log_record_offsets(records: &Bound<'_, pyo3::PyAny>) -> PyResult<LogFieldOffs
         req_slippage: fields.get_item("req_slippage")?.get_item(1)?.extract()?,
         req_min_size: fields.get_item("req_min_size")?.get_item(1)?.extract()?,
         req_max_size: fields.get_item("req_max_size")?.get_item(1)?.extract()?,
-        req_size_granularity: fields
-            .get_item("req_size_granularity")?
-            .get_item(1)?
-            .extract()?,
+        req_size_granularity: fields.get_item("req_size_granularity")?.get_item(1)?.extract()?,
         req_reject_prob: fields.get_item("req_reject_prob")?.get_item(1)?.extract()?,
         req_lock_cash: fields.get_item("req_lock_cash")?.get_item(1)?.extract()?,
-        req_allow_partial: fields
-            .get_item("req_allow_partial")?
-            .get_item(1)?
-            .extract()?,
-        req_raise_reject: fields
-            .get_item("req_raise_reject")?
-            .get_item(1)?
-            .extract()?,
+        req_allow_partial: fields.get_item("req_allow_partial")?.get_item(1)?.extract()?,
+        req_raise_reject: fields.get_item("req_raise_reject")?.get_item(1)?.extract()?,
         req_log: fields.get_item("req_log")?.get_item(1)?.extract()?,
         new_cash: fields.get_item("new_cash")?.get_item(1)?.extract()?,
         new_position: fields.get_item("new_position")?.get_item(1)?.extract()?,
@@ -808,16 +792,13 @@ fn buy(
             exec_state.free_cash
         } else {
             let cover_req_cash = exec_state.position.abs() * adj_price * (1.0 + fees) + fixed_fees;
-            let cover_free_cash = add(
-                exec_state.free_cash + 2.0 * exec_state.debt,
-                -cover_req_cash,
-            );
+            let cover_free_cash = add(exec_state.free_cash + 2.0 * exec_state.debt, -cover_req_cash);
             if cover_free_cash > 0.0 {
                 exec_state.free_cash + 2.0 * exec_state.debt
             } else if cover_free_cash < 0.0 {
                 let avg_entry_price = exec_state.debt / exec_state.position.abs();
-                let max_short_size = (exec_state.free_cash - fixed_fees)
-                    / (adj_price * (1.0 + fees) - 2.0 * avg_entry_price);
+                let max_short_size =
+                    (exec_state.free_cash - fixed_fees) / (adj_price * (1.0 + fees) - 2.0 * avg_entry_price);
                 max_short_size * adj_price * (1.0 + fees) + fixed_fees
             } else {
                 exec_state.cash
@@ -923,10 +904,7 @@ fn buy(
     if is_less(final_size, min_size) {
         return Ok((
             exec_state,
-            order_not_filled(
-                ORDER_STATUS_REJECTED,
-                ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
-            ),
+            order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED),
         ));
     }
 
@@ -1084,10 +1062,7 @@ fn sell(
     if is_less(size_limit, min_size) {
         return Ok((
             exec_state,
-            order_not_filled(
-                ORDER_STATUS_REJECTED,
-                ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED,
-            ),
+            order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_MIN_SIZE_NOT_REACHED),
         ));
     }
 
@@ -1208,9 +1183,7 @@ fn execute_order(
         return Err(PortfolioSimError::ValueError("position must be finite"));
     }
     if !debt.is_finite() || debt < 0.0 {
-        return Err(PortfolioSimError::ValueError(
-            "debt must be finite and 0 or greater",
-        ));
+        return Err(PortfolioSimError::ValueError("debt must be finite and 0 or greater"));
     }
     if free_cash.is_nan() {
         return Err(PortfolioSimError::ValueError("free_cash cannot be NaN"));
@@ -1242,9 +1215,7 @@ fn execute_order(
         return Err(PortfolioSimError::ValueError("order.fees must be finite"));
     }
     if !order.fixed_fees.is_finite() {
-        return Err(PortfolioSimError::ValueError(
-            "order.fixed_fees must be finite",
-        ));
+        return Err(PortfolioSimError::ValueError("order.fixed_fees must be finite"));
     }
     if !order.slippage.is_finite() || order.slippage < 0.0 {
         return Err(PortfolioSimError::ValueError(
@@ -1257,13 +1228,9 @@ fn execute_order(
         ));
     }
     if order.max_size.is_nan() || order.max_size <= 0.0 {
-        return Err(PortfolioSimError::ValueError(
-            "order.max_size must be greater than 0",
-        ));
+        return Err(PortfolioSimError::ValueError("order.max_size must be greater than 0"));
     }
-    if order.size_granularity.is_infinite()
-        || (!order.size_granularity.is_nan() && order.size_granularity <= 0.0)
-    {
+    if order.size_granularity.is_infinite() || (!order.size_granularity.is_nan() && order.size_granularity <= 0.0) {
         return Err(PortfolioSimError::ValueError(
             "order.size_granularity must be either NaN or finite and greater than 0",
         ));
@@ -1412,13 +1379,7 @@ fn update_value(
 
 /// Fill an order record into a pre-allocated OrderRecord buffer.
 #[inline]
-fn fill_order_record(
-    records: &mut [OrderRecord],
-    idx: usize,
-    i: i64,
-    col: i64,
-    order_result: &OrderResult,
-) {
+fn fill_order_record(records: &mut [OrderRecord], idx: usize, i: i64, col: i64, order_result: &OrderResult) {
     records[idx] = OrderRecord {
         id: idx as i64,
         col,
@@ -1508,9 +1469,7 @@ fn process_order(
     // Raise if rejected
     let is_rejected = order_result.status == ORDER_STATUS_REJECTED;
     if is_rejected && order.raise_reject {
-        return Err(PortfolioSimError::RejectedOrder(rejected_order_message(
-            &order_result,
-        )));
+        return Err(PortfolioSimError::RejectedOrder(rejected_order_message(&order_result)));
     }
 
     // Update value
@@ -2236,9 +2195,7 @@ pub fn simulate_from_orders_py<'py>(
         ));
     }
 
-    let log_dt = py
-        .import_bound("vectorbt.portfolio.enums")?
-        .getattr("log_dt")?;
+    let log_dt = py.import_bound("vectorbt.portfolio.enums")?.getattr("log_dt")?;
     let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
     let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
     let log_offsets = log_record_offsets(&log_arr)?;
@@ -2372,27 +2329,12 @@ fn read_signals(
 ) -> (bool, bool, bool, bool) {
     if entry || exit {
         if dir == DIRECTION_LONG_ONLY {
-            (
-                entry || long_entry,
-                exit || long_exit,
-                short_entry,
-                short_exit,
-            )
+            (entry || long_entry, exit || long_exit, short_entry, short_exit)
         } else if dir == DIRECTION_SHORT_ONLY {
-            (
-                long_entry,
-                long_exit,
-                entry || short_entry,
-                exit || short_exit,
-            )
+            (long_entry, long_exit, entry || short_entry, exit || short_exit)
         } else {
             // DIRECTION_BOTH
-            (
-                entry || long_entry,
-                long_exit,
-                exit || short_entry,
-                short_exit,
-            )
+            (entry || long_entry, long_exit, exit || short_entry, short_exit)
         }
     } else {
         (long_entry, long_exit, short_entry, short_exit)
@@ -2586,9 +2528,7 @@ pub fn simulate_from_signals_py<'py>(
         ));
     }
 
-    let log_dt = py
-        .import_bound("vectorbt.portfolio.enums")?
-        .getattr("log_dt")?;
+    let log_dt = py.import_bound("vectorbt.portfolio.enums")?.getattr("log_dt")?;
     let effective_max_logs = if max_logs == 0 { 1 } else { max_logs };
     let log_arr = numpy_empty(py, effective_max_logs, &log_dt)?;
     let log_offsets = log_record_offsets(&log_arr)?;
@@ -2757,14 +2697,7 @@ pub fn get_trade_stats_py(
     exit_fees: f64,
     direction: i64,
 ) -> (f64, f64) {
-    get_trade_stats(
-        size,
-        entry_price,
-        entry_fees,
-        exit_price,
-        exit_fees,
-        direction,
-    )
+    get_trade_stats(size, entry_price, entry_fees, exit_price, exit_fees, direction)
 }
 
 fn get_short_size(position_before: f64, position_now: f64) -> f64 {
@@ -2816,13 +2749,7 @@ pub fn get_entry_trades_py<'py>(
     Ok(PyArray1::from_vec_bound(py, trades))
 }
 
-fn get_free_cash_diff(
-    position_before: f64,
-    position_now: f64,
-    debt_now: f64,
-    price: f64,
-    fees: f64,
-) -> (f64, f64) {
+fn get_free_cash_diff(position_before: f64, position_now: f64, debt_now: f64, price: f64, fees: f64) -> (f64, f64) {
     let size = add(position_now, -position_before);
     let final_cash = -size * price - fees;
     if is_close(size, 0.0) {
@@ -3086,11 +3013,7 @@ fn simulate_from_orders_inner(
     } else {
         Vec::new()
     };
-    let mut call_seq_mut = if auto_call_seq {
-        Some(call_seq.to_vec())
-    } else {
-        None
-    };
+    let mut call_seq_mut = if auto_call_seq { Some(call_seq.to_vec()) } else { None };
 
     let mut oidx: i64 = 0;
     let mut lidx: i64 = 0;
@@ -3185,9 +3108,7 @@ fn simulate_from_orders_inner(
                     };
                     let col_i = call_seq_ref[i * ncols + col] as usize;
                     if col_i >= group_len {
-                        return Err(PortfolioSimError::ValueError(
-                            "Call index exceeds bounds of the group",
-                        ));
+                        return Err(PortfolioSimError::ValueError("Call index exceeds bounds of the group"));
                     }
                     col = from_col + col_i;
                 }
@@ -3284,11 +3205,7 @@ fn simulate_from_orders_inner(
 // ############# Signal processing helpers ############# //
 
 /// Generate stop signal and change accumulation if needed.
-fn generate_stop_signal(
-    position_now: f64,
-    upon_stop_exit: i64,
-    accumulate: i64,
-) -> (bool, bool, bool, bool, i64) {
+fn generate_stop_signal(position_now: f64, upon_stop_exit: i64, accumulate: i64) -> (bool, bool, bool, bool, i64) {
     let mut is_long_entry = false;
     let mut is_long_exit = false;
     let mut is_short_entry = false;
@@ -3319,13 +3236,7 @@ fn generate_stop_signal(
             is_long_entry = true;
         }
     }
-    (
-        is_long_entry,
-        is_long_exit,
-        is_short_entry,
-        is_short_exit,
-        accumulate,
-    )
+    (is_long_entry, is_long_exit, is_short_entry, is_short_exit, accumulate)
 }
 
 /// Resolve price and slippage of a stop order.
@@ -3472,13 +3383,7 @@ fn resolve_opposite_entry(
             accumulate = ACCUMULATION_DISABLED;
         }
     }
-    (
-        is_long_entry,
-        is_long_exit,
-        is_short_entry,
-        is_short_exit,
-        accumulate,
-    )
+    (is_long_entry, is_long_exit, is_short_entry, is_short_exit, accumulate)
 }
 
 /// Translate direction-aware signals into size, size type, and direction.
@@ -3493,10 +3398,7 @@ fn signals_to_size(
     accumulate: i64,
     val_price_now: f64,
 ) -> Result<(f64, i64, i64), PortfolioSimError> {
-    if size_type != SIZE_TYPE_AMOUNT
-        && size_type != SIZE_TYPE_VALUE
-        && size_type != SIZE_TYPE_PERCENT
-    {
+    if size_type != SIZE_TYPE_AMOUNT && size_type != SIZE_TYPE_VALUE && size_type != SIZE_TYPE_PERCENT {
         return Err(PortfolioSimError::RejectedOrder(
             "Only SizeType.Amount, SizeType.Value, and SizeType.Percent are supported",
         ));
@@ -3600,9 +3502,7 @@ fn get_stop_price_rs(
     hit_below: bool,
 ) -> Result<f64, PortfolioSimError> {
     if stop < 0.0 {
-        return Err(PortfolioSimError::RejectedOrder(
-            "Stop value must be 0 or greater",
-        ));
+        return Err(PortfolioSimError::RejectedOrder("Stop value must be 0 or greater"));
     }
     if (position_now > 0.0 && hit_below) || (position_now < 0.0 && !hit_below) {
         let sp = stop_price * (1.0 - stop);
@@ -3863,8 +3763,7 @@ fn cash_flow_inner(
                 size *= -1.0;
             }
             let new_position_now = add(position_now, size);
-            let (new_debt, cash_flow) =
-                get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
+            let (new_debt, cash_flow) = get_free_cash_diff(position_now, new_position_now, debt_now, price, fees);
             debt_now = new_debt;
             out[i * ncols + col] = add(out[i * ncols + col], cash_flow);
             position_now = new_position_now;
@@ -3879,13 +3778,7 @@ pub fn get_short_size_py(position_before: f64, position_now: f64) -> f64 {
     get_short_size(position_before, position_now)
 }
 
-fn sum_grouped_inner(
-    a: &[f64],
-    group_lens: &[i64],
-    nrows: usize,
-    ncols: usize,
-    n_groups: usize,
-) -> Vec<f64> {
+fn sum_grouped_inner(a: &[f64], group_lens: &[i64], nrows: usize, ncols: usize, n_groups: usize) -> Vec<f64> {
     let group_starts = col_start_idxs_usize(group_lens);
     let mut out = uninit_f64_vec(nrows * n_groups);
     for group in 0..n_groups {
@@ -3953,29 +3846,15 @@ fn process_signals_at(
             let high_val = high_s.get(i, col);
             let low_val = low_s.get(i, col);
             let close_val = close_s.get(i, col);
-            let o = if open_val.is_nan() {
-                close_val
-            } else {
-                open_val
-            };
-            let l = if low_val.is_nan() {
-                o.min(close_val)
-            } else {
-                low_val
-            };
-            let h = if high_val.is_nan() {
-                o.max(close_val)
-            } else {
-                high_val
-            };
+            let o = if open_val.is_nan() { close_val } else { open_val };
+            let l = if low_val.is_nan() { o.min(close_val) } else { low_val };
+            let h = if high_val.is_nan() { o.max(close_val) } else { high_val };
 
             if !sl_curr_stop.is_nan() {
-                stop_price =
-                    get_stop_price_rs(position_now, sl_curr_price, sl_curr_stop, o, l, h, true)?;
+                stop_price = get_stop_price_rs(position_now, sl_curr_price, sl_curr_stop, o, l, h, true)?;
             }
             if stop_price.is_nan() && !tp_curr_stop.is_nan() {
-                stop_price =
-                    get_stop_price_rs(position_now, tp_init_price, tp_curr_stop, o, l, h, false)?;
+                stop_price = get_stop_price_rs(position_now, tp_init_price, tp_curr_stop, o, l, h, false)?;
             }
 
             // Update trailing stop
@@ -4008,8 +3887,7 @@ fn process_signals_at(
 
         let close_val = close_s.get(i, col);
         let sxp = stop_exit_price_s.get(i, col);
-        let (p, s) =
-            resolve_stop_price_and_slippage(stop_price, price_out, close_val, slippage_out, sxp);
+        let (p, s) = resolve_stop_price_and_slippage(stop_price, price_out, close_val, slippage_out, sxp);
         price_out = p;
         slippage_out = s;
     } else {
@@ -4355,9 +4233,7 @@ fn simulate_from_signals_non_shared_inner(
                         let new_sl_trail = sl_trail_s.get(i, col);
                         let new_tp_stop = tp_stop_s.get(i, col);
 
-                        if state.position == 0.0
-                            || last_position.signum() != state.position.signum()
-                        {
+                        if state.position == 0.0 || last_position.signum() != state.position.signum() {
                             sl_curr_i = i as i64;
                             sl_init_i = i as i64;
                             sl_curr_price = new_init_price;
@@ -4480,11 +4356,7 @@ fn simulate_from_signals_inner(
     } else {
         Vec::new()
     };
-    let mut call_seq_mut = if auto_call_seq {
-        Some(call_seq.to_vec())
-    } else {
-        None
-    };
+    let mut call_seq_mut = if auto_call_seq { Some(call_seq.to_vec()) } else { None };
 
     let mut oidx: i64 = 0;
     let mut lidx: i64 = 0;
@@ -4616,8 +4488,7 @@ fn simulate_from_signals_inner(
                                 if final_direction == DIRECTION_LONG_ONLY {
                                     temp_order_value[k] = order_size * asset_value_now;
                                 } else {
-                                    let max_exposure =
-                                        2.0 * asset_value_now.max(0.0) + free_cash_now.max(0.0);
+                                    let max_exposure = 2.0 * asset_value_now.max(0.0) + free_cash_now.max(0.0);
                                     temp_order_value[k] = order_size * max_exposure;
                                 }
                             }
@@ -4772,8 +4643,7 @@ fn simulate_from_signals_inner(
                             let new_sl_trail = sl_trail_s.get(i, col);
                             let new_tp_stop = tp_stop_s.get(i, col);
 
-                            if position_now == 0.0 || new_position.signum() != position_now.signum()
-                            {
+                            if position_now == 0.0 || new_position.signum() != position_now.signum() {
                                 sl_curr_i_arr[col] = i as i64;
                                 sl_init_i_arr[col] = i as i64;
                                 sl_curr_price_arr[col] = new_init_price;
@@ -4854,10 +4724,7 @@ pub fn asset_flow_py<'py>(
 
 #[pyfunction]
 #[pyo3(name = "assets_rs")]
-pub fn assets_py<'py>(
-    py: Python<'py>,
-    asset_flow: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn assets_py<'py>(py: Python<'py>, asset_flow: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let af = asset_flow.as_array();
     let nrows = af.nrows();
     let ncols = af.ncols();
@@ -4939,9 +4806,7 @@ pub fn sum_grouped_py<'py>(
     let gl_cow = array1_as_slice_cow(&group_lens);
     let n_groups = gl_cow.len();
 
-    let result = py.allow_threads(|| {
-        sum_grouped_inner(a_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
-    });
+    let result = py.allow_threads(|| sum_grouped_inner(a_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups));
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -4960,9 +4825,7 @@ pub fn cash_flow_grouped_py<'py>(
     let gl_cow = array1_as_slice_cow(&group_lens);
     let n_groups = gl_cow.len();
 
-    let result = py.allow_threads(|| {
-        sum_grouped_inner(cf_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
-    });
+    let result = py.allow_threads(|| sum_grouped_inner(cf_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups));
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -5170,9 +5033,7 @@ pub fn asset_value_grouped_py<'py>(
     let gl_cow = array1_as_slice_cow(&group_lens);
     let n_groups = gl_cow.len();
 
-    let result = py.allow_threads(|| {
-        sum_grouped_inner(av_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups)
-    });
+    let result = py.allow_threads(|| sum_grouped_inner(av_cow.as_ref(), gl_cow.as_ref(), nrows, ncols, n_groups));
 
     let arr = Array2::from_shape_vec((nrows, n_groups), result).unwrap();
     Ok(PyArray2::from_owned_array_bound(py, arr))
@@ -5208,8 +5069,7 @@ pub fn value_in_sim_order_py<'py>(
                 if j >= group_len {
                     let last_j = j - group_len;
                     let last_i = last_j / group_len;
-                    let last_col =
-                        from_col + cs_cow[last_i * ncols + from_col + last_j % group_len] as usize;
+                    let last_col = from_col + cs_cow[last_i * ncols + from_col + last_j % group_len] as usize;
                     if !av_cow[last_i * ncols + last_col].is_nan() {
                         asset_value_now -= av_cow[last_i * ncols + last_col];
                     }
@@ -5371,11 +5231,7 @@ pub fn final_value_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let tp_cow = array1_as_slice_cow(&total_profit);
     let ic_cow = array1_as_slice_cow(&init_cash);
-    let out: Vec<f64> = tp_cow
-        .iter()
-        .zip(ic_cow.iter())
-        .map(|(t, i)| t + i)
-        .collect();
+    let out: Vec<f64> = tp_cow.iter().zip(ic_cow.iter()).map(|(t, i)| t + i).collect();
     Ok(PyArray1::from_vec_bound(py, out))
 }
 
@@ -5388,11 +5244,7 @@ pub fn total_return_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let tp_cow = array1_as_slice_cow(&total_profit);
     let ic_cow = array1_as_slice_cow(&init_cash);
-    let out: Vec<f64> = tp_cow
-        .iter()
-        .zip(ic_cow.iter())
-        .map(|(t, i)| t / i)
-        .collect();
+    let out: Vec<f64> = tp_cow.iter().zip(ic_cow.iter()).map(|(t, i)| t / i).collect();
     Ok(PyArray1::from_vec_bound(py, out))
 }
 
@@ -5452,11 +5304,7 @@ pub fn asset_returns_py<'py>(
         let mut out = uninit_f64_vec(nrows * ncols);
         for col in 0..ncols {
             for i in 0..nrows {
-                let input_value = if i == 0 {
-                    0.0
-                } else {
-                    av_cow[(i - 1) * ncols + col]
-                };
+                let input_value = if i == 0 { 0.0 } else { av_cow[(i - 1) * ncols + col] };
                 let output_value = av_cow[i * ncols + col] + cf_cow[i * ncols + col];
                 out[i * ncols + col] = get_return(input_value, output_value);
             }
@@ -5522,9 +5370,7 @@ fn get_entry_trades_inner(
                 return Err(PortfolioSimError::ValueError("size must be greater than 0"));
             }
             if order_price <= 0.0 {
-                return Err(PortfolioSimError::ValueError(
-                    "price must be greater than 0",
-                ));
+                return Err(PortfolioSimError::ValueError("price must be greater than 0"));
             }
 
             if !in_position {
@@ -5713,14 +5559,7 @@ fn fill_entry_trades_in_position(
         let entry_price = unsafe { *(base.add(offsets.price) as *const f64) };
         let entry_idx = unsafe { *(base.add(offsets.idx) as *const i64) };
 
-        let (pnl, ret) = get_trade_stats(
-            entry_size,
-            entry_price,
-            entry_fees,
-            exit_price,
-            exit_fees,
-            direction,
-        );
+        let (pnl, ret) = get_trade_stats(entry_size, entry_price, entry_fees, exit_price, exit_fees, direction);
         let tidx = records.len();
         records.push(TradeRecord {
             id: tidx as i64,
@@ -5824,9 +5663,7 @@ fn get_exit_trades_inner(
                 return Err(PortfolioSimError::ValueError("size must be greater than 0"));
             }
             if order_price <= 0.0 {
-                return Err(PortfolioSimError::ValueError(
-                    "price must be greater than 0",
-                ));
+                return Err(PortfolioSimError::ValueError("price must be greater than 0"));
             }
 
             if !in_position {
@@ -5867,14 +5704,8 @@ fn get_exit_trades_inner(
                     let size_fraction = exit_size / entry_size_sum;
                     let entry_fees = size_fraction * entry_fees_sum;
 
-                    let (pnl, ret) = get_trade_stats(
-                        exit_size,
-                        entry_price,
-                        entry_fees,
-                        exit_price,
-                        exit_fees,
-                        direction,
-                    );
+                    let (pnl, ret) =
+                        get_trade_stats(exit_size, entry_price, entry_fees, exit_price, exit_fees, direction);
 
                     let tidx = records.len();
                     records.push(TradeRecord {
@@ -5965,14 +5796,7 @@ fn get_exit_trades_inner(
             let size_fraction = exit_size / entry_size_sum;
             let entry_fees = size_fraction * entry_fees_sum;
 
-            let (pnl, ret) = get_trade_stats(
-                exit_size,
-                entry_price,
-                entry_fees,
-                exit_price,
-                exit_fees,
-                direction,
-            );
+            let (pnl, ret) = get_trade_stats(exit_size, entry_price, entry_fees, exit_price, exit_fees, direction);
 
             let tidx = records.len();
             records.push(TradeRecord {
@@ -6068,11 +5892,7 @@ pub fn gross_exposure_py<'py>(
         let mut out = Vec::with_capacity(nrows * ncols);
         for idx in 0..nrows * ncols {
             let denom = add(av_cow[idx], c_cow[idx]);
-            out.push(if denom == 0.0 {
-                0.0
-            } else {
-                av_cow[idx] / denom
-            });
+            out.push(if denom == 0.0 { 0.0 } else { av_cow[idx] / denom });
         }
         out
     });

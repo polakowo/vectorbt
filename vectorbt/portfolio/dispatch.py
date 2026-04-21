@@ -644,7 +644,9 @@ def simulate_from_orders(
             flex_2d,
             name="size_granularity",
         )
-        reject_prob_arr = prepare_flex_array_for_rust(reject_prob, target_shape, np.float64, flex_2d, name="reject_prob")
+        reject_prob_arr = prepare_flex_array_for_rust(
+            reject_prob, target_shape, np.float64, flex_2d, name="reject_prob"
+        )
         lock_cash_arr = prepare_flex_array_for_rust(lock_cash, target_shape, np.bool_, flex_2d, name="lock_cash")
         allow_partial_arr = prepare_flex_array_for_rust(
             allow_partial,
@@ -946,7 +948,9 @@ def simulate_from_signals(
             flex_2d,
             name="size_granularity",
         )
-        reject_prob_arr = prepare_flex_array_for_rust(reject_prob, target_shape, np.float64, flex_2d, name="reject_prob")
+        reject_prob_arr = prepare_flex_array_for_rust(
+            reject_prob, target_shape, np.float64, flex_2d, name="reject_prob"
+        )
         lock_cash_arr = prepare_flex_array_for_rust(lock_cash, target_shape, np.bool_, flex_2d, name="lock_cash")
         allow_partial_arr = prepare_flex_array_for_rust(
             allow_partial,

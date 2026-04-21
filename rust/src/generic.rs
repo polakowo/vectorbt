@@ -3,8 +3,8 @@
 
 use ndarray::{Array2, ArrayView2};
 use numpy::{
-    Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2,
-    PyReadonlyArrayDyn, PyUntypedArrayMethods,
+    Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn,
+    PyUntypedArrayMethods,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -185,18 +185,14 @@ pub(crate) fn validate_group_lens(group_lens: &[i64]) -> PyResult<Vec<usize>> {
 }
 
 #[inline(always)]
-pub(crate) fn array1_as_slice_cow<'py, T: Copy + Element>(
-    a: &'py PyReadonlyArray1<'py, T>,
-) -> Cow<'py, [T]> {
+pub(crate) fn array1_as_slice_cow<'py, T: Copy + Element>(a: &'py PyReadonlyArray1<'py, T>) -> Cow<'py, [T]> {
     match a.as_slice() {
         Ok(slice) => Cow::Borrowed(slice),
         Err(_) => Cow::Owned(a.as_array().iter().copied().collect()),
     }
 }
 
-pub(crate) fn array2_as_slice_cow<'py, T: Copy + Element>(
-    a: &'py PyReadonlyArray2<'py, T>,
-) -> Cow<'py, [T]> {
+pub(crate) fn array2_as_slice_cow<'py, T: Copy + Element>(a: &'py PyReadonlyArray2<'py, T>) -> Cow<'py, [T]> {
     // Only borrow if C-contiguous (standard layout); F-order as_slice returns column-major data
     if a.as_array().is_standard_layout() {
         if let Ok(slice) = a.as_slice() {
@@ -209,21 +205,10 @@ pub(crate) fn array2_as_slice_cow<'py, T: Copy + Element>(
 
 pub(crate) enum FlexArray<'py, T: Copy + Element> {
     Scalar(T),
-    OneD {
-        data: Cow<'py, [T]>,
-        flex_2d: bool,
-    },
-    TwoDFull {
-        data: Cow<'py, [T]>,
-        cols: usize,
-    },
-    TwoDRow {
-        data: Cow<'py, [T]>,
-        cols: usize,
-    },
-    TwoDCol {
-        data: Cow<'py, [T]>,
-    },
+    OneD { data: Cow<'py, [T]>, flex_2d: bool },
+    TwoDFull { data: Cow<'py, [T]>, cols: usize },
+    TwoDRow { data: Cow<'py, [T]>, cols: usize },
+    TwoDCol { data: Cow<'py, [T]> },
 }
 
 impl<'py, T: Copy + Element> FlexArray<'py, T> {
@@ -293,24 +278,16 @@ impl<'py, T: Copy + Element> FlexArray<'py, T> {
             }
             return Ok(Self::TwoDCol { data });
         }
-        Err(PyValueError::new_err(format!(
-            "`{name}` must be 0D, 1D, or 2D"
-        )))
+        Err(PyValueError::new_err(format!("`{name}` must be 0D, 1D, or 2D")))
     }
 
     #[inline(always)]
     pub(crate) fn get(&self, i: usize, col: usize) -> T {
         match self {
             Self::Scalar(value) => *value,
-            Self::OneD { data, flex_2d } => unsafe {
-                *data.get_unchecked(if *flex_2d { col } else { i })
-            },
-            Self::TwoDFull { data, cols } => unsafe {
-                *data.get_unchecked(i * *cols + col)
-            },
-            Self::TwoDRow { data, cols } => unsafe {
-                *data.get_unchecked(col.min(*cols - 1))
-            },
+            Self::OneD { data, flex_2d } => unsafe { *data.get_unchecked(if *flex_2d { col } else { i }) },
+            Self::TwoDFull { data, cols } => unsafe { *data.get_unchecked(i * *cols + col) },
+            Self::TwoDRow { data, cols } => unsafe { *data.get_unchecked(col.min(*cols - 1)) },
             Self::TwoDCol { data } => unsafe { *data.get_unchecked(i) },
         }
     }
@@ -330,9 +307,7 @@ pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
     } else if len1 == 1 {
         Ok(len2)
     } else {
-        Err(PyValueError::new_err(
-            "operands could not be broadcast together",
-        ))
+        Err(PyValueError::new_err("operands could not be broadcast together"))
     }
 }
 
@@ -341,21 +316,14 @@ pub(crate) fn broadcast_len3(len1: usize, len2: usize, len3: usize) -> PyResult<
         if (len1 == 0 || len1 == 1) && (len2 == 0 || len2 == 1) && (len3 == 0 || len3 == 1) {
             Ok(0)
         } else {
-            Err(PyValueError::new_err(
-                "operands could not be broadcast together",
-            ))
+            Err(PyValueError::new_err("operands could not be broadcast together"))
         }
     } else {
         let out_len = len1.max(len2).max(len3);
-        if (len1 == out_len || len1 == 1)
-            && (len2 == out_len || len2 == 1)
-            && (len3 == out_len || len3 == 1)
-        {
+        if (len1 == out_len || len1 == 1) && (len2 == out_len || len2 == 1) && (len3 == out_len || len3 == 1) {
             Ok(out_len)
         } else {
-            Err(PyValueError::new_err(
-                "operands could not be broadcast together",
-            ))
+            Err(PyValueError::new_err("operands could not be broadcast together"))
         }
     }
 }
@@ -427,9 +395,7 @@ where
 
 pub(crate) fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
     let shape = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::zeros(shape);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     for (out_v, &v) in dst.iter_mut().zip(src.iter()) {
@@ -440,9 +406,7 @@ pub(crate) fn fillna_2d_c(a: ArrayView2<'_, f64>, value: f64) -> Array2<f64> {
 
 pub(crate) fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     if ncols == 1 {
         return Array2::from_shape_vec((nrows, 1), bshift_1d(src, n, fill_value))
             .expect("1-column output shape must match");
@@ -464,9 +428,7 @@ pub(crate) fn bshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> 
 
 pub(crate) fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     if ncols == 1 {
         return Array2::from_shape_vec((nrows, 1), fshift_1d(src, n, fill_value))
             .expect("1-column output shape must match");
@@ -488,12 +450,9 @@ pub(crate) fn fshift_2d_c(a: ArrayView2<'_, f64>, n: usize, fill_value: f64) -> 
 
 pub(crate) fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     if ncols == 1 {
-        return Array2::from_shape_vec((nrows, 1), diff_1d(src, n))
-            .expect("1-column output shape must match");
+        return Array2::from_shape_vec((nrows, 1), diff_1d(src, n)).expect("1-column output shape must match");
     }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
@@ -509,12 +468,9 @@ pub(crate) fn diff_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
 
 pub(crate) fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     if ncols == 1 {
-        return Array2::from_shape_vec((nrows, 1), pct_change_1d(src, n))
-            .expect("1-column output shape must match");
+        return Array2::from_shape_vec((nrows, 1), pct_change_1d(src, n)).expect("1-column output shape must match");
     }
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
@@ -530,9 +486,7 @@ pub(crate) fn pct_change_2d_c(a: ArrayView2<'_, f64>, n: usize) -> Array2<f64> {
 
 pub(crate) fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     if nrows == 0 {
         return out;
@@ -556,9 +510,7 @@ pub(crate) fn ffill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
 
 pub(crate) fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     if nrows == 0 {
         return out;
@@ -582,9 +534,7 @@ pub(crate) fn bfill_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
 
 pub(crate) fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::zeros((nrows, ncols));
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
@@ -603,9 +553,7 @@ pub(crate) fn nancumsum_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
 
 pub(crate) fn nancumprod_2d_c(a: ArrayView2<'_, f64>) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::zeros((nrows, ncols));
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut prods = vec![1.0f64; ncols];
@@ -627,9 +575,7 @@ pub(crate) fn nansum_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     if ncols == 0 {
         return Vec::new();
     }
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = vec![0.0f64; ncols];
     for row in src.chunks_exact(ncols) {
         for (col, &v) in row.iter().enumerate() {
@@ -646,9 +592,7 @@ pub(crate) fn nanprod_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     if ncols == 0 {
         return Vec::new();
     }
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = vec![1.0f64; ncols];
     for row in src.chunks_exact(ncols) {
         for (col, &v) in row.iter().enumerate() {
@@ -665,9 +609,7 @@ pub(crate) fn nancnt_2d_c(a: ArrayView2<'_, f64>) -> Vec<i64> {
     if ncols == 0 {
         return Vec::new();
     }
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = vec![0i64; ncols];
     for row in src.chunks_exact(ncols) {
         for (col, &v) in row.iter().enumerate() {
@@ -684,9 +626,7 @@ pub(crate) fn nanmean_2d_c(a: ArrayView2<'_, f64>) -> Vec<f64> {
     if ncols == 0 {
         return Vec::new();
     }
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
     let mut counts = vec![0usize; ncols];
     for row in src.chunks_exact(ncols) {
@@ -708,9 +648,7 @@ pub(crate) fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
     if ncols == 0 {
         return Vec::new();
     }
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
     let mut sums_sq = vec![0.0f64; ncols];
     let mut counts = vec![0usize; ncols];
@@ -728,8 +666,7 @@ pub(crate) fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
         let cnt = counts[col];
         if cnt > ddof {
             let mean = sums[col] / cnt as f64;
-            let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
-                / (cnt - ddof) as f64;
+            let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
             out[col] = variance.abs().sqrt();
         }
     }
@@ -738,9 +675,7 @@ pub(crate) fn nanstd_2d_c(a: ArrayView2<'_, f64>, ddof: usize) -> Vec<f64> {
 
 pub(crate) fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
@@ -768,16 +703,9 @@ pub(crate) fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usi
     out
 }
 
-pub(crate) fn rolling_std_2d_c(
-    a: ArrayView2<'_, f64>,
-    window: usize,
-    minp: usize,
-    ddof: usize,
-) -> Array2<f64> {
+pub(crate) fn rolling_std_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize, ddof: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
@@ -803,8 +731,7 @@ pub(crate) fn rolling_std_2d_c(
             let cnt = counts[col];
             if cnt >= minp && cnt > ddof {
                 let mean = sums[col] / cnt as f64;
-                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
-                    / (cnt - ddof) as f64;
+                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
                 dst[row_start + col] = variance.abs().sqrt();
             }
         }
@@ -814,9 +741,7 @@ pub(crate) fn rolling_std_2d_c(
 
 pub(crate) fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
@@ -839,9 +764,7 @@ pub(crate) fn expanding_mean_2d_c(a: ArrayView2<'_, f64>, minp: usize) -> Array2
 
 pub(crate) fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
     let mut sums = vec![0.0f64; ncols];
@@ -859,8 +782,7 @@ pub(crate) fn expanding_std_2d_c(a: ArrayView2<'_, f64>, minp: usize, ddof: usiz
             let cnt = counts[col];
             if cnt >= minp && cnt > ddof {
                 let mean = sums[col] / cnt as f64;
-                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean)
-                    / (cnt - ddof) as f64;
+                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
                 dst[row_start + col] = variance.abs().sqrt();
             }
         }
@@ -884,9 +806,7 @@ pub(crate) fn set_by_mask_mult_1d(a: &[f64], mask: &[bool], values: &[f64]) -> V
 }
 
 pub(crate) fn fillna_1d(a: &[f64], value: f64) -> Vec<f64> {
-    a.iter()
-        .map(|&v| if v.is_nan() { value } else { v })
-        .collect()
+    a.iter().map(|&v| if v.is_nan() { value } else { v }).collect()
 }
 
 pub(crate) fn fillna_1d_into(a: &[f64], out: &mut [f64], value: f64) {
@@ -1107,10 +1027,7 @@ pub(crate) fn nanmedian_1d(a: &[f64]) -> f64 {
     let mid = n / 2;
     vals.select_nth_unstable_by(mid, |x, y| x.partial_cmp(y).unwrap());
     if n % 2 == 0 {
-        let lower_max = vals[..mid]
-            .iter()
-            .copied()
-            .fold(f64::NEG_INFINITY, f64::max);
+        let lower_max = vals[..mid].iter().copied().fold(f64::NEG_INFINITY, f64::max);
         (lower_max + vals[mid]) / 2.0
     } else {
         vals[mid]
@@ -1232,8 +1149,7 @@ pub(crate) fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize)
         }
         if cnt >= minp && cnt > ddof {
             let mean = sum / cnt as f64;
-            let variance =
-                (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
+            let variance = (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
             out[i] = variance.abs().sqrt();
         }
     }
@@ -1273,8 +1189,7 @@ pub(crate) fn expanding_std_1d(a: &[f64], minp: usize, ddof: usize) -> Vec<f64> 
         }
         if cnt >= minp && cnt > ddof {
             let mean = sum / cnt as f64;
-            let variance =
-                (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
+            let variance = (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
             out[i] = variance.abs().sqrt();
         }
     }
@@ -1292,11 +1207,7 @@ pub(crate) fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> 
     let old_wt_factor = 1.0 - alpha;
     let new_wt = if adjust { 1.0 } else { alpha };
     let mut weighted_avg = a[0];
-    let mut nobs = if !weighted_avg.is_nan() {
-        1usize
-    } else {
-        0usize
-    };
+    let mut nobs = if !weighted_avg.is_nan() { 1usize } else { 0usize };
     if nobs >= minp {
         out[0] = weighted_avg;
     }
@@ -1329,16 +1240,9 @@ pub(crate) fn ewm_mean_1d(a: &[f64], span: usize, minp: usize, adjust: bool) -> 
     out
 }
 
-pub(crate) fn ewm_mean_2d_c(
-    a: ArrayView2<'_, f64>,
-    span: usize,
-    minp: usize,
-    adjust: bool,
-) -> Array2<f64> {
+pub(crate) fn ewm_mean_2d_c(a: ArrayView2<'_, f64>, span: usize, minp: usize, adjust: bool) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     if nrows == 0 {
         return out;
@@ -1371,8 +1275,8 @@ pub(crate) fn ewm_mean_2d_c(
                 old_wt[col] *= old_wt_factor;
                 if is_observation {
                     if weighted_avg[col] != cur {
-                        weighted_avg[col] = ((old_wt[col] * weighted_avg[col]) + (new_wt * cur))
-                            / (old_wt[col] + new_wt);
+                        weighted_avg[col] =
+                            ((old_wt[col] * weighted_avg[col]) + (new_wt * cur)) / (old_wt[col] + new_wt);
                     }
                     if adjust {
                         old_wt[col] += new_wt;
@@ -1391,13 +1295,7 @@ pub(crate) fn ewm_mean_2d_c(
     out
 }
 
-pub(crate) fn ewm_std_1d(
-    a: &[f64],
-    span: usize,
-    minp: usize,
-    adjust: bool,
-    _ddof: usize,
-) -> Vec<f64> {
+pub(crate) fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1474,9 +1372,7 @@ pub(crate) fn ewm_std_2d_c(
     _ddof: usize,
 ) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
-    let src = a
-        .as_slice()
-        .expect("standard-layout array must be sliceable");
+    let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     if nrows == 0 {
         return out;
@@ -1519,15 +1415,12 @@ pub(crate) fn ewm_std_2d_c(
                     let old_mean_x = mean_x[col];
                     let old_mean_y = mean_y[col];
                     if mean_x[col] != cur_x {
-                        mean_x[col] = ((old_wt[col] * old_mean_x) + (new_wt * cur_x))
-                            / (old_wt[col] + new_wt);
+                        mean_x[col] = ((old_wt[col] * old_mean_x) + (new_wt * cur_x)) / (old_wt[col] + new_wt);
                     }
                     if mean_y[col] != cur_y {
-                        mean_y[col] = ((old_wt[col] * old_mean_y) + (new_wt * cur_y))
-                            / (old_wt[col] + new_wt);
+                        mean_y[col] = ((old_wt[col] * old_mean_y) + (new_wt * cur_y)) / (old_wt[col] + new_wt);
                     }
-                    cov[col] = ((old_wt[col]
-                        * (cov[col] + ((old_mean_x - mean_x[col]) * (old_mean_y - mean_y[col]))))
+                    cov[col] = ((old_wt[col] * (cov[col] + ((old_mean_x - mean_x[col]) * (old_mean_y - mean_y[col]))))
                         + (new_wt * ((cur_x - mean_x[col]) * (cur_y - mean_y[col]))))
                         / (old_wt[col] + new_wt);
                     sum_wt[col] += new_wt;
@@ -1636,11 +1529,7 @@ pub(crate) fn flatten_forder(a: ArrayView2<'_, f64>) -> Vec<f64> {
     out
 }
 
-pub(crate) fn flatten_grouped(
-    a: ArrayView2<'_, f64>,
-    group_lens: &[usize],
-    in_c_order: bool,
-) -> Array2<f64> {
+pub(crate) fn flatten_grouped(a: ArrayView2<'_, f64>, group_lens: &[usize], in_c_order: bool) -> Array2<f64> {
     let (nrows, _) = a.dim();
     let max_group_len = group_lens.iter().copied().max().unwrap_or(0);
     let mut out = Array2::<f64>::from_elem((nrows * max_group_len, group_lens.len()), f64::NAN);
@@ -1662,11 +1551,7 @@ pub(crate) fn flatten_grouped(
     out
 }
 
-pub(crate) fn flatten_uniform_grouped(
-    a: ArrayView2<'_, f64>,
-    group_lens: &[usize],
-    in_c_order: bool,
-) -> Array2<f64> {
+pub(crate) fn flatten_uniform_grouped(a: ArrayView2<'_, f64>, group_lens: &[usize], in_c_order: bool) -> Array2<f64> {
     flatten_grouped(a, group_lens, in_c_order)
 }
 
@@ -1799,9 +1684,7 @@ pub(crate) fn find_ranges(a: ArrayView2<'_, f64>, gap_value: f64) -> Vec<RangeRe
     let mut ridx = 0i64;
     let gap_is_nan = gap_value.is_nan();
     if a.is_standard_layout() {
-        let src = a
-            .as_slice()
-            .expect("standard-layout array must be sliceable");
+        let src = a.as_slice().expect("standard-layout array must be sliceable");
         for col in 0..ncols {
             let mut range_started = false;
             let mut start_idx = -1i64;
@@ -1911,9 +1794,7 @@ pub(crate) fn range_coverage(
     for col in 0..col_lens.len() {
         let col_len = col_lens[col];
         if col_len < 0 || index_lens[col] < 0 {
-            return Err(PyValueError::new_err(
-                "col_lens and index_lens must be non-negative",
-            ));
+            return Err(PyValueError::new_err("col_lens and index_lens must be non-negative"));
         }
         if col_len == 0 {
             continue;
@@ -1991,9 +1872,7 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
     }
     let mut ddidx = 0i64;
     if a.is_standard_layout() {
-        let src = a
-            .as_slice()
-            .expect("standard-layout array must be sliceable");
+        let src = a.as_slice().expect("standard-layout array must be sliceable");
         for col in 0..ncols {
             let mut drawdown_started = false;
             let mut peak_idx = -1i64;
@@ -2184,28 +2063,19 @@ pub fn set_by_mask_rs<'py>(
     let (nrows, ncols) = a_arr.dim();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() && mask_arr.is_standard_layout() {
-            let a_slice = a_arr
-                .as_slice()
-                .expect("standard-layout array must be sliceable");
-            let mask_slice = mask_arr
-                .as_slice()
-                .expect("standard-layout array must be sliceable");
+            let a_slice = a_arr.as_slice().expect("standard-layout array must be sliceable");
+            let mask_slice = mask_arr.as_slice().expect("standard-layout array must be sliceable");
             let out = a_slice
                 .iter()
                 .zip(mask_slice.iter())
                 .map(|(&v, &m)| if m { value } else { v })
                 .collect::<Vec<_>>();
-            return Array2::from_shape_vec((nrows, ncols), out)
-                .expect("flat output shape must match");
+            return Array2::from_shape_vec((nrows, ncols), out).expect("flat output shape must match");
         }
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         for row in 0..nrows {
             for col in 0..ncols {
-                out[[row, col]] = if mask_arr[[row, col]] {
-                    value
-                } else {
-                    a_arr[[row, col]]
-                };
+                out[[row, col]] = if mask_arr[[row, col]] { value } else { a_arr[[row, col]] };
             }
         }
         out
@@ -2225,9 +2095,7 @@ pub fn set_by_mask_mult_1d_rs<'py>(
     let a_cow = array1_as_slice_cow(&a);
     let mask_cow = array1_as_slice_cow(&mask);
     let values_cow = array1_as_slice_cow(&values);
-    let result = py.allow_threads(|| {
-        set_by_mask_mult_1d(a_cow.as_ref(), mask_cow.as_ref(), values_cow.as_ref())
-    });
+    let result = py.allow_threads(|| set_by_mask_mult_1d(a_cow.as_ref(), mask_cow.as_ref(), values_cow.as_ref()));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -2245,27 +2113,17 @@ pub fn set_by_mask_mult_rs<'py>(
     let values_arr = values.as_array();
     let (nrows, ncols) = a_arr.dim();
     let result = py.allow_threads(|| {
-        if a_arr.is_standard_layout()
-            && mask_arr.is_standard_layout()
-            && values_arr.is_standard_layout()
-        {
-            let a_slice = a_arr
-                .as_slice()
-                .expect("standard-layout array must be sliceable");
-            let mask_slice = mask_arr
-                .as_slice()
-                .expect("standard-layout array must be sliceable");
-            let values_slice = values_arr
-                .as_slice()
-                .expect("standard-layout array must be sliceable");
+        if a_arr.is_standard_layout() && mask_arr.is_standard_layout() && values_arr.is_standard_layout() {
+            let a_slice = a_arr.as_slice().expect("standard-layout array must be sliceable");
+            let mask_slice = mask_arr.as_slice().expect("standard-layout array must be sliceable");
+            let values_slice = values_arr.as_slice().expect("standard-layout array must be sliceable");
             let out = a_slice
                 .iter()
                 .zip(mask_slice.iter())
                 .zip(values_slice.iter())
                 .map(|((&v, &m), &new_v)| if m { new_v } else { v })
                 .collect::<Vec<_>>();
-            return Array2::from_shape_vec((nrows, ncols), out)
-                .expect("flat output shape must match");
+            return Array2::from_shape_vec((nrows, ncols), out).expect("flat output shape must match");
         }
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         for row in 0..nrows {
@@ -2344,11 +2202,7 @@ pub fn fshift_rs<'py>(
 export_1d_array!(bfill_1d_rs, bfill_1d);
 
 #[pyfunction]
-pub fn diff_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-    n: usize,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn diff_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>, n: usize) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2380,10 +2234,7 @@ pub fn pct_change_rs<'py>(
 }
 
 #[pyfunction]
-pub fn bfill_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn bfill_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2396,10 +2247,7 @@ pub fn bfill_rs<'py>(
 }
 
 #[pyfunction]
-pub fn ffill_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn ffill_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2412,10 +2260,7 @@ pub fn ffill_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nanprod_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nanprod_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2428,10 +2273,7 @@ pub fn nanprod_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nancumsum_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn nancumsum_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2444,10 +2286,7 @@ pub fn nancumsum_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nancumprod_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray2<f64>>> {
+pub fn nancumprod_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2460,10 +2299,7 @@ pub fn nancumprod_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nansum_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nansum_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2476,10 +2312,7 @@ pub fn nansum_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nancnt_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<i64>>> {
+pub fn nancnt_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2501,30 +2334,21 @@ pub fn nancnt_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nanmin_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nanmin_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmin_1d));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
 #[pyfunction]
-pub fn nanmax_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nanmax_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmax_1d));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
 #[pyfunction]
-pub fn nanmean_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nanmean_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| {
         if a_arr.is_standard_layout() {
@@ -2537,10 +2361,7 @@ pub fn nanmean_rs<'py>(
 }
 
 #[pyfunction]
-pub fn nanmedian_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn nanmedian_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmedian_1d));
     Ok(PyArray1::from_vec_bound(py, result))
@@ -2595,8 +2416,7 @@ pub fn rolling_min_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_min_1d(col, window, minp)));
+    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_min_1d(col, window, minp)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -2626,8 +2446,7 @@ pub fn rolling_max_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_max_1d(col, window, minp)));
+    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_max_1d(col, window, minp)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -2731,8 +2550,7 @@ pub fn ewm_mean_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     validate_window(minp, span, "span")?;
     let a_arr = a.as_array();
-    let result =
-        py.allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_mean_1d(col, span, minp, adjust)));
+    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_mean_1d(col, span, minp, adjust)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -2768,8 +2586,7 @@ pub fn ewm_std_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     validate_window(minp, span, "span")?;
     let a_arr = a.as_array();
-    let result = py
-        .allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_std_1d(col, span, minp, adjust, ddof)));
+    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_std_1d(col, span, minp, adjust, ddof)));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -2854,10 +2671,7 @@ pub fn expanding_std_rs<'py>(
 }
 
 #[pyfunction]
-pub fn flatten_forder_rs<'py>(
-    py: Python<'py>,
-    a: PyReadonlyArray2<'py, f64>,
-) -> PyResult<Bound<'py, PyArray1<f64>>> {
+pub fn flatten_forder_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
     let result = py.allow_threads(|| flatten_forder(a_arr));
     Ok(PyArray1::from_vec_bound(py, result))
@@ -3033,13 +2847,7 @@ pub fn range_duration_rs<'py>(
     let start_idx_cow = array1_as_slice_cow(&start_idx);
     let end_idx_cow = array1_as_slice_cow(&end_idx);
     let status_cow = array1_as_slice_cow(&status);
-    let result = py.allow_threads(|| {
-        range_duration(
-            start_idx_cow.as_ref(),
-            end_idx_cow.as_ref(),
-            status_cow.as_ref(),
-        )
-    });
+    let result = py.allow_threads(|| range_duration(start_idx_cow.as_ref(), end_idx_cow.as_ref(), status_cow.as_ref()));
     Ok(PyArray1::from_vec_bound(py, result))
 }
 
@@ -3194,11 +3002,7 @@ pub fn dd_recovery_duration_ratio_rs<'py>(
     let start_idx_slice = start_idx_cow.as_ref();
     let valley_idx_slice = valley_idx_cow.as_ref();
     let end_idx_slice = end_idx_cow.as_ref();
-    let out_len = broadcast_len3(
-        start_idx_slice.len(),
-        valley_idx_slice.len(),
-        end_idx_slice.len(),
-    )?;
+    let out_len = broadcast_len3(start_idx_slice.len(), valley_idx_slice.len(), end_idx_slice.len())?;
     let result = py.allow_threads(|| {
         (0..out_len)
             .map(|i| {
