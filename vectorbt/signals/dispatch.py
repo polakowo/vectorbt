@@ -11,7 +11,8 @@ from vectorbt._engine import (
     array_compatible_with_rust,
     exact_array_compatible_with_rust,
     prepare_array_for_rust,
-    flex_broadcast_to_shape,
+    prepare_flex_array_for_rust,
+    flex_array_compatible_with_rust,
     callback_unsupported_with_rust,
     combine_rust_support,
     matching_shape_compatible_with_rust,
@@ -180,15 +181,14 @@ def generate_rand_by_prob(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            array_compatible_with_rust(prob, dtype=np.float64),
-            array_shape_compatible_with_rust("prob", prob, shape),
+            flex_array_compatible_with_rust("prob", prob, shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_by_prob_rs
 
-        prob = prepare_array_for_rust(prob, dtype=np.float64)
-        return generate_rand_by_prob_rs(shape[0], shape[1], prob, pick_first, seed=seed)
+        prob = prepare_flex_array_for_rust(prob, shape, np.float64, flex_2d, name="prob")
+        return generate_rand_by_prob_rs(shape[0], shape[1], prob, pick_first, flex_2d=flex_2d, seed=seed)
     from vectorbt.signals.nb import generate_rand_by_prob_nb
 
     return generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
@@ -250,16 +250,15 @@ def generate_rand_ex_by_prob(
         engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
-            array_compatible_with_rust(prob, dtype=np.float64),
-            matching_shape_compatible_with_rust("prob", entries, prob),
+            flex_array_compatible_with_rust("prob", prob, entries.shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_ex_by_prob_rs
 
         entries = prepare_array_for_rust(entries, dtype=np.bool_)
-        prob = prepare_array_for_rust(prob, dtype=np.float64)
-        return generate_rand_ex_by_prob_rs(entries, prob, wait, until_next, skip_until_exit, seed=seed)
+        prob = prepare_flex_array_for_rust(prob, entries.shape, np.float64, flex_2d, name="prob")
+        return generate_rand_ex_by_prob_rs(entries, prob, wait, until_next, skip_until_exit, flex_2d=flex_2d, seed=seed)
     from vectorbt.signals.nb import generate_rand_ex_by_prob_nb
 
     return generate_rand_ex_by_prob_nb(
@@ -356,18 +355,15 @@ def generate_rand_enex_by_prob(
     eng = resolve_engine(
         engine,
         supports_rust=combine_rust_support(
-            array_compatible_with_rust(entry_prob, dtype=np.float64),
-            array_compatible_with_rust(exit_prob, dtype=np.float64),
-            array_shape_compatible_with_rust("entry_prob", entry_prob, shape),
-            array_shape_compatible_with_rust("exit_prob", exit_prob, shape),
-            matching_shape_compatible_with_rust("exit_prob", entry_prob, exit_prob),
+            flex_array_compatible_with_rust("entry_prob", entry_prob, shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("exit_prob", exit_prob, shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.signals import generate_rand_enex_by_prob_rs
 
-        entry_prob = prepare_array_for_rust(entry_prob, dtype=np.float64)
-        exit_prob = prepare_array_for_rust(exit_prob, dtype=np.float64)
+        entry_prob = prepare_flex_array_for_rust(entry_prob, shape, np.float64, flex_2d, name="entry_prob")
+        exit_prob = prepare_flex_array_for_rust(exit_prob, shape, np.float64, flex_2d, name="exit_prob")
         return generate_rand_enex_by_prob_rs(
             shape[0],
             shape[1],
@@ -377,6 +373,7 @@ def generate_rand_enex_by_prob(
             exit_wait,
             entry_pick_first,
             exit_pick_first,
+            flex_2d=flex_2d,
             seed=seed,
         )
     from vectorbt.signals.nb import generate_rand_enex_by_prob_nb
@@ -412,11 +409,9 @@ def generate_stop_ex(
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(ts, dtype=np.float64),
-            array_compatible_with_rust(stop, dtype=np.float64),
-            array_compatible_with_rust(trailing, dtype=np.bool_),
             matching_shape_compatible_with_rust("ts", entries, ts),
-            matching_shape_compatible_with_rust("stop", entries, stop),
-            matching_shape_compatible_with_rust("trailing", entries, trailing),
+            flex_array_compatible_with_rust("stop", stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("trailing", trailing, entries.shape, np.bool_, flex_2d),
         ),
     )
     if eng == "rust":
@@ -424,9 +419,19 @@ def generate_stop_ex(
 
         entries = prepare_array_for_rust(entries, dtype=np.bool_)
         ts = prepare_array_for_rust(ts, dtype=np.float64)
-        stop = prepare_array_for_rust(stop, dtype=np.float64)
-        trailing = prepare_array_for_rust(trailing, dtype=np.bool_)
-        return generate_stop_ex_rs(entries, ts, stop, trailing, wait, until_next, skip_until_exit, pick_first)
+        stop = prepare_flex_array_for_rust(stop, entries.shape, np.float64, flex_2d, name="stop")
+        trailing = prepare_flex_array_for_rust(trailing, entries.shape, np.bool_, flex_2d, name="trailing")
+        return generate_stop_ex_rs(
+            entries,
+            ts,
+            stop,
+            trailing,
+            wait,
+            until_next,
+            skip_until_exit,
+            pick_first,
+            flex_2d=flex_2d,
+        )
     from vectorbt.signals.nb import generate_stop_ex_nb
 
     return generate_stop_ex_nb(
@@ -459,11 +464,9 @@ def generate_stop_enex(
         supports_rust=combine_rust_support(
             array_compatible_with_rust(entries, dtype=np.bool_),
             array_compatible_with_rust(ts, dtype=np.float64),
-            array_compatible_with_rust(stop, dtype=np.float64),
-            array_compatible_with_rust(trailing, dtype=np.bool_),
             matching_shape_compatible_with_rust("ts", entries, ts),
-            matching_shape_compatible_with_rust("stop", entries, stop),
-            matching_shape_compatible_with_rust("trailing", entries, trailing),
+            flex_array_compatible_with_rust("stop", stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("trailing", trailing, entries.shape, np.bool_, flex_2d),
         ),
     )
     if eng == "rust":
@@ -471,9 +474,9 @@ def generate_stop_enex(
 
         entries = prepare_array_for_rust(entries, dtype=np.bool_)
         ts = prepare_array_for_rust(ts, dtype=np.float64)
-        stop = prepare_array_for_rust(stop, dtype=np.float64)
-        trailing = prepare_array_for_rust(trailing, dtype=np.bool_)
-        return generate_stop_enex_rs(entries, ts, stop, trailing, entry_wait, exit_wait, pick_first)
+        stop = prepare_flex_array_for_rust(stop, entries.shape, np.float64, flex_2d, name="stop")
+        trailing = prepare_flex_array_for_rust(trailing, entries.shape, np.bool_, flex_2d, name="trailing")
+        return generate_stop_enex_rs(entries, ts, stop, trailing, entry_wait, exit_wait, pick_first, flex_2d=flex_2d)
     from vectorbt.signals.nb import generate_stop_enex_nb
 
     return generate_stop_enex_nb(
@@ -519,20 +522,16 @@ def generate_ohlc_stop_ex(
             array_compatible_with_rust(close, dtype=np.float64),
             exact_array_compatible_with_rust(stop_price_out, dtype=np.float64),
             exact_array_compatible_with_rust(stop_type_out, dtype=np.int64),
-            array_compatible_with_rust(sl_stop, dtype=np.float64),
-            array_compatible_with_rust(sl_trail, dtype=np.bool_),
-            array_compatible_with_rust(tp_stop, dtype=np.float64),
-            array_compatible_with_rust(reverse, dtype=np.bool_),
             matching_shape_compatible_with_rust("open", entries, open),
             matching_shape_compatible_with_rust("high", entries, high),
             matching_shape_compatible_with_rust("low", entries, low),
             matching_shape_compatible_with_rust("close", entries, close),
             matching_shape_compatible_with_rust("stop_price_out", entries, stop_price_out),
             matching_shape_compatible_with_rust("stop_type_out", entries, stop_type_out),
-            matching_shape_compatible_with_rust("sl_stop", entries, sl_stop),
-            matching_shape_compatible_with_rust("sl_trail", entries, sl_trail),
-            matching_shape_compatible_with_rust("tp_stop", entries, tp_stop),
-            matching_shape_compatible_with_rust("reverse", entries, reverse),
+            flex_array_compatible_with_rust("sl_stop", sl_stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("sl_trail", sl_trail, entries.shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("tp_stop", tp_stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("reverse", reverse, entries.shape, np.bool_, flex_2d),
         ),
     )
     if eng == "rust":
@@ -543,10 +542,10 @@ def generate_ohlc_stop_ex(
         high = prepare_array_for_rust(high, dtype=np.float64)
         low = prepare_array_for_rust(low, dtype=np.float64)
         close = prepare_array_for_rust(close, dtype=np.float64)
-        sl_stop = prepare_array_for_rust(sl_stop, dtype=np.float64)
-        sl_trail = prepare_array_for_rust(sl_trail, dtype=np.bool_)
-        tp_stop = prepare_array_for_rust(tp_stop, dtype=np.float64)
-        reverse = prepare_array_for_rust(reverse, dtype=np.bool_)
+        sl_stop = prepare_flex_array_for_rust(sl_stop, entries.shape, np.float64, flex_2d, name="sl_stop")
+        sl_trail = prepare_flex_array_for_rust(sl_trail, entries.shape, np.bool_, flex_2d, name="sl_trail")
+        tp_stop = prepare_flex_array_for_rust(tp_stop, entries.shape, np.float64, flex_2d, name="tp_stop")
+        reverse = prepare_flex_array_for_rust(reverse, entries.shape, np.bool_, flex_2d, name="reverse")
         return generate_ohlc_stop_ex_rs(
             entries,
             open,
@@ -564,6 +563,7 @@ def generate_ohlc_stop_ex(
             until_next,
             skip_until_exit,
             pick_first,
+            flex_2d=flex_2d,
         )
     from vectorbt.signals.nb import generate_ohlc_stop_ex_nb
 
@@ -655,20 +655,16 @@ def generate_ohlc_stop_enex(
             array_compatible_with_rust(close, dtype=np.float64),
             exact_array_compatible_with_rust(stop_price_out, dtype=np.float64),
             exact_array_compatible_with_rust(stop_type_out, dtype=np.int64),
-            array_compatible_with_rust(sl_stop, dtype=np.float64),
-            array_compatible_with_rust(sl_trail, dtype=np.bool_),
-            array_compatible_with_rust(tp_stop, dtype=np.float64),
-            array_compatible_with_rust(reverse, dtype=np.bool_),
             matching_shape_compatible_with_rust("open", entries, open),
             matching_shape_compatible_with_rust("high", entries, high),
             matching_shape_compatible_with_rust("low", entries, low),
             matching_shape_compatible_with_rust("close", entries, close),
             matching_shape_compatible_with_rust("stop_price_out", entries, stop_price_out),
             matching_shape_compatible_with_rust("stop_type_out", entries, stop_type_out),
-            matching_shape_compatible_with_rust("sl_stop", entries, sl_stop),
-            matching_shape_compatible_with_rust("sl_trail", entries, sl_trail),
-            matching_shape_compatible_with_rust("tp_stop", entries, tp_stop),
-            matching_shape_compatible_with_rust("reverse", entries, reverse),
+            flex_array_compatible_with_rust("sl_stop", sl_stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("sl_trail", sl_trail, entries.shape, np.bool_, flex_2d),
+            flex_array_compatible_with_rust("tp_stop", tp_stop, entries.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("reverse", reverse, entries.shape, np.bool_, flex_2d),
         ),
     )
     if eng == "rust":
@@ -679,10 +675,10 @@ def generate_ohlc_stop_enex(
         high = prepare_array_for_rust(high, dtype=np.float64)
         low = prepare_array_for_rust(low, dtype=np.float64)
         close = prepare_array_for_rust(close, dtype=np.float64)
-        sl_stop = prepare_array_for_rust(sl_stop, dtype=np.float64)
-        sl_trail = prepare_array_for_rust(sl_trail, dtype=np.bool_)
-        tp_stop = prepare_array_for_rust(tp_stop, dtype=np.float64)
-        reverse = prepare_array_for_rust(reverse, dtype=np.bool_)
+        sl_stop = prepare_flex_array_for_rust(sl_stop, entries.shape, np.float64, flex_2d, name="sl_stop")
+        sl_trail = prepare_flex_array_for_rust(sl_trail, entries.shape, np.bool_, flex_2d, name="sl_trail")
+        tp_stop = prepare_flex_array_for_rust(tp_stop, entries.shape, np.float64, flex_2d, name="tp_stop")
+        reverse = prepare_flex_array_for_rust(reverse, entries.shape, np.bool_, flex_2d, name="reverse")
         return generate_ohlc_stop_enex_rs(
             entries,
             open,
@@ -699,6 +695,7 @@ def generate_ohlc_stop_enex(
             entry_wait,
             exit_wait,
             pick_first,
+            flex_2d=flex_2d,
         )
     from vectorbt.signals.nb import generate_ohlc_stop_enex_nb
 
@@ -732,13 +729,16 @@ def rand_by_prob_apply(
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RPROB`."""
     engine = resolve_random_engine(engine)
-    prob = flex_broadcast_to_shape(prob, input_shape, np.float64)
     return generate_rand_by_prob(
         input_shape,
         prob,
         pick_first,
         flex_2d,
-        seed=seed_for_rust(seed, engine, array_compatible_with_rust(prob, dtype=np.float64)),
+        seed=seed_for_rust(
+            seed,
+            engine,
+            flex_array_compatible_with_rust("prob", prob, input_shape, np.float64, flex_2d),
+        ),
         engine=engine,
     )
 
@@ -755,7 +755,6 @@ def rand_ex_by_prob_apply(
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.RPROBX`."""
     engine = resolve_random_engine(engine)
-    prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
     return generate_rand_ex_by_prob(
         entries,
         prob,
@@ -768,8 +767,7 @@ def rand_ex_by_prob_apply(
             engine,
             combine_rust_support(
                 array_compatible_with_rust(entries, dtype=np.bool_),
-                array_compatible_with_rust(prob, dtype=np.float64),
-                matching_shape_compatible_with_rust("prob", entries, prob),
+                flex_array_compatible_with_rust("prob", prob, entries.shape, np.float64, flex_2d),
             ),
         ),
         engine=engine,
@@ -790,8 +788,6 @@ def rand_enex_by_prob_apply(
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function used by `vectorbt.signals.generators.RPROBNX`."""
     engine = resolve_random_engine(engine)
-    entry_prob = flex_broadcast_to_shape(entry_prob, input_shape, np.float64, flex_2d=flex_2d)
-    exit_prob = flex_broadcast_to_shape(exit_prob, input_shape, np.float64, flex_2d=flex_2d)
     return generate_rand_enex_by_prob(
         input_shape,
         entry_prob,
@@ -805,9 +801,8 @@ def rand_enex_by_prob_apply(
             seed,
             engine,
             combine_rust_support(
-                array_compatible_with_rust(entry_prob, dtype=np.float64),
-                array_compatible_with_rust(exit_prob, dtype=np.float64),
-                matching_shape_compatible_with_rust("exit_prob", entry_prob, exit_prob),
+                flex_array_compatible_with_rust("entry_prob", entry_prob, input_shape, np.float64, flex_2d),
+                flex_array_compatible_with_rust("exit_prob", exit_prob, input_shape, np.float64, flex_2d),
             ),
         ),
         engine=engine,
@@ -832,14 +827,12 @@ def rand_chain_by_prob_apply(
     engine = resolve_random_engine(engine)
     if exit_wait is None:
         exit_wait = wait
-    prob = flex_broadcast_to_shape(prob, entries.shape, np.float64)
     if (
         resolve_engine(
             engine,
             supports_rust=combine_rust_support(
                 array_compatible_with_rust(entries.astype(np.float64), dtype=np.float64),
-                array_compatible_with_rust(prob, dtype=np.float64),
-                matching_shape_compatible_with_rust("exit_prob", entries, prob),
+                flex_array_compatible_with_rust("prob", prob, entries.shape, np.float64, flex_2d),
             ),
         )
         == "numba"
@@ -874,8 +867,7 @@ def rand_chain_by_prob_apply(
             engine,
             combine_rust_support(
                 array_compatible_with_rust(entry_prob, dtype=np.float64),
-                array_compatible_with_rust(prob, dtype=np.float64),
-                matching_shape_compatible_with_rust("exit_prob", entry_prob, prob),
+                flex_array_compatible_with_rust("prob", prob, entries.shape, np.float64, flex_2d),
             ),
         ),
         engine=engine,
@@ -896,8 +888,6 @@ def stop_ex_apply(
 ) -> tp.Array2d:
     """Apply function used by `vectorbt.signals.generators.STX`."""
     ts = np.asarray(ts, dtype=np.float64)
-    stop = flex_broadcast_to_shape(stop, entries.shape, np.float64)
-    trailing = flex_broadcast_to_shape(trailing, entries.shape, np.bool_)
     return generate_stop_ex(
         entries,
         ts,
@@ -930,8 +920,6 @@ def stop_enex_apply(
     if exit_wait is None:
         exit_wait = wait
     ts = np.asarray(ts, dtype=np.float64)
-    stop = flex_broadcast_to_shape(stop, entries.shape, np.float64)
-    trailing = flex_broadcast_to_shape(trailing, entries.shape, np.bool_)
     return generate_stop_enex(
         entries,
         ts,
@@ -970,10 +958,6 @@ def ohlc_stop_ex_apply(
     high = np.asarray(high, dtype=np.float64)
     low = np.asarray(low, dtype=np.float64)
     close = np.asarray(close, dtype=np.float64)
-    sl_stop = flex_broadcast_to_shape(sl_stop, entries.shape, np.float64)
-    sl_trail = flex_broadcast_to_shape(sl_trail, entries.shape, np.bool_)
-    tp_stop = flex_broadcast_to_shape(tp_stop, entries.shape, np.float64)
-    reverse = flex_broadcast_to_shape(reverse, entries.shape, np.bool_)
     return generate_ohlc_stop_ex(
         entries,
         open,
@@ -1025,10 +1009,6 @@ def ohlc_stop_enex_apply(
     high = np.asarray(high, dtype=np.float64)
     low = np.asarray(low, dtype=np.float64)
     close = np.asarray(close, dtype=np.float64)
-    sl_stop = flex_broadcast_to_shape(sl_stop, entries.shape, np.float64)
-    sl_trail = flex_broadcast_to_shape(sl_trail, entries.shape, np.bool_)
-    tp_stop = flex_broadcast_to_shape(tp_stop, entries.shape, np.float64)
-    reverse = flex_broadcast_to_shape(reverse, entries.shape, np.bool_)
     return generate_ohlc_stop_enex(
         entries,
         open,

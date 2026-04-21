@@ -1,9 +1,11 @@
 // Copyright (c) 2021 Oleg Polakow. All rights reserved.
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-use crate::generic::{array1_as_slice_cow, RangeRecord, RANGE_CLOSED, RANGE_OPEN};
+use crate::generic::{array1_as_slice_cow, FlexArray, RangeRecord, RANGE_CLOSED, RANGE_OPEN};
 use ndarray::{Array2, ArrayView2};
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadwriteArray2};
+use numpy::{
+    PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn, PyReadwriteArray2,
+};
 use pyo3::exceptions::{PyValueError, PyZeroDivisionError};
 use pyo3::prelude::*;
 use rand::seq::index::sample;
@@ -91,14 +93,27 @@ pub(crate) fn generate_rand<R: Rng + ?Sized>(
 pub(crate) fn generate_rand_by_prob<R: Rng + ?Sized>(
     nrows: usize,
     ncols: usize,
-    prob: ArrayView2<'_, f64>,
+    prob: &FlexArray<'_, f64>,
     pick_first: bool,
     rng: &mut R,
 ) -> Array2<bool> {
     let mut out = Array2::<bool>::from_elem((nrows, ncols), false);
+    if let Some((prob_src, prob_cols)) = prob.as_full_2d() {
+        for col in 0..ncols {
+            for row in 0..nrows {
+                if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(row * prob_cols + col) } {
+                    out[[row, col]] = true;
+                    if pick_first {
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
+    }
     for col in 0..ncols {
         for row in 0..nrows {
-            if rng.gen::<f64>() < prob[[row, col]] {
+            if rng.gen::<f64>() < prob.get(row, col) {
                 out[[row, col]] = true;
                 if pick_first {
                     break;
@@ -127,7 +142,6 @@ pub(crate) fn generate_rand_ex<R: Rng + ?Sized>(
 ) -> Array2<bool> {
     let (nrows, ncols) = entries.dim();
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
-
     for col in 0..ncols {
         let mut last_exit_i: i64 = -1;
         let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
@@ -154,7 +168,7 @@ pub(crate) fn generate_rand_ex<R: Rng + ?Sized>(
 
 pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
     entries: ArrayView2<'_, bool>,
-    prob: ArrayView2<'_, f64>,
+    prob: &FlexArray<'_, f64>,
     wait: usize,
     until_next: bool,
     skip_until_exit: bool,
@@ -162,6 +176,36 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
 ) -> Array2<bool> {
     let (nrows, ncols) = entries.dim();
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
+    if let Some((prob_src, prob_cols)) = prob.as_full_2d() {
+        for col in 0..ncols {
+            let mut last_exit_i: i64 = -1;
+            let mut entry_i_opt = next_true_in_col(entries, col, 0, nrows);
+            while let Some(entry_i) = entry_i_opt {
+                let next_entry_i = next_true_in_col(entries, col, entry_i + 1, nrows);
+                if !(skip_until_exit && (entry_i as i64) <= last_exit_i) {
+                    let from_i = entry_i + wait;
+                    let to_i = if until_next {
+                        next_entry_i.unwrap_or(nrows)
+                    } else {
+                        nrows
+                    };
+                    if to_i > from_i {
+                        for idx in from_i..to_i {
+                            if rng.gen::<f64>()
+                                < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) }
+                            {
+                                exits[[idx, col]] = true;
+                                last_exit_i = idx as i64;
+                                break;
+                            }
+                        }
+                    }
+                }
+                entry_i_opt = next_entry_i;
+            }
+        }
+        return exits;
+    }
 
     for col in 0..ncols {
         let mut last_exit_i: i64 = -1;
@@ -177,7 +221,7 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
                 };
                 if to_i > from_i {
                     for idx in from_i..to_i {
-                        if rng.gen::<f64>() < prob[[idx, col]] {
+                        if rng.gen::<f64>() < prob.get(idx, col) {
                             exits[[idx, col]] = true;
                             last_exit_i = idx as i64;
                             break;
@@ -340,8 +384,8 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
 pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
     nrows: usize,
     ncols: usize,
-    entry_prob: ArrayView2<'a, f64>,
-    exit_prob: ArrayView2<'a, f64>,
+    entry_prob: &FlexArray<'a, f64>,
+    exit_prob: &FlexArray<'a, f64>,
     entry_wait: usize,
     exit_wait: usize,
     entry_pick_first: bool,
@@ -350,6 +394,77 @@ pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
 ) -> PyResult<(Array2<bool>, Array2<bool>)> {
     let mut entries = Array2::<bool>::from_elem((nrows, ncols), false);
     let mut exits = Array2::<bool>::from_elem((nrows, ncols), false);
+    if let (Some((entry_src, entry_cols)), Some((exit_src, exit_cols))) =
+        (entry_prob.as_full_2d(), exit_prob.as_full_2d())
+    {
+        for col in 0..ncols {
+            let mut prev_prev_i: i64 = -2;
+            let mut prev_i: i64 = -1;
+            let mut i = 0usize;
+            loop {
+                let is_entry = i % 2 == 0;
+                let from_i_raw: i64 = if is_entry {
+                    if i == 0 {
+                        0
+                    } else {
+                        prev_i + entry_wait as i64
+                    }
+                } else {
+                    prev_i + exit_wait as i64
+                };
+                if from_i_raw >= nrows as i64 {
+                    break;
+                }
+                let from_i = from_i_raw as usize;
+                let to_i = nrows;
+                let (prob_src, prob_cols, pick_first) = if is_entry {
+                    (entry_src, entry_cols, entry_pick_first)
+                } else {
+                    (exit_src, exit_cols, exit_pick_first)
+                };
+                let mut first_i: Option<usize> = None;
+                let mut last_i: Option<usize> = None;
+                let mut hits: Vec<usize> = Vec::new();
+                for idx in from_i..to_i {
+                    if rng.gen::<f64>()
+                        < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) }
+                    {
+                        if first_i.is_none() {
+                            first_i = Some(idx);
+                        }
+                        if !pick_first {
+                            hits.push(idx);
+                        }
+                        last_i = Some(idx);
+                        if pick_first {
+                            break;
+                        }
+                    }
+                }
+                let first_i = match first_i {
+                    Some(v) => v,
+                    None => break,
+                };
+                if first_i as i64 == prev_i && prev_i == prev_prev_i {
+                    return Err(PyValueError::new_err("Infinite loop detected"));
+                }
+                let target: &mut Array2<bool> = if is_entry { &mut entries } else { &mut exits };
+                if pick_first {
+                    target[[first_i, col]] = true;
+                    prev_prev_i = prev_i;
+                    prev_i = first_i as i64;
+                } else {
+                    for idx in &hits {
+                        target[[*idx, col]] = true;
+                    }
+                    prev_prev_i = prev_i;
+                    prev_i = last_i.unwrap() as i64;
+                }
+                i += 1;
+            }
+        }
+        return Ok((entries, exits));
+    }
 
     for col in 0..ncols {
         let mut prev_prev_i: i64 = -2;
@@ -380,7 +495,7 @@ pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
             let mut last_i: Option<usize> = None;
             let mut hits: Vec<usize> = Vec::new();
             for idx in from_i..to_i {
-                if rng.gen::<f64>() < prob_view[[idx, col]] {
+                if rng.gen::<f64>() < prob_view.get(idx, col) {
                     if first_i.is_none() {
                         first_i = Some(idx);
                     }
@@ -430,15 +545,15 @@ fn stop_choice_first(
     to_i: usize,
     col: usize,
     ts: ArrayView2<'_, f64>,
-    stop: ArrayView2<'_, f64>,
-    trailing: ArrayView2<'_, bool>,
+    stop: &FlexArray<'_, f64>,
+    trailing: &FlexArray<'_, bool>,
     wait: usize,
 ) -> Option<usize> {
     let init_i = from_i as i64 - wait as i64;
     let init_i = if init_i < 0 { 0usize } else { init_i as usize };
     let init_ts = ts[[init_i, col]];
-    let init_stop = stop[[init_i, col]];
-    let init_trailing = trailing[[init_i, col]];
+    let init_stop = stop.get(init_i, col);
+    let init_trailing = trailing.get(init_i, col);
     let mut max_high = init_ts;
     let mut min_low = init_ts;
 
@@ -487,15 +602,15 @@ fn stop_choice_all(
     to_i: usize,
     col: usize,
     ts: ArrayView2<'_, f64>,
-    stop: ArrayView2<'_, f64>,
-    trailing: ArrayView2<'_, bool>,
+    stop: &FlexArray<'_, f64>,
+    trailing: &FlexArray<'_, bool>,
     wait: usize,
 ) -> Vec<usize> {
     let init_i = from_i as i64 - wait as i64;
     let init_i = if init_i < 0 { 0usize } else { init_i as usize };
     let init_ts = ts[[init_i, col]];
-    let init_stop = stop[[init_i, col]];
-    let init_trailing = trailing[[init_i, col]];
+    let init_stop = stop.get(init_i, col);
+    let init_trailing = trailing.get(init_i, col);
     let mut max_high = init_ts;
     let mut min_low = init_ts;
     let mut out = Vec::new();
@@ -539,8 +654,8 @@ fn stop_choice_all(
 pub(crate) fn generate_stop_ex(
     entries: ArrayView2<'_, bool>,
     ts: ArrayView2<'_, f64>,
-    stop: ArrayView2<'_, f64>,
-    trailing: ArrayView2<'_, bool>,
+    stop: &FlexArray<'_, f64>,
+    trailing: &FlexArray<'_, bool>,
     wait: usize,
     until_next: bool,
     skip_until_exit: bool,
@@ -589,8 +704,8 @@ pub(crate) fn generate_stop_ex(
 pub(crate) fn generate_stop_enex(
     entries: ArrayView2<'_, bool>,
     ts: ArrayView2<'_, f64>,
-    stop: ArrayView2<'_, f64>,
-    trailing: ArrayView2<'_, bool>,
+    stop: &FlexArray<'_, f64>,
+    trailing: &FlexArray<'_, bool>,
     entry_wait: usize,
     exit_wait: usize,
     pick_first: bool,
@@ -697,10 +812,10 @@ fn ohlc_stop_choice(
     close: ArrayView2<'_, f64>,
     stop_price_out: &mut ndarray::ArrayViewMut2<'_, f64>,
     stop_type_out: &mut ndarray::ArrayViewMut2<'_, i64>,
-    sl_stop: ArrayView2<'_, f64>,
-    sl_trail: ArrayView2<'_, bool>,
-    tp_stop: ArrayView2<'_, f64>,
-    reverse: ArrayView2<'_, bool>,
+    sl_stop: &FlexArray<'_, f64>,
+    sl_trail: &FlexArray<'_, bool>,
+    tp_stop: &FlexArray<'_, f64>,
+    reverse: &FlexArray<'_, bool>,
     is_open_safe: bool,
     wait: usize,
     pick_first: bool,
@@ -712,16 +827,16 @@ fn ohlc_stop_choice(
         init_i_i as usize
     };
     let init_open = open[[init_i, col]];
-    let init_sl_stop = sl_stop[[init_i, col]];
+    let init_sl_stop = sl_stop.get(init_i, col);
     if !init_sl_stop.is_nan() && init_sl_stop < 0.0 {
         return Err(PyValueError::new_err("Stop value must be 0 or greater"));
     }
-    let init_sl_trail = sl_trail[[init_i, col]];
-    let init_tp_stop = tp_stop[[init_i, col]];
+    let init_sl_trail = sl_trail.get(init_i, col);
+    let init_tp_stop = tp_stop.get(init_i, col);
     if !init_tp_stop.is_nan() && init_tp_stop < 0.0 {
         return Err(PyValueError::new_err("Stop value must be 0 or greater"));
     }
-    let init_reverse = reverse[[init_i, col]];
+    let init_reverse = reverse.get(init_i, col);
     let mut max_p = init_open;
     let mut min_p = init_open;
     let mut out = Vec::new();
@@ -833,10 +948,10 @@ pub(crate) fn generate_ohlc_stop_ex(
     close: ArrayView2<'_, f64>,
     stop_price_out: &mut ndarray::ArrayViewMut2<'_, f64>,
     stop_type_out: &mut ndarray::ArrayViewMut2<'_, i64>,
-    sl_stop: ArrayView2<'_, f64>,
-    sl_trail: ArrayView2<'_, bool>,
-    tp_stop: ArrayView2<'_, f64>,
-    reverse: ArrayView2<'_, bool>,
+    sl_stop: &FlexArray<'_, f64>,
+    sl_trail: &FlexArray<'_, bool>,
+    tp_stop: &FlexArray<'_, f64>,
+    reverse: &FlexArray<'_, bool>,
     is_open_safe: bool,
     wait: usize,
     until_next: bool,
@@ -906,10 +1021,10 @@ pub(crate) fn generate_ohlc_stop_enex(
     close: ArrayView2<'_, f64>,
     stop_price_out: &mut ndarray::ArrayViewMut2<'_, f64>,
     stop_type_out: &mut ndarray::ArrayViewMut2<'_, i64>,
-    sl_stop: ArrayView2<'_, f64>,
-    sl_trail: ArrayView2<'_, bool>,
-    tp_stop: ArrayView2<'_, f64>,
-    reverse: ArrayView2<'_, bool>,
+    sl_stop: &FlexArray<'_, f64>,
+    sl_trail: &FlexArray<'_, bool>,
+    tp_stop: &FlexArray<'_, f64>,
+    reverse: &FlexArray<'_, bool>,
     is_open_safe: bool,
     entry_wait: usize,
     exit_wait: usize,
@@ -1442,24 +1557,20 @@ pub fn generate_rand_rs<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (nrows, ncols, prob, pick_first, seed=None))]
+#[pyo3(signature = (nrows, ncols, prob, pick_first, seed=None, flex_2d=true))]
 pub fn generate_rand_by_prob_rs<'py>(
     py: Python<'py>,
     nrows: usize,
     ncols: usize,
-    prob: PyReadonlyArray2<'py, f64>,
+    prob: PyReadonlyArrayDyn<'py, f64>,
     pick_first: bool,
     seed: Option<u64>,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
-    let prob_arr = prob.as_array();
-    if prob_arr.dim() != (nrows, ncols) {
-        return Err(PyValueError::new_err(
-            "prob shape must equal (nrows, ncols)",
-        ));
-    }
+    let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
     let result =
-        py.allow_threads(|| generate_rand_by_prob(nrows, ncols, prob_arr, pick_first, &mut rng));
+        py.allow_threads(|| generate_rand_by_prob(nrows, ncols, &prob_flex, pick_first, &mut rng));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 
@@ -1482,26 +1593,25 @@ pub fn generate_rand_ex_rs<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (entries, prob, wait, until_next, skip_until_exit, seed=None))]
+#[pyo3(signature = (entries, prob, wait, until_next, skip_until_exit, seed=None, flex_2d=true))]
 pub fn generate_rand_ex_by_prob_rs<'py>(
     py: Python<'py>,
     entries: PyReadonlyArray2<'py, bool>,
-    prob: PyReadonlyArray2<'py, f64>,
+    prob: PyReadonlyArrayDyn<'py, f64>,
     wait: usize,
     until_next: bool,
     skip_until_exit: bool,
     seed: Option<u64>,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let entries_arr = entries.as_array();
-    let prob_arr = prob.as_array();
-    if prob_arr.dim() != entries_arr.dim() {
-        return Err(PyValueError::new_err("prob shape must equal entries shape"));
-    }
+    let (nrows, ncols) = entries_arr.dim();
+    let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
     let result = py.allow_threads(|| {
         generate_rand_ex_by_prob(
             entries_arr,
-            prob_arr,
+            &prob_flex,
             wait,
             until_next,
             skip_until_exit,
@@ -1548,38 +1658,37 @@ pub fn generate_rand_enex_rs<'py>(
     entry_pick_first,
     exit_pick_first,
     seed=None,
+    flex_2d=true,
 ))]
 pub fn generate_rand_enex_by_prob_rs<'py>(
     py: Python<'py>,
     nrows: usize,
     ncols: usize,
-    entry_prob: PyReadonlyArray2<'py, f64>,
-    exit_prob: PyReadonlyArray2<'py, f64>,
+    entry_prob: PyReadonlyArrayDyn<'py, f64>,
+    exit_prob: PyReadonlyArrayDyn<'py, f64>,
     entry_wait: usize,
     exit_wait: usize,
     entry_pick_first: bool,
     exit_pick_first: bool,
     seed: Option<u64>,
+    flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     if entry_wait == 0 && exit_wait == 0 {
         return Err(PyValueError::new_err(
             "entry_wait and exit_wait cannot be both 0",
         ));
     }
-    let entry_prob_arr = entry_prob.as_array();
-    let exit_prob_arr = exit_prob.as_array();
-    if entry_prob_arr.dim() != (nrows, ncols) || exit_prob_arr.dim() != (nrows, ncols) {
-        return Err(PyValueError::new_err(
-            "prob shape must equal (nrows, ncols)",
-        ));
-    }
+    let entry_prob_flex =
+        FlexArray::from_pyarray("entry_prob", &entry_prob, nrows, ncols, flex_2d)?;
+    let exit_prob_flex =
+        FlexArray::from_pyarray("exit_prob", &exit_prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
     let (entries, exits) = py.allow_threads(|| {
         generate_rand_enex_by_prob(
             nrows,
             ncols,
-            entry_prob_arr,
-            exit_prob_arr,
+            &entry_prob_flex,
+            &exit_prob_flex,
             entry_wait,
             exit_wait,
             entry_pick_first,
@@ -1594,34 +1703,33 @@ pub fn generate_rand_enex_by_prob_rs<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (entries, ts, stop, trailing, wait, until_next, skip_until_exit, pick_first))]
+#[pyo3(signature = (entries, ts, stop, trailing, wait, until_next, skip_until_exit, pick_first, flex_2d=true))]
 pub fn generate_stop_ex_rs<'py>(
     py: Python<'py>,
     entries: PyReadonlyArray2<'py, bool>,
     ts: PyReadonlyArray2<'py, f64>,
-    stop: PyReadonlyArray2<'py, f64>,
-    trailing: PyReadonlyArray2<'py, bool>,
+    stop: PyReadonlyArrayDyn<'py, f64>,
+    trailing: PyReadonlyArrayDyn<'py, bool>,
     wait: usize,
     until_next: bool,
     skip_until_exit: bool,
     pick_first: bool,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let entries_arr = entries.as_array();
     let ts_arr = ts.as_array();
-    let stop_arr = stop.as_array();
-    let trailing_arr = trailing.as_array();
     let shape = entries_arr.dim();
-    if ts_arr.dim() != shape || stop_arr.dim() != shape || trailing_arr.dim() != shape {
-        return Err(PyValueError::new_err(
-            "ts, stop and trailing must match entries shape",
-        ));
+    if ts_arr.dim() != shape {
+        return Err(PyValueError::new_err("ts must match entries shape"));
     }
+    let stop_flex = FlexArray::from_pyarray("stop", &stop, shape.0, shape.1, flex_2d)?;
+    let trailing_flex = FlexArray::from_pyarray("trailing", &trailing, shape.0, shape.1, flex_2d)?;
     let result = py.allow_threads(|| {
         generate_stop_ex(
             entries_arr,
             ts_arr,
-            stop_arr,
-            trailing_arr,
+            &stop_flex,
+            &trailing_flex,
             wait,
             until_next,
             skip_until_exit,
@@ -1632,33 +1740,32 @@ pub fn generate_stop_ex_rs<'py>(
 }
 
 #[pyfunction]
-#[pyo3(signature = (entries, ts, stop, trailing, entry_wait, exit_wait, pick_first))]
+#[pyo3(signature = (entries, ts, stop, trailing, entry_wait, exit_wait, pick_first, flex_2d=true))]
 pub fn generate_stop_enex_rs<'py>(
     py: Python<'py>,
     entries: PyReadonlyArray2<'py, bool>,
     ts: PyReadonlyArray2<'py, f64>,
-    stop: PyReadonlyArray2<'py, f64>,
-    trailing: PyReadonlyArray2<'py, bool>,
+    stop: PyReadonlyArrayDyn<'py, f64>,
+    trailing: PyReadonlyArrayDyn<'py, bool>,
     entry_wait: usize,
     exit_wait: usize,
     pick_first: bool,
+    flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     let entries_arr = entries.as_array();
     let ts_arr = ts.as_array();
-    let stop_arr = stop.as_array();
-    let trailing_arr = trailing.as_array();
     let shape = entries_arr.dim();
-    if ts_arr.dim() != shape || stop_arr.dim() != shape || trailing_arr.dim() != shape {
-        return Err(PyValueError::new_err(
-            "ts, stop and trailing must match entries shape",
-        ));
+    if ts_arr.dim() != shape {
+        return Err(PyValueError::new_err("ts must match entries shape"));
     }
+    let stop_flex = FlexArray::from_pyarray("stop", &stop, shape.0, shape.1, flex_2d)?;
+    let trailing_flex = FlexArray::from_pyarray("trailing", &trailing, shape.0, shape.1, flex_2d)?;
     let (new_entries, exits) = py.allow_threads(|| {
         generate_stop_enex(
             entries_arr,
             ts_arr,
-            stop_arr,
-            trailing_arr,
+            &stop_flex,
+            &trailing_flex,
             entry_wait,
             exit_wait,
             pick_first,
@@ -1688,6 +1795,7 @@ pub fn generate_stop_enex_rs<'py>(
     until_next,
     skip_until_exit,
     pick_first,
+    flex_2d=true,
 ))]
 #[allow(clippy::too_many_arguments)]
 pub fn generate_ohlc_stop_ex_rs<'py>(
@@ -1699,39 +1807,34 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
     close: PyReadonlyArray2<'py, f64>,
     mut stop_price_out: PyReadwriteArray2<'py, f64>,
     mut stop_type_out: PyReadwriteArray2<'py, i64>,
-    sl_stop: PyReadonlyArray2<'py, f64>,
-    sl_trail: PyReadonlyArray2<'py, bool>,
-    tp_stop: PyReadonlyArray2<'py, f64>,
-    reverse: PyReadonlyArray2<'py, bool>,
+    sl_stop: PyReadonlyArrayDyn<'py, f64>,
+    sl_trail: PyReadonlyArrayDyn<'py, bool>,
+    tp_stop: PyReadonlyArrayDyn<'py, f64>,
+    reverse: PyReadonlyArrayDyn<'py, bool>,
     is_open_safe: bool,
     wait: usize,
     until_next: bool,
     skip_until_exit: bool,
     pick_first: bool,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let entries_arr = entries.as_array();
     let open_arr = open.as_array();
     let high_arr = high.as_array();
     let low_arr = low.as_array();
     let close_arr = close.as_array();
-    let sl_stop_arr = sl_stop.as_array();
-    let sl_trail_arr = sl_trail.as_array();
-    let tp_stop_arr = tp_stop.as_array();
-    let reverse_arr = reverse.as_array();
     let shape = entries_arr.dim();
     if open_arr.dim() != shape
         || high_arr.dim() != shape
         || low_arr.dim() != shape
         || close_arr.dim() != shape
-        || sl_stop_arr.dim() != shape
-        || sl_trail_arr.dim() != shape
-        || tp_stop_arr.dim() != shape
-        || reverse_arr.dim() != shape
     {
-        return Err(PyValueError::new_err(
-            "OHLC and stop inputs must match entries shape",
-        ));
+        return Err(PyValueError::new_err("OHLC inputs must match entries shape"));
     }
+    let sl_stop_flex = FlexArray::from_pyarray("sl_stop", &sl_stop, shape.0, shape.1, flex_2d)?;
+    let sl_trail_flex = FlexArray::from_pyarray("sl_trail", &sl_trail, shape.0, shape.1, flex_2d)?;
+    let tp_stop_flex = FlexArray::from_pyarray("tp_stop", &tp_stop, shape.0, shape.1, flex_2d)?;
+    let reverse_flex = FlexArray::from_pyarray("reverse", &reverse, shape.0, shape.1, flex_2d)?;
     let mut stop_price_view = stop_price_out.as_array_mut();
     let mut stop_type_view = stop_type_out.as_array_mut();
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
@@ -1748,10 +1851,10 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
             close_arr,
             &mut stop_price_view,
             &mut stop_type_view,
-            sl_stop_arr,
-            sl_trail_arr,
-            tp_stop_arr,
-            reverse_arr,
+            &sl_stop_flex,
+            &sl_trail_flex,
+            &tp_stop_flex,
+            &reverse_flex,
             is_open_safe,
             wait,
             until_next,
@@ -1779,6 +1882,7 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
     entry_wait,
     exit_wait,
     pick_first,
+    flex_2d=true,
 ))]
 #[allow(clippy::too_many_arguments)]
 pub fn generate_ohlc_stop_enex_rs<'py>(
@@ -1790,38 +1894,33 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
     close: PyReadonlyArray2<'py, f64>,
     mut stop_price_out: PyReadwriteArray2<'py, f64>,
     mut stop_type_out: PyReadwriteArray2<'py, i64>,
-    sl_stop: PyReadonlyArray2<'py, f64>,
-    sl_trail: PyReadonlyArray2<'py, bool>,
-    tp_stop: PyReadonlyArray2<'py, f64>,
-    reverse: PyReadonlyArray2<'py, bool>,
+    sl_stop: PyReadonlyArrayDyn<'py, f64>,
+    sl_trail: PyReadonlyArrayDyn<'py, bool>,
+    tp_stop: PyReadonlyArrayDyn<'py, f64>,
+    reverse: PyReadonlyArrayDyn<'py, bool>,
     is_open_safe: bool,
     entry_wait: usize,
     exit_wait: usize,
     pick_first: bool,
+    flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     let entries_arr = entries.as_array();
     let open_arr = open.as_array();
     let high_arr = high.as_array();
     let low_arr = low.as_array();
     let close_arr = close.as_array();
-    let sl_stop_arr = sl_stop.as_array();
-    let sl_trail_arr = sl_trail.as_array();
-    let tp_stop_arr = tp_stop.as_array();
-    let reverse_arr = reverse.as_array();
     let shape = entries_arr.dim();
     if open_arr.dim() != shape
         || high_arr.dim() != shape
         || low_arr.dim() != shape
         || close_arr.dim() != shape
-        || sl_stop_arr.dim() != shape
-        || sl_trail_arr.dim() != shape
-        || tp_stop_arr.dim() != shape
-        || reverse_arr.dim() != shape
     {
-        return Err(PyValueError::new_err(
-            "OHLC and stop inputs must match entries shape",
-        ));
+        return Err(PyValueError::new_err("OHLC inputs must match entries shape"));
     }
+    let sl_stop_flex = FlexArray::from_pyarray("sl_stop", &sl_stop, shape.0, shape.1, flex_2d)?;
+    let sl_trail_flex = FlexArray::from_pyarray("sl_trail", &sl_trail, shape.0, shape.1, flex_2d)?;
+    let tp_stop_flex = FlexArray::from_pyarray("tp_stop", &tp_stop, shape.0, shape.1, flex_2d)?;
+    let reverse_flex = FlexArray::from_pyarray("reverse", &reverse, shape.0, shape.1, flex_2d)?;
     let mut stop_price_view = stop_price_out.as_array_mut();
     let mut stop_type_view = stop_type_out.as_array_mut();
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
@@ -1838,10 +1937,10 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
             close_arr,
             &mut stop_price_view,
             &mut stop_type_view,
-            sl_stop_arr,
-            sl_trail_arr,
-            tp_stop_arr,
-            reverse_arr,
+            &sl_stop_flex,
+            &sl_trail_flex,
+            &tp_stop_flex,
+            &reverse_flex,
             is_open_safe,
             entry_wait,
             exit_wait,

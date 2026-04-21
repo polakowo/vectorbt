@@ -14,7 +14,6 @@ from vectorbt._engine import (
     prepare_flex_array_for_rust,
     col_map_compatible_with_rust,
     combine_rust_support,
-    flex_broadcast_to_shape,
     flex_array_compatible_with_rust,
     resolve_engine,
     resolve_random_engine,

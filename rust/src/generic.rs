@@ -314,6 +314,14 @@ impl<'py, T: Copy + Element> FlexArray<'py, T> {
             Self::TwoDCol { data } => unsafe { *data.get_unchecked(i) },
         }
     }
+
+    #[inline(always)]
+    pub(crate) fn as_full_2d(&self) -> Option<(&[T], usize)> {
+        match self {
+            Self::TwoDFull { data, cols } => Some((data.as_ref(), *cols)),
+            _ => None,
+        }
+    }
 }
 
 pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {

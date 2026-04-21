@@ -3,10 +3,10 @@
 
 use crate::generic::{
     apply_2d_by_col, bshift_1d_into, ewm_mean_1d, ewm_std_1d, rolling_max_1d, rolling_mean_1d,
-    rolling_min_1d, rolling_std_1d,
+    rolling_min_1d, rolling_std_1d, FlexArray,
 };
 use ndarray::{Array2, ArrayView2};
-use numpy::{PyArray2, PyReadonlyArray2};
+use numpy::{PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -411,19 +411,69 @@ pub(crate) fn mean_labels_apply(
 
 pub(crate) fn local_extrema_apply(
     close: ArrayView2<'_, f64>,
-    pos_th: ArrayView2<'_, f64>,
-    neg_th: ArrayView2<'_, f64>,
+    pos_th: &FlexArray<'_, f64>,
+    neg_th: &FlexArray<'_, f64>,
 ) -> PyResult<Array2<i64>> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<i64>::from_elem((nrows, ncols), 0);
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
+        (pos_th.as_full_2d(), neg_th.as_full_2d())
+    {
+        for col in 0..ncols {
+            let mut prev_i: usize = 0;
+            let mut direction: i64 = 0;
+
+            for i in 1..nrows {
+                let _pos_th = unsafe { *pos_src.get_unchecked(prev_i * pos_cols + col) }.abs();
+                let _neg_th = unsafe { *neg_src.get_unchecked(prev_i * neg_cols + col) }.abs();
+                if _pos_th == 0.0 {
+                    return Err(PyValueError::new_err("Positive threshold cannot be 0"));
+                }
+                if _neg_th == 0.0 {
+                    return Err(PyValueError::new_err("Negative threshold cannot be 0"));
+                }
+
+                if direction == 1 {
+                    if close[[i, col]] < close[[prev_i, col]] {
+                        prev_i = i;
+                    } else if close[[i, col]] >= close[[prev_i, col]] * (1.0 + _pos_th) {
+                        out[[prev_i, col]] = -1;
+                        prev_i = i;
+                        direction = -1;
+                    }
+                } else if direction == -1 {
+                    if close[[i, col]] > close[[prev_i, col]] {
+                        prev_i = i;
+                    } else if close[[i, col]] <= close[[prev_i, col]] * (1.0 - _neg_th) {
+                        out[[prev_i, col]] = 1;
+                        prev_i = i;
+                        direction = 1;
+                    }
+                } else if close[[i, col]] >= close[[prev_i, col]] * (1.0 + _pos_th) {
+                    out[[prev_i, col]] = -1;
+                    prev_i = i;
+                    direction = -1;
+                } else if close[[i, col]] <= close[[prev_i, col]] * (1.0 - _neg_th) {
+                    out[[prev_i, col]] = 1;
+                    prev_i = i;
+                    direction = 1;
+                }
+
+                if i == nrows - 1 && direction != 0 {
+                    out[[prev_i, col]] = -direction;
+                }
+            }
+        }
+        return Ok(out);
+    }
 
     for col in 0..ncols {
         let mut prev_i: usize = 0;
         let mut direction: i64 = 0;
 
         for i in 1..nrows {
-            let _pos_th = pos_th[[prev_i, col]].abs();
-            let _neg_th = neg_th[[prev_i, col]].abs();
+            let _pos_th = pos_th.get(prev_i, col).abs();
+            let _neg_th = neg_th.get(prev_i, col).abs();
             if _pos_th == 0.0 {
                 return Err(PyValueError::new_err("Positive threshold cannot be 0"));
             }
@@ -547,11 +597,61 @@ pub(crate) fn bn_cont_trend_labels(
 pub(crate) fn bn_cont_sat_trend_labels(
     close: ArrayView2<'_, f64>,
     local_extrema: ArrayView2<'_, i64>,
-    pos_th: ArrayView2<'_, f64>,
-    neg_th: ArrayView2<'_, f64>,
+    pos_th: &FlexArray<'_, f64>,
+    neg_th: &FlexArray<'_, f64>,
 ) -> PyResult<Array2<f64>> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
+        (pos_th.as_full_2d(), neg_th.as_full_2d())
+    {
+        for col in 0..ncols {
+            let mut prev_i_opt: Option<usize> = None;
+            for next_i in 0..nrows {
+                if local_extrema[[next_i, col]] == 0 {
+                    continue;
+                }
+                let Some(prev_i) = prev_i_opt else {
+                    prev_i_opt = Some(next_i);
+                    continue;
+                };
+
+                let _pos_th = unsafe { *pos_src.get_unchecked(prev_i * pos_cols + col) }.abs();
+                let _neg_th = unsafe { *neg_src.get_unchecked(prev_i * neg_cols + col) }.abs();
+                if _pos_th == 0.0 {
+                    return Err(PyValueError::new_err("Positive threshold cannot be 0"));
+                }
+                if _neg_th == 0.0 {
+                    return Err(PyValueError::new_err("Negative threshold cannot be 0"));
+                }
+
+                let (_min, _max) = slice_min_max(close, col, prev_i, next_i);
+                let going_up = close[[next_i, col]] > close[[prev_i, col]];
+                for i in prev_i..next_i {
+                    let c = close[[i, col]];
+                    if going_up {
+                        let _start = _max / (1.0 + _pos_th);
+                        let _end = _min * (1.0 + _pos_th);
+                        if _max >= _end && c <= _start {
+                            out[[i, col]] = 1.0;
+                        } else {
+                            out[[i, col]] = 1.0 - (c - _start) / (_max - _start);
+                        }
+                    } else {
+                        let _start = _min / (1.0 - _neg_th);
+                        let _end = _max * (1.0 - _neg_th);
+                        if _min <= _end && c >= _start {
+                            out[[i, col]] = 0.0;
+                        } else {
+                            out[[i, col]] = 1.0 - (c - _min) / (_start - _min);
+                        }
+                    }
+                }
+                prev_i_opt = Some(next_i);
+            }
+        }
+        return Ok(out);
+    }
 
     for col in 0..ncols {
         let mut prev_i_opt: Option<usize> = None;
@@ -564,8 +664,8 @@ pub(crate) fn bn_cont_sat_trend_labels(
                 continue;
             };
 
-            let _pos_th = pos_th[[prev_i, col]].abs();
-            let _neg_th = neg_th[[prev_i, col]].abs();
+            let _pos_th = pos_th.get(prev_i, col).abs();
+            let _neg_th = neg_th.get(prev_i, col).abs();
             if _pos_th == 0.0 {
                 return Err(PyValueError::new_err("Positive threshold cannot be 0"));
             }
@@ -638,8 +738,8 @@ pub(crate) fn pct_trend_labels(
 
 pub(crate) fn trend_labels_apply(
     close: ArrayView2<'_, f64>,
-    pos_th: ArrayView2<'_, f64>,
-    neg_th: ArrayView2<'_, f64>,
+    pos_th: &FlexArray<'_, f64>,
+    neg_th: &FlexArray<'_, f64>,
     mode: i64,
 ) -> PyResult<Array2<f64>> {
     let local_extrema = local_extrema_apply(close, pos_th, neg_th)?;
@@ -659,17 +759,43 @@ pub(crate) fn trend_labels_apply(
 pub(crate) fn breakout_labels(
     close: ArrayView2<'_, f64>,
     window: usize,
-    pos_th: ArrayView2<'_, f64>,
-    neg_th: ArrayView2<'_, f64>,
+    pos_th: &FlexArray<'_, f64>,
+    neg_th: &FlexArray<'_, f64>,
     wait: usize,
 ) -> Array2<f64> {
     let (nrows, ncols) = close.dim();
     let mut out = Array2::<f64>::from_elem((nrows, ncols), 0.0);
+    if let (Some((pos_src, pos_cols)), Some((neg_src, neg_cols))) =
+        (pos_th.as_full_2d(), neg_th.as_full_2d())
+    {
+        for col in 0..ncols {
+            for i in 0..nrows {
+                let _pos_th = unsafe { *pos_src.get_unchecked(i * pos_cols + col) }.abs();
+                let _neg_th = unsafe { *neg_src.get_unchecked(i * neg_cols + col) }.abs();
+                let start = i + wait;
+                let end = (i + window + wait).min(nrows);
+                if start >= end {
+                    continue;
+                }
+                for j in start..end {
+                    if _pos_th > 0.0 && close[[j, col]] >= close[[i, col]] * (1.0 + _pos_th) {
+                        out[[i, col]] = 1.0;
+                        break;
+                    }
+                    if _neg_th > 0.0 && close[[j, col]] <= close[[i, col]] * (1.0 - _neg_th) {
+                        out[[i, col]] = -1.0;
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
+    }
 
     for col in 0..ncols {
         for i in 0..nrows {
-            let _pos_th = pos_th[[i, col]].abs();
-            let _neg_th = neg_th[[i, col]].abs();
+            let _pos_th = pos_th.get(i, col).abs();
+            let _neg_th = neg_th.get(i, col).abs();
             let start = i + wait;
             let end = (i + window + wait).min(nrows);
             if start >= end {
@@ -774,18 +900,19 @@ pub fn mean_labels_apply_rs<'py>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (close, pos_th, neg_th, flex_2d=true))]
 pub fn local_extrema_apply_rs<'py>(
     py: Python<'py>,
     close: PyReadonlyArray2<'py, f64>,
-    pos_th: PyReadonlyArray2<'py, f64>,
-    neg_th: PyReadonlyArray2<'py, f64>,
+    pos_th: PyReadonlyArrayDyn<'py, f64>,
+    neg_th: PyReadonlyArrayDyn<'py, f64>,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<i64>>> {
     let close_arr = close.as_array();
-    let pos_arr = pos_th.as_array();
-    let neg_arr = neg_th.as_array();
-    validate_matching_shape("pos_th", close_arr.dim(), pos_arr.dim())?;
-    validate_matching_shape("neg_th", close_arr.dim(), neg_arr.dim())?;
-    let result = py.allow_threads(|| local_extrema_apply(close_arr, pos_arr, neg_arr));
+    let (nrows, ncols) = close_arr.dim();
+    let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
+    let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
+    let result = py.allow_threads(|| local_extrema_apply(close_arr, &pos_flex, &neg_flex));
     Ok(PyArray2::from_owned_array_bound(py, result?))
 }
 
@@ -816,21 +943,23 @@ pub fn bn_cont_trend_labels_rs<'py>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (close, local_extrema, pos_th, neg_th, flex_2d=true))]
 pub fn bn_cont_sat_trend_labels_rs<'py>(
     py: Python<'py>,
     close: PyReadonlyArray2<'py, f64>,
     local_extrema: PyReadonlyArray2<'py, i64>,
-    pos_th: PyReadonlyArray2<'py, f64>,
-    neg_th: PyReadonlyArray2<'py, f64>,
+    pos_th: PyReadonlyArrayDyn<'py, f64>,
+    neg_th: PyReadonlyArrayDyn<'py, f64>,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
     let le_arr = local_extrema.as_array();
-    let pos_arr = pos_th.as_array();
-    let neg_arr = neg_th.as_array();
+    let (nrows, ncols) = close_arr.dim();
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
-    validate_matching_shape("pos_th", close_arr.dim(), pos_arr.dim())?;
-    validate_matching_shape("neg_th", close_arr.dim(), neg_arr.dim())?;
-    let result = py.allow_threads(|| bn_cont_sat_trend_labels(close_arr, le_arr, pos_arr, neg_arr));
+    let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
+    let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
+    let result =
+        py.allow_threads(|| bn_cont_sat_trend_labels(close_arr, le_arr, &pos_flex, &neg_flex));
     Ok(PyArray2::from_owned_array_bound(py, result?))
 }
 
@@ -849,38 +978,39 @@ pub fn pct_trend_labels_rs<'py>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (close, pos_th, neg_th, mode, flex_2d=true))]
 pub fn trend_labels_apply_rs<'py>(
     py: Python<'py>,
     close: PyReadonlyArray2<'py, f64>,
-    pos_th: PyReadonlyArray2<'py, f64>,
-    neg_th: PyReadonlyArray2<'py, f64>,
+    pos_th: PyReadonlyArrayDyn<'py, f64>,
+    neg_th: PyReadonlyArrayDyn<'py, f64>,
     mode: i64,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let pos_arr = pos_th.as_array();
-    let neg_arr = neg_th.as_array();
-    validate_matching_shape("pos_th", close_arr.dim(), pos_arr.dim())?;
-    validate_matching_shape("neg_th", close_arr.dim(), neg_arr.dim())?;
-    let result = py.allow_threads(|| trend_labels_apply(close_arr, pos_arr, neg_arr, mode));
+    let (nrows, ncols) = close_arr.dim();
+    let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
+    let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
+    let result = py.allow_threads(|| trend_labels_apply(close_arr, &pos_flex, &neg_flex, mode));
     Ok(PyArray2::from_owned_array_bound(py, result?))
 }
 
 #[pyfunction]
-#[pyo3(signature = (close, window, pos_th, neg_th, wait=1))]
+#[pyo3(signature = (close, window, pos_th, neg_th, wait=1, flex_2d=true))]
 pub fn breakout_labels_rs<'py>(
     py: Python<'py>,
     close: PyReadonlyArray2<'py, f64>,
     window: usize,
-    pos_th: PyReadonlyArray2<'py, f64>,
-    neg_th: PyReadonlyArray2<'py, f64>,
+    pos_th: PyReadonlyArrayDyn<'py, f64>,
+    neg_th: PyReadonlyArrayDyn<'py, f64>,
     wait: usize,
+    flex_2d: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let pos_arr = pos_th.as_array();
-    let neg_arr = neg_th.as_array();
-    validate_matching_shape("pos_th", close_arr.dim(), pos_arr.dim())?;
-    validate_matching_shape("neg_th", close_arr.dim(), neg_arr.dim())?;
-    let result = py.allow_threads(|| breakout_labels(close_arr, window, pos_arr, neg_arr, wait));
+    let (nrows, ncols) = close_arr.dim();
+    let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
+    let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
+    let result = py.allow_threads(|| breakout_labels(close_arr, window, &pos_flex, &neg_flex, wait));
     Ok(PyArray2::from_owned_array_bound(py, result))
 }
 

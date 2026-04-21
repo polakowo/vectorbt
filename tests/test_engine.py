@@ -964,7 +964,7 @@ class TestSignalsRustParity:
         with pytest.raises(ValueError, match="shape \\(8, 2\\)"):
             signal_dispatch.generate_rand_by_prob(
                 shape,
-                np.array([0.2, 0.3], dtype=np.float64),
+                np.array([0.2, 0.3, 0.4], dtype=np.float64),
                 True,
                 True,
                 seed=42,
@@ -1985,42 +1985,6 @@ class TestPortfolioRustParity:
         for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
             np.testing.assert_allclose(or_rust[field], or_nb[field], err_msg=f"Mismatch in {field}")
 
-    def test_orders_rust_dispatch_keeps_flex_inputs_compact(self, monkeypatch):
-        def raise_if_called(*args, **kwargs):
-            raise AssertionError("Rust dispatch should not broadcast flexible inputs in Python")
-
-        monkeypatch.setattr(portfolio_dispatch, "flex_broadcast_to_shape", raise_if_called)
-        rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
-            self.target_shape,
-            self.group_lens_ungrouped,
-            self.init_cash.copy(),
-            self.call_seq.copy(),
-            size=np.array([1.0, -1.0, 0.5], dtype=np.float64),
-            price=np.asarray(np.inf),
-            close=self.close.copy(),
-            fees=np.asarray(0.001),
-            max_orders=self.target_shape[0] * self.target_shape[1],
-            max_logs=0,
-            flex_2d=True,
-            engine="rust",
-        )
-        numba_orders, numba_logs = portfolio_dispatch.simulate_from_orders(
-            self.target_shape,
-            self.group_lens_ungrouped,
-            self.init_cash.copy(),
-            self.call_seq.copy(),
-            size=np.array([1.0, -1.0, 0.5], dtype=np.float64),
-            price=np.asarray(np.inf),
-            close=self.close.copy(),
-            fees=np.asarray(0.001),
-            max_orders=self.target_shape[0] * self.target_shape[1],
-            max_logs=0,
-            flex_2d=True,
-            engine="numba",
-        )
-        record_arrays_close(rust_orders, numba_orders)
-        record_arrays_close(rust_logs, numba_logs)
-
     def test_orders_prepares_base_arrays(self):
         call_seq_rust = self.call_seq.copy()
         rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
@@ -2117,48 +2081,6 @@ class TestPortfolioRustParity:
                 flex_2d=True,
                 engine="rust",
             )
-
-    def test_signals_rust_dispatch_keeps_flex_inputs_compact(self, monkeypatch):
-        def raise_if_called(*args, **kwargs):
-            raise AssertionError("Rust dispatch should not broadcast flexible inputs in Python")
-
-        monkeypatch.setattr(portfolio_dispatch, "flex_broadcast_to_shape", raise_if_called)
-        entries = np.array([True, False, True, False, False], dtype=np.bool_)
-        exits = np.array([False, True, False, True, False], dtype=np.bool_)
-        rust_orders, rust_logs = portfolio_dispatch.simulate_from_signals(
-            self.target_shape,
-            self.group_lens_ungrouped,
-            self.init_cash.copy(),
-            self.call_seq.copy(),
-            entries=entries,
-            exits=exits,
-            price=np.asarray(np.inf),
-            close=self.close.copy(),
-            size=np.asarray(1.0),
-            fees=np.asarray(0.001),
-            max_orders=self.target_shape[0] * self.target_shape[1],
-            max_logs=0,
-            flex_2d=False,
-            engine="rust",
-        )
-        numba_orders, numba_logs = portfolio_dispatch.simulate_from_signals(
-            self.target_shape,
-            self.group_lens_ungrouped,
-            self.init_cash.copy(),
-            self.call_seq.copy(),
-            entries=entries,
-            exits=exits,
-            price=np.asarray(np.inf),
-            close=self.close.copy(),
-            size=np.asarray(1.0),
-            fees=np.asarray(0.001),
-            max_orders=self.target_shape[0] * self.target_shape[1],
-            max_logs=0,
-            flex_2d=False,
-            engine="numba",
-        )
-        record_arrays_close(rust_orders, numba_orders)
-        record_arrays_close(rust_logs, numba_logs)
 
     def test_simulate_from_orders_auto_call_seq(self):
         or_rust, _ = self._run_sim("rust", auto_call_seq=True)

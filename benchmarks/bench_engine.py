@@ -87,6 +87,7 @@ SUITE_CORE = "core"
 SUITE_EXTENDED = "extended"
 SUITE_CHOICES = (SUITE_CORE, SUITE_EXTENDED)
 CORE_EXCLUDED_TAGS = {"scalar", "o1", "fixed_input", "cache_lookup", "metadata", "extended_only"}
+EXTENDED_SPLIT_SUFFIXES = ("_full", "_flex")
 
 
 def filter_cases_by_suite(cases: list[BenchmarkCase], suite: str) -> list[BenchmarkCase]:
@@ -94,8 +95,29 @@ def filter_cases_by_suite(cases: list[BenchmarkCase], suite: str) -> list[Benchm
     if suite == SUITE_EXTENDED:
         return cases
     if suite == SUITE_CORE:
-        return [case for case in cases if CORE_EXCLUDED_TAGS.isdisjoint(case.tags)]
+        return [
+            case
+            for case in cases
+            if CORE_EXCLUDED_TAGS.isdisjoint(case.tags) and not case.name.endswith(EXTENDED_SPLIT_SUFFIXES)
+        ]
     raise ValueError(f"Unknown benchmark suite: {suite}")
+
+
+def add_core_flex_aliases(cases: list[BenchmarkCase], suite: str) -> list[BenchmarkCase]:
+    """Add unsuffixed compact-flex aliases for the core suite."""
+    if suite != SUITE_CORE:
+        return cases
+    aliases = []
+    for case in cases:
+        if case.name.endswith("_flex"):
+            aliases.append(
+                replace(
+                    case,
+                    name=case.name.removesuffix("_flex"),
+                    tags=tuple(tag for tag in case.tags if tag != "extended_only"),
+                )
+            )
+    return cases + aliases
 
 
 def make_array(rows: int, cols: int, nan_ratio: float, seed: int) -> np.ndarray:
@@ -198,9 +220,13 @@ def make_cases(
     signal_n = np.full(a.shape[1], max(1, min(a.shape[0] // 20, a.shape[0] // 2)), dtype=np.int64)
     signal_prob = np.full(a.shape, 0.05, dtype=np.float64)
     exit_prob = np.full(a.shape, 0.07, dtype=np.float64)
+    signal_prob_flex = np.asarray(0.05, dtype=np.float64)
+    exit_prob_flex = np.asarray(0.07, dtype=np.float64)
     signal_ts = np.nan_to_num(np.cumsum(np.nan_to_num(a, nan=0.0), axis=0) + 100.0, nan=100.0).astype(np.float64)
     signal_stop = np.full(a.shape, -0.02, dtype=np.float64)
     signal_trailing = np.ones(a.shape, dtype=np.bool_)
+    signal_stop_flex = np.asarray(-0.02, dtype=np.float64)
+    signal_trailing_flex = np.asarray(True, dtype=np.bool_)
     signal_open = signal_ts.copy()
     signal_high = signal_ts + np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 + 0.1
     signal_low = signal_ts - np.abs(np.nan_to_num(a, nan=0.0)) * 0.1 - 0.1
@@ -214,6 +240,10 @@ def make_cases(
     sl_trail = np.ones(a.shape, dtype=np.bool_)
     tp_stop = np.full(a.shape, 0.03, dtype=np.float64)
     reverse = np.zeros(a.shape, dtype=np.bool_)
+    sl_stop_flex = np.asarray(0.02, dtype=np.float64)
+    sl_trail_flex = np.asarray(True, dtype=np.bool_)
+    tp_stop_flex = np.asarray(0.03, dtype=np.float64)
+    reverse_flex = np.asarray(False, dtype=np.bool_)
 
     def signal_sig_pos_rank_nb() -> np.ndarray:
         sig_pos_temp = np.full(a.shape[1], -1, dtype=np.int64)
@@ -268,6 +298,52 @@ def make_cases(
             True,
         )
 
+    def signal_ohlc_stop_ex_flex_nb() -> np.ndarray:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return signal_nb.generate_ohlc_stop_ex_nb(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop_flex,
+            sl_trail_flex,
+            tp_stop_flex,
+            reverse_flex,
+            True,
+            1,
+            True,
+            False,
+            True,
+            True,
+        )
+
+    def signal_ohlc_stop_ex_flex_rs() -> np.ndarray:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return rust_signals.generate_ohlc_stop_ex_rs(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop_flex,
+            sl_trail_flex,
+            tp_stop_flex,
+            reverse_flex,
+            True,
+            1,
+            True,
+            False,
+            True,
+            True,
+        )
+
     def signal_ohlc_stop_enex_nb() -> tuple[np.ndarray, np.ndarray]:
         stop_price_out = np.empty(a.shape, dtype=np.float64)
         stop_type_out = np.empty(a.shape, dtype=np.int64)
@@ -308,6 +384,50 @@ def make_cases(
             True,
             1,
             1,
+            True,
+        )
+
+    def signal_ohlc_stop_enex_flex_nb() -> tuple[np.ndarray, np.ndarray]:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return signal_nb.generate_ohlc_stop_enex_nb(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop_flex,
+            sl_trail_flex,
+            tp_stop_flex,
+            reverse_flex,
+            True,
+            1,
+            1,
+            True,
+            True,
+        )
+
+    def signal_ohlc_stop_enex_flex_rs() -> tuple[np.ndarray, np.ndarray]:
+        stop_price_out = np.empty(a.shape, dtype=np.float64)
+        stop_type_out = np.empty(a.shape, dtype=np.int64)
+        return rust_signals.generate_ohlc_stop_enex_rs(
+            signal_mask,
+            signal_open,
+            signal_high,
+            signal_low,
+            signal_close,
+            stop_price_out,
+            stop_type_out,
+            sl_stop_flex,
+            sl_trail_flex,
+            tp_stop_flex,
+            reverse_flex,
+            True,
+            1,
+            1,
+            True,
             True,
         )
 
@@ -594,11 +714,19 @@ def make_cases(
                 False,
             ),
             BenchmarkCase(
-                "signals.generate_rand_by_prob",
+                "signals.generate_rand_by_prob_full",
                 signal_nb.generate_rand_by_prob_nb,
                 (a.shape, signal_prob, False, True, seed),
                 rust_signals.generate_rand_by_prob_rs,
                 (a.shape[0], a.shape[1], signal_prob, False, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_by_prob_flex",
+                signal_nb.generate_rand_by_prob_nb,
+                (a.shape, signal_prob_flex, False, True, seed),
+                rust_signals.generate_rand_by_prob_rs,
+                (a.shape[0], a.shape[1], signal_prob_flex, False, seed, True),
                 False,
             ),
             BenchmarkCase(
@@ -610,11 +738,19 @@ def make_cases(
                 False,
             ),
             BenchmarkCase(
-                "signals.generate_rand_ex_by_prob",
+                "signals.generate_rand_ex_by_prob_full",
                 signal_nb.generate_rand_ex_by_prob_nb,
                 (signal_mask, exit_prob, 1, True, False, True, seed),
                 rust_signals.generate_rand_ex_by_prob_rs,
                 (signal_mask, exit_prob, 1, True, False, seed),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_rand_ex_by_prob_flex",
+                signal_nb.generate_rand_ex_by_prob_nb,
+                (signal_mask, exit_prob_flex, 1, True, False, True, seed),
+                rust_signals.generate_rand_ex_by_prob_rs,
+                (signal_mask, exit_prob_flex, 1, True, False, seed, True),
                 False,
             ),
             BenchmarkCase(
@@ -626,7 +762,7 @@ def make_cases(
                 False,
             ),
             BenchmarkCase(
-                "signals.generate_rand_enex_by_prob",
+                "signals.generate_rand_enex_by_prob_full",
                 signal_nb.generate_rand_enex_by_prob_nb,
                 (a.shape, signal_prob, exit_prob, 1, 1, True, True, True, seed),
                 rust_signals.generate_rand_enex_by_prob_rs,
@@ -634,22 +770,62 @@ def make_cases(
                 False,
             ),
             BenchmarkCase(
-                "signals.generate_stop_ex",
+                "signals.generate_rand_enex_by_prob_flex",
+                signal_nb.generate_rand_enex_by_prob_nb,
+                (a.shape, signal_prob_flex, exit_prob_flex, 1, 1, True, True, True, seed),
+                rust_signals.generate_rand_enex_by_prob_rs,
+                (a.shape[0], a.shape[1], signal_prob_flex, exit_prob_flex, 1, 1, True, True, seed, True),
+                False,
+            ),
+            BenchmarkCase(
+                "signals.generate_stop_ex_full",
                 signal_nb.generate_stop_ex_nb,
                 (signal_mask, signal_ts, signal_stop, signal_trailing, 1, True, False, True, True),
                 rust_signals.generate_stop_ex_rs,
                 (signal_mask, signal_ts, signal_stop, signal_trailing, 1, True, False, True),
             ),
             BenchmarkCase(
-                "signals.generate_stop_enex",
+                "signals.generate_stop_ex_flex",
+                signal_nb.generate_stop_ex_nb,
+                (signal_mask, signal_ts, signal_stop_flex, signal_trailing_flex, 1, True, False, True, True),
+                rust_signals.generate_stop_ex_rs,
+                (signal_mask, signal_ts, signal_stop_flex, signal_trailing_flex, 1, True, False, True, True),
+            ),
+            BenchmarkCase(
+                "signals.generate_stop_enex_full",
                 signal_nb.generate_stop_enex_nb,
                 (signal_mask, signal_ts, signal_stop, signal_trailing, 1, 1, True, True),
                 rust_signals.generate_stop_enex_rs,
                 (signal_mask, signal_ts, signal_stop, signal_trailing, 1, 1, True),
             ),
-            BenchmarkCase("signals.generate_ohlc_stop_ex", signal_ohlc_stop_ex_nb, (), signal_ohlc_stop_ex_rs, ()),
             BenchmarkCase(
-                "signals.generate_ohlc_stop_enex", signal_ohlc_stop_enex_nb, (), signal_ohlc_stop_enex_rs, ()
+                "signals.generate_stop_enex_flex",
+                signal_nb.generate_stop_enex_nb,
+                (signal_mask, signal_ts, signal_stop_flex, signal_trailing_flex, 1, 1, True, True),
+                rust_signals.generate_stop_enex_rs,
+                (signal_mask, signal_ts, signal_stop_flex, signal_trailing_flex, 1, 1, True, True),
+            ),
+            BenchmarkCase("signals.generate_ohlc_stop_ex_full", signal_ohlc_stop_ex_nb, (), signal_ohlc_stop_ex_rs, ()),
+            BenchmarkCase(
+                "signals.generate_ohlc_stop_ex_flex",
+                signal_ohlc_stop_ex_flex_nb,
+                (),
+                signal_ohlc_stop_ex_flex_rs,
+                (),
+            ),
+            BenchmarkCase(
+                "signals.generate_ohlc_stop_enex_full",
+                signal_ohlc_stop_enex_nb,
+                (),
+                signal_ohlc_stop_enex_rs,
+                (),
+            ),
+            BenchmarkCase(
+                "signals.generate_ohlc_stop_enex_flex",
+                signal_ohlc_stop_enex_flex_nb,
+                (),
+                signal_ohlc_stop_enex_flex_rs,
+                (),
             ),
         ]
 
@@ -658,8 +834,21 @@ def make_cases(
         labels_close = signal_ts
         labels_pos_th = np.full(labels_close.shape, 0.05, dtype=np.float64)
         labels_neg_th = np.full(labels_close.shape, 0.05, dtype=np.float64)
+        labels_pos_th_flex = np.asarray(0.05, dtype=np.float64)
+        labels_neg_th_flex = np.asarray(0.05, dtype=np.float64)
         nb_local_extrema = labels_nb.local_extrema_apply_nb(labels_close, labels_pos_th, labels_neg_th, True)
         rs_local_extrema = rust_labels.local_extrema_apply_rs(labels_close, labels_pos_th, labels_neg_th)
+        nb_local_extrema_flex = labels_nb.local_extrema_apply_nb(
+            labels_close,
+            labels_pos_th_flex,
+            labels_neg_th_flex,
+            True,
+        )
+        rs_local_extrema_flex = rust_labels.local_extrema_apply_rs(
+            labels_close,
+            labels_pos_th_flex,
+            labels_neg_th_flex,
+        )
 
         labels_cases = [
             BenchmarkCase(
@@ -707,11 +896,18 @@ def make_cases(
                 False,
             ),
             BenchmarkCase(
-                "labels.local_extrema_apply",
+                "labels.local_extrema_apply_full",
                 labels_nb.local_extrema_apply_nb,
                 (labels_close, labels_pos_th, labels_neg_th, True),
                 rust_labels.local_extrema_apply_rs,
                 (labels_close, labels_pos_th, labels_neg_th),
+            ),
+            BenchmarkCase(
+                "labels.local_extrema_apply_flex",
+                labels_nb.local_extrema_apply_nb,
+                (labels_close, labels_pos_th_flex, labels_neg_th_flex, True),
+                rust_labels.local_extrema_apply_rs,
+                (labels_close, labels_pos_th_flex, labels_neg_th_flex),
             ),
             BenchmarkCase(
                 "labels.bn_trend_labels",
@@ -728,11 +924,18 @@ def make_cases(
                 (labels_close, rs_local_extrema),
             ),
             BenchmarkCase(
-                "labels.bn_cont_sat_trend_labels",
+                "labels.bn_cont_sat_trend_labels_full",
                 labels_nb.bn_cont_sat_trend_labels_nb,
                 (labels_close, nb_local_extrema, labels_pos_th, labels_neg_th, True),
                 rust_labels.bn_cont_sat_trend_labels_rs,
                 (labels_close, rs_local_extrema, labels_pos_th, labels_neg_th),
+            ),
+            BenchmarkCase(
+                "labels.bn_cont_sat_trend_labels_flex",
+                labels_nb.bn_cont_sat_trend_labels_nb,
+                (labels_close, nb_local_extrema_flex, labels_pos_th_flex, labels_neg_th_flex, True),
+                rust_labels.bn_cont_sat_trend_labels_rs,
+                (labels_close, rs_local_extrema_flex, labels_pos_th_flex, labels_neg_th_flex),
             ),
             BenchmarkCase(
                 "labels.pct_trend_labels",
@@ -742,18 +945,32 @@ def make_cases(
                 (labels_close, rs_local_extrema, False),
             ),
             BenchmarkCase(
-                "labels.trend_labels_apply",
+                "labels.trend_labels_apply_full",
                 labels_nb.trend_labels_apply_nb,
                 (labels_close, labels_pos_th, labels_neg_th, 0, True),
                 rust_labels.trend_labels_apply_rs,
                 (labels_close, labels_pos_th, labels_neg_th, 0),
             ),
             BenchmarkCase(
-                "labels.breakout_labels",
+                "labels.trend_labels_apply_flex",
+                labels_nb.trend_labels_apply_nb,
+                (labels_close, labels_pos_th_flex, labels_neg_th_flex, 0, True),
+                rust_labels.trend_labels_apply_rs,
+                (labels_close, labels_pos_th_flex, labels_neg_th_flex, 0),
+            ),
+            BenchmarkCase(
+                "labels.breakout_labels_full",
                 labels_nb.breakout_labels_nb,
                 (labels_close, window, labels_pos_th, labels_neg_th, 1, True),
                 rust_labels.breakout_labels_rs,
                 (labels_close, window, labels_pos_th, labels_neg_th, 1),
+            ),
+            BenchmarkCase(
+                "labels.breakout_labels_flex",
+                labels_nb.breakout_labels_nb,
+                (labels_close, window, labels_pos_th_flex, labels_neg_th_flex, 1, True),
+                rust_labels.breakout_labels_rs,
+                (labels_close, window, labels_pos_th_flex, labels_neg_th_flex, 1),
             ),
         ]
 
@@ -1513,9 +1730,27 @@ def make_cases(
         pf_log = np.zeros(pf_target_shape, dtype=np.bool_)
         pf_val_price = np.full(pf_target_shape, np.inf, dtype=np.float64)
         pf_signal_size = np.ones(pf_target_shape, dtype=np.float64)
+        pf_size_flex = np.asarray(1.0, dtype=np.float64)
+        pf_price_flex = pf_close
+        pf_size_type_flex = np.asarray(0, dtype=np.int64)
+        pf_direction_flex = np.asarray(2, dtype=np.int64)
+        pf_long_only_direction_flex = np.asarray(0, dtype=np.int64)
+        pf_fees_flex = np.asarray(0.001, dtype=np.float64)
+        pf_fixed_fees_flex = np.asarray(0.0, dtype=np.float64)
+        pf_slippage_flex = np.asarray(0.0, dtype=np.float64)
+        pf_min_size_flex = np.asarray(0.0, dtype=np.float64)
+        pf_max_size_flex = np.asarray(np.inf, dtype=np.float64)
+        pf_size_gran_flex = np.asarray(np.nan, dtype=np.float64)
+        pf_reject_prob_flex = np.asarray(0.0, dtype=np.float64)
+        pf_lock_cash_flex = np.asarray(False, dtype=np.bool_)
+        pf_allow_partial_flex = np.asarray(True, dtype=np.bool_)
+        pf_raise_reject_flex = np.asarray(False, dtype=np.bool_)
+        pf_log_flex = np.asarray(False, dtype=np.bool_)
+        pf_val_price_flex = np.asarray(np.inf, dtype=np.float64)
         pf_entries = np.ascontiguousarray(signal_grid % 11 == 0)
         pf_exits = np.ascontiguousarray(signal_grid % 13 == 0)
         pf_false = np.zeros(pf_target_shape, dtype=np.bool_)
+        pf_false_flex = np.asarray(False, dtype=np.bool_)
         pf_long_entries = np.ascontiguousarray(signal_grid % 11 == 0)
         pf_long_exits = np.ascontiguousarray(signal_grid % 13 == 0)
         pf_short_entries = np.ascontiguousarray(signal_grid % 17 == 0)
@@ -1536,6 +1771,18 @@ def make_cases(
         pf_stop_exit_price = np.zeros(pf_target_shape, dtype=np.int64)
         pf_upon_stop_exit = np.zeros(pf_target_shape, dtype=np.int64)
         pf_upon_stop_update = np.ones(pf_target_shape, dtype=np.int64)
+        pf_accumulate_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_long_conflict_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_short_conflict_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_dir_conflict_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_opposite_entry_flex = np.asarray(4, dtype=np.int64)
+        pf_sl_stop_flex = np.asarray(np.nan, dtype=np.float64)
+        pf_sl_trail_flex = np.asarray(False, dtype=np.bool_)
+        pf_tp_stop_flex = np.asarray(np.nan, dtype=np.float64)
+        pf_stop_entry_price_flex = np.asarray(3, dtype=np.int64)
+        pf_stop_exit_price_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_stop_exit_flex = np.asarray(0, dtype=np.int64)
+        pf_upon_stop_update_flex = np.asarray(1, dtype=np.int64)
         max_orders = rows * cols
         max_signal_orders = rows * cols * 2
 
@@ -1654,6 +1901,129 @@ def make_cases(
                 pf_stop_exit_price,
                 pf_upon_stop_exit,
                 pf_upon_stop_update,
+                use_stops=False,
+                auto_call_seq=False,
+                ffill_val_price=True,
+                update_value=False,
+                max_orders=max_signal_orders,
+                max_logs=0,
+            )
+
+        def simulate_signals_flex_nb(
+            init_cash: np.ndarray,
+            entries: np.ndarray,
+            exits: np.ndarray,
+            direction,
+            long_entries,
+            long_exits,
+            short_entries,
+            short_exits,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            return portfolio_nb.simulate_from_signals_nb(
+                pf_target_shape,
+                pf_group_lens,
+                init_cash.copy(),
+                pf_call_seq.copy(),
+                entries,
+                exits,
+                direction,
+                long_entries,
+                long_exits,
+                short_entries,
+                short_exits,
+                pf_size_flex,
+                pf_price_flex,
+                pf_size_type_flex,
+                pf_fees_flex,
+                pf_fixed_fees_flex,
+                pf_slippage_flex,
+                pf_min_size_flex,
+                pf_max_size_flex,
+                pf_size_gran_flex,
+                pf_reject_prob_flex,
+                pf_lock_cash_flex,
+                pf_allow_partial_flex,
+                pf_raise_reject_flex,
+                pf_log_flex,
+                pf_accumulate_flex,
+                pf_upon_long_conflict_flex,
+                pf_upon_short_conflict_flex,
+                pf_upon_dir_conflict_flex,
+                pf_upon_opposite_entry_flex,
+                pf_val_price_flex,
+                pf_open,
+                pf_high,
+                pf_low,
+                pf_close,
+                pf_sl_stop_flex,
+                pf_sl_trail_flex,
+                pf_tp_stop_flex,
+                pf_stop_entry_price_flex,
+                pf_stop_exit_price_flex,
+                pf_upon_stop_exit_flex,
+                pf_upon_stop_update_flex,
+                False,
+                False,
+                True,
+                False,
+                max_signal_orders,
+                0,
+                True,
+            )
+
+        def simulate_signals_flex_rs(
+            init_cash: np.ndarray,
+            entries: np.ndarray,
+            exits: np.ndarray,
+            direction,
+            long_entries,
+            long_exits,
+            short_entries,
+            short_exits,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            return rust_portfolio.simulate_from_signals_rs(
+                pf_target_shape,
+                pf_group_lens,
+                init_cash.copy(),
+                pf_call_seq.copy(),
+                entries,
+                exits,
+                direction,
+                long_entries,
+                long_exits,
+                short_entries,
+                short_exits,
+                pf_size_flex,
+                pf_price_flex,
+                pf_size_type_flex,
+                pf_fees_flex,
+                pf_fixed_fees_flex,
+                pf_slippage_flex,
+                pf_min_size_flex,
+                pf_max_size_flex,
+                pf_size_gran_flex,
+                pf_reject_prob_flex,
+                pf_lock_cash_flex,
+                pf_allow_partial_flex,
+                pf_raise_reject_flex,
+                pf_log_flex,
+                pf_accumulate_flex,
+                pf_upon_long_conflict_flex,
+                pf_upon_short_conflict_flex,
+                pf_upon_dir_conflict_flex,
+                pf_upon_opposite_entry_flex,
+                pf_val_price_flex,
+                pf_open,
+                pf_high,
+                pf_low,
+                pf_close,
+                pf_sl_stop_flex,
+                pf_sl_trail_flex,
+                pf_tp_stop_flex,
+                pf_stop_entry_price_flex,
+                pf_stop_exit_price_flex,
+                pf_upon_stop_exit_flex,
+                pf_upon_stop_update_flex,
                 use_stops=False,
                 auto_call_seq=False,
                 ffill_val_price=True,
@@ -1849,7 +2219,7 @@ def make_cases(
                 (pf_target_shape, pf_group_lens_grouped, 0),
             ),
             BenchmarkCase(
-                "portfolio.simulate_from_orders",
+                "portfolio.simulate_from_orders_full",
                 lambda: portfolio_nb.simulate_from_orders_nb(
                     pf_target_shape,
                     pf_group_lens,
@@ -1912,7 +2282,70 @@ def make_cases(
                 check=False,
             ),
             BenchmarkCase(
-                "portfolio.simulate_from_signals",
+                "portfolio.simulate_from_orders_flex",
+                lambda: portfolio_nb.simulate_from_orders_nb(
+                    pf_target_shape,
+                    pf_group_lens,
+                    pf_init_cash.copy(),
+                    pf_call_seq.copy(),
+                    pf_size_flex,
+                    pf_price_flex,
+                    pf_size_type_flex,
+                    pf_direction_flex,
+                    pf_fees_flex,
+                    pf_fixed_fees_flex,
+                    pf_slippage_flex,
+                    pf_min_size_flex,
+                    pf_max_size_flex,
+                    pf_size_gran_flex,
+                    pf_reject_prob_flex,
+                    pf_lock_cash_flex,
+                    pf_allow_partial_flex,
+                    pf_raise_reject_flex,
+                    pf_log_flex,
+                    pf_val_price_flex,
+                    pf_close,
+                    False,
+                    True,
+                    False,
+                    max_orders,
+                    0,
+                    True,
+                ),
+                (),
+                lambda: rust_portfolio.simulate_from_orders_rs(
+                    pf_target_shape,
+                    pf_group_lens,
+                    pf_init_cash.copy(),
+                    pf_call_seq.copy(),
+                    pf_size_flex,
+                    pf_price_flex,
+                    pf_size_type_flex,
+                    pf_direction_flex,
+                    pf_fees_flex,
+                    pf_fixed_fees_flex,
+                    pf_slippage_flex,
+                    pf_min_size_flex,
+                    pf_max_size_flex,
+                    pf_size_gran_flex,
+                    pf_reject_prob_flex,
+                    pf_lock_cash_flex,
+                    pf_allow_partial_flex,
+                    pf_raise_reject_flex,
+                    pf_log_flex,
+                    pf_val_price_flex,
+                    pf_close,
+                    auto_call_seq=False,
+                    ffill_val_price=True,
+                    update_value=False,
+                    max_orders=max_orders,
+                    max_logs=0,
+                ),
+                (),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.simulate_from_signals_full",
                 simulate_signals_nb,
                 (
                     pf_init_cash,
@@ -1938,7 +2371,33 @@ def make_cases(
                 check=False,
             ),
             BenchmarkCase(
-                "portfolio.simulate_from_signals_ls",
+                "portfolio.simulate_from_signals_flex",
+                simulate_signals_flex_nb,
+                (
+                    pf_init_cash,
+                    pf_entries,
+                    pf_exits,
+                    pf_long_only_direction_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                ),
+                simulate_signals_flex_rs,
+                (
+                    pf_init_cash,
+                    pf_entries,
+                    pf_exits,
+                    pf_long_only_direction_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_false_flex,
+                ),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.simulate_from_signals_ls_full",
                 simulate_signals_nb,
                 (
                     pf_init_cash,
@@ -1956,6 +2415,32 @@ def make_cases(
                     pf_false,
                     pf_false,
                     pf_long_only_direction,
+                    pf_long_entries,
+                    pf_long_exits,
+                    pf_short_entries,
+                    pf_short_exits,
+                ),
+                check=False,
+            ),
+            BenchmarkCase(
+                "portfolio.simulate_from_signals_ls_flex",
+                simulate_signals_flex_nb,
+                (
+                    pf_init_cash,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_long_only_direction_flex,
+                    pf_long_entries,
+                    pf_long_exits,
+                    pf_short_entries,
+                    pf_short_exits,
+                ),
+                simulate_signals_flex_rs,
+                (
+                    pf_init_cash,
+                    pf_false_flex,
+                    pf_false_flex,
+                    pf_long_only_direction_flex,
                     pf_long_entries,
                     pf_long_exits,
                     pf_short_entries,
@@ -2178,6 +2663,7 @@ def make_cases(
         ]
 
     cases.extend(portfolio_cases)
+    cases = add_core_flex_aliases(cases, suite)
     return filter_cases_by_suite(cases, suite)
 
 

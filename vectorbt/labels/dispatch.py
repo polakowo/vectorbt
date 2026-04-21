@@ -9,8 +9,9 @@ from vectorbt import _typing as tp
 from vectorbt._engine import (
     array_compatible_with_rust,
     prepare_array_for_rust,
+    prepare_flex_array_for_rust,
     combine_rust_support,
-    flex_broadcast_to_shape,
+    flex_array_compatible_with_rust,
     matching_shape_compatible_with_rust,
     non_neg_int_compatible_with_rust,
     resolve_engine,
@@ -183,15 +184,19 @@ def local_extrema_apply(
     """Engine-neutral `vectorbt.labels.nb.local_extrema_apply_nb`."""
     eng = resolve_engine(
         engine,
-        supports_rust=array_compatible_with_rust(close, dtype=np.float64),
+        supports_rust=combine_rust_support(
+            array_compatible_with_rust(close, dtype=np.float64),
+            flex_array_compatible_with_rust("pos_th", pos_th, close.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("neg_th", neg_th, close.shape, np.float64, flex_2d),
+        ),
     )
     if eng == "rust":
         from vectorbt_rust.labels import local_extrema_apply_rs
 
-        pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
-        neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        pos_th = prepare_flex_array_for_rust(pos_th, close.shape, np.float64, flex_2d, name="pos_th")
+        neg_th = prepare_flex_array_for_rust(neg_th, close.shape, np.float64, flex_2d, name="neg_th")
         close = prepare_array_for_rust(close, dtype=np.float64)
-        return local_extrema_apply_rs(close, pos_th, neg_th)
+        return local_extrema_apply_rs(close, pos_th, neg_th, flex_2d=flex_2d)
     from vectorbt.labels.nb import local_extrema_apply_nb
 
     return local_extrema_apply_nb(close, pos_th, neg_th, flex_2d)
@@ -262,16 +267,18 @@ def bn_cont_sat_trend_labels(
             array_compatible_with_rust(close, dtype=np.float64),
             array_compatible_with_rust(local_extrema, dtype=np.int64),
             matching_shape_compatible_with_rust("local_extrema", close, local_extrema),
+            flex_array_compatible_with_rust("pos_th", pos_th, close.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("neg_th", neg_th, close.shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.labels import bn_cont_sat_trend_labels_rs
 
-        pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
-        neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        pos_th = prepare_flex_array_for_rust(pos_th, close.shape, np.float64, flex_2d, name="pos_th")
+        neg_th = prepare_flex_array_for_rust(neg_th, close.shape, np.float64, flex_2d, name="neg_th")
         close = prepare_array_for_rust(close, dtype=np.float64)
         local_extrema = prepare_array_for_rust(local_extrema, dtype=np.int64)
-        return bn_cont_sat_trend_labels_rs(close, local_extrema, pos_th, neg_th)
+        return bn_cont_sat_trend_labels_rs(close, local_extrema, pos_th, neg_th, flex_2d=flex_2d)
     from vectorbt.labels.nb import bn_cont_sat_trend_labels_nb
 
     return bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d)
@@ -314,15 +321,19 @@ def trend_labels_apply(
     """Engine-neutral `vectorbt.labels.nb.trend_labels_apply_nb`."""
     eng = resolve_engine(
         engine,
-        supports_rust=array_compatible_with_rust(close, dtype=np.float64),
+        supports_rust=combine_rust_support(
+            array_compatible_with_rust(close, dtype=np.float64),
+            flex_array_compatible_with_rust("pos_th", pos_th, close.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("neg_th", neg_th, close.shape, np.float64, flex_2d),
+        ),
     )
     if eng == "rust":
         from vectorbt_rust.labels import trend_labels_apply_rs
 
-        pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
-        neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        pos_th = prepare_flex_array_for_rust(pos_th, close.shape, np.float64, flex_2d, name="pos_th")
+        neg_th = prepare_flex_array_for_rust(neg_th, close.shape, np.float64, flex_2d, name="neg_th")
         close = prepare_array_for_rust(close, dtype=np.float64)
-        return trend_labels_apply_rs(close, pos_th, neg_th, int(mode))
+        return trend_labels_apply_rs(close, pos_th, neg_th, int(mode), flex_2d=flex_2d)
     from vectorbt.labels.nb import trend_labels_apply_nb
 
     return trend_labels_apply_nb(close, pos_th, neg_th, mode, flex_2d)
@@ -344,15 +355,17 @@ def breakout_labels(
             array_compatible_with_rust(close, dtype=np.float64),
             non_neg_int_compatible_with_rust("window", window),
             non_neg_int_compatible_with_rust("wait", wait),
+            flex_array_compatible_with_rust("pos_th", pos_th, close.shape, np.float64, flex_2d),
+            flex_array_compatible_with_rust("neg_th", neg_th, close.shape, np.float64, flex_2d),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.labels import breakout_labels_rs
 
-        pos_th = flex_broadcast_to_shape(pos_th, close.shape, np.float64, flex_2d)
-        neg_th = flex_broadcast_to_shape(neg_th, close.shape, np.float64, flex_2d)
+        pos_th = prepare_flex_array_for_rust(pos_th, close.shape, np.float64, flex_2d, name="pos_th")
+        neg_th = prepare_flex_array_for_rust(neg_th, close.shape, np.float64, flex_2d, name="neg_th")
         close = prepare_array_for_rust(close, dtype=np.float64)
-        return breakout_labels_rs(close, window, pos_th, neg_th, wait)
+        return breakout_labels_rs(close, window, pos_th, neg_th, wait, flex_2d=flex_2d)
     from vectorbt.labels.nb import breakout_labels_nb
 
     return breakout_labels_nb(close, window, pos_th, neg_th, wait, flex_2d)
