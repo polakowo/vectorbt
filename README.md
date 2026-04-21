@@ -59,18 +59,18 @@ VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt
 
 ## Features
 
-- **Fast, vectorized backtesting** and strategy research built on pandas and NumPy, accelerated with Numba
+- **Fast, vectorized backtesting** and strategy research built on pandas, NumPy, and Numba
+- **Optional Rust engine** for precompiled speed without JIT overhead
 - **Pandas-native API** with custom accessors and high-performance operations
 - **Flexible broadcasting** for multi-asset analysis and large-scale parameter sweeps
 - **Rich indicator ecosystem** with custom indicators and integrations for TA-Lib, Pandas TA, and more
-- **Portfolio backtesting** with trade, position, drawdown, and performance analytics, including QuantStats integration
+- **Portfolio backtesting** with trade, drawdown, and performance analytics, including QuantStats integration
 - **Signal tooling** for generation, ranking, mapping, and distribution analysis
 - **Built-in data access** with preprocessing and synthetic data generation
 - **Robustness testing** with walk-forward optimization and label generation for ML workflows
 - **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
 - **Automation tools** for scheduled updates and Telegram notifications
 - **Composable Python API** for rapid experimentation and AI agent-driven workflows
-- **Optional Rust engine** for precompiled speed without JIT overhead
 
 ## Installation
 
@@ -84,7 +84,7 @@ To install the optional Rust engine:
 pip install -U "vectorbt[rust]"
 ```
 
-To install all optional integrations:
+To install all optional integrations (TA-Lib, Pandas TA, etc.):
 
 ```sh
 pip install -U "vectorbt[full]"

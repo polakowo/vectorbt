@@ -18,7 +18,7 @@ To install the optional Rust engine:
 pip install -U "vectorbt[rust]"
 ```
 
-To install all optional integrations:
+To install all optional integrations (TA-Lib, Pandas TA, etc.):
 
 ```sh
 pip install -U "vectorbt[full]"
