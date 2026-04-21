@@ -36,3 +36,4 @@ warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
 import_submodules(__name__)
 
 __pdoc__["_settings"] = True
+__pdoc__["_engine"] = True
