@@ -11,6 +11,7 @@ from vectorbt._engine import (
     array_compatible_with_rust,
     exact_array_compatible_with_rust,
     prepare_array_for_rust,
+    prepare_flex_array_for_rust,
     col_map_compatible_with_rust,
     combine_rust_support,
     flex_broadcast_to_shape,
@@ -628,23 +629,41 @@ def simulate_from_orders(
     if eng == "rust":
         from vectorbt_rust.portfolio import simulate_from_orders_rs
 
-        size_2d = flex_broadcast_to_shape(size, target_shape, np.float64, flex_2d)
-        price_2d = flex_broadcast_to_shape(price, target_shape, np.float64, flex_2d)
-        size_type_2d = flex_broadcast_to_shape(size_type, target_shape, np.int64, flex_2d)
-        direction_2d = flex_broadcast_to_shape(direction, target_shape, np.int64, flex_2d)
-        fees_2d = flex_broadcast_to_shape(fees, target_shape, np.float64, flex_2d)
-        fixed_fees_2d = flex_broadcast_to_shape(fixed_fees, target_shape, np.float64, flex_2d)
-        slippage_2d = flex_broadcast_to_shape(slippage, target_shape, np.float64, flex_2d)
-        min_size_2d = flex_broadcast_to_shape(min_size, target_shape, np.float64, flex_2d)
-        max_size_2d = flex_broadcast_to_shape(max_size, target_shape, np.float64, flex_2d)
-        size_granularity_2d = flex_broadcast_to_shape(size_granularity, target_shape, np.float64, flex_2d)
-        reject_prob_2d = flex_broadcast_to_shape(reject_prob, target_shape, np.float64, flex_2d)
-        lock_cash_2d = flex_broadcast_to_shape(lock_cash, target_shape, np.bool_, flex_2d)
-        allow_partial_2d = flex_broadcast_to_shape(allow_partial, target_shape, np.bool_, flex_2d)
-        raise_reject_2d = flex_broadcast_to_shape(raise_reject, target_shape, np.bool_, flex_2d)
-        log_2d = flex_broadcast_to_shape(log, target_shape, np.bool_, flex_2d)
-        val_price_2d = flex_broadcast_to_shape(val_price, target_shape, np.float64, flex_2d)
-        close_2d = flex_broadcast_to_shape(close, target_shape, np.float64, flex_2d)
+        size_arr = prepare_flex_array_for_rust(size, target_shape, np.float64, flex_2d, name="size")
+        price_arr = prepare_flex_array_for_rust(price, target_shape, np.float64, flex_2d, name="price")
+        size_type_arr = prepare_flex_array_for_rust(size_type, target_shape, np.int64, flex_2d, name="size_type")
+        direction_arr = prepare_flex_array_for_rust(direction, target_shape, np.int64, flex_2d, name="direction")
+        fees_arr = prepare_flex_array_for_rust(fees, target_shape, np.float64, flex_2d, name="fees")
+        fixed_fees_arr = prepare_flex_array_for_rust(fixed_fees, target_shape, np.float64, flex_2d, name="fixed_fees")
+        slippage_arr = prepare_flex_array_for_rust(slippage, target_shape, np.float64, flex_2d, name="slippage")
+        min_size_arr = prepare_flex_array_for_rust(min_size, target_shape, np.float64, flex_2d, name="min_size")
+        max_size_arr = prepare_flex_array_for_rust(max_size, target_shape, np.float64, flex_2d, name="max_size")
+        size_granularity_arr = prepare_flex_array_for_rust(
+            size_granularity,
+            target_shape,
+            np.float64,
+            flex_2d,
+            name="size_granularity",
+        )
+        reject_prob_arr = prepare_flex_array_for_rust(reject_prob, target_shape, np.float64, flex_2d, name="reject_prob")
+        lock_cash_arr = prepare_flex_array_for_rust(lock_cash, target_shape, np.bool_, flex_2d, name="lock_cash")
+        allow_partial_arr = prepare_flex_array_for_rust(
+            allow_partial,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="allow_partial",
+        )
+        raise_reject_arr = prepare_flex_array_for_rust(
+            raise_reject,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="raise_reject",
+        )
+        log_arr = prepare_flex_array_for_rust(log, target_shape, np.bool_, flex_2d, name="log")
+        val_price_arr = prepare_flex_array_for_rust(val_price, target_shape, np.float64, flex_2d, name="val_price")
+        close_arr = prepare_flex_array_for_rust(close, target_shape, np.float64, flex_2d, name="close")
 
         group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
@@ -653,29 +672,30 @@ def simulate_from_orders(
             group_lens,
             init_cash,
             call_seq,
-            size_2d,
-            price_2d,
-            size_type_2d,
-            direction_2d,
-            fees_2d,
-            fixed_fees_2d,
-            slippage_2d,
-            min_size_2d,
-            max_size_2d,
-            size_granularity_2d,
-            reject_prob_2d,
-            lock_cash_2d,
-            allow_partial_2d,
-            raise_reject_2d,
-            log_2d,
-            val_price_2d,
-            close_2d,
+            size_arr,
+            price_arr,
+            size_type_arr,
+            direction_arr,
+            fees_arr,
+            fixed_fees_arr,
+            slippage_arr,
+            min_size_arr,
+            max_size_arr,
+            size_granularity_arr,
+            reject_prob_arr,
+            lock_cash_arr,
+            allow_partial_arr,
+            raise_reject_arr,
+            log_arr,
+            val_price_arr,
+            close_arr,
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             max_orders=max_orders,
             max_logs=max_logs,
             seed=seed,
+            flex_2d=flex_2d,
         )
     from vectorbt.portfolio.nb import simulate_from_orders_nb
 
@@ -887,44 +907,128 @@ def simulate_from_signals(
     if eng == "rust":
         from vectorbt_rust.portfolio import simulate_from_signals_rs
 
-        entries_2d = flex_broadcast_to_shape(entries, target_shape, np.bool_, flex_2d)
-        exits_2d = flex_broadcast_to_shape(exits, target_shape, np.bool_, flex_2d)
-        direction_2d = flex_broadcast_to_shape(direction, target_shape, np.int64, flex_2d)
-        long_entries_2d = flex_broadcast_to_shape(long_entries, target_shape, np.bool_, flex_2d)
-        long_exits_2d = flex_broadcast_to_shape(long_exits, target_shape, np.bool_, flex_2d)
-        short_entries_2d = flex_broadcast_to_shape(short_entries, target_shape, np.bool_, flex_2d)
-        short_exits_2d = flex_broadcast_to_shape(short_exits, target_shape, np.bool_, flex_2d)
-        size_2d = flex_broadcast_to_shape(size, target_shape, np.float64, flex_2d)
-        price_2d = flex_broadcast_to_shape(price, target_shape, np.float64, flex_2d)
-        size_type_2d = flex_broadcast_to_shape(size_type, target_shape, np.int64, flex_2d)
-        fees_2d = flex_broadcast_to_shape(fees, target_shape, np.float64, flex_2d)
-        fixed_fees_2d = flex_broadcast_to_shape(fixed_fees, target_shape, np.float64, flex_2d)
-        slippage_2d = flex_broadcast_to_shape(slippage, target_shape, np.float64, flex_2d)
-        min_size_2d = flex_broadcast_to_shape(min_size, target_shape, np.float64, flex_2d)
-        max_size_2d = flex_broadcast_to_shape(max_size, target_shape, np.float64, flex_2d)
-        size_granularity_2d = flex_broadcast_to_shape(size_granularity, target_shape, np.float64, flex_2d)
-        reject_prob_2d = flex_broadcast_to_shape(reject_prob, target_shape, np.float64, flex_2d)
-        lock_cash_2d = flex_broadcast_to_shape(lock_cash, target_shape, np.bool_, flex_2d)
-        allow_partial_2d = flex_broadcast_to_shape(allow_partial, target_shape, np.bool_, flex_2d)
-        raise_reject_2d = flex_broadcast_to_shape(raise_reject, target_shape, np.bool_, flex_2d)
-        log_2d = flex_broadcast_to_shape(log, target_shape, np.bool_, flex_2d)
-        accumulate_2d = flex_broadcast_to_shape(accumulate, target_shape, np.int64, flex_2d)
-        upon_long_conflict_2d = flex_broadcast_to_shape(upon_long_conflict, target_shape, np.int64, flex_2d)
-        upon_short_conflict_2d = flex_broadcast_to_shape(upon_short_conflict, target_shape, np.int64, flex_2d)
-        upon_dir_conflict_2d = flex_broadcast_to_shape(upon_dir_conflict, target_shape, np.int64, flex_2d)
-        upon_opposite_entry_2d = flex_broadcast_to_shape(upon_opposite_entry, target_shape, np.int64, flex_2d)
-        val_price_2d = flex_broadcast_to_shape(val_price, target_shape, np.float64, flex_2d)
-        open_2d = flex_broadcast_to_shape(open, target_shape, np.float64, flex_2d)
-        high_2d = flex_broadcast_to_shape(high, target_shape, np.float64, flex_2d)
-        low_2d = flex_broadcast_to_shape(low, target_shape, np.float64, flex_2d)
-        close_2d = flex_broadcast_to_shape(close, target_shape, np.float64, flex_2d)
-        sl_stop_2d = flex_broadcast_to_shape(sl_stop, target_shape, np.float64, flex_2d)
-        sl_trail_2d = flex_broadcast_to_shape(sl_trail, target_shape, np.bool_, flex_2d)
-        tp_stop_2d = flex_broadcast_to_shape(tp_stop, target_shape, np.float64, flex_2d)
-        stop_entry_price_2d = flex_broadcast_to_shape(stop_entry_price, target_shape, np.int64, flex_2d)
-        stop_exit_price_2d = flex_broadcast_to_shape(stop_exit_price, target_shape, np.int64, flex_2d)
-        upon_stop_exit_2d = flex_broadcast_to_shape(upon_stop_exit, target_shape, np.int64, flex_2d)
-        upon_stop_update_2d = flex_broadcast_to_shape(upon_stop_update, target_shape, np.int64, flex_2d)
+        entries_arr = prepare_flex_array_for_rust(entries, target_shape, np.bool_, flex_2d, name="entries")
+        exits_arr = prepare_flex_array_for_rust(exits, target_shape, np.bool_, flex_2d, name="exits")
+        direction_arr = prepare_flex_array_for_rust(direction, target_shape, np.int64, flex_2d, name="direction")
+        long_entries_arr = prepare_flex_array_for_rust(
+            long_entries,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="long_entries",
+        )
+        long_exits_arr = prepare_flex_array_for_rust(long_exits, target_shape, np.bool_, flex_2d, name="long_exits")
+        short_entries_arr = prepare_flex_array_for_rust(
+            short_entries,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="short_entries",
+        )
+        short_exits_arr = prepare_flex_array_for_rust(
+            short_exits,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="short_exits",
+        )
+        size_arr = prepare_flex_array_for_rust(size, target_shape, np.float64, flex_2d, name="size")
+        price_arr = prepare_flex_array_for_rust(price, target_shape, np.float64, flex_2d, name="price")
+        size_type_arr = prepare_flex_array_for_rust(size_type, target_shape, np.int64, flex_2d, name="size_type")
+        fees_arr = prepare_flex_array_for_rust(fees, target_shape, np.float64, flex_2d, name="fees")
+        fixed_fees_arr = prepare_flex_array_for_rust(fixed_fees, target_shape, np.float64, flex_2d, name="fixed_fees")
+        slippage_arr = prepare_flex_array_for_rust(slippage, target_shape, np.float64, flex_2d, name="slippage")
+        min_size_arr = prepare_flex_array_for_rust(min_size, target_shape, np.float64, flex_2d, name="min_size")
+        max_size_arr = prepare_flex_array_for_rust(max_size, target_shape, np.float64, flex_2d, name="max_size")
+        size_granularity_arr = prepare_flex_array_for_rust(
+            size_granularity,
+            target_shape,
+            np.float64,
+            flex_2d,
+            name="size_granularity",
+        )
+        reject_prob_arr = prepare_flex_array_for_rust(reject_prob, target_shape, np.float64, flex_2d, name="reject_prob")
+        lock_cash_arr = prepare_flex_array_for_rust(lock_cash, target_shape, np.bool_, flex_2d, name="lock_cash")
+        allow_partial_arr = prepare_flex_array_for_rust(
+            allow_partial,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="allow_partial",
+        )
+        raise_reject_arr = prepare_flex_array_for_rust(
+            raise_reject,
+            target_shape,
+            np.bool_,
+            flex_2d,
+            name="raise_reject",
+        )
+        log_arr = prepare_flex_array_for_rust(log, target_shape, np.bool_, flex_2d, name="log")
+        accumulate_arr = prepare_flex_array_for_rust(accumulate, target_shape, np.int64, flex_2d, name="accumulate")
+        upon_long_conflict_arr = prepare_flex_array_for_rust(
+            upon_long_conflict,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_long_conflict",
+        )
+        upon_short_conflict_arr = prepare_flex_array_for_rust(
+            upon_short_conflict,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_short_conflict",
+        )
+        upon_dir_conflict_arr = prepare_flex_array_for_rust(
+            upon_dir_conflict,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_dir_conflict",
+        )
+        upon_opposite_entry_arr = prepare_flex_array_for_rust(
+            upon_opposite_entry,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_opposite_entry",
+        )
+        val_price_arr = prepare_flex_array_for_rust(val_price, target_shape, np.float64, flex_2d, name="val_price")
+        open_arr = prepare_flex_array_for_rust(open, target_shape, np.float64, flex_2d, name="open")
+        high_arr = prepare_flex_array_for_rust(high, target_shape, np.float64, flex_2d, name="high")
+        low_arr = prepare_flex_array_for_rust(low, target_shape, np.float64, flex_2d, name="low")
+        close_arr = prepare_flex_array_for_rust(close, target_shape, np.float64, flex_2d, name="close")
+        sl_stop_arr = prepare_flex_array_for_rust(sl_stop, target_shape, np.float64, flex_2d, name="sl_stop")
+        sl_trail_arr = prepare_flex_array_for_rust(sl_trail, target_shape, np.bool_, flex_2d, name="sl_trail")
+        tp_stop_arr = prepare_flex_array_for_rust(tp_stop, target_shape, np.float64, flex_2d, name="tp_stop")
+        stop_entry_price_arr = prepare_flex_array_for_rust(
+            stop_entry_price,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="stop_entry_price",
+        )
+        stop_exit_price_arr = prepare_flex_array_for_rust(
+            stop_exit_price,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="stop_exit_price",
+        )
+        upon_stop_exit_arr = prepare_flex_array_for_rust(
+            upon_stop_exit,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_stop_exit",
+        )
+        upon_stop_update_arr = prepare_flex_array_for_rust(
+            upon_stop_update,
+            target_shape,
+            np.int64,
+            flex_2d,
+            name="upon_stop_update",
+        )
 
         group_lens = prepare_array_for_rust(group_lens, dtype=np.int64)
         init_cash = prepare_array_for_rust(init_cash, dtype=np.float64)
@@ -933,44 +1037,44 @@ def simulate_from_signals(
             group_lens,
             init_cash,
             call_seq,
-            entries_2d,
-            exits_2d,
-            direction_2d,
-            long_entries_2d,
-            long_exits_2d,
-            short_entries_2d,
-            short_exits_2d,
-            size_2d,
-            price_2d,
-            size_type_2d,
-            fees_2d,
-            fixed_fees_2d,
-            slippage_2d,
-            min_size_2d,
-            max_size_2d,
-            size_granularity_2d,
-            reject_prob_2d,
-            lock_cash_2d,
-            allow_partial_2d,
-            raise_reject_2d,
-            log_2d,
-            accumulate_2d,
-            upon_long_conflict_2d,
-            upon_short_conflict_2d,
-            upon_dir_conflict_2d,
-            upon_opposite_entry_2d,
-            val_price_2d,
-            open_2d,
-            high_2d,
-            low_2d,
-            close_2d,
-            sl_stop_2d,
-            sl_trail_2d,
-            tp_stop_2d,
-            stop_entry_price_2d,
-            stop_exit_price_2d,
-            upon_stop_exit_2d,
-            upon_stop_update_2d,
+            entries_arr,
+            exits_arr,
+            direction_arr,
+            long_entries_arr,
+            long_exits_arr,
+            short_entries_arr,
+            short_exits_arr,
+            size_arr,
+            price_arr,
+            size_type_arr,
+            fees_arr,
+            fixed_fees_arr,
+            slippage_arr,
+            min_size_arr,
+            max_size_arr,
+            size_granularity_arr,
+            reject_prob_arr,
+            lock_cash_arr,
+            allow_partial_arr,
+            raise_reject_arr,
+            log_arr,
+            accumulate_arr,
+            upon_long_conflict_arr,
+            upon_short_conflict_arr,
+            upon_dir_conflict_arr,
+            upon_opposite_entry_arr,
+            val_price_arr,
+            open_arr,
+            high_arr,
+            low_arr,
+            close_arr,
+            sl_stop_arr,
+            sl_trail_arr,
+            tp_stop_arr,
+            stop_entry_price_arr,
+            stop_exit_price_arr,
+            upon_stop_exit_arr,
+            upon_stop_update_arr,
             use_stops=use_stops,
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
@@ -978,6 +1082,7 @@ def simulate_from_signals(
             max_orders=max_orders,
             max_logs=max_logs,
             seed=seed,
+            flex_2d=flex_2d,
         )
     from vectorbt.portfolio.nb import simulate_from_signals_nb
 

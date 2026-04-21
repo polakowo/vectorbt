@@ -80,6 +80,43 @@ class TestEngineResolution:
         with pytest.raises(ValueError, match="cannot be safely cast"):
             _engine.prepare_array_for_rust(np.array([1, 2], dtype=np.int64), dtype=np.float64)
 
+    def test_prepare_flex_array_for_rust(self):
+        scalar = np.asarray(1.0)
+        prepared_scalar = _engine.prepare_flex_array_for_rust(scalar, (5, 3), dtype=np.float64)
+        assert prepared_scalar is scalar
+        assert prepared_scalar.shape == ()
+
+        col_arr = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        prepared_col = _engine.prepare_flex_array_for_rust(col_arr, (5, 3), dtype=np.float64, flex_2d=True)
+        assert prepared_col is col_arr
+        assert prepared_col.shape == (3,)
+
+        row_arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float64)
+        prepared_row = _engine.prepare_flex_array_for_rust(row_arr, (5, 3), dtype=np.float64, flex_2d=False)
+        assert prepared_row is row_arr
+        assert prepared_row.shape == (5,)
+
+        f32_arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        prepared_f32 = _engine.prepare_flex_array_for_rust(f32_arr, (5, 3), dtype=np.float64)
+        assert prepared_f32.dtype == np.dtype(np.float64)
+        assert prepared_f32.shape == (3,)
+
+        with pytest.raises(ValueError, match="`size` to broadcast"):
+            _engine.prepare_flex_array_for_rust(
+                np.ones((2, 2), dtype=np.float64),
+                (5, 3),
+                dtype=np.float64,
+                name="size",
+            )
+
+        with pytest.raises(ValueError, match="`size` to be float64-compatible"):
+            _engine.prepare_flex_array_for_rust(
+                np.full((5, 3), "x"),
+                (5, 3),
+                dtype=np.float64,
+                name="size",
+            )
+
     def test_global_rust_support_helpers(self):
         assert _engine.combine_rust_support(_engine.RustSupport(True), _engine.RustSupport(True)).supported
 
@@ -1948,6 +1985,42 @@ class TestPortfolioRustParity:
         for field in ["id", "col", "idx", "size", "price", "fees", "side"]:
             np.testing.assert_allclose(or_rust[field], or_nb[field], err_msg=f"Mismatch in {field}")
 
+    def test_orders_rust_dispatch_keeps_flex_inputs_compact(self, monkeypatch):
+        def raise_if_called(*args, **kwargs):
+            raise AssertionError("Rust dispatch should not broadcast flexible inputs in Python")
+
+        monkeypatch.setattr(portfolio_dispatch, "flex_broadcast_to_shape", raise_if_called)
+        rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
+            self.target_shape,
+            self.group_lens_ungrouped,
+            self.init_cash.copy(),
+            self.call_seq.copy(),
+            size=np.array([1.0, -1.0, 0.5], dtype=np.float64),
+            price=np.asarray(np.inf),
+            close=self.close.copy(),
+            fees=np.asarray(0.001),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=True,
+            engine="rust",
+        )
+        numba_orders, numba_logs = portfolio_dispatch.simulate_from_orders(
+            self.target_shape,
+            self.group_lens_ungrouped,
+            self.init_cash.copy(),
+            self.call_seq.copy(),
+            size=np.array([1.0, -1.0, 0.5], dtype=np.float64),
+            price=np.asarray(np.inf),
+            close=self.close.copy(),
+            fees=np.asarray(0.001),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=True,
+            engine="numba",
+        )
+        record_arrays_close(rust_orders, numba_orders)
+        record_arrays_close(rust_logs, numba_logs)
+
     def test_orders_prepares_base_arrays(self):
         call_seq_rust = self.call_seq.copy()
         rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
@@ -2044,6 +2117,48 @@ class TestPortfolioRustParity:
                 flex_2d=True,
                 engine="rust",
             )
+
+    def test_signals_rust_dispatch_keeps_flex_inputs_compact(self, monkeypatch):
+        def raise_if_called(*args, **kwargs):
+            raise AssertionError("Rust dispatch should not broadcast flexible inputs in Python")
+
+        monkeypatch.setattr(portfolio_dispatch, "flex_broadcast_to_shape", raise_if_called)
+        entries = np.array([True, False, True, False, False], dtype=np.bool_)
+        exits = np.array([False, True, False, True, False], dtype=np.bool_)
+        rust_orders, rust_logs = portfolio_dispatch.simulate_from_signals(
+            self.target_shape,
+            self.group_lens_ungrouped,
+            self.init_cash.copy(),
+            self.call_seq.copy(),
+            entries=entries,
+            exits=exits,
+            price=np.asarray(np.inf),
+            close=self.close.copy(),
+            size=np.asarray(1.0),
+            fees=np.asarray(0.001),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=False,
+            engine="rust",
+        )
+        numba_orders, numba_logs = portfolio_dispatch.simulate_from_signals(
+            self.target_shape,
+            self.group_lens_ungrouped,
+            self.init_cash.copy(),
+            self.call_seq.copy(),
+            entries=entries,
+            exits=exits,
+            price=np.asarray(np.inf),
+            close=self.close.copy(),
+            size=np.asarray(1.0),
+            fees=np.asarray(0.001),
+            max_orders=self.target_shape[0] * self.target_shape[1],
+            max_logs=0,
+            flex_2d=False,
+            engine="numba",
+        )
+        record_arrays_close(rust_orders, numba_orders)
+        record_arrays_close(rust_logs, numba_logs)
 
     def test_simulate_from_orders_auto_call_seq(self):
         or_rust, _ = self._run_sim("rust", auto_call_seq=True)

@@ -5,7 +5,7 @@
 use ndarray::Array2;
 use numpy::{
     Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2,
-    PyUntypedArrayMethods,
+    PyReadonlyArrayDyn, PyUntypedArrayMethods,
 };
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
@@ -40,7 +40,7 @@ fn uninit_f64_vec(len: usize) -> Vec<f64> {
     out
 }
 
-use crate::generic::{array1_as_slice_cow, array2_as_slice_cow};
+use crate::generic::{array1_as_slice_cow, array2_as_slice_cow, FlexArray};
 use crate::records::{array_raw_parts, numpy_empty};
 
 // ############# Math utilities ############# //
@@ -2151,6 +2151,7 @@ fn validate_group_lens_raw(gl: &[i64]) -> Result<Vec<usize>, String> {
     max_orders = None,
     max_logs = 0,
     seed = None,
+    flex_2d = true,
 ))]
 pub fn simulate_from_orders_py<'py>(
     py: Python<'py>,
@@ -2159,29 +2160,30 @@ pub fn simulate_from_orders_py<'py>(
     init_cash: PyReadonlyArray1<'py, f64>,
     mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
     // Pre-broadcast 2D arrays
-    size: PyReadonlyArray2<'py, f64>,
-    price: PyReadonlyArray2<'py, f64>,
-    size_type: PyReadonlyArray2<'py, i64>,
-    direction: PyReadonlyArray2<'py, i64>,
-    fees: PyReadonlyArray2<'py, f64>,
-    fixed_fees: PyReadonlyArray2<'py, f64>,
-    slippage: PyReadonlyArray2<'py, f64>,
-    min_size: PyReadonlyArray2<'py, f64>,
-    max_size: PyReadonlyArray2<'py, f64>,
-    size_granularity: PyReadonlyArray2<'py, f64>,
-    reject_prob: PyReadonlyArray2<'py, f64>,
-    lock_cash: PyReadonlyArray2<'py, bool>,
-    allow_partial: PyReadonlyArray2<'py, bool>,
-    raise_reject: PyReadonlyArray2<'py, bool>,
-    log: PyReadonlyArray2<'py, bool>,
-    val_price: PyReadonlyArray2<'py, f64>,
-    close: PyReadonlyArray2<'py, f64>,
+    size: PyReadonlyArrayDyn<'py, f64>,
+    price: PyReadonlyArrayDyn<'py, f64>,
+    size_type: PyReadonlyArrayDyn<'py, i64>,
+    direction: PyReadonlyArrayDyn<'py, i64>,
+    fees: PyReadonlyArrayDyn<'py, f64>,
+    fixed_fees: PyReadonlyArrayDyn<'py, f64>,
+    slippage: PyReadonlyArrayDyn<'py, f64>,
+    min_size: PyReadonlyArrayDyn<'py, f64>,
+    max_size: PyReadonlyArrayDyn<'py, f64>,
+    size_granularity: PyReadonlyArrayDyn<'py, f64>,
+    reject_prob: PyReadonlyArrayDyn<'py, f64>,
+    lock_cash: PyReadonlyArrayDyn<'py, bool>,
+    allow_partial: PyReadonlyArrayDyn<'py, bool>,
+    raise_reject: PyReadonlyArrayDyn<'py, bool>,
+    log: PyReadonlyArrayDyn<'py, bool>,
+    val_price: PyReadonlyArrayDyn<'py, f64>,
+    close: PyReadonlyArrayDyn<'py, f64>,
     auto_call_seq: bool,
     ffill_val_price: bool,
     update_value: bool,
     max_orders: Option<usize>,
     max_logs: usize,
     seed: Option<u64>,
+    flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
     let (nrows, ncols) = target_shape;
 
@@ -2196,23 +2198,23 @@ pub fn simulate_from_orders_py<'py>(
             Cow::Owned(cs_view.iter().copied().collect())
         }
     };
-    let size_cow = array2_as_slice_cow(&size);
-    let price_cow = array2_as_slice_cow(&price);
-    let st_cow = array2_as_slice_cow(&size_type);
-    let dir_cow = array2_as_slice_cow(&direction);
-    let fees_cow = array2_as_slice_cow(&fees);
-    let ff_cow = array2_as_slice_cow(&fixed_fees);
-    let slip_cow = array2_as_slice_cow(&slippage);
-    let mins_cow = array2_as_slice_cow(&min_size);
-    let maxs_cow = array2_as_slice_cow(&max_size);
-    let sg_cow = array2_as_slice_cow(&size_granularity);
-    let rp_cow = array2_as_slice_cow(&reject_prob);
-    let lc_cow = array2_as_slice_cow(&lock_cash);
-    let ap_cow = array2_as_slice_cow(&allow_partial);
-    let rr_cow = array2_as_slice_cow(&raise_reject);
-    let log_cow = array2_as_slice_cow(&log);
-    let vp_cow = array2_as_slice_cow(&val_price);
-    let close_cow = array2_as_slice_cow(&close);
+    let size_flex = FlexArray::from_pyarray("size", &size, nrows, ncols, flex_2d)?;
+    let price_flex = FlexArray::from_pyarray("price", &price, nrows, ncols, flex_2d)?;
+    let st_flex = FlexArray::from_pyarray("size_type", &size_type, nrows, ncols, flex_2d)?;
+    let dir_flex = FlexArray::from_pyarray("direction", &direction, nrows, ncols, flex_2d)?;
+    let fees_flex = FlexArray::from_pyarray("fees", &fees, nrows, ncols, flex_2d)?;
+    let ff_flex = FlexArray::from_pyarray("fixed_fees", &fixed_fees, nrows, ncols, flex_2d)?;
+    let slip_flex = FlexArray::from_pyarray("slippage", &slippage, nrows, ncols, flex_2d)?;
+    let mins_flex = FlexArray::from_pyarray("min_size", &min_size, nrows, ncols, flex_2d)?;
+    let maxs_flex = FlexArray::from_pyarray("max_size", &max_size, nrows, ncols, flex_2d)?;
+    let sg_flex = FlexArray::from_pyarray("size_granularity", &size_granularity, nrows, ncols, flex_2d)?;
+    let rp_flex = FlexArray::from_pyarray("reject_prob", &reject_prob, nrows, ncols, flex_2d)?;
+    let lc_flex = FlexArray::from_pyarray("lock_cash", &lock_cash, nrows, ncols, flex_2d)?;
+    let ap_flex = FlexArray::from_pyarray("allow_partial", &allow_partial, nrows, ncols, flex_2d)?;
+    let rr_flex = FlexArray::from_pyarray("raise_reject", &raise_reject, nrows, ncols, flex_2d)?;
+    let log_flex = FlexArray::from_pyarray("log", &log, nrows, ncols, flex_2d)?;
+    let vp_flex = FlexArray::from_pyarray("val_price", &val_price, nrows, ncols, flex_2d)?;
+    let close_flex = FlexArray::from_pyarray("close", &close, nrows, ncols, flex_2d)?;
 
     // Allocate log records via numpy (because of mixed types)
     let cash_sharing = gl_cow.iter().any(|&g| g > 1);
@@ -2253,23 +2255,23 @@ pub fn simulate_from_orders_py<'py>(
                     nrows,
                     ncols,
                     ic_cow.as_ref(),
-                    size_cow.as_ref(),
-                    price_cow.as_ref(),
-                    st_cow.as_ref(),
-                    dir_cow.as_ref(),
-                    fees_cow.as_ref(),
-                    ff_cow.as_ref(),
-                    slip_cow.as_ref(),
-                    mins_cow.as_ref(),
-                    maxs_cow.as_ref(),
-                    sg_cow.as_ref(),
-                    rp_cow.as_ref(),
-                    lc_cow.as_ref(),
-                    ap_cow.as_ref(),
-                    rr_cow.as_ref(),
-                    log_cow.as_ref(),
-                    vp_cow.as_ref(),
-                    close_cow.as_ref(),
+                    &size_flex,
+                    &price_flex,
+                    &st_flex,
+                    &dir_flex,
+                    &fees_flex,
+                    &ff_flex,
+                    &slip_flex,
+                    &mins_flex,
+                    &maxs_flex,
+                    &sg_flex,
+                    &rp_flex,
+                    &lc_flex,
+                    &ap_flex,
+                    &rr_flex,
+                    &log_flex,
+                    &vp_flex,
+                    &close_flex,
                     ffill_val_price,
                     update_value,
                     max_ord,
@@ -2286,23 +2288,23 @@ pub fn simulate_from_orders_py<'py>(
                 gl_cow.as_ref(),
                 ic_cow.as_ref(),
                 cs_cow.as_ref(),
-                size_cow.as_ref(),
-                price_cow.as_ref(),
-                st_cow.as_ref(),
-                dir_cow.as_ref(),
-                fees_cow.as_ref(),
-                ff_cow.as_ref(),
-                slip_cow.as_ref(),
-                mins_cow.as_ref(),
-                maxs_cow.as_ref(),
-                sg_cow.as_ref(),
-                rp_cow.as_ref(),
-                lc_cow.as_ref(),
-                ap_cow.as_ref(),
-                rr_cow.as_ref(),
-                log_cow.as_ref(),
-                vp_cow.as_ref(),
-                close_cow.as_ref(),
+                &size_flex,
+                &price_flex,
+                &st_flex,
+                &dir_flex,
+                &fees_flex,
+                &ff_flex,
+                &slip_flex,
+                &mins_flex,
+                &maxs_flex,
+                &sg_flex,
+                &rp_flex,
+                &lc_flex,
+                &ap_flex,
+                &rr_flex,
+                &log_flex,
+                &vp_flex,
+                &close_flex,
                 auto_call_seq,
                 ffill_val_price,
                 update_value,
@@ -2451,6 +2453,7 @@ fn read_signals(
     max_orders = None,
     max_logs = 0,
     seed = None,
+    flex_2d = true,
 ))]
 pub fn simulate_from_signals_py<'py>(
     py: Python<'py>,
@@ -2459,48 +2462,48 @@ pub fn simulate_from_signals_py<'py>(
     init_cash: PyReadonlyArray1<'py, f64>,
     mut call_seq: numpy::PyReadwriteArray2<'py, i64>,
     // Signal arrays - pre-broadcast 2D
-    entries: PyReadonlyArray2<'py, bool>,
-    exits: PyReadonlyArray2<'py, bool>,
-    direction: PyReadonlyArray2<'py, i64>,
-    long_entries: PyReadonlyArray2<'py, bool>,
-    long_exits: PyReadonlyArray2<'py, bool>,
-    short_entries: PyReadonlyArray2<'py, bool>,
-    short_exits: PyReadonlyArray2<'py, bool>,
+    entries: PyReadonlyArrayDyn<'py, bool>,
+    exits: PyReadonlyArrayDyn<'py, bool>,
+    direction: PyReadonlyArrayDyn<'py, i64>,
+    long_entries: PyReadonlyArrayDyn<'py, bool>,
+    long_exits: PyReadonlyArrayDyn<'py, bool>,
+    short_entries: PyReadonlyArrayDyn<'py, bool>,
+    short_exits: PyReadonlyArrayDyn<'py, bool>,
     // Order params
-    size: PyReadonlyArray2<'py, f64>,
-    price: PyReadonlyArray2<'py, f64>,
-    size_type: PyReadonlyArray2<'py, i64>,
-    fees: PyReadonlyArray2<'py, f64>,
-    fixed_fees: PyReadonlyArray2<'py, f64>,
-    slippage: PyReadonlyArray2<'py, f64>,
-    min_size: PyReadonlyArray2<'py, f64>,
-    max_size: PyReadonlyArray2<'py, f64>,
-    size_granularity: PyReadonlyArray2<'py, f64>,
-    reject_prob: PyReadonlyArray2<'py, f64>,
-    lock_cash: PyReadonlyArray2<'py, bool>,
-    allow_partial: PyReadonlyArray2<'py, bool>,
-    raise_reject: PyReadonlyArray2<'py, bool>,
-    log: PyReadonlyArray2<'py, bool>,
+    size: PyReadonlyArrayDyn<'py, f64>,
+    price: PyReadonlyArrayDyn<'py, f64>,
+    size_type: PyReadonlyArrayDyn<'py, i64>,
+    fees: PyReadonlyArrayDyn<'py, f64>,
+    fixed_fees: PyReadonlyArrayDyn<'py, f64>,
+    slippage: PyReadonlyArrayDyn<'py, f64>,
+    min_size: PyReadonlyArrayDyn<'py, f64>,
+    max_size: PyReadonlyArrayDyn<'py, f64>,
+    size_granularity: PyReadonlyArrayDyn<'py, f64>,
+    reject_prob: PyReadonlyArrayDyn<'py, f64>,
+    lock_cash: PyReadonlyArrayDyn<'py, bool>,
+    allow_partial: PyReadonlyArrayDyn<'py, bool>,
+    raise_reject: PyReadonlyArrayDyn<'py, bool>,
+    log: PyReadonlyArrayDyn<'py, bool>,
     // Signal conflict/resolution params
-    accumulate: PyReadonlyArray2<'py, i64>,
-    upon_long_conflict: PyReadonlyArray2<'py, i64>,
-    upon_short_conflict: PyReadonlyArray2<'py, i64>,
-    upon_dir_conflict: PyReadonlyArray2<'py, i64>,
-    upon_opposite_entry: PyReadonlyArray2<'py, i64>,
+    accumulate: PyReadonlyArrayDyn<'py, i64>,
+    upon_long_conflict: PyReadonlyArrayDyn<'py, i64>,
+    upon_short_conflict: PyReadonlyArrayDyn<'py, i64>,
+    upon_dir_conflict: PyReadonlyArrayDyn<'py, i64>,
+    upon_opposite_entry: PyReadonlyArrayDyn<'py, i64>,
     // Price/valuation
-    val_price: PyReadonlyArray2<'py, f64>,
-    open: PyReadonlyArray2<'py, f64>,
-    high: PyReadonlyArray2<'py, f64>,
-    low: PyReadonlyArray2<'py, f64>,
-    close: PyReadonlyArray2<'py, f64>,
+    val_price: PyReadonlyArrayDyn<'py, f64>,
+    open: PyReadonlyArrayDyn<'py, f64>,
+    high: PyReadonlyArrayDyn<'py, f64>,
+    low: PyReadonlyArrayDyn<'py, f64>,
+    close: PyReadonlyArrayDyn<'py, f64>,
     // Stop params
-    sl_stop: PyReadonlyArray2<'py, f64>,
-    sl_trail: PyReadonlyArray2<'py, bool>,
-    tp_stop: PyReadonlyArray2<'py, f64>,
-    stop_entry_price: PyReadonlyArray2<'py, i64>,
-    stop_exit_price: PyReadonlyArray2<'py, i64>,
-    upon_stop_exit: PyReadonlyArray2<'py, i64>,
-    upon_stop_update: PyReadonlyArray2<'py, i64>,
+    sl_stop: PyReadonlyArrayDyn<'py, f64>,
+    sl_trail: PyReadonlyArrayDyn<'py, bool>,
+    tp_stop: PyReadonlyArrayDyn<'py, f64>,
+    stop_entry_price: PyReadonlyArrayDyn<'py, i64>,
+    stop_exit_price: PyReadonlyArrayDyn<'py, i64>,
+    upon_stop_exit: PyReadonlyArrayDyn<'py, i64>,
+    upon_stop_update: PyReadonlyArrayDyn<'py, i64>,
     // Scalar flags
     use_stops: bool,
     auto_call_seq: bool,
@@ -2509,6 +2512,7 @@ pub fn simulate_from_signals_py<'py>(
     max_orders: Option<usize>,
     max_logs: usize,
     seed: Option<u64>,
+    flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
     let (nrows, ncols) = target_shape;
 
@@ -2523,53 +2527,44 @@ pub fn simulate_from_signals_py<'py>(
         }
     };
 
-    // Signal arrays
-    let entries_cow = array2_as_slice_cow(&entries);
-    let exits_cow = array2_as_slice_cow(&exits);
-    let dir_cow = array2_as_slice_cow(&direction);
-    let le_cow = array2_as_slice_cow(&long_entries);
-    let lx_cow = array2_as_slice_cow(&long_exits);
-    let se_cow = array2_as_slice_cow(&short_entries);
-    let sx_cow = array2_as_slice_cow(&short_exits);
-
-    // Order arrays
-    let size_cow = array2_as_slice_cow(&size);
-    let price_cow = array2_as_slice_cow(&price);
-    let st_cow = array2_as_slice_cow(&size_type);
-    let fees_cow = array2_as_slice_cow(&fees);
-    let ff_cow = array2_as_slice_cow(&fixed_fees);
-    let slip_cow = array2_as_slice_cow(&slippage);
-    let mins_cow = array2_as_slice_cow(&min_size);
-    let maxs_cow = array2_as_slice_cow(&max_size);
-    let sg_cow = array2_as_slice_cow(&size_granularity);
-    let rp_cow = array2_as_slice_cow(&reject_prob);
-    let lc_cow = array2_as_slice_cow(&lock_cash);
-    let ap_cow = array2_as_slice_cow(&allow_partial);
-    let rr_cow = array2_as_slice_cow(&raise_reject);
-    let log_cow = array2_as_slice_cow(&log);
-
-    // Conflict arrays
-    let acc_cow = array2_as_slice_cow(&accumulate);
-    let ulc_cow = array2_as_slice_cow(&upon_long_conflict);
-    let usc_cow = array2_as_slice_cow(&upon_short_conflict);
-    let udc_cow = array2_as_slice_cow(&upon_dir_conflict);
-    let uoe_cow = array2_as_slice_cow(&upon_opposite_entry);
-
-    // Price arrays
-    let vp_cow = array2_as_slice_cow(&val_price);
-    let open_cow = array2_as_slice_cow(&open);
-    let high_cow = array2_as_slice_cow(&high);
-    let low_cow = array2_as_slice_cow(&low);
-    let close_cow = array2_as_slice_cow(&close);
-
-    // Stop arrays
-    let sls_cow = array2_as_slice_cow(&sl_stop);
-    let slt_cow = array2_as_slice_cow(&sl_trail);
-    let tps_cow = array2_as_slice_cow(&tp_stop);
-    let sep_cow = array2_as_slice_cow(&stop_entry_price);
-    let sxp_cow = array2_as_slice_cow(&stop_exit_price);
-    let use_cow = array2_as_slice_cow(&upon_stop_exit);
-    let usu_cow = array2_as_slice_cow(&upon_stop_update);
+    let entries_flex = FlexArray::from_pyarray("entries", &entries, nrows, ncols, flex_2d)?;
+    let exits_flex = FlexArray::from_pyarray("exits", &exits, nrows, ncols, flex_2d)?;
+    let dir_flex = FlexArray::from_pyarray("direction", &direction, nrows, ncols, flex_2d)?;
+    let le_flex = FlexArray::from_pyarray("long_entries", &long_entries, nrows, ncols, flex_2d)?;
+    let lx_flex = FlexArray::from_pyarray("long_exits", &long_exits, nrows, ncols, flex_2d)?;
+    let se_flex = FlexArray::from_pyarray("short_entries", &short_entries, nrows, ncols, flex_2d)?;
+    let sx_flex = FlexArray::from_pyarray("short_exits", &short_exits, nrows, ncols, flex_2d)?;
+    let size_flex = FlexArray::from_pyarray("size", &size, nrows, ncols, flex_2d)?;
+    let price_flex = FlexArray::from_pyarray("price", &price, nrows, ncols, flex_2d)?;
+    let st_flex = FlexArray::from_pyarray("size_type", &size_type, nrows, ncols, flex_2d)?;
+    let fees_flex = FlexArray::from_pyarray("fees", &fees, nrows, ncols, flex_2d)?;
+    let ff_flex = FlexArray::from_pyarray("fixed_fees", &fixed_fees, nrows, ncols, flex_2d)?;
+    let slip_flex = FlexArray::from_pyarray("slippage", &slippage, nrows, ncols, flex_2d)?;
+    let mins_flex = FlexArray::from_pyarray("min_size", &min_size, nrows, ncols, flex_2d)?;
+    let maxs_flex = FlexArray::from_pyarray("max_size", &max_size, nrows, ncols, flex_2d)?;
+    let sg_flex = FlexArray::from_pyarray("size_granularity", &size_granularity, nrows, ncols, flex_2d)?;
+    let rp_flex = FlexArray::from_pyarray("reject_prob", &reject_prob, nrows, ncols, flex_2d)?;
+    let lc_flex = FlexArray::from_pyarray("lock_cash", &lock_cash, nrows, ncols, flex_2d)?;
+    let ap_flex = FlexArray::from_pyarray("allow_partial", &allow_partial, nrows, ncols, flex_2d)?;
+    let rr_flex = FlexArray::from_pyarray("raise_reject", &raise_reject, nrows, ncols, flex_2d)?;
+    let log_flex = FlexArray::from_pyarray("log", &log, nrows, ncols, flex_2d)?;
+    let acc_flex = FlexArray::from_pyarray("accumulate", &accumulate, nrows, ncols, flex_2d)?;
+    let ulc_flex = FlexArray::from_pyarray("upon_long_conflict", &upon_long_conflict, nrows, ncols, flex_2d)?;
+    let usc_flex = FlexArray::from_pyarray("upon_short_conflict", &upon_short_conflict, nrows, ncols, flex_2d)?;
+    let udc_flex = FlexArray::from_pyarray("upon_dir_conflict", &upon_dir_conflict, nrows, ncols, flex_2d)?;
+    let uoe_flex = FlexArray::from_pyarray("upon_opposite_entry", &upon_opposite_entry, nrows, ncols, flex_2d)?;
+    let vp_flex = FlexArray::from_pyarray("val_price", &val_price, nrows, ncols, flex_2d)?;
+    let open_flex = FlexArray::from_pyarray("open", &open, nrows, ncols, flex_2d)?;
+    let high_flex = FlexArray::from_pyarray("high", &high, nrows, ncols, flex_2d)?;
+    let low_flex = FlexArray::from_pyarray("low", &low, nrows, ncols, flex_2d)?;
+    let close_flex = FlexArray::from_pyarray("close", &close, nrows, ncols, flex_2d)?;
+    let sls_flex = FlexArray::from_pyarray("sl_stop", &sl_stop, nrows, ncols, flex_2d)?;
+    let slt_flex = FlexArray::from_pyarray("sl_trail", &sl_trail, nrows, ncols, flex_2d)?;
+    let tps_flex = FlexArray::from_pyarray("tp_stop", &tp_stop, nrows, ncols, flex_2d)?;
+    let sep_flex = FlexArray::from_pyarray("stop_entry_price", &stop_entry_price, nrows, ncols, flex_2d)?;
+    let sxp_flex = FlexArray::from_pyarray("stop_exit_price", &stop_exit_price, nrows, ncols, flex_2d)?;
+    let use_flex = FlexArray::from_pyarray("upon_stop_exit", &upon_stop_exit, nrows, ncols, flex_2d)?;
+    let usu_flex = FlexArray::from_pyarray("upon_stop_update", &upon_stop_update, nrows, ncols, flex_2d)?;
 
     // Validate
     let cash_sharing = gl_cow.iter().any(|&g| g > 1);
@@ -2609,44 +2604,44 @@ pub fn simulate_from_signals_py<'py>(
                     nrows,
                     ncols,
                     ic_cow.as_ref(),
-                    entries_cow.as_ref(),
-                    exits_cow.as_ref(),
-                    dir_cow.as_ref(),
-                    le_cow.as_ref(),
-                    lx_cow.as_ref(),
-                    se_cow.as_ref(),
-                    sx_cow.as_ref(),
-                    size_cow.as_ref(),
-                    price_cow.as_ref(),
-                    st_cow.as_ref(),
-                    fees_cow.as_ref(),
-                    ff_cow.as_ref(),
-                    slip_cow.as_ref(),
-                    mins_cow.as_ref(),
-                    maxs_cow.as_ref(),
-                    sg_cow.as_ref(),
-                    rp_cow.as_ref(),
-                    lc_cow.as_ref(),
-                    ap_cow.as_ref(),
-                    rr_cow.as_ref(),
-                    log_cow.as_ref(),
-                    acc_cow.as_ref(),
-                    ulc_cow.as_ref(),
-                    usc_cow.as_ref(),
-                    udc_cow.as_ref(),
-                    uoe_cow.as_ref(),
-                    vp_cow.as_ref(),
-                    open_cow.as_ref(),
-                    high_cow.as_ref(),
-                    low_cow.as_ref(),
-                    close_cow.as_ref(),
-                    sls_cow.as_ref(),
-                    slt_cow.as_ref(),
-                    tps_cow.as_ref(),
-                    sep_cow.as_ref(),
-                    sxp_cow.as_ref(),
-                    use_cow.as_ref(),
-                    usu_cow.as_ref(),
+                    &entries_flex,
+                    &exits_flex,
+                    &dir_flex,
+                    &le_flex,
+                    &lx_flex,
+                    &se_flex,
+                    &sx_flex,
+                    &size_flex,
+                    &price_flex,
+                    &st_flex,
+                    &fees_flex,
+                    &ff_flex,
+                    &slip_flex,
+                    &mins_flex,
+                    &maxs_flex,
+                    &sg_flex,
+                    &rp_flex,
+                    &lc_flex,
+                    &ap_flex,
+                    &rr_flex,
+                    &log_flex,
+                    &acc_flex,
+                    &ulc_flex,
+                    &usc_flex,
+                    &udc_flex,
+                    &uoe_flex,
+                    &vp_flex,
+                    &open_flex,
+                    &high_flex,
+                    &low_flex,
+                    &close_flex,
+                    &sls_flex,
+                    &slt_flex,
+                    &tps_flex,
+                    &sep_flex,
+                    &sxp_flex,
+                    &use_flex,
+                    &usu_flex,
                     use_stops,
                     ffill_val_price,
                     update_value,
@@ -2664,44 +2659,44 @@ pub fn simulate_from_signals_py<'py>(
                 gl_cow.as_ref(),
                 ic_cow.as_ref(),
                 cs_cow.as_ref(),
-                entries_cow.as_ref(),
-                exits_cow.as_ref(),
-                dir_cow.as_ref(),
-                le_cow.as_ref(),
-                lx_cow.as_ref(),
-                se_cow.as_ref(),
-                sx_cow.as_ref(),
-                size_cow.as_ref(),
-                price_cow.as_ref(),
-                st_cow.as_ref(),
-                fees_cow.as_ref(),
-                ff_cow.as_ref(),
-                slip_cow.as_ref(),
-                mins_cow.as_ref(),
-                maxs_cow.as_ref(),
-                sg_cow.as_ref(),
-                rp_cow.as_ref(),
-                lc_cow.as_ref(),
-                ap_cow.as_ref(),
-                rr_cow.as_ref(),
-                log_cow.as_ref(),
-                acc_cow.as_ref(),
-                ulc_cow.as_ref(),
-                usc_cow.as_ref(),
-                udc_cow.as_ref(),
-                uoe_cow.as_ref(),
-                vp_cow.as_ref(),
-                open_cow.as_ref(),
-                high_cow.as_ref(),
-                low_cow.as_ref(),
-                close_cow.as_ref(),
-                sls_cow.as_ref(),
-                slt_cow.as_ref(),
-                tps_cow.as_ref(),
-                sep_cow.as_ref(),
-                sxp_cow.as_ref(),
-                use_cow.as_ref(),
-                usu_cow.as_ref(),
+                &entries_flex,
+                &exits_flex,
+                &dir_flex,
+                &le_flex,
+                &lx_flex,
+                &se_flex,
+                &sx_flex,
+                &size_flex,
+                &price_flex,
+                &st_flex,
+                &fees_flex,
+                &ff_flex,
+                &slip_flex,
+                &mins_flex,
+                &maxs_flex,
+                &sg_flex,
+                &rp_flex,
+                &lc_flex,
+                &ap_flex,
+                &rr_flex,
+                &log_flex,
+                &acc_flex,
+                &ulc_flex,
+                &usc_flex,
+                &udc_flex,
+                &uoe_flex,
+                &vp_flex,
+                &open_flex,
+                &high_flex,
+                &low_flex,
+                &close_flex,
+                &sls_flex,
+                &slt_flex,
+                &tps_flex,
+                &sep_flex,
+                &sxp_flex,
+                &use_flex,
+                &usu_flex,
                 use_stops,
                 auto_call_seq,
                 ffill_val_price,
@@ -2907,23 +2902,23 @@ fn simulate_from_orders_non_shared_inner(
     nrows: usize,
     ncols: usize,
     init_cash: &[f64],
-    size_s: &[f64],
-    price_s: &[f64],
-    size_type_s: &[i64],
-    direction_s: &[i64],
-    fees_s: &[f64],
-    fixed_fees_s: &[f64],
-    slippage_s: &[f64],
-    min_size_s: &[f64],
-    max_size_s: &[f64],
-    size_granularity_s: &[f64],
-    reject_prob_s: &[f64],
-    lock_cash_s: &[bool],
-    allow_partial_s: &[bool],
-    raise_reject_s: &[bool],
-    log_s: &[bool],
-    val_price_s: &[f64],
-    close_s: &[f64],
+    size_s: &FlexArray<'_, f64>,
+    price_s: &FlexArray<'_, f64>,
+    size_type_s: &FlexArray<'_, i64>,
+    direction_s: &FlexArray<'_, i64>,
+    fees_s: &FlexArray<'_, f64>,
+    fixed_fees_s: &FlexArray<'_, f64>,
+    slippage_s: &FlexArray<'_, f64>,
+    min_size_s: &FlexArray<'_, f64>,
+    max_size_s: &FlexArray<'_, f64>,
+    size_granularity_s: &FlexArray<'_, f64>,
+    reject_prob_s: &FlexArray<'_, f64>,
+    lock_cash_s: &FlexArray<'_, bool>,
+    allow_partial_s: &FlexArray<'_, bool>,
+    raise_reject_s: &FlexArray<'_, bool>,
+    log_s: &FlexArray<'_, bool>,
+    val_price_s: &FlexArray<'_, f64>,
+    close_s: &FlexArray<'_, f64>,
     ffill_val_price: bool,
     do_update_value: bool,
     max_orders: usize,
@@ -2949,25 +2944,23 @@ fn simulate_from_orders_non_shared_inner(
         let mut last_val_price = f64::NAN;
 
         for i in 0..nrows {
-            let idx = i * ncols + col;
-
-            let mut order_price = price_s[idx];
+            let mut order_price = price_s.get(i, col);
             if order_price.is_infinite() {
                 if order_price > 0.0 {
-                    order_price = close_s[idx];
+                    order_price = close_s.get(i, col);
                 } else if i > 0 {
-                    order_price = close_s[(i - 1) * ncols + col];
+                    order_price = close_s.get(i - 1, col);
                 } else {
                     order_price = f64::NAN;
                 }
             }
 
-            let mut val_price_now = val_price_s[idx];
+            let mut val_price_now = val_price_s.get(i, col);
             if val_price_now.is_infinite() {
                 if val_price_now > 0.0 {
                     val_price_now = order_price;
                 } else if i > 0 {
-                    val_price_now = close_s[(i - 1) * ncols + col];
+                    val_price_now = close_s.get(i - 1, col);
                 } else {
                     val_price_now = f64::NAN;
                 }
@@ -2982,21 +2975,21 @@ fn simulate_from_orders_non_shared_inner(
             }
 
             let order = Order {
-                size: size_s[idx],
+                size: size_s.get(i, col),
                 price: order_price,
-                size_type: size_type_s[idx],
-                direction: direction_s[idx],
-                fees: fees_s[idx],
-                fixed_fees: fixed_fees_s[idx],
-                slippage: slippage_s[idx],
-                min_size: min_size_s[idx],
-                max_size: max_size_s[idx],
-                size_granularity: size_granularity_s[idx],
-                reject_prob: reject_prob_s[idx],
-                lock_cash: lock_cash_s[idx],
-                allow_partial: allow_partial_s[idx],
-                raise_reject: raise_reject_s[idx],
-                log: log_s[idx],
+                size_type: size_type_s.get(i, col),
+                direction: direction_s.get(i, col),
+                fees: fees_s.get(i, col),
+                fixed_fees: fixed_fees_s.get(i, col),
+                slippage: slippage_s.get(i, col),
+                min_size: min_size_s.get(i, col),
+                max_size: max_size_s.get(i, col),
+                size_granularity: size_granularity_s.get(i, col),
+                reject_prob: reject_prob_s.get(i, col),
+                lock_cash: lock_cash_s.get(i, col),
+                allow_partial: allow_partial_s.get(i, col),
+                raise_reject: raise_reject_s.get(i, col),
+                log: log_s.get(i, col),
             };
 
             let state = ProcessOrderState {
@@ -3051,23 +3044,23 @@ fn simulate_from_orders_inner(
     group_lens: &[i64],
     init_cash: &[f64],
     call_seq: &[i64],
-    size_s: &[f64],
-    price_s: &[f64],
-    size_type_s: &[i64],
-    direction_s: &[i64],
-    fees_s: &[f64],
-    fixed_fees_s: &[f64],
-    slippage_s: &[f64],
-    min_size_s: &[f64],
-    max_size_s: &[f64],
-    size_granularity_s: &[f64],
-    reject_prob_s: &[f64],
-    lock_cash_s: &[bool],
-    allow_partial_s: &[bool],
-    raise_reject_s: &[bool],
-    log_s: &[bool],
-    val_price_s: &[f64],
-    close_s: &[f64],
+    size_s: &FlexArray<'_, f64>,
+    price_s: &FlexArray<'_, f64>,
+    size_type_s: &FlexArray<'_, i64>,
+    direction_s: &FlexArray<'_, i64>,
+    fees_s: &FlexArray<'_, f64>,
+    fixed_fees_s: &FlexArray<'_, f64>,
+    slippage_s: &FlexArray<'_, f64>,
+    min_size_s: &FlexArray<'_, f64>,
+    max_size_s: &FlexArray<'_, f64>,
+    size_granularity_s: &FlexArray<'_, f64>,
+    reject_prob_s: &FlexArray<'_, f64>,
+    lock_cash_s: &FlexArray<'_, bool>,
+    allow_partial_s: &FlexArray<'_, bool>,
+    raise_reject_s: &FlexArray<'_, bool>,
+    log_s: &FlexArray<'_, bool>,
+    val_price_s: &FlexArray<'_, f64>,
+    close_s: &FlexArray<'_, f64>,
     auto_call_seq: bool,
     ffill_val_price: bool,
     do_update_value: bool,
@@ -3113,15 +3106,14 @@ fn simulate_from_orders_inner(
             // Phase 1: resolve prices for each column in this group
             for k in 0..group_len {
                 let col = from_col + k;
-                let idx = i * ncols + col;
 
                 // Resolve order price
-                let mut _price = price_s[idx];
+                let mut _price = price_s.get(i, col);
                 if _price.is_infinite() {
                     if _price > 0.0 {
-                        _price = close_s[idx];
+                        _price = close_s.get(i, col);
                     } else if i > 0 {
-                        _price = close_s[(i - 1) * ncols + col];
+                        _price = close_s.get(i - 1, col);
                     } else {
                         _price = f64::NAN;
                     }
@@ -3129,12 +3121,12 @@ fn simulate_from_orders_inner(
                 order_price_arr[col] = _price;
 
                 // Resolve val price
-                let mut _val_price = val_price_s[idx];
+                let mut _val_price = val_price_s.get(i, col);
                 if _val_price.is_infinite() {
                     if _val_price > 0.0 {
                         _val_price = _price;
                     } else if i > 0 {
-                        _val_price = close_s[(i - 1) * ncols + col];
+                        _val_price = close_s.get(i - 1, col);
                     } else {
                         _val_price = f64::NAN;
                     }
@@ -3158,11 +3150,10 @@ fn simulate_from_orders_inner(
                 if auto_call_seq {
                     for k in 0..group_len {
                         let col = from_col + k;
-                        let idx = i * ncols + col;
                         temp_order_value[k] = approx_order_value(
-                            size_s[idx],
-                            size_type_s[idx],
-                            direction_s[idx],
+                            size_s.get(i, col),
+                            size_type_s.get(i, col),
+                            direction_s.get(i, col),
                             cash_now,
                             last_position[col],
                             free_cash_now,
@@ -3211,23 +3202,22 @@ fn simulate_from_orders_inner(
                     }
                 }
 
-                let idx = i * ncols + col;
                 let order = Order {
-                    size: size_s[idx],
+                    size: size_s.get(i, col),
                     price: order_price_arr[col],
-                    size_type: size_type_s[idx],
-                    direction: direction_s[idx],
-                    fees: fees_s[idx],
-                    fixed_fees: fixed_fees_s[idx],
-                    slippage: slippage_s[idx],
-                    min_size: min_size_s[idx],
-                    max_size: max_size_s[idx],
-                    size_granularity: size_granularity_s[idx],
-                    reject_prob: reject_prob_s[idx],
-                    lock_cash: lock_cash_s[idx],
-                    allow_partial: allow_partial_s[idx],
-                    raise_reject: raise_reject_s[idx],
-                    log: log_s[idx],
+                    size_type: size_type_s.get(i, col),
+                    direction: direction_s.get(i, col),
+                    fees: fees_s.get(i, col),
+                    fixed_fees: fixed_fees_s.get(i, col),
+                    slippage: slippage_s.get(i, col),
+                    min_size: min_size_s.get(i, col),
+                    max_size: max_size_s.get(i, col),
+                    size_granularity: size_granularity_s.get(i, col),
+                    reject_prob: reject_prob_s.get(i, col),
+                    lock_cash: lock_cash_s.get(i, col),
+                    allow_partial: allow_partial_s.get(i, col),
+                    raise_reject: raise_reject_s.get(i, col),
+                    log: log_s.get(i, col),
                 };
 
                 let state = ProcessOrderState {
@@ -3914,33 +3904,33 @@ fn sum_grouped_inner(
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn process_signals_at(
-    idx: usize,
     i: usize,
+    col: usize,
     position_now: f64,
     order_price: f64,
     slippage_val: f64,
     // Signal arrays
-    entries_s: &[bool],
-    exits_s: &[bool],
-    direction_s: &[i64],
-    long_entries_s: &[bool],
-    long_exits_s: &[bool],
-    short_entries_s: &[bool],
-    short_exits_s: &[bool],
+    entries_s: &FlexArray<'_, bool>,
+    exits_s: &FlexArray<'_, bool>,
+    direction_s: &FlexArray<'_, i64>,
+    long_entries_s: &FlexArray<'_, bool>,
+    long_exits_s: &FlexArray<'_, bool>,
+    short_entries_s: &FlexArray<'_, bool>,
+    short_exits_s: &FlexArray<'_, bool>,
     // Conflict params
-    accumulate_s: &[i64],
-    upon_long_conflict_s: &[i64],
-    upon_short_conflict_s: &[i64],
-    upon_dir_conflict_s: &[i64],
-    upon_opposite_entry_s: &[i64],
+    accumulate_s: &FlexArray<'_, i64>,
+    upon_long_conflict_s: &FlexArray<'_, i64>,
+    upon_short_conflict_s: &FlexArray<'_, i64>,
+    upon_dir_conflict_s: &FlexArray<'_, i64>,
+    upon_opposite_entry_s: &FlexArray<'_, i64>,
     // OHLC
-    open_s: &[f64],
-    high_s: &[f64],
-    low_s: &[f64],
-    close_s: &[f64],
+    open_s: &FlexArray<'_, f64>,
+    high_s: &FlexArray<'_, f64>,
+    low_s: &FlexArray<'_, f64>,
+    close_s: &FlexArray<'_, f64>,
     // Stop params
-    upon_stop_exit_s: &[i64],
-    stop_exit_price_s: &[i64],
+    upon_stop_exit_s: &FlexArray<'_, i64>,
+    stop_exit_price_s: &FlexArray<'_, i64>,
     // Stop state (mutable)
     use_stops: bool,
     sl_curr_stop: f64,
@@ -3953,16 +3943,16 @@ fn process_signals_at(
 ) -> Result<(bool, bool, bool, bool, i64, f64, f64), PortfolioSimError> {
     let mut price_out = order_price;
     let mut slippage_out = slippage_val;
-    let mut accumulate_val = accumulate_s[idx];
+    let mut accumulate_val = accumulate_s.get(i, col);
 
     // Check stops
     let mut stop_price = f64::NAN;
     if use_stops {
         if !sl_curr_stop.is_nan() || !tp_curr_stop.is_nan() {
-            let open_val = open_s[idx];
-            let high_val = high_s[idx];
-            let low_val = low_s[idx];
-            let close_val = close_s[idx];
+            let open_val = open_s.get(i, col);
+            let high_val = high_s.get(i, col);
+            let low_val = low_s.get(i, col);
+            let close_val = close_s.get(i, col);
             let o = if open_val.is_nan() {
                 close_val
             } else {
@@ -4008,7 +3998,7 @@ fn process_signals_at(
     let (mut is_long_entry, mut is_long_exit, mut is_short_entry, mut is_short_exit);
 
     if use_stops && !stop_price.is_nan() {
-        let upon_stop = upon_stop_exit_s[idx];
+        let upon_stop = upon_stop_exit_s.get(i, col);
         let result = generate_stop_signal(position_now, upon_stop, accumulate_val);
         is_long_entry = result.0;
         is_long_exit = result.1;
@@ -4016,21 +4006,21 @@ fn process_signals_at(
         is_short_exit = result.3;
         accumulate_val = result.4;
 
-        let close_val = close_s[idx];
-        let sxp = stop_exit_price_s[idx];
+        let close_val = close_s.get(i, col);
+        let sxp = stop_exit_price_s.get(i, col);
         let (p, s) =
             resolve_stop_price_and_slippage(stop_price, price_out, close_val, slippage_out, sxp);
         price_out = p;
         slippage_out = s;
     } else {
         let signals = read_signals(
-            entries_s[idx],
-            exits_s[idx],
-            direction_s[idx],
-            long_entries_s[idx],
-            long_exits_s[idx],
-            short_entries_s[idx],
-            short_exits_s[idx],
+            entries_s.get(i, col),
+            exits_s.get(i, col),
+            direction_s.get(i, col),
+            long_entries_s.get(i, col),
+            long_exits_s.get(i, col),
+            short_entries_s.get(i, col),
+            short_exits_s.get(i, col),
         );
         is_long_entry = signals.0;
         is_long_exit = signals.1;
@@ -4044,7 +4034,7 @@ fn process_signals_at(
                 is_long_entry,
                 is_long_exit,
                 DIRECTION_LONG_ONLY,
-                upon_long_conflict_s[idx],
+                upon_long_conflict_s.get(i, col),
             );
             is_long_entry = r.0;
             is_long_exit = r.1;
@@ -4053,7 +4043,7 @@ fn process_signals_at(
                 is_short_entry,
                 is_short_exit,
                 DIRECTION_SHORT_ONLY,
-                upon_short_conflict_s[idx],
+                upon_short_conflict_s.get(i, col),
             );
             is_short_entry = r.0;
             is_short_exit = r.1;
@@ -4062,7 +4052,7 @@ fn process_signals_at(
                 position_now,
                 is_long_entry,
                 is_short_entry,
-                upon_dir_conflict_s[idx],
+                upon_dir_conflict_s.get(i, col),
             );
             is_long_entry = r.0;
             is_short_entry = r.1;
@@ -4073,7 +4063,7 @@ fn process_signals_at(
                 is_long_exit,
                 is_short_entry,
                 is_short_exit,
-                upon_opposite_entry_s[idx],
+                upon_opposite_entry_s.get(i, col),
                 accumulate_val,
             );
             is_long_entry = r.0;
@@ -4099,44 +4089,44 @@ fn simulate_from_signals_non_shared_inner(
     nrows: usize,
     ncols: usize,
     init_cash: &[f64],
-    entries_s: &[bool],
-    exits_s: &[bool],
-    direction_s: &[i64],
-    long_entries_s: &[bool],
-    long_exits_s: &[bool],
-    short_entries_s: &[bool],
-    short_exits_s: &[bool],
-    size_s: &[f64],
-    price_s: &[f64],
-    size_type_s: &[i64],
-    fees_s: &[f64],
-    fixed_fees_s: &[f64],
-    slippage_s: &[f64],
-    min_size_s: &[f64],
-    max_size_s: &[f64],
-    size_granularity_s: &[f64],
-    reject_prob_s: &[f64],
-    lock_cash_s: &[bool],
-    allow_partial_s: &[bool],
-    raise_reject_s: &[bool],
-    log_s: &[bool],
-    accumulate_s: &[i64],
-    upon_long_conflict_s: &[i64],
-    upon_short_conflict_s: &[i64],
-    upon_dir_conflict_s: &[i64],
-    upon_opposite_entry_s: &[i64],
-    val_price_s: &[f64],
-    open_s: &[f64],
-    high_s: &[f64],
-    low_s: &[f64],
-    close_s: &[f64],
-    sl_stop_s: &[f64],
-    sl_trail_s: &[bool],
-    tp_stop_s: &[f64],
-    stop_entry_price_s: &[i64],
-    stop_exit_price_s: &[i64],
-    upon_stop_exit_s: &[i64],
-    upon_stop_update_s: &[i64],
+    entries_s: &FlexArray<'_, bool>,
+    exits_s: &FlexArray<'_, bool>,
+    direction_s: &FlexArray<'_, i64>,
+    long_entries_s: &FlexArray<'_, bool>,
+    long_exits_s: &FlexArray<'_, bool>,
+    short_entries_s: &FlexArray<'_, bool>,
+    short_exits_s: &FlexArray<'_, bool>,
+    size_s: &FlexArray<'_, f64>,
+    price_s: &FlexArray<'_, f64>,
+    size_type_s: &FlexArray<'_, i64>,
+    fees_s: &FlexArray<'_, f64>,
+    fixed_fees_s: &FlexArray<'_, f64>,
+    slippage_s: &FlexArray<'_, f64>,
+    min_size_s: &FlexArray<'_, f64>,
+    max_size_s: &FlexArray<'_, f64>,
+    size_granularity_s: &FlexArray<'_, f64>,
+    reject_prob_s: &FlexArray<'_, f64>,
+    lock_cash_s: &FlexArray<'_, bool>,
+    allow_partial_s: &FlexArray<'_, bool>,
+    raise_reject_s: &FlexArray<'_, bool>,
+    log_s: &FlexArray<'_, bool>,
+    accumulate_s: &FlexArray<'_, i64>,
+    upon_long_conflict_s: &FlexArray<'_, i64>,
+    upon_short_conflict_s: &FlexArray<'_, i64>,
+    upon_dir_conflict_s: &FlexArray<'_, i64>,
+    upon_opposite_entry_s: &FlexArray<'_, i64>,
+    val_price_s: &FlexArray<'_, f64>,
+    open_s: &FlexArray<'_, f64>,
+    high_s: &FlexArray<'_, f64>,
+    low_s: &FlexArray<'_, f64>,
+    close_s: &FlexArray<'_, f64>,
+    sl_stop_s: &FlexArray<'_, f64>,
+    sl_trail_s: &FlexArray<'_, bool>,
+    tp_stop_s: &FlexArray<'_, f64>,
+    stop_entry_price_s: &FlexArray<'_, i64>,
+    stop_exit_price_s: &FlexArray<'_, i64>,
+    upon_stop_exit_s: &FlexArray<'_, i64>,
+    upon_stop_update_s: &FlexArray<'_, i64>,
     use_stops: bool,
     ffill_val_price: bool,
     do_update_value: bool,
@@ -4174,19 +4164,17 @@ fn simulate_from_signals_non_shared_inner(
         let mut tp_curr_stop = f64::NAN;
 
         for i in 0..nrows {
-            let idx = i * ncols + col;
-
             // Resolve order price
-            let mut order_price = price_s[idx];
+            let mut order_price = price_s.get(i, col);
             if order_price.is_infinite() {
                 if order_price > 0.0 {
-                    order_price = close_s[idx];
+                    order_price = close_s.get(i, col);
                 } else {
-                    let open_val = open_s[idx];
+                    let open_val = open_s.get(i, col);
                     if !open_val.is_nan() {
                         order_price = open_val;
                     } else if i > 0 {
-                        order_price = close_s[(i - 1) * ncols + col];
+                        order_price = close_s.get(i - 1, col);
                     } else {
                         order_price = f64::NAN;
                     }
@@ -4194,12 +4182,12 @@ fn simulate_from_signals_non_shared_inner(
             }
 
             // Resolve valuation price
-            let mut val_price_now = val_price_s[idx];
+            let mut val_price_now = val_price_s.get(i, col);
             if val_price_now.is_infinite() {
                 if val_price_now > 0.0 {
                     val_price_now = order_price;
                 } else if i > 0 {
-                    val_price_now = close_s[(i - 1) * ncols + col];
+                    val_price_now = close_s.get(i - 1, col);
                 } else {
                     val_price_now = f64::NAN;
                 }
@@ -4209,7 +4197,7 @@ fn simulate_from_signals_non_shared_inner(
             }
 
             let position_now = last_position;
-            let slippage_val = slippage_s[idx];
+            let slippage_val = slippage_s.get(i, col);
 
             // Process signals
             let (
@@ -4221,8 +4209,8 @@ fn simulate_from_signals_non_shared_inner(
                 final_price,
                 final_slippage,
             ) = process_signals_at(
-                idx,
                 i,
+                col,
                 position_now,
                 order_price,
                 slippage_val,
@@ -4261,8 +4249,8 @@ fn simulate_from_signals_non_shared_inner(
                 is_long_exit,
                 is_short_entry,
                 is_short_exit,
-                size_s[idx],
-                size_type_s[idx],
+                size_s.get(i, col),
+                size_type_s.get(i, col),
                 accumulate_val,
                 last_val_price,
             )?;
@@ -4282,17 +4270,17 @@ fn simulate_from_signals_non_shared_inner(
                     price: final_price,
                     size_type: final_size_type,
                     direction: final_direction,
-                    fees: fees_s[idx],
-                    fixed_fees: fixed_fees_s[idx],
+                    fees: fees_s.get(i, col),
+                    fixed_fees: fixed_fees_s.get(i, col),
                     slippage: final_slippage,
-                    min_size: min_size_s[idx],
-                    max_size: max_size_s[idx],
-                    size_granularity: size_granularity_s[idx],
-                    reject_prob: reject_prob_s[idx],
-                    lock_cash: lock_cash_s[idx],
-                    allow_partial: allow_partial_s[idx],
-                    raise_reject: raise_reject_s[idx],
-                    log: log_s[idx],
+                    min_size: min_size_s.get(i, col),
+                    max_size: max_size_s.get(i, col),
+                    size_granularity: size_granularity_s.get(i, col),
+                    reject_prob: reject_prob_s.get(i, col),
+                    lock_cash: lock_cash_s.get(i, col),
+                    allow_partial: allow_partial_s.get(i, col),
+                    raise_reject: raise_reject_s.get(i, col),
+                    log: log_s.get(i, col),
                 };
 
                 let mut value_now = cash_now;
@@ -4352,7 +4340,7 @@ fn simulate_from_signals_non_shared_inner(
                         tp_init_price = f64::NAN;
                         tp_curr_stop = f64::NAN;
                     } else {
-                        let sep = stop_entry_price_s[idx];
+                        let sep = stop_entry_price_s.get(i, col);
                         let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
                             new_state.val_price
                         } else if sep == STOP_ENTRY_PRICE {
@@ -4360,12 +4348,12 @@ fn simulate_from_signals_non_shared_inner(
                         } else if sep == STOP_ENTRY_FILL_PRICE {
                             order_result.price
                         } else {
-                            close_s[idx]
+                            close_s.get(i, col)
                         };
-                        let usu = upon_stop_update_s[idx];
-                        let new_sl_stop = sl_stop_s[idx];
-                        let new_sl_trail = sl_trail_s[idx];
-                        let new_tp_stop = tp_stop_s[idx];
+                        let usu = upon_stop_update_s.get(i, col);
+                        let new_sl_stop = sl_stop_s.get(i, col);
+                        let new_sl_trail = sl_trail_s.get(i, col);
+                        let new_tp_stop = tp_stop_s.get(i, col);
 
                         if state.position == 0.0
                             || last_position.signum() != state.position.signum()
@@ -4412,44 +4400,44 @@ fn simulate_from_signals_inner(
     group_lens: &[i64],
     init_cash: &[f64],
     call_seq: &[i64],
-    entries_s: &[bool],
-    exits_s: &[bool],
-    direction_s: &[i64],
-    long_entries_s: &[bool],
-    long_exits_s: &[bool],
-    short_entries_s: &[bool],
-    short_exits_s: &[bool],
-    size_s: &[f64],
-    price_s: &[f64],
-    size_type_s: &[i64],
-    fees_s: &[f64],
-    fixed_fees_s: &[f64],
-    slippage_s: &[f64],
-    min_size_s: &[f64],
-    max_size_s: &[f64],
-    size_granularity_s: &[f64],
-    reject_prob_s: &[f64],
-    lock_cash_s: &[bool],
-    allow_partial_s: &[bool],
-    raise_reject_s: &[bool],
-    log_s: &[bool],
-    accumulate_s: &[i64],
-    upon_long_conflict_s: &[i64],
-    upon_short_conflict_s: &[i64],
-    upon_dir_conflict_s: &[i64],
-    upon_opposite_entry_s: &[i64],
-    val_price_s: &[f64],
-    open_s: &[f64],
-    high_s: &[f64],
-    low_s: &[f64],
-    close_s: &[f64],
-    sl_stop_s: &[f64],
-    sl_trail_s: &[bool],
-    tp_stop_s: &[f64],
-    stop_entry_price_s: &[i64],
-    stop_exit_price_s: &[i64],
-    upon_stop_exit_s: &[i64],
-    upon_stop_update_s: &[i64],
+    entries_s: &FlexArray<'_, bool>,
+    exits_s: &FlexArray<'_, bool>,
+    direction_s: &FlexArray<'_, i64>,
+    long_entries_s: &FlexArray<'_, bool>,
+    long_exits_s: &FlexArray<'_, bool>,
+    short_entries_s: &FlexArray<'_, bool>,
+    short_exits_s: &FlexArray<'_, bool>,
+    size_s: &FlexArray<'_, f64>,
+    price_s: &FlexArray<'_, f64>,
+    size_type_s: &FlexArray<'_, i64>,
+    fees_s: &FlexArray<'_, f64>,
+    fixed_fees_s: &FlexArray<'_, f64>,
+    slippage_s: &FlexArray<'_, f64>,
+    min_size_s: &FlexArray<'_, f64>,
+    max_size_s: &FlexArray<'_, f64>,
+    size_granularity_s: &FlexArray<'_, f64>,
+    reject_prob_s: &FlexArray<'_, f64>,
+    lock_cash_s: &FlexArray<'_, bool>,
+    allow_partial_s: &FlexArray<'_, bool>,
+    raise_reject_s: &FlexArray<'_, bool>,
+    log_s: &FlexArray<'_, bool>,
+    accumulate_s: &FlexArray<'_, i64>,
+    upon_long_conflict_s: &FlexArray<'_, i64>,
+    upon_short_conflict_s: &FlexArray<'_, i64>,
+    upon_dir_conflict_s: &FlexArray<'_, i64>,
+    upon_opposite_entry_s: &FlexArray<'_, i64>,
+    val_price_s: &FlexArray<'_, f64>,
+    open_s: &FlexArray<'_, f64>,
+    high_s: &FlexArray<'_, f64>,
+    low_s: &FlexArray<'_, f64>,
+    close_s: &FlexArray<'_, f64>,
+    sl_stop_s: &FlexArray<'_, f64>,
+    sl_trail_s: &FlexArray<'_, bool>,
+    tp_stop_s: &FlexArray<'_, f64>,
+    stop_entry_price_s: &FlexArray<'_, i64>,
+    stop_exit_price_s: &FlexArray<'_, i64>,
+    upon_stop_exit_s: &FlexArray<'_, i64>,
+    upon_stop_update_s: &FlexArray<'_, i64>,
     use_stops: bool,
     auto_call_seq: bool,
     ffill_val_price: bool,
@@ -4512,30 +4500,29 @@ fn simulate_from_signals_inner(
             // Phase 1: Resolve prices
             for k in 0..group_len {
                 let col = from_col + k;
-                let idx = i * ncols + col;
 
-                let mut order_price = price_s[idx];
+                let mut order_price = price_s.get(i, col);
                 if order_price.is_infinite() {
                     if order_price > 0.0 {
-                        order_price = close_s[idx];
+                        order_price = close_s.get(i, col);
                     } else {
-                        let open_val = open_s[idx];
+                        let open_val = open_s.get(i, col);
                         if !open_val.is_nan() {
                             order_price = open_val;
                         } else if i > 0 {
-                            order_price = close_s[(i - 1) * ncols + col];
+                            order_price = close_s.get(i - 1, col);
                         } else {
                             order_price = f64::NAN;
                         }
                     }
                 }
 
-                let mut val_price_now = val_price_s[idx];
+                let mut val_price_now = val_price_s.get(i, col);
                 if val_price_now.is_infinite() {
                     if val_price_now > 0.0 {
                         val_price_now = order_price;
                     } else if i > 0 {
-                        val_price_now = close_s[(i - 1) * ncols + col];
+                        val_price_now = close_s.get(i - 1, col);
                     } else {
                         val_price_now = f64::NAN;
                     }
@@ -4549,9 +4536,8 @@ fn simulate_from_signals_inner(
             // Phase 2: Process signals for each column
             for k in 0..group_len {
                 let col = from_col + k;
-                let idx = i * ncols + col;
                 let position_now = last_position[col];
-                let slippage_val = slippage_s[idx];
+                let slippage_val = slippage_s.get(i, col);
 
                 let (
                     is_long_entry,
@@ -4562,8 +4548,8 @@ fn simulate_from_signals_inner(
                     final_price,
                     final_slippage,
                 ) = process_signals_at(
-                    idx,
                     i,
+                    col,
                     position_now,
                     price_arr[col],
                     slippage_val,
@@ -4601,8 +4587,8 @@ fn simulate_from_signals_inner(
                     is_long_exit,
                     is_short_entry,
                     is_short_exit,
-                    size_s[idx],
-                    size_type_s[idx],
+                    size_s.get(i, col),
+                    size_type_s.get(i, col),
                     accumulate_val,
                     last_val_price[col],
                 )?;
@@ -4677,7 +4663,6 @@ fn simulate_from_signals_inner(
                     from_col + k
                 };
 
-                let idx = i * ncols + col;
                 let position_now = last_position[col];
                 let debt_now = last_debt[col];
                 let val_price_now = last_val_price[col];
@@ -4705,17 +4690,17 @@ fn simulate_from_signals_inner(
                         price: price_arr[col],
                         size_type: size_type_arr[col],
                         direction: final_direction,
-                        fees: fees_s[idx],
-                        fixed_fees: fixed_fees_s[idx],
+                        fees: fees_s.get(i, col),
+                        fixed_fees: fixed_fees_s.get(i, col),
                         slippage: slippage_arr[col],
-                        min_size: min_size_s[idx],
-                        max_size: max_size_s[idx],
-                        size_granularity: size_granularity_s[idx],
-                        reject_prob: reject_prob_s[idx],
-                        lock_cash: lock_cash_s[idx],
-                        allow_partial: allow_partial_s[idx],
-                        raise_reject: raise_reject_s[idx],
-                        log: log_s[idx],
+                        min_size: min_size_s.get(i, col),
+                        max_size: max_size_s.get(i, col),
+                        size_granularity: size_granularity_s.get(i, col),
+                        reject_prob: reject_prob_s.get(i, col),
+                        lock_cash: lock_cash_s.get(i, col),
+                        allow_partial: allow_partial_s.get(i, col),
+                        raise_reject: raise_reject_s.get(i, col),
+                        log: log_s.get(i, col),
                     };
 
                     let state = ProcessOrderState {
@@ -4772,7 +4757,7 @@ fn simulate_from_signals_inner(
                             tp_init_price_arr[col] = f64::NAN;
                             tp_curr_stop_arr[col] = f64::NAN;
                         } else {
-                            let sep = stop_entry_price_s[idx];
+                            let sep = stop_entry_price_s.get(i, col);
                             let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
                                 new_state.val_price
                             } else if sep == STOP_ENTRY_PRICE {
@@ -4780,12 +4765,12 @@ fn simulate_from_signals_inner(
                             } else if sep == STOP_ENTRY_FILL_PRICE {
                                 order_result.price
                             } else {
-                                close_s[idx]
+                                close_s.get(i, col)
                             };
-                            let usu = upon_stop_update_s[idx];
-                            let new_sl_stop = sl_stop_s[idx];
-                            let new_sl_trail = sl_trail_s[idx];
-                            let new_tp_stop = tp_stop_s[idx];
+                            let usu = upon_stop_update_s.get(i, col);
+                            let new_sl_stop = sl_stop_s.get(i, col);
+                            let new_sl_trail = sl_trail_s.get(i, col);
+                            let new_tp_stop = tp_stop_s.get(i, col);
 
                             if position_now == 0.0 || new_position.signum() != position_now.signum()
                             {

@@ -150,6 +150,24 @@ def prepare_array_for_rust(a: tp.Any, dtype: tp.Any = np.float64) -> tp.Array:
     return np.asarray(a, dtype=dtype)
 
 
+def prepare_flex_array_for_rust(
+    a: tp.Any,
+    shape: tp.Shape,
+    dtype: tp.Any = np.float64,
+    flex_2d: bool = True,
+    name: str = "array",
+) -> tp.Array:
+    """Return a compact flexible array for Rust without broadcasting to ``shape``."""
+    support = flex_array_compatible_with_rust(name, a, shape, dtype=dtype, flex_2d=flex_2d)
+    if not support.supported:
+        raise ValueError(support.reason)
+    dtype = np.dtype(dtype)
+    arr = np.asarray(a)
+    if arr.dtype == dtype:
+        return arr
+    return np.asarray(a, dtype=dtype)
+
+
 def matching_shape_compatible_with_rust(name: str, a: tp.Any, other: tp.Any) -> RustSupport:
     """Return whether two arrays have the same shape."""
     if not isinstance(a, np.ndarray) or not isinstance(other, np.ndarray):

@@ -2,7 +2,10 @@
 // This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 use ndarray::{Array2, ArrayView2};
-use numpy::{Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{
+    Element, PyArray1, PyArray2, PyArrayDescr, PyReadonlyArray1, PyReadonlyArray2,
+    PyReadonlyArrayDyn, PyUntypedArrayMethods,
+};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::seq::SliceRandom;
@@ -202,6 +205,115 @@ pub(crate) fn array2_as_slice_cow<'py, T: Copy + Element>(
     }
     // Fallback: iterate in logical (row-major) order
     Cow::Owned(a.as_array().iter().copied().collect())
+}
+
+pub(crate) enum FlexArray<'py, T: Copy + Element> {
+    Scalar(T),
+    OneD {
+        data: Cow<'py, [T]>,
+        flex_2d: bool,
+    },
+    TwoDFull {
+        data: Cow<'py, [T]>,
+        cols: usize,
+    },
+    TwoDRow {
+        data: Cow<'py, [T]>,
+        cols: usize,
+    },
+    TwoDCol {
+        data: Cow<'py, [T]>,
+    },
+}
+
+impl<'py, T: Copy + Element> FlexArray<'py, T> {
+    pub(crate) fn from_pyarray(
+        name: &str,
+        a: &'py PyReadonlyArrayDyn<'py, T>,
+        nrows: usize,
+        ncols: usize,
+        flex_2d: bool,
+    ) -> PyResult<Self> {
+        let ndim = a.ndim();
+        let shape = a.shape();
+        if ndim == 0 {
+            let value = a
+                .as_array()
+                .iter()
+                .next()
+                .copied()
+                .ok_or_else(|| PyValueError::new_err(format!("`{name}` cannot be empty")))?;
+            return Ok(Self::Scalar(value));
+        }
+        if ndim == 1 {
+            let len = shape[0];
+            let valid_len = len == 1 || if flex_2d { len == ncols } else { len == nrows };
+            if !valid_len {
+                return Err(PyValueError::new_err(format!(
+                    "`{name}` cannot broadcast to shape ({nrows}, {ncols})"
+                )));
+            }
+            let data = if a.as_array().is_standard_layout() {
+                match a.as_slice() {
+                    Ok(slice) => Cow::Borrowed(slice),
+                    Err(_) => Cow::Owned(a.as_array().iter().copied().collect()),
+                }
+            } else {
+                Cow::Owned(a.as_array().iter().copied().collect())
+            };
+            if len == 1 {
+                return Ok(Self::Scalar(data[0]));
+            }
+            return Ok(Self::OneD { data, flex_2d });
+        }
+        if ndim == 2 {
+            let rows = shape[0];
+            let cols = shape[1];
+            if (rows != 1 && rows != nrows) || (cols != 1 && cols != ncols) {
+                return Err(PyValueError::new_err(format!(
+                    "`{name}` cannot broadcast to shape ({nrows}, {ncols})"
+                )));
+            }
+            let data = if a.as_array().is_standard_layout() {
+                match a.as_slice() {
+                    Ok(slice) => Cow::Borrowed(slice),
+                    Err(_) => Cow::Owned(a.as_array().iter().copied().collect()),
+                }
+            } else {
+                Cow::Owned(a.as_array().iter().copied().collect())
+            };
+            if rows == 1 && cols == 1 {
+                return Ok(Self::Scalar(data[0]));
+            }
+            if rows == nrows && cols == ncols {
+                return Ok(Self::TwoDFull { data, cols });
+            }
+            if rows == 1 {
+                return Ok(Self::TwoDRow { data, cols });
+            }
+            return Ok(Self::TwoDCol { data });
+        }
+        Err(PyValueError::new_err(format!(
+            "`{name}` must be 0D, 1D, or 2D"
+        )))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get(&self, i: usize, col: usize) -> T {
+        match self {
+            Self::Scalar(value) => *value,
+            Self::OneD { data, flex_2d } => unsafe {
+                *data.get_unchecked(if *flex_2d { col } else { i })
+            },
+            Self::TwoDFull { data, cols } => unsafe {
+                *data.get_unchecked(i * *cols + col)
+            },
+            Self::TwoDRow { data, cols } => unsafe {
+                *data.get_unchecked(col.min(*cols - 1))
+            },
+            Self::TwoDCol { data } => unsafe { *data.get_unchecked(i) },
+        }
+    }
 }
 
 pub(crate) fn broadcast_len2(len1: usize, len2: usize) -> PyResult<usize> {
