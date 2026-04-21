@@ -62,10 +62,10 @@ jobs:
         run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv pip install --python .venv -e ".[test]"
+        run: uv pip install --python .venv -e ".[test-rust]"
 
       - name: Build local Rust engine
         run: uv run --python .venv --no-sync python -m maturin develop --manifest-path rust/Cargo.toml --release
 
       - name: Run Rust engine tests
-        run: uv run --python .venv --no-sync pytest tests/test_engine.py
+        run: uv run --python .venv --no-sync pytest tests/

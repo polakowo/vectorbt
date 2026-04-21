@@ -70,6 +70,9 @@ test = [
     "pytest-cov",
     "pytest-xdist",
     "codecov",
+]
+test-rust = [
+    "vectorbt[test]",
     "maturin>=1.7,<2.0",
 ]
 docs = [
