@@ -58,7 +58,7 @@ pub fn shuffle_rs<'py>(
                 }
             }
             None => {
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 for col in 0..ncols {
                     for (i, &v) in a_arr.column(col).iter().enumerate() {
                         col_buf[i] = v;
@@ -1505,7 +1505,7 @@ pub(crate) fn shuffle_1d(a: &[f64], seed: Option<u64>) -> Vec<f64> {
             shuffle_1d_with_rng(a, &mut rng)
         }
         None => {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             shuffle_1d_with_rng(a, &mut rng)
         }
     }

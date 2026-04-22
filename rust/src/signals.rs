@@ -90,7 +90,7 @@ pub(crate) fn generate_rand_by_prob<R: Rng + ?Sized>(
     if let Some((prob_src, prob_cols)) = prob.as_full_2d() {
         for col in 0..ncols {
             for row in 0..nrows {
-                if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(row * prob_cols + col) } {
+                if rng.random::<f64>() < unsafe { *prob_src.get_unchecked(row * prob_cols + col) } {
                     out[[row, col]] = true;
                     if pick_first {
                         break;
@@ -102,7 +102,7 @@ pub(crate) fn generate_rand_by_prob<R: Rng + ?Sized>(
     }
     for col in 0..ncols {
         for row in 0..nrows {
-            if rng.gen::<f64>() < prob.get(row, col) {
+            if rng.random::<f64>() < prob.get(row, col) {
                 out[[row, col]] = true;
                 if pick_first {
                     break;
@@ -139,7 +139,7 @@ pub(crate) fn generate_rand_ex<R: Rng + ?Sized>(
                     nrows
                 };
                 if to_i > from_i {
-                    let exit_i = from_i + rng.gen_range(0..to_i - from_i);
+                    let exit_i = from_i + rng.random_range(0..to_i - from_i);
                     exits[[exit_i, col]] = true;
                     last_exit_i = exit_i as i64;
                 }
@@ -175,7 +175,7 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
                     };
                     if to_i > from_i {
                         for idx in from_i..to_i {
-                            if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
+                            if rng.random::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
                                 exits[[idx, col]] = true;
                                 last_exit_i = idx as i64;
                                 break;
@@ -203,7 +203,7 @@ pub(crate) fn generate_rand_ex_by_prob<R: Rng + ?Sized>(
                 };
                 if to_i > from_i {
                     for idx in from_i..to_i {
-                        if rng.gen::<f64>() < prob.get(idx, col) {
+                        if rng.random::<f64>() < prob.get(idx, col) {
                             exits[[idx, col]] = true;
                             last_exit_i = idx as i64;
                             break;
@@ -222,7 +222,7 @@ fn uniform_summing_to_one<R: Rng + ?Sized>(n: usize, rng: &mut R) -> Vec<f64> {
     rand_floats[0] = 0.0;
     rand_floats[1] = 1.0;
     for slot in rand_floats.iter_mut().take(n + 1).skip(2) {
-        *slot = rng.gen::<f64>();
+        *slot = rng.random::<f64>();
     }
     rand_floats.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let mut diffs = vec![0.0f64; n];
@@ -242,7 +242,7 @@ fn rescale_float_to_int<R: Rng + ?Sized>(floats: &[f64], int_range: (f64, f64), 
     let leftover = total as i64 - sum;
     if leftover > 0 && !ints.is_empty() {
         for _ in 0..leftover {
-            let idx = rng.gen_range(0..ints.len());
+            let idx = rng.random_range(0..ints.len());
             ints[idx] += 1;
         }
     }
@@ -286,7 +286,7 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
                 if nrows <= exit_wait {
                     return Err(PyValueError::new_err("Cannot fit entry before exit_wait"));
                 }
-                let entry_idx = rng.gen_range(0..(nrows - exit_wait));
+                let entry_idx = rng.random_range(0..(nrows - exit_wait));
                 entries[[entry_idx, col]] = true;
             } else if col_n > 1 {
                 let col_n_usize = col_n as usize;
@@ -341,7 +341,7 @@ pub(crate) fn generate_rand_enex<R: Rng + ?Sized>(
                 } else {
                     nrows - 1
                 };
-                let i = rng.gen_range(0..(exit_i - entry_i + 1));
+                let i = rng.random_range(0..(exit_i - entry_i + 1));
                 exits[[entry_i + i, col]] = true;
                 entry_i_opt = next_entry_i;
             }
@@ -395,7 +395,7 @@ pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
                 let mut last_i: Option<usize> = None;
                 let mut hits: Vec<usize> = Vec::new();
                 for idx in from_i..to_i {
-                    if rng.gen::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
+                    if rng.random::<f64>() < unsafe { *prob_src.get_unchecked(idx * prob_cols + col) } {
                         if first_i.is_none() {
                             first_i = Some(idx);
                         }
@@ -462,7 +462,7 @@ pub(crate) fn generate_rand_enex_by_prob<'a, R: Rng + ?Sized>(
             let mut last_i: Option<usize> = None;
             let mut hits: Vec<usize> = Vec::new();
             for idx in from_i..to_i {
-                if rng.gen::<f64>() < prob_view.get(idx, col) {
+                if rng.random::<f64>() < prob_view.get(idx, col) {
                     if first_i.is_none() {
                         first_i = Some(idx);
                     }
@@ -1418,7 +1418,7 @@ pub(crate) fn norm_avg_index(a: ArrayView2<'_, bool>) -> Vec<f64> {
 fn make_rng(seed: Option<u64>) -> ChaCha8Rng {
     match seed {
         Some(s) => ChaCha8Rng::seed_from_u64(s),
-        None => ChaCha8Rng::from_entropy(),
+        None => ChaCha8Rng::seed_from_u64(rand::random()),
     }
 }
 
