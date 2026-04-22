@@ -1,12 +1,23 @@
-# Rust engine
+<h1 align="center">vectorbt Rust Engine</h1>
 
-This directory contains the optional Rust engine for vectorbt. It builds the
-`vectorbt-rust` Python extension package, exposed to Python as `vectorbt_rust`.
+<p align="center">
+    <a href="https://pypi.org/project/vectorbt-rust" title="PyPI">
+        <img src="https://img.shields.io/pypi/v/vectorbt-rust?color=blueviolet" />
+    </a>
+    <a href="https://pypi.org/project/vectorbt-rust" title="Python">
+        <img src="https://img.shields.io/pypi/pyversions/vectorbt-rust" />
+    </a>
+    <a href="https://www.rust-lang.org" title="Built with Rust">
+        <img src="https://img.shields.io/badge/built_with-Rust-dea584?logo=rust" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" title="License">
+        <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
+    </a>
+</p>
 
-Rust is an acceleration engine. The canonical semantics still live in the
-Numba implementations under `vectorbt/<subpackage>/nb.py`; Rust kernels are
-called through engine-neutral dispatch wrappers under
-`vectorbt/<subpackage>/dispatch.py`.
+Optional Rust acceleration engine for [vectorbt](https://github.com/polakowo/vectorbt).
+Provides high-performance drop-in replacements for vectorbt's Numba kernels,
+dispatched transparently via `engine="rust"` or the global engine setting.
 
 > [!NOTE]
 > Most users should not import `vectorbt_rust` directly. Prefer vectorbt's public
