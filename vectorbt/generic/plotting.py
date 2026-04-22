@@ -27,6 +27,16 @@ from vectorbt.utils.array_ import renormalize
 from vectorbt.utils.colors import rgb_from_cmap
 from vectorbt.utils.config import Configured, resolve_dict
 from vectorbt.utils.figure import make_figure
+from vectorbt.utils.figure import (  # noqa: F401  exposed as vbt.plotting.*
+    create_figure,
+    register_renderer,
+    get_renderer,
+    list_renderers,
+)
+from vectorbt.utils.plotting_protocol import (  # noqa: F401  exposed as vbt.plotting.*
+    FigureProtocol,
+    Capability,
+)
 
 
 def clean_labels(labels: tp.ArrayLikeSequence) -> tp.ArrayLikeSequence:
