@@ -5,16 +5,7 @@
 
 from vectorbt.utils.config import atomic_dict, merge_dicts, Config, Configured, AtomicConfig
 from vectorbt.utils.decorators import CacheCondition, cached_property, cached_method
-from vectorbt.utils.figure import (
-    Figure,
-    FigureWidget,
-    make_figure,
-    make_subplots,
-    create_figure,
-    register_renderer,
-    get_renderer,
-    list_renderers,
-)
+from vectorbt.utils.figure import Figure, FigureWidget, make_figure, make_subplots
 from vectorbt.utils.image_ import save_animation
 from vectorbt.utils.random_ import set_seed
 from vectorbt.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
@@ -38,10 +29,6 @@ __all__ = [
     "FigureWidget",
     "make_figure",
     "make_subplots",
-    "create_figure",
-    "register_renderer",
-    "get_renderer",
-    "list_renderers",
     "set_seed",
     "save_animation",
     "AsyncJob",
