@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Math utilities."""
@@ -43,12 +43,12 @@ def is_addition_zero_nb(a: float, b: float, rel_tol: float = rel_tol, abs_tol: f
     """Tell whether addition of two values yields zero."""
     if np.sign(a) != np.sign(b):
         return is_close_nb(abs(a), abs(b), rel_tol=rel_tol, abs_tol=abs_tol)
-    return is_close_nb(a + b, 0., rel_tol=rel_tol, abs_tol=abs_tol)
+    return is_close_nb(a + b, 0.0, rel_tol=rel_tol, abs_tol=abs_tol)
 
 
 @njit(cache=True)
 def add_nb(a: float, b: float, rel_tol: float = rel_tol, abs_tol: float = abs_tol) -> float:
     """Add two floats."""
     if is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-        return 0.
+        return 0.0
     return a + b

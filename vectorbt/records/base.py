@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Base class for working with records.
@@ -400,7 +400,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.records import nb
+from vectorbt.records import dispatch, nb
 from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.utils import checks
@@ -468,24 +468,13 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         dict(
             dtype=None,
             settings=dict(
-                id=dict(
-                    name='id',
-                    title='Id'
-                ),
-                col=dict(
-                    name='col',
-                    title='Column',
-                    mapping='columns'
-                ),
-                idx=dict(
-                    name='idx',
-                    title='Timestamp',
-                    mapping='index'
-                )
-            )
+                id=dict(name="id", title="Id"),
+                col=dict(name="col", title="Column", mapping="columns"),
+                idx=dict(name="idx", title="Timestamp", mapping="index"),
+            ),
         ),
         readonly=True,
-        as_attrs=False
+        as_attrs=False,
     )
 
     @property
@@ -498,28 +487,22 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """
         return self._field_config
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 records_arr: tp.RecordArray,
-                 col_mapper: tp.Optional[ColumnMapper] = None,
-                 **kwargs) -> None:
-        Wrapping.__init__(
-            self,
-            wrapper,
-            records_arr=records_arr,
-            col_mapper=col_mapper,
-            **kwargs
-        )
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        Wrapping.__init__(self, wrapper, records_arr=records_arr, col_mapper=col_mapper, engine=engine, **kwargs)
         StatsBuilderMixin.__init__(self)
 
         # Check fields
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
-        field_names = {
-            dct.get('name', field_name)
-            for field_name, dct in self.field_config.get('settings', {}).items()
-        }
-        dtype = self.field_config.get('dtype', None)
+        field_names = {dct.get("name", field_name) for field_name, dct in self.field_config.get("settings", {}).items()}
+        dtype = self.field_config.get("dtype", None)
         if dtype is not None:
             for field in dtype.names:
                 if field not in records_arr.dtype.names:
@@ -527,49 +510,61 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                         raise TypeError(f"Field '{field}' from {dtype} cannot be found in records or config")
 
         self._records_arr = records_arr
+        self._engine = engine
         if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, self.col_arr)
+            col_mapper = ColumnMapper(wrapper, self.col_arr, engine=engine)
         self._col_mapper = col_mapper
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     def replace(self: RecordsT, **kwargs) -> RecordsT:
         """See `vectorbt.utils.config.Configured.replace`.
 
         Also, makes sure that `Records.col_mapper` is not passed to the new instance."""
-        if self.config.get('col_mapper', None) is not None:
-            if 'wrapper' in kwargs:
-                if self.wrapper is not kwargs.get('wrapper'):
-                    kwargs['col_mapper'] = None
-            if 'records_arr' in kwargs:
-                if self.records_arr is not kwargs.get('records_arr'):
-                    kwargs['col_mapper'] = None
+        if self.config.get("col_mapper", None) is not None:
+            if "wrapper" in kwargs:
+                if self.wrapper is not kwargs.get("wrapper"):
+                    kwargs["col_mapper"] = None
+            if "records_arr" in kwargs:
+                if self.records_arr is not kwargs.get("records_arr"):
+                    kwargs["col_mapper"] = None
         return Configured.replace(self, **kwargs)
 
-    def get_by_col_idxs(self, col_idxs: tp.Array1d) -> tp.RecordArray:
+    def get_by_col_idxs(self, col_idxs: tp.Array1d, engine: tp.Optional[str] = None) -> tp.RecordArray:
         """Get records corresponding to column indices.
 
         Returns new records array."""
-        if self.col_mapper.is_sorted():
-            new_records_arr = nb.record_col_range_select_nb(
-                self.values, self.col_mapper.col_range, to_1d_array(col_idxs))  # faster
+        engine = engine if engine is not None else self.engine
+        if self.col_mapper.is_sorted(engine=engine):
+            new_records_arr = dispatch.record_col_range_select(
+                self.values,
+                self.col_mapper.col_range,
+                to_1d_array(col_idxs),
+                engine=engine,
+            )  # faster
         else:
-            new_records_arr = nb.record_col_map_select_nb(
-                self.values, self.col_mapper.col_map, to_1d_array(col_idxs))
+            new_records_arr = dispatch.record_col_map_select(
+                self.values, self.col_mapper.col_map, to_1d_array(col_idxs), engine=engine
+            )
         return new_records_arr
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
-        new_records_arr = self.get_by_col_idxs(col_idxs)
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func,
+            column_only_select=True,
+            **kwargs,
+        )
+        new_records_arr = self.get_by_col_idxs(col_idxs, engine=self.engine)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
     def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
         new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr
-        )
+        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr)
 
     @property
     def records_arr(self) -> tp.RecordArray:
@@ -604,23 +599,23 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         df = self.records.copy()
-        field_settings = self.field_config.get('settings', {})
+        field_settings = self.field_config.get("settings", {})
         for col_name in df.columns:
             if col_name in field_settings:
                 dct = field_settings[col_name]
-                if dct.get('ignore', False):
+                if dct.get("ignore", False):
                     df = df.drop(columns=col_name)
                     continue
-                field_name = dct.get('name', col_name)
-                if 'title' in dct:
-                    title = dct['title']
+                field_name = dct.get("name", col_name)
+                if "title" in dct:
+                    title = dct["title"]
                     new_columns = dict()
                     new_columns[field_name] = title
                     df.rename(columns=new_columns, inplace=True)
                 else:
                     title = field_name
-                if 'mapping' in dct:
-                    if isinstance(dct['mapping'], str) and dct['mapping'] == 'index':
+                if "mapping" in dct:
+                    if isinstance(dct["mapping"], str) and dct["mapping"] == "index":
                         df[title] = self.get_map_field_to_index(col_name)
                     else:
                         df[title] = self.get_apply_mapping_arr(col_name)
@@ -628,19 +623,19 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
 
     def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
         """Resolve any setting of the field. Uses `Records.field_config`."""
-        return self.field_config.get('settings', {}).get(field, {}).get(setting, default)
+        return self.field_config.get("settings", {}).get(field, {}).get(setting, default)
 
     def get_field_name(self, field: str) -> str:
         """Resolve the name of the field. Uses `Records.field_config`.."""
-        return self.get_field_setting(field, 'name', field)
+        return self.get_field_setting(field, "name", field)
 
     def get_field_title(self, field: str) -> str:
         """Resolve the title of the field. Uses `Records.field_config`."""
-        return self.get_field_setting(field, 'title', field)
+        return self.get_field_setting(field, "title", field)
 
     def get_field_mapping(self, field: str) -> tp.Optional[tp.MappingLike]:
         """Resolve the mapping of the field. Uses `Records.field_config`."""
-        return self.get_field_setting(field, 'mapping', None)
+        return self.get_field_setting(field, "mapping", None)
 
     def get_field_arr(self, field: str) -> tp.Array1d:
         """Resolve the array of the field. Uses `Records.field_config`."""
@@ -661,58 +656,65 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     @property
     def id_arr(self) -> tp.Array1d:
         """Get id array."""
-        return self.values[self.get_field_name('id')]
+        return self.values[self.get_field_name("id")]
 
     @property
     def col_arr(self) -> tp.Array1d:
         """Get column array."""
-        return self.values[self.get_field_name('col')]
+        return self.values[self.get_field_name("col")]
 
     @property
     def idx_arr(self) -> tp.Optional[tp.Array1d]:
         """Get index array."""
-        idx_field_name = self.get_field_name('idx')
+        idx_field_name = self.get_field_name("idx")
         if idx_field_name is None:
             return None
         return self.values[idx_field_name]
 
     @cached_method
-    def is_sorted(self, incl_id: bool = False) -> bool:
+    def is_sorted(self, incl_id: bool = False, engine: tp.Optional[str] = None) -> bool:
         """Check whether records are sorted."""
+        engine = engine if engine is not None else self.engine
         if incl_id:
-            return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
-        return nb.is_col_sorted_nb(self.col_arr)
+            return dispatch.is_col_idx_sorted(self.col_arr, self.id_arr, engine=engine)
+        return dispatch.is_col_sorted(self.col_arr, engine=engine)
 
-    def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
+    def sort(
+        self: RecordsT,
+        incl_id: bool = False,
+        group_by: tp.GroupByLike = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).
 
         !!! note
             Sorting is expensive. A better approach is to append records already in the correct order."""
-        if self.is_sorted(incl_id=incl_id):
+        engine = engine if engine is not None else self.engine
+        if self.is_sorted(incl_id=incl_id, engine=engine):
             return self.replace(**kwargs).regroup(group_by)
         if incl_id:
             ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
-            ind = np.argsort(self.col_arr, kind='stable')
+            ind = np.argsort(self.col_arr, kind="stable")
         return self.replace(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
     def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
         mask_indices = np.flatnonzero(mask)
-        return self.replace(
-            records_arr=np.take(self.values, mask_indices),
-            **kwargs
-        ).regroup(group_by)
+        return self.replace(records_arr=np.take(self.values, mask_indices), **kwargs).regroup(group_by)
 
-    def map_array(self,
-                  a: tp.ArrayLike,
-                  idx_arr: tp.Optional[tp.ArrayLike] = None,
-                  mapping: tp.Optional[tp.MappingLike] = None,
-                  group_by: tp.GroupByLike = None,
-                  **kwargs) -> MappedArray:
+    def map_array(
+        self,
+        a: tp.ArrayLike,
+        idx_arr: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> MappedArray:
         """Convert array to mapped array.
 
-         The length of the array should match that of the records."""
+        The length of the array should match that of the records."""
         if not isinstance(a, np.ndarray):
             a = np.asarray(a)
         checks.assert_shape_equal(a, self.values)
@@ -726,7 +728,8 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=self.col_mapper,
-            **kwargs
+            engine=self.engine,
+            **kwargs,
         ).regroup(group_by)
 
     def map_field(self, field: str, **kwargs) -> MappedArray:
@@ -736,10 +739,13 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         mapped_arr = self.values[field]
         return self.map_array(mapped_arr, **kwargs)
 
-    def map(self,
-            map_func_nb: tp.RecordMapFunc, *args,
-            dtype: tp.Optional[tp.DTypeLike] = None,
-            **kwargs) -> MappedArray:
+    def map(
+        self,
+        map_func_nb: tp.RecordMapFunc,
+        *args,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        **kwargs,
+    ) -> MappedArray:
         """Map each record to a scalar value. Returns mapped array.
 
         See `vectorbt.records.nb.map_records_nb`.
@@ -750,12 +756,15 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         mapped_arr = np.asarray(mapped_arr, dtype=dtype)
         return self.map_array(mapped_arr, **kwargs)
 
-    def apply(self,
-              apply_func_nb: tp.RecordApplyFunc, *args,
-              group_by: tp.GroupByLike = None,
-              apply_per_group: bool = False,
-              dtype: tp.Optional[tp.DTypeLike] = None,
-              **kwargs) -> MappedArray:
+    def apply(
+        self,
+        apply_func_nb: tp.RecordApplyFunc,
+        *args,
+        group_by: tp.GroupByLike = None,
+        apply_per_group: bool = False,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        **kwargs,
+    ) -> MappedArray:
         """Apply function on records per column/group. Returns mapped array.
 
         Applies per group if `apply_per_group` is True.
@@ -775,10 +784,12 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     @cached_method
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return count by column."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="count"), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
-            group_by=group_by, **wrap_kwargs)
+            group_by=group_by,
+            **wrap_kwargs,
+        )
 
     # ############# Stats ############# #
 
@@ -789,41 +800,25 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `records.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        records_stats_cfg = settings['records']['stats']
 
-        return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
-            records_stats_cfg
-        )
+        records_stats_cfg = settings["records"]["stats"]
+
+        return merge_dicts(StatsBuilderMixin.stats_defaults.__get__(self), records_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            count=dict(
-                title='Count',
-                calc_func='count',
-                tags='records'
-            )
+            count=dict(title="Count", calc_func="count", tags="records"),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -839,12 +834,10 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `records.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        records_plots_cfg = settings['records']['plots']
 
-        return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
-            records_plots_cfg
-        )
+        records_plots_cfg = settings["records"]["plots"]
+
+        return merge_dicts(PlotsBuilderMixin.plots_defaults.__get__(self), records_plots_cfg)
 
     @property
     def subplots(self) -> Config:
@@ -857,16 +850,14 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """Build field config documentation."""
         if source_cls is None:
             source_cls = Records
-        return string.Template(
-            inspect.cleandoc(get_dict_attr(source_cls, 'field_config').__doc__)
-        ).substitute(
-            {'field_config': cls.field_config.to_doc(), 'cls_name': cls.__name__}
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "field_config").__doc__)).substitute(
+            {"field_config": cls.field_config.to_doc(), "cls_name": cls.__name__},
         )
 
     @classmethod
     def override_field_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
         """Call this method on each subclass that overrides `field_config`."""
-        __pdoc__[cls.__name__ + '.field_config'] = cls.build_field_config_doc(source_cls=source_cls)
+        __pdoc__[cls.__name__ + ".field_config"] = cls.build_field_config_doc(source_cls=source_cls)
 
 
 Records.override_field_config_doc(__pdoc__)

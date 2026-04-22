@@ -1,16 +1,44 @@
-.ipynb_checkpoints
-__pycache__
-.vscode
-.idea
-.mypy_cache
-.pytest_cache
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venvs/
+
+# Jupyter
+.ipynb_checkpoints/
+/*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Type checking / testing
+.mypy_cache/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rust
+rust/target/
+
+# Project-specific
 apps/candlestick-patterns/data
 docs/docs/api
-docs/site
-dist
-vectorbt.egg-info
-venvs
-.DS_Store
-build
-.mcp.json
+docs/site/
+
+# Lock files
 uv.lock
+
+# Private
+.mcp.json
+development.md

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Named tuples and enumerated types.
@@ -8,9 +8,7 @@ Defines enums and other schemas for `vectorbt.labels`."""
 from vectorbt import _typing as tp
 from vectorbt.utils.docs import to_doc
 
-__all__ = [
-    'TrendMode'
-]
+__all__ = ["TrendMode"]
 
 __pdoc__ = {}
 
@@ -26,7 +24,9 @@ class TrendModeT(tp.NamedTuple):
 TrendMode = TrendModeT()
 """_"""
 
-__pdoc__['TrendMode'] = f"""Trend mode.
+__pdoc__[
+    "TrendMode"
+] = f"""Trend mode.
 
 ```json
 {to_doc(TrendMode)}

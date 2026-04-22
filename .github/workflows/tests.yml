@@ -29,8 +29,43 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      - name: Create virtual environment
+        run: uv venv --python ${{ matrix.python-version }}
+
       - name: Install dependencies
-        run: uv sync --extra cov
+        run: uv pip install --python .venv -e ".[test]"
 
       - name: Run tests
-        run: uv run pytest tests/
+        run: uv run --python .venv --no-sync pytest tests/
+
+  rust-engine:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Create virtual environment
+        run: uv venv --python ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv pip install --python .venv -e ".[test-rust]"
+
+      - name: Build local Rust engine
+        run: uv run --python .venv --no-sync python -m maturin develop --manifest-path rust/Cargo.toml --release
+
+      - name: Run Rust engine tests
+        run: uv run --python .venv --no-sync pytest tests/

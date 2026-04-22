@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Base data class.
@@ -278,6 +278,7 @@ __pdoc__ = {}
 
 class symbol_dict(dict):
     """Dict that contains symbols as keys."""
+
     pass
 
 
@@ -291,15 +292,17 @@ DataT = tp.TypeVar("DataT", bound="Data")
 class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 data: tp.Data,
-                 tz_localize: tp.Optional[tp.TimezoneLike],
-                 tz_convert: tp.Optional[tp.TimezoneLike],
-                 missing_index: str,
-                 missing_columns: str,
-                 download_kwargs: dict,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        data: tp.Data,
+        tz_localize: tp.Optional[tp.TimezoneLike],
+        tz_convert: tp.Optional[tp.TimezoneLike],
+        missing_index: str,
+        missing_columns: str,
+        download_kwargs: dict,
+        **kwargs,
+    ) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -309,7 +312,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             missing_index=missing_index,
             missing_columns=missing_columns,
             download_kwargs=download_kwargs,
-            **kwargs
+            **kwargs,
         )
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
@@ -328,10 +331,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
         new_data = {k: pd_indexing_func(v) for k, v in self.data.items()}
-        return self.replace(
-            wrapper=new_wrapper,
-            data=new_data
-        )
+        return self.replace(wrapper=new_wrapper, data=new_data)
 
     @property
     def data(self) -> tp.Data:
@@ -369,7 +369,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         return self._download_kwargs
 
     @classmethod
-    def align_index(cls, data: tp.Data, missing: str = 'nan') -> tp.Data:
+    def align_index(cls, data: tp.Data, missing: str = "nan") -> tp.Data:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -386,15 +386,16 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 index = v.index
             else:
                 if len(index.intersection(v.index)) != len(index.union(v.index)):
-                    if missing == 'nan':
-                        warnings.warn("Symbols have mismatching index. "
-                                      "Setting missing data points to NaN.", stacklevel=2)
+                    if missing == "nan":
+                        warnings.warn(
+                            "Symbols have mismatching index. " "Setting missing data points to NaN.",
+                            stacklevel=2,
+                        )
                         index = index.union(v.index)
-                    elif missing == 'drop':
-                        warnings.warn("Symbols have mismatching index. "
-                                      "Dropping missing data points.", stacklevel=2)
+                    elif missing == "drop":
+                        warnings.warn("Symbols have mismatching index. " "Dropping missing data points.", stacklevel=2)
                         index = index.intersection(v.index)
-                    elif missing == 'raise':
+                    elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
                         raise ValueError(f"missing='{missing}' is not recognized")
@@ -404,7 +405,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         return new_data
 
     @classmethod
-    def align_columns(cls, data: tp.Data, missing: str = 'raise') -> tp.Data:
+    def align_columns(cls, data: tp.Data, missing: str = "raise") -> tp.Data:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -425,15 +426,19 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 columns = v.columns
             else:
                 if len(columns.intersection(v.columns)) != len(columns.union(v.columns)):
-                    if missing == 'nan':
-                        warnings.warn("Symbols have mismatching columns. "
-                                      "Setting missing data points to NaN.", stacklevel=2)
+                    if missing == "nan":
+                        warnings.warn(
+                            "Symbols have mismatching columns. " "Setting missing data points to NaN.",
+                            stacklevel=2,
+                        )
                         columns = columns.union(v.columns)
-                    elif missing == 'drop':
-                        warnings.warn("Symbols have mismatching columns. "
-                                      "Dropping missing data points.", stacklevel=2)
+                    elif missing == "drop":
+                        warnings.warn(
+                            "Symbols have mismatching columns. " "Dropping missing data points.",
+                            stacklevel=2,
+                        )
                         columns = columns.intersection(v.columns)
-                    elif missing == 'raise':
+                    elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
                         raise ValueError(f"missing='{missing}' is not recognized")
@@ -464,14 +469,16 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         return _kwargs
 
     @classmethod
-    def from_data(cls: tp.Type[DataT],
-                  data: tp.Data,
-                  tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                  tz_convert: tp.Optional[tp.TimezoneLike] = None,
-                  missing_index: tp.Optional[str] = None,
-                  missing_columns: tp.Optional[str] = None,
-                  wrapper_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> DataT:
+    def from_data(
+        cls: tp.Type[DataT],
+        data: tp.Data,
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        missing_index: tp.Optional[str] = None,
+        missing_columns: tp.Optional[str] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
         """Create a new `Data` instance from (aligned) data.
 
         Args:
@@ -489,17 +496,18 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
         For defaults, see `data` in `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        data_cfg = settings['data']
+
+        data_cfg = settings["data"]
 
         # Get global defaults
         if tz_localize is None:
-            tz_localize = data_cfg['tz_localize']
+            tz_localize = data_cfg["tz_localize"]
         if tz_convert is None:
-            tz_convert = data_cfg['tz_convert']
+            tz_convert = data_cfg["tz_convert"]
         if missing_index is None:
-            missing_index = data_cfg['missing_index']
+            missing_index = data_cfg["missing_index"]
         if missing_columns is None:
-            missing_columns = data_cfg['missing_columns']
+            missing_columns = data_cfg["missing_columns"]
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
 
@@ -537,7 +545,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             tz_convert=tz_convert,
             missing_index=missing_index,
             missing_columns=missing_columns,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -546,14 +554,16 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         raise NotImplementedError
 
     @classmethod
-    def download(cls: tp.Type[DataT],
-                 symbols: tp.Union[tp.Label, tp.Labels],
-                 tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                 tz_convert: tp.Optional[tp.TimezoneLike] = None,
-                 missing_index: tp.Optional[str] = None,
-                 missing_columns: tp.Optional[str] = None,
-                 wrapper_kwargs: tp.KwargsLike = None,
-                 **kwargs) -> DataT:
+    def download(
+        cls: tp.Type[DataT],
+        symbols: tp.Union[tp.Label, tp.Labels],
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        missing_index: tp.Optional[str] = None,
+        missing_columns: tp.Optional[str] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
         """Download data using `Data.download_symbol`.
 
         Args:
@@ -591,7 +601,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             missing_index=missing_index,
             missing_columns=missing_columns,
             wrapper_kwargs=wrapper_kwargs,
-            download_kwargs=kwargs
+            download_kwargs=kwargs,
         )
 
     def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
@@ -619,11 +629,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             # Convert array to pandas
             if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
                 new_obj = np.asarray(new_obj)
-                index = pd.RangeIndex(
-                    start=v.index[-1],
-                    stop=v.index[-1] + new_obj.shape[0],
-                    step=1
-                )
+                index = pd.RangeIndex(start=v.index[-1], stop=v.index[-1] + new_obj.shape[0], step=1)
                 if new_obj.ndim == 1:
                     new_obj = pd.Series(new_obj, index=index)
                 else:
@@ -651,20 +657,17 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             else:
                 v = v[self.data[k].columns]
             v = pd.concat((self.data[k], v), axis=0)
-            v = v[~v.index.duplicated(keep='last')]
+            v = v[~v.index.duplicated(keep="last")]
             if isinstance(v.index, pd.DatetimeIndex):
                 v.index.freq = v.index.inferred_freq
             new_data[k] = v
 
         # Create new instance
         new_index = new_data[self.symbols[0]].index
-        return self.replace(
-            wrapper=self.wrapper.replace(index=new_index),
-            data=new_data
-        )
+        return self.replace(wrapper=self.wrapper.replace(index=new_index), data=new_data)
 
     @cached_method
-    def concat(self, level_name: str = 'symbol') -> tp.Data:
+    def concat(self, level_name: str = "symbol") -> tp.Data:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         first_data = self.data[self.symbols[0]]
         index = first_data.index
@@ -673,15 +676,9 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         else:
             columns = first_data.columns
         if len(self.symbols) > 1:
-            new_data = {c: pd.DataFrame(
-                index=index,
-                columns=pd.Index(self.symbols, name=level_name)
-            ) for c in columns}
+            new_data = {c: pd.DataFrame(index=index, columns=pd.Index(self.symbols, name=level_name)) for c in columns}
         else:
-            new_data = {c: pd.Series(
-                index=index,
-                name=self.symbols[0]
-            ) for c in columns}
+            new_data = {c: pd.Series(index=index, name=self.symbols[0]) for c in columns}
         for c in columns:
             for s in self.symbols:
                 if isinstance(self.data[s], pd.Series):
@@ -725,51 +722,37 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `data.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        data_stats_cfg = settings['data']['stats']
 
-        return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
-            data_stats_cfg
-        )
+        data_stats_cfg = settings["data"]["stats"]
+
+        return merge_dicts(StatsBuilderMixin.stats_defaults.__get__(self), data_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             total_symbols=dict(
-                title='Total Symbols',
+                title="Total Symbols",
                 calc_func=lambda self: len(self.symbols),
                 agg_func=None,
-                tags='data'
+                tags="data",
             ),
             null_counts=dict(
-                title='Null Counts',
-                calc_func=lambda self, group_by:
-                {
-                    k: v.isnull().vbt(wrapper=self.wrapper).sum(group_by=group_by)
-                    for k, v in self.data.items()
+                title="Null Counts",
+                calc_func=lambda self, group_by: {
+                    k: v.isnull().vbt(wrapper=self.wrapper).sum(group_by=group_by) for k, v in self.data.items()
                 },
-                tags='data'
-            )
+                tags="data",
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -778,10 +761,12 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             base: tp.Optional[float] = None,
-             **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        base: tp.Optional[float] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot orders.
 
         Args:
@@ -818,23 +803,14 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `data.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        data_plots_cfg = settings['data']['plots']
 
-        return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
-            data_plots_cfg
-        )
+        data_plots_cfg = settings["data"]["plots"]
+
+        return merge_dicts(PlotsBuilderMixin.plots_defaults.__get__(self), data_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
-        dict(
-            plot=dict(
-                check_is_not_grouped=True,
-                plot_func='plot',
-                pass_add_trace_kwargs=True,
-                tags='data'
-            )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_add_trace_kwargs=True, tags="data")),
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property

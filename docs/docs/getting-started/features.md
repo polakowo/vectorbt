@@ -6,7 +6,7 @@ title: Features
 
 ## Pandas
 
-- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
+- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy, Numba, and optional Rust kernels. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
 
 ```pycon title="Compute the rolling z-score"
 >>> import vectorbt as vbt
@@ -31,6 +31,22 @@ title: Features
 
 >>> %timeit big_ts.vbt.rolling_apply(2, vbt_zscore_nb)
 33.1 ms ± 1.17 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+```
+
+- [x] **Optional Rust engine**: Precompiled Rust kernels are available for supported generic, indicator, signal, records, returns, labels, and portfolio paths. Use `engine="rust"` per call or `vbt.settings["engine"] = "rust"` globally. With the default `engine="auto"`, VectorBT uses Rust only when the optional extension is installed and the specific call is supported, otherwise it falls back to Numba.
+
+```pycon title="Process one million orders"
+>>> big_close = pd.DataFrame(100 + np.random.uniform(size=(1000, 1000)))
+>>> big_entries = pd.DataFrame(np.full(big_close.shape, False))
+>>> big_entries.iloc[0::2] = True
+>>> big_exits = pd.DataFrame(np.full(big_close.shape, False))
+>>> big_exits.iloc[1::2] = True
+
+%timeit vbt.Portfolio.from_signals(big_close, big_entries, big_exits, engine="numba")
+53.8 ms ± 2.03 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+%timeit vbt.Portfolio.from_signals(big_close, big_entries, big_exits, engine="rust")
+42.4 ms ± 106 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
 - [x] **Flexible broadcasting**: Mechanism for broadcasting array-like objects of arbitrary shapes, including pandas objects with MultiIndex.
@@ -148,7 +164,7 @@ Data updated with 5 data points
 
 ## Indicators
 
-- [x] **Technical indicators**: Most popular technical indicators with full Numba support, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
+- [x] **Technical indicators**: Most popular technical indicators with full Numba support and optional Rust acceleration for built-in kernels, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
 
 ```pycon title="Compute 2 moving averages at once"
 >>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
@@ -228,7 +244,7 @@ custom_sigma       0.01        0.01
 array([3, 2])
 ```
 
-- [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support.
+- [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support and optional Rust acceleration for supported generators.
 
 ```pycon title="Generate entries and exits using different probabilities"
 >>> rprobnx = vbt.RPROBNX.run(
@@ -290,7 +306,7 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 
 ## Modeling
 
-- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
+- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports optional Rust acceleration for supported vectorized simulation, order, trade, position, and portfolio metric paths. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
 
 ```pycon title="Backtest the Golden Cross"
 >>> price = vbt.YFData.download('BTC-USD', start='2018-01-01').get('Close')
@@ -329,7 +345,7 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 
 ## Analysis
 
-- [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their rolling versions. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**.
+- [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their rolling versions, with optional Rust acceleration for supported returns metrics. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**.
 
 ```pycon title="Visualize performance using QuantStats"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
@@ -370,7 +386,7 @@ Partition Distance: Std                           NaT
 dtype: object
 ```
 
-- [x] **Records and mapped arrays**: In-house data structures for analyzing complex data, such as simulation logs. Fully compiled with Numba.
+- [x] **Records and mapped arrays**: In-house data structures for analyzing complex data, such as simulation logs. Fully compiled with Numba and optionally accelerated with Rust for supported mapped-array and record-selection kernels.
 
 ```pycon title="Parse 5 highest slippage values from logs"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for working with templates."""
@@ -44,9 +44,11 @@ class Sub(SafeToStr):
         return self.template.substitute(mapping)
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(" \
-               f"template=\"{self.template.template}\", " \
-               f"mapping={prepare_for_doc(self.mapping)})"
+        return (
+            f"{self.__class__.__name__}("
+            f'template="{self.template.template}", '
+            f"mapping={prepare_for_doc(self.mapping)})"
+        )
 
 
 class Rep(SafeToStr):
@@ -76,9 +78,7 @@ class Rep(SafeToStr):
         return mapping[self.key]
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(" \
-               f"key='{self.key}', " \
-               f"mapping={prepare_for_doc(self.mapping)})"
+        return f"{self.__class__.__name__}(" f"key='{self.key}', " f"mapping={prepare_for_doc(self.mapping)})"
 
 
 class RepEval(SafeToStr):
@@ -108,9 +108,11 @@ class RepEval(SafeToStr):
         return eval(self.expression, {}, mapping)
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(" \
-               f"expression=\"{self.expression}\", " \
-               f"mapping={prepare_for_doc(self.mapping)})"
+        return (
+            f"{self.__class__.__name__}("
+            f'expression="{self.expression}", '
+            f"mapping={prepare_for_doc(self.mapping)})"
+        )
 
 
 class RepFunc(SafeToStr):
@@ -145,9 +147,7 @@ class RepFunc(SafeToStr):
         return self.func(**func_kwargs)
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(" \
-               f"func={self.func}, " \
-               f"mapping={prepare_for_doc(self.mapping)})"
+        return f"{self.__class__.__name__}(" f"func={self.func}, " f"mapping={prepare_for_doc(self.mapping)})"
 
 
 def has_templates(obj: tp.Any) -> tp.Any:
@@ -173,10 +173,12 @@ def has_templates(obj: tp.Any) -> tp.Any:
     return False
 
 
-def deep_substitute(obj: tp.Any,
-                    mapping: tp.Optional[tp.Mapping] = None,
-                    safe: bool = False,
-                    make_copy: bool = True) -> tp.Any:
+def deep_substitute(
+    obj: tp.Any,
+    mapping: tp.Optional[tp.Mapping] = None,
+    safe: bool = False,
+    make_copy: bool = True,
+) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a mapping.
 
     Traverses tuples, lists, dicts and (frozen-)sets. Does not look for templates in keys.

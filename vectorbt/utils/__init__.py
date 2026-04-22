@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Modules with utilities that are used throughout vectorbt."""
@@ -12,29 +12,29 @@ from vectorbt.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, S
 from vectorbt.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
 
 __all__ = [
-    'atomic_dict',
-    'merge_dicts',
-    'Config',
-    'Configured',
-    'AtomicConfig',
-    'Sub',
-    'Rep',
-    'RepEval',
-    'RepFunc',
-    'deep_substitute',
-    'CacheCondition',
-    'cached_property',
-    'cached_method',
-    'Figure',
-    'FigureWidget',
-    'make_figure',
-    'make_subplots',
-    'set_seed',
-    'save_animation',
-    'AsyncJob',
-    'AsyncScheduler',
-    'CancelledError',
-    'ScheduleManager'
+    "atomic_dict",
+    "merge_dicts",
+    "Config",
+    "Configured",
+    "AtomicConfig",
+    "Sub",
+    "Rep",
+    "RepEval",
+    "RepFunc",
+    "deep_substitute",
+    "CacheCondition",
+    "cached_property",
+    "cached_method",
+    "Figure",
+    "FigureWidget",
+    "make_figure",
+    "make_subplots",
+    "set_seed",
+    "save_animation",
+    "AsyncJob",
+    "AsyncScheduler",
+    "CancelledError",
+    "ScheduleManager",
 ]
 
 __pdoc__ = {k: False for k in __all__}

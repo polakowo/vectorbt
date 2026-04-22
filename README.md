@@ -47,23 +47,30 @@
     </a>
 </p>
 
-Test thousands of trading ideas in seconds, analyze portfolios across markets and timeframes, and uncover what works with minimal code. Built for both human researchers and AI agents, VectorBT combines rapid experimentation with a mature, battle-tested backtesting stack shaped by years of community use.
+<h3 align="center"><b>Thinks in matrices. Backtests at scale.</b></h3>
 
-VectorBT is the open-source, community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
+<p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, accelerates the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
+
+---
+
+Explore thousands of trading ideas across assets and timeframes, analyze portfolio performance down to individual trades, and visualize results interactively, all in a few lines of code. Built for both human researchers and AI agents, VectorBT combines large-scale experimentation with a mature, battle-tested backtesting stack refined through years of community use.
+
+VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
 
 ## Features
 
-- Fast, vectorized backtesting and strategy research on pandas/NumPy, accelerated with Numba
-- Pandas-native API with custom accessors and high-performance operations
-- Flexible broadcasting for multi-asset analysis and large parameter sweeps
-- Rich indicator ecosystem with support for custom indicators and popular TA libraries (TA-Lib, Pandas TA, etc.)
-- Portfolio backtesting with trades, positions, drawdowns, and performance analysis (incl. QuantStats)
-- Signal-based tooling for generation, ranking, mapping, and distribution analysis
-- Built-in data access (Yahoo Finance, CCXT, Alpaca, etc.), preprocessing, and random data generation
-- Robustness testing, walk-forward optimization, and label generation for ML workflows
-- Interactive visualization with Plotly, Jupyter widgets, and browser-friendly dashboards
-- Automation support for scheduled updates and Telegram notifications
-- Composable Python API suitable for rapid experimentation and AI agent-driven workflows
+- **Fast, vectorized backtesting** and strategy research built on pandas, NumPy, and Numba
+- **Optional Rust engine** for precompiled speed without JIT overhead
+- **Pandas-native API** with custom accessors and high-performance operations
+- **Flexible broadcasting** for multi-asset analysis and large-scale parameter sweeps
+- **Rich indicator ecosystem** with custom indicators and integrations for TA-Lib, Pandas TA, and more
+- **Portfolio backtesting** with trade, drawdown, and performance analytics, including QuantStats integration
+- **Signal tooling** for generation, ranking, mapping, and distribution analysis
+- **Built-in data access** with preprocessing and synthetic data generation
+- **Robustness testing** with walk-forward optimization and label generation for ML workflows
+- **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
+- **Automation tools** for scheduled updates and Telegram notifications
+- **Composable Python API** for rapid experimentation and AI agent-driven workflows
 
 ## Installation
 
@@ -71,17 +78,27 @@ VectorBT is the open-source, community edition of [VectorBT PRO](https://vectorb
 pip install -U vectorbt
 ```
 
-To install optional dependencies as well:
+To install the optional Rust engine:
+
+```sh
+pip install -U "vectorbt[rust]"
+```
+
+To install all optional integrations (TA-Lib, Pandas TA, etc.):
 
 ```sh
 pip install -U "vectorbt[full]"
 ```
 
-## Usage
+To install all optional integrations together with the Rust engine:
 
-VectorBT lets you backtest strategies in just a few lines of Python.
+```sh
+pip install -U "vectorbt[full,rust]"
+```
 
-* Profit from investing $100 in Bitcoin since 2014:
+## Examples
+
+### Invest $100 in Bitcoin since 2014
 
 ```python
 import vectorbt as vbt
@@ -97,7 +114,7 @@ print(pf.total_profit())
 19501.10906763755
 ```
 
-* Buy when the 10-day SMA crosses above the 50-day SMA, and sell on the opposite crossover:
+### Trade a dual-SMA crossover strategy
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -113,7 +130,7 @@ print(pf.total_profit())
 34417.80960086067
 ```
 
-* Generate 1,000 strategies with random signals and test them on BTC and ETH:
+### Generate 1,000 random strategies
 
 ```python
 import numpy as np
@@ -132,7 +149,7 @@ fig.show()
 
 ![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg)
 
-* For hyperparameter optimization fans: test 10,000 window combinations of a dual-SMA crossover strategy on BTC, ETH, and XRP:
+### Test 10,000 dual-SMA window combinations
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
@@ -154,7 +171,7 @@ fig.show()
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
 
-Inspect any strategy configuration by indexing with pandas:
+### Inspect any strategy configuration
 
 ```python
 print(pf[(10, 20, "ETH-USD")].stats())
@@ -192,7 +209,7 @@ Sortino Ratio                                   1.301377
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
-Same goes for plotting:
+### Plot any strategy configuration
 
 ```python
 pf[(10, 20, "ETH-USD")].plot().show()
@@ -200,9 +217,9 @@ pf[(10, 20, "ETH-USD")].plot().show()
 
 ![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_portfolio.svg)
 
-It's not all about backtesting! VectorBT can also help with financial data analysis and visualization.
+### Animate Bollinger Bands across multiple symbols
 
-* Create a GIF that animates Bollinger Bands %B and bandwidth across multiple symbols:
+VectorBT goes beyond backtesting, with tools for financial data analysis and visualization:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
@@ -235,13 +252,13 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
 
-This is just the tip of the iceberg. Visit the [website](https://vectorbt.dev/) to learn more.
+Visit the website￼[website](https://vectorbt.dev/) for more examples, documentation, and guides.
 
-## Apps
+## Example apps
 
-### Candlestick Patterns ([here](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/))
+### [Candlestick Patterns](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
 
-Explore candlestick-pattern signals interactively and backtest them with VectorBT.
+Explore candlestick patterns interactively and backtest their signals with VectorBT.
 
 [![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
 
@@ -255,7 +272,7 @@ Explore candlestick-pattern signals interactively and backtest them with VectorB
 
 This work is [fair-code](http://faircode.io/) distributed under the [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license.
 
-The source code is open, and everyone (individuals and organizations) may use it for free. However, you may not sell products or services that are primarily this software.
+The source code is publicly available, and everyone (individuals and organizations) may use it for free. However, you may not sell products or services that are primarily this software.
 
 If you have questions or want to request a license exception, please [contact the author](mailto:olegpolakow@vectorbt.pro).
 
@@ -269,4 +286,4 @@ Installing optional dependencies may be subject to a more restrictive license.
 
 This software is for educational purposes only. Do not risk money you cannot afford to lose.
 
-USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
+Use the software at your own risk. The authors and affiliates assume no responsibility for your trading results.

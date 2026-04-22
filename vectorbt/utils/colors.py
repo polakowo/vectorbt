@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for working with colors."""
@@ -25,7 +25,7 @@ def adjust_opacity(color: tp.Any, opacity: float) -> str:
     import matplotlib.colors as mc
 
     rgb = mc.to_rgb(color)
-    return 'rgba(%d,%d,%d,%.4f)' % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255), opacity)
+    return "rgba(%d,%d,%d,%.4f)" % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255), opacity)
 
 
 def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
@@ -42,4 +42,4 @@ def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
         c = color
     c = colorsys.rgb_to_hls(*mc.to_rgb(c))
     rgb = colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
-    return 'rgb(%d,%d,%d)' % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
+    return "rgb(%d,%d,%d)" % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))

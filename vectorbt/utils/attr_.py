@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for working with class/instance attributes."""
@@ -23,11 +23,13 @@ def get_dict_attr(obj, attr):
     raise AttributeError
 
 
-def default_getattr_func(obj: tp.Any,
-                         attr: str,
-                         args: tp.Optional[tp.Args] = None,
-                         kwargs: tp.Optional[tp.Kwargs] = None,
-                         call_attr: bool = True) -> tp.Any:
+def default_getattr_func(
+    obj: tp.Any,
+    attr: str,
+    args: tp.Optional[tp.Args] = None,
+    kwargs: tp.Optional[tp.Kwargs] = None,
+    call_attr: bool = True,
+) -> tp.Any:
     """Default `getattr_func`."""
     if args is None:
         args = ()
@@ -39,10 +41,12 @@ def default_getattr_func(obj: tp.Any,
     return out
 
 
-def deep_getattr(obj: tp.Any,
-                 attr_chain: tp.Union[str, tuple, Iterable],
-                 getattr_func: tp.Callable = default_getattr_func,
-                 call_last_attr: bool = True) -> tp.Any:
+def deep_getattr(
+    obj: tp.Any,
+    attr_chain: tp.Union[str, tuple, Iterable],
+    getattr_func: tp.Callable = default_getattr_func,
+    call_last_attr: bool = True,
+) -> tp.Any:
     """Retrieve attribute consecutively.
 
     The attribute chain `attr_chain` can be:
@@ -62,43 +66,27 @@ def deep_getattr(obj: tp.Any,
     checks.assert_instance_of(attr_chain, (str, tuple, Iterable))
 
     if isinstance(attr_chain, str):
-        if '.' in attr_chain:
-            return deep_getattr(
-                obj,
-                attr_chain.split('.'),
-                getattr_func=getattr_func,
-                call_last_attr=call_last_attr
-            )
+        if "." in attr_chain:
+            return deep_getattr(obj, attr_chain.split("."), getattr_func=getattr_func, call_last_attr=call_last_attr)
         return getattr_func(obj, attr_chain, call_attr=call_last_attr)
     if isinstance(attr_chain, tuple):
-        if len(attr_chain) == 1 \
-                and isinstance(attr_chain[0], str):
+        if len(attr_chain) == 1 and isinstance(attr_chain[0], str):
             return getattr_func(obj, attr_chain[0])
-        if len(attr_chain) == 2 \
-                and isinstance(attr_chain[0], str) \
-                and isinstance(attr_chain[1], tuple):
+        if len(attr_chain) == 2 and isinstance(attr_chain[0], str) and isinstance(attr_chain[1], tuple):
             return getattr_func(obj, attr_chain[0], args=attr_chain[1])
-        if len(attr_chain) == 3 \
-                and isinstance(attr_chain[0], str) \
-                and isinstance(attr_chain[1], tuple) \
-                and isinstance(attr_chain[2], dict):
+        if (
+            len(attr_chain) == 3
+            and isinstance(attr_chain[0], str)
+            and isinstance(attr_chain[1], tuple)
+            and isinstance(attr_chain[2], dict)
+        ):
             return getattr_func(obj, attr_chain[0], args=attr_chain[1], kwargs=attr_chain[2])
     result = obj
     for i, attr in enumerate(attr_chain):
         if i < len(attr_chain) - 1:
-            result = deep_getattr(
-                result,
-                attr,
-                getattr_func=getattr_func,
-                call_last_attr=True
-            )
+            result = deep_getattr(result, attr, getattr_func=getattr_func, call_last_attr=True)
         else:
-            result = deep_getattr(
-                result,
-                attr,
-                getattr_func=getattr_func,
-                call_last_attr=call_last_attr
-            )
+            result = deep_getattr(result, attr, getattr_func=getattr_func, call_last_attr=call_last_attr)
     return result
 
 
@@ -113,13 +101,15 @@ class AttrResolver:
     @property
     def self_aliases(self) -> tp.Set[str]:
         """Names to associate with this object."""
-        return {'self'}
+        return {"self"}
 
-    def resolve_self(self: AttrResolverT,
-                     cond_kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
-                     impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> AttrResolverT:
+    def resolve_self(
+        self: AttrResolverT,
+        cond_kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
+        impacts_caching: bool = True,
+        silence_warnings: bool = False,
+    ) -> AttrResolverT:
         """Resolve self.
 
         !!! note
@@ -138,15 +128,17 @@ class AttrResolver:
         Should return an object."""
         return out
 
-    def resolve_attr(self,
-                     attr: str,
-                     args: tp.ArgsLike = None,
-                     cond_kwargs: tp.KwargsLike = None,
-                     kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.Optional[tp.Container[str]] = None,
-                     cache_dct: tp.KwargsLike = None,
-                     use_caching: bool = True,
-                     passed_kwargs_out: tp.KwargsLike = None) -> tp.Any:
+    def resolve_attr(
+        self,
+        attr: str,
+        args: tp.ArgsLike = None,
+        cond_kwargs: tp.KwargsLike = None,
+        kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.Optional[tp.Container[str]] = None,
+        cache_dct: tp.KwargsLike = None,
+        use_caching: bool = True,
+        passed_kwargs_out: tp.KwargsLike = None,
+    ) -> tp.Any:
         """Resolve an attribute using keyword arguments and built-in caching.
 
         * If `attr` is a property, returns its value.
@@ -172,8 +164,8 @@ class AttrResolver:
         # Resolve attribute
         cls = type(self)
         _attr = self.pre_resolve_attr(attr, final_kwargs=final_kwargs)
-        if 'get_' + attr in dir(cls):
-            _attr = 'get_' + attr
+        if "get_" + attr in dir(cls):
+            _attr = "get_" + attr
         if inspect.ismethod(getattr(cls, _attr)) or inspect.isfunction(getattr(cls, _attr)):
             attr_func = getattr(self, _attr)
             attr_func_kwargs = dict()

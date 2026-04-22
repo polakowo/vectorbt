@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """A factory for building new signal generators with ease.
@@ -15,15 +15,12 @@ import numpy as np
 from numba import njit
 
 from vectorbt import _typing as tp
+from vectorbt._engine import callback_unsupported_with_rust, resolve_engine
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
+from vectorbt.signals import dispatch
 from vectorbt.signals.enums import FactoryMode
-from vectorbt.signals.nb import (
-    generate_nb,
-    generate_ex_nb,
-    generate_enex_nb,
-    first_choice_nb
-)
+from vectorbt.signals.nb import generate_nb, generate_ex_nb, generate_enex_nb, first_choice_nb
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.enum_ import map_enum_fields
@@ -43,12 +40,14 @@ class SignalFactory(IndicatorFactory):
     Other arguments are passed to `vectorbt.indicators.factory.IndicatorFactory`.
     ```"""
 
-    def __init__(self,
-                 *args,
-                 mode: tp.Union[str, int] = FactoryMode.Both,
-                 input_names: tp.Optional[tp.Sequence[str]] = None,
-                 attr_settings: tp.KwargsLike = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        mode: tp.Union[str, int] = FactoryMode.Both,
+        input_names: tp.Optional[tp.Sequence[str]] = None,
+        attr_settings: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
         mode = map_enum_fields(mode, FactoryMode)
         if input_names is None:
             input_names = []
@@ -57,22 +56,22 @@ class SignalFactory(IndicatorFactory):
         if attr_settings is None:
             attr_settings = {}
 
-        if 'entries' in input_names:
+        if "entries" in input_names:
             raise ValueError("entries cannot be used in input_names")
-        if 'exits' in input_names:
+        if "exits" in input_names:
             raise ValueError("exits cannot be used in input_names")
         if mode == FactoryMode.Entries:
-            output_names = ['entries']
+            output_names = ["entries"]
         elif mode == FactoryMode.Exits:
-            input_names = ['entries'] + input_names
-            output_names = ['exits']
+            input_names = ["entries"] + input_names
+            output_names = ["exits"]
         elif mode == FactoryMode.Both:
-            output_names = ['entries', 'exits']
+            output_names = ["entries", "exits"]
         else:
-            input_names = ['entries'] + input_names
-            output_names = ['new_entries', 'exits']
-        if 'entries' in input_names:
-            attr_settings['entries'] = dict(dtype=np.bool_)
+            input_names = ["entries"] + input_names
+            output_names = ["new_entries", "exits"]
+        if "entries" in input_names:
+            attr_settings["entries"] = dict(dtype=np.bool_)
         for output_name in output_names:
             attr_settings[output_name] = dict(dtype=np.bool_)
 
@@ -82,19 +81,21 @@ class SignalFactory(IndicatorFactory):
             input_names=input_names,
             output_names=output_names,
             attr_settings=attr_settings,
-            **kwargs
+            **kwargs,
         )
         self.mode = mode
 
-        def plot(_self,
-                 entry_y: tp.Optional[tp.ArrayLike] = None,
-                 exit_y: tp.Optional[tp.ArrayLike] = None,
-                 entry_types: tp.Optional[tp.ArrayLikeSequence] = None,
-                 exit_types: tp.Optional[tp.ArrayLikeSequence] = None,
-                 entry_trace_kwargs: tp.KwargsLike = None,
-                 exit_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **kwargs) -> tp.BaseFigure:  # pragma: no cover
+        def plot(
+            _self,
+            entry_y: tp.Optional[tp.ArrayLike] = None,
+            exit_y: tp.Optional[tp.ArrayLike] = None,
+            entry_types: tp.Optional[tp.ArrayLikeSequence] = None,
+            exit_types: tp.Optional[tp.ArrayLikeSequence] = None,
+            entry_trace_kwargs: tp.KwargsLike = None,
+            exit_trace_kwargs: tp.KwargsLike = None,
+            fig: tp.Optional[tp.BaseFigure] = None,
+            **kwargs,
+        ) -> tp.BaseFigure:  # pragma: no cover
             if _self.wrapper.ndim > 1:
                 raise TypeError("Select a column first. Use indexing.")
 
@@ -104,42 +105,67 @@ class SignalFactory(IndicatorFactory):
                 exit_trace_kwargs = {}
             entry_trace_kwargs = merge_dicts(
                 dict(name="New Entry" if mode == FactoryMode.Chain else "Entry"),
-                entry_trace_kwargs
+                entry_trace_kwargs,
             )
-            exit_trace_kwargs = merge_dicts(
-                dict(name="Exit"),
-                exit_trace_kwargs
-            )
+            exit_trace_kwargs = merge_dicts(dict(name="Exit"), exit_trace_kwargs)
             if entry_types is not None:
                 entry_types = np.asarray(entry_types)
-                entry_trace_kwargs = merge_dicts(dict(
-                    customdata=entry_types,
-                    hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
-                ), entry_trace_kwargs)
+                entry_trace_kwargs = merge_dicts(
+                    dict(customdata=entry_types, hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"),
+                    entry_trace_kwargs,
+                )
             if exit_types is not None:
                 exit_types = np.asarray(exit_types)
-                exit_trace_kwargs = merge_dicts(dict(
-                    customdata=exit_types,
-                    hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
-                ), exit_trace_kwargs)
+                exit_trace_kwargs = merge_dicts(
+                    dict(customdata=exit_types, hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"),
+                    exit_trace_kwargs,
+                )
             if mode == FactoryMode.Entries:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
             elif mode == FactoryMode.Exits:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
             elif mode == FactoryMode.Both:
                 fig = _self.entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
             else:
                 fig = _self.new_entries.vbt.signals.plot_as_entry_markers(
-                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                    y=entry_y,
+                    trace_kwargs=entry_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
                 fig = _self.exits.vbt.signals.plot_as_exit_markers(
-                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
+                    y=exit_y,
+                    trace_kwargs=exit_trace_kwargs,
+                    fig=fig,
+                    **kwargs,
+                )
 
             return fig
 
@@ -157,24 +183,26 @@ class SignalFactory(IndicatorFactory):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_markers`.
         """.format(
-            self.class_name, 'new_entries' if mode == FactoryMode.Chain else 'entries'
+            self.class_name,
+            "new_entries" if mode == FactoryMode.Chain else "entries",
         )
 
-        setattr(self.Indicator, 'plot', plot)
+        setattr(self.Indicator, "plot", plot)
 
     def from_choice_func(
-            self,
-            entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
-            exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
-            generate_func: tp.Callable = generate_nb,
-            generate_ex_func: tp.Callable = generate_ex_nb,
-            generate_enex_func: tp.Callable = generate_enex_nb,
-            cache_func: tp.Callable = None,
-            entry_settings: tp.KwargsLike = None,
-            exit_settings: tp.KwargsLike = None,
-            cache_settings: tp.KwargsLike = None,
-            numba_loop: bool = False,
-            **kwargs) -> tp.Type[IndicatorBase]:
+        self,
+        entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+        exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+        generate_func: tp.Callable = dispatch.generate,
+        generate_ex_func: tp.Callable = dispatch.generate_ex,
+        generate_enex_func: tp.Callable = dispatch.generate_enex,
+        cache_func: tp.Callable = None,
+        entry_settings: tp.KwargsLike = None,
+        exit_settings: tp.KwargsLike = None,
+        cache_settings: tp.KwargsLike = None,
+        numba_loop: bool = False,
+        **kwargs,
+    ) -> tp.Type[IndicatorBase]:
         """Build signal generator class around entry and exit choice functions.
 
         A choice function is simply a function that returns indices of signals.
@@ -464,6 +492,13 @@ class SignalFactory(IndicatorFactory):
         input_names = self.input_names
         param_names = self.param_names
         in_output_names = self.in_output_names
+        if numba_loop:
+            if generate_func is dispatch.generate:
+                generate_func = generate_nb
+            if generate_ex_func is dispatch.generate_ex:
+                generate_ex_func = generate_ex_nb
+            if generate_enex_func is dispatch.generate_enex:
+                generate_enex_func = generate_enex_nb
 
         if mode == FactoryMode.Entries:
             require_input_shape = True
@@ -489,14 +524,12 @@ class SignalFactory(IndicatorFactory):
                 entry_choice_func = first_choice_nb
             if entry_settings is None:
                 entry_settings = {}
-            entry_settings = merge_dicts(dict(
-                pass_inputs=['entries']
-            ), entry_settings)
+            entry_settings = merge_dicts(dict(pass_inputs=["entries"]), entry_settings)
             checks.assert_not_none(entry_choice_func)
             checks.assert_numba_func(entry_choice_func)
             checks.assert_not_none(exit_choice_func)
             checks.assert_numba_func(exit_choice_func)
-        require_input_shape = kwargs.pop('require_input_shape', require_input_shape)
+        require_input_shape = kwargs.pop("require_input_shape", require_input_shape)
 
         if entry_settings is None:
             entry_settings = {}
@@ -505,13 +538,7 @@ class SignalFactory(IndicatorFactory):
         if cache_settings is None:
             cache_settings = {}
 
-        valid_keys = [
-            'pass_inputs',
-            'pass_in_outputs',
-            'pass_params',
-            'pass_kwargs',
-            'pass_cache'
-        ]
+        valid_keys = ["pass_inputs", "pass_in_outputs", "pass_params", "pass_kwargs", "pass_cache"]
         checks.assert_dict_valid(entry_settings, valid_keys)
         checks.assert_dict_valid(exit_settings, valid_keys)
         checks.assert_dict_valid(cache_settings, valid_keys)
@@ -526,17 +553,17 @@ class SignalFactory(IndicatorFactory):
                     checks.assert_in(name, all_names)
             return func_input_names
 
-        entry_input_names = _get_func_names(entry_settings, 'pass_inputs', input_names)
-        exit_input_names = _get_func_names(exit_settings, 'pass_inputs', input_names)
-        cache_input_names = _get_func_names(cache_settings, 'pass_inputs', input_names)
+        entry_input_names = _get_func_names(entry_settings, "pass_inputs", input_names)
+        exit_input_names = _get_func_names(exit_settings, "pass_inputs", input_names)
+        cache_input_names = _get_func_names(cache_settings, "pass_inputs", input_names)
 
-        entry_in_output_names = _get_func_names(entry_settings, 'pass_in_outputs', in_output_names)
-        exit_in_output_names = _get_func_names(exit_settings, 'pass_in_outputs', in_output_names)
-        cache_in_output_names = _get_func_names(cache_settings, 'pass_in_outputs', in_output_names)
+        entry_in_output_names = _get_func_names(entry_settings, "pass_in_outputs", in_output_names)
+        exit_in_output_names = _get_func_names(exit_settings, "pass_in_outputs", in_output_names)
+        cache_in_output_names = _get_func_names(cache_settings, "pass_in_outputs", in_output_names)
 
-        entry_param_names = _get_func_names(entry_settings, 'pass_params', param_names)
-        exit_param_names = _get_func_names(exit_settings, 'pass_params', param_names)
-        cache_param_names = _get_func_names(cache_settings, 'pass_params', param_names)
+        entry_param_names = _get_func_names(entry_settings, "pass_params", param_names)
+        exit_param_names = _get_func_names(exit_settings, "pass_params", param_names)
+        cache_param_names = _get_func_names(cache_settings, "pass_params", param_names)
 
         # Build a function that selects a parameter tuple
         if mode == FactoryMode.Entries:
@@ -549,6 +576,8 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _0 += ", entry_param_tuples"
             _0 += ", entry_args"
+            if not numba_loop:
+                _0 += ", engine=None"
             _1 = "shape"
             _1 += ", entry_pick_first"
             _1 += ", entry_choice_func"
@@ -558,15 +587,14 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _1 += ", *entry_param_tuples[i]"
             _1 += ", *entry_args"
+            if not numba_loop:
+                _1 += ", engine=engine"
             func_str = "def apply_func({0}):\n   return generate_func({1})".format(_0, _1)
-            scope = {
-                'generate_func': generate_func,
-                'entry_choice_func': entry_choice_func
-            }
+            scope = {"generate_func": generate_func, "entry_choice_func": entry_choice_func}
             filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, 'single')
+            code = compile(func_str, filename, "single")
             exec(code, scope)
-            apply_func = scope['apply_func']
+            apply_func = scope["apply_func"]
             if numba_loop:
                 apply_func = njit(apply_func)
                 apply_and_concat_func = combine_fns.apply_and_concat_one_nb
@@ -586,6 +614,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _0 += ", exit_param_tuples"
             _0 += ", exit_args"
+            if not numba_loop:
+                _0 += ", engine=None"
             _1 = "entries"
             _1 += ", exit_wait"
             _1 += ", until_next"
@@ -598,15 +628,14 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", *exit_param_tuples[i]"
             _1 += ", *exit_args"
+            if not numba_loop:
+                _1 += ", engine=engine"
             func_str = "def apply_func({0}):\n   return generate_ex_func({1})".format(_0, _1)
-            scope = {
-                'generate_ex_func': generate_ex_func,
-                'exit_choice_func': exit_choice_func
-            }
+            scope = {"generate_ex_func": generate_ex_func, "exit_choice_func": exit_choice_func}
             filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, 'single')
+            code = compile(func_str, filename, "single")
             exec(code, scope)
-            apply_func = scope['apply_func']
+            apply_func = scope["apply_func"]
             if numba_loop:
                 apply_func = njit(apply_func)
                 apply_and_concat_func = combine_fns.apply_and_concat_one_nb
@@ -632,6 +661,8 @@ class SignalFactory(IndicatorFactory):
                 _0 += ", exit_param_tuples"
             _0 += ", entry_args"
             _0 += ", exit_args"
+            if not numba_loop:
+                _0 += ", engine=None"
             _1 = "shape"
             _1 += ", entry_wait"
             _1 += ", exit_wait"
@@ -651,38 +682,44 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", *exit_param_tuples[i]"
             _1 += ", *exit_args)"
+            if not numba_loop:
+                _1 += ", engine=engine"
             func_str = "def apply_func({0}):\n   return generate_enex_func({1})".format(_0, _1)
             scope = {
-                'generate_enex_func': generate_enex_func,
-                'entry_choice_func': entry_choice_func,
-                'exit_choice_func': exit_choice_func
+                "generate_enex_func": generate_enex_func,
+                "entry_choice_func": entry_choice_func,
+                "exit_choice_func": exit_choice_func,
             }
             filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, 'single')
+            code = compile(func_str, filename, "single")
             exec(code, scope)
-            apply_func = scope['apply_func']
+            apply_func = scope["apply_func"]
             if numba_loop:
                 apply_func = njit(apply_func)
                 apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
             else:
                 apply_and_concat_func = combine_fns.apply_and_concat_multiple
 
-        def custom_func(input_list: tp.List[tp.AnyArray],
-                        in_output_list: tp.List[tp.List[tp.AnyArray]],
-                        param_list: tp.List[tp.List[tp.Param]],
-                        *args,
-                        input_shape: tp.Optional[tp.Shape] = None,
-                        flex_2d: tp.Optional[bool] = None,
-                        entry_args: tp.Optional[tp.Args] = None,
-                        exit_args: tp.Optional[tp.Args] = None,
-                        cache_args: tp.Optional[tp.Args] = None,
-                        entry_kwargs: tp.KwargsLike = None,
-                        exit_kwargs: tp.KwargsLike = None,
-                        cache_kwargs: tp.KwargsLike = None,
-                        return_cache: bool = False,
-                        use_cache: tp.Optional[CacheOutputT] = None,
-                        **_kwargs) -> tp.Union[CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
+        def custom_func(
+            input_list: tp.List[tp.AnyArray],
+            in_output_list: tp.List[tp.List[tp.AnyArray]],
+            param_list: tp.List[tp.List[tp.Param]],
+            *args,
+            input_shape: tp.Optional[tp.Shape] = None,
+            flex_2d: tp.Optional[bool] = None,
+            entry_args: tp.Optional[tp.Args] = None,
+            exit_args: tp.Optional[tp.Args] = None,
+            cache_args: tp.Optional[tp.Args] = None,
+            entry_kwargs: tp.KwargsLike = None,
+            exit_kwargs: tp.KwargsLike = None,
+            cache_kwargs: tp.KwargsLike = None,
+            return_cache: bool = False,
+            use_cache: tp.Optional[CacheOutputT] = None,
+            engine: tp.Optional[str] = None,
+            **_kwargs,
+        ) -> tp.Union[CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             # Get arguments
+            resolve_engine(engine, supports_rust=callback_unsupported_with_rust())
             if len(input_list) == 0:
                 if input_shape is None:
                     raise ValueError("Pass input_shape if no input time series were passed")
@@ -701,8 +738,7 @@ class SignalFactory(IndicatorFactory):
                 entry_args = args
             elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_choice_func == first_choice_nb):
                 if len(exit_args) > 0:
-                    raise ValueError("Use *args instead of exit_args "
-                                     "with FactoryMode.Exits or FactoryMode.Chain")
+                    raise ValueError("Use *args instead of exit_args " "with FactoryMode.Exits or FactoryMode.Chain")
                 exit_args = args
             else:
                 if len(args) > 0:
@@ -720,8 +756,9 @@ class SignalFactory(IndicatorFactory):
                 entry_kwargs = _kwargs
             elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_choice_func == first_choice_nb):
                 if len(exit_kwargs) > 0:
-                    raise ValueError("Use **kwargs instead of exit_kwargs "
-                                     "with FactoryMode.Exits or FactoryMode.Chain")
+                    raise ValueError(
+                        "Use **kwargs instead of exit_kwargs " "with FactoryMode.Exits or FactoryMode.Chain"
+                    )
                 exit_kwargs = _kwargs
             else:
                 if len(_kwargs) > 0:
@@ -736,16 +773,16 @@ class SignalFactory(IndicatorFactory):
                 flex_2d=flex_2d,
             )
             if mode == FactoryMode.Entries:
-                kwargs_defaults['pick_first'] = False
+                kwargs_defaults["pick_first"] = False
             entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
             exit_kwargs = merge_dicts(kwargs_defaults, exit_kwargs)
             cache_kwargs = merge_dicts(kwargs_defaults, cache_kwargs)
-            entry_wait = entry_kwargs['wait']
-            exit_wait = exit_kwargs['wait']
-            entry_pick_first = entry_kwargs['pick_first']
-            exit_pick_first = exit_kwargs['pick_first']
-            until_next = exit_kwargs['until_next']
-            skip_until_exit = exit_kwargs['skip_until_exit']
+            entry_wait = entry_kwargs["wait"]
+            exit_wait = exit_kwargs["wait"]
+            entry_pick_first = entry_kwargs["pick_first"]
+            exit_pick_first = exit_kwargs["pick_first"]
+            until_next = exit_kwargs["until_next"]
+            skip_until_exit = exit_kwargs["skip_until_exit"]
 
             # Distribute arguments across functions
             entry_input_tuple = ()
@@ -785,7 +822,7 @@ class SignalFactory(IndicatorFactory):
             exit_param_tuples = list(zip(*exit_param_list))
 
             def _build_more_args(func_settings: tp.Kwargs, func_kwargs: tp.Kwargs) -> tp.Args:
-                pass_kwargs = func_settings.get('pass_kwargs', [])
+                pass_kwargs = func_settings.get("pass_kwargs", [])
                 if isinstance(pass_kwargs, dict):
                     pass_kwargs = list(pass_kwargs.items())
                 more_args = ()
@@ -794,7 +831,7 @@ class SignalFactory(IndicatorFactory):
                     if isinstance(key, tuple):
                         key, value = key
                     else:
-                        if key.startswith('temp_idx_arr'):
+                        if key.startswith("temp_idx_arr"):
                             value = np.empty((input_shape[0],), dtype=np.int64)
                     value = func_kwargs.get(key, value)
                     more_args += (value,)
@@ -820,7 +857,7 @@ class SignalFactory(IndicatorFactory):
                     *_cache_in_output_list,
                     *_cache_param_list,
                     *cache_args,
-                    *cache_more_args
+                    *cache_more_args,
                 )
             if return_cache:
                 return cache
@@ -831,9 +868,9 @@ class SignalFactory(IndicatorFactory):
 
             entry_cache = ()
             exit_cache = ()
-            if entry_settings.get('pass_cache', False):
+            if entry_settings.get("pass_cache", False):
                 entry_cache = cache
-            if exit_settings.get('pass_cache', False):
+            if exit_settings.get("pass_cache", False):
                 exit_cache = cache
 
             # Apply and concatenate
@@ -853,7 +890,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _entry_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_shape,
@@ -861,8 +898,11 @@ class SignalFactory(IndicatorFactory):
                     entry_input_tuple,
                     *_entry_in_output_tuples,
                     *_entry_param_tuples,
-                    entry_args + entry_more_args + entry_cache
+                    entry_args + entry_more_args + entry_cache,
                 )
+                if not numba_loop:
+                    apply_args += (engine,)
+                return apply_and_concat_func(*apply_args)
 
             elif mode == FactoryMode.Exits:
                 if len(exit_in_output_names) > 0:
@@ -880,7 +920,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _exit_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_list[0],
@@ -891,8 +931,11 @@ class SignalFactory(IndicatorFactory):
                     exit_input_tuple,
                     *_exit_in_output_tuples,
                     *_exit_param_tuples,
-                    exit_args + exit_more_args + exit_cache
+                    exit_args + exit_more_args + exit_cache,
                 )
+                if not numba_loop:
+                    apply_args += (engine,)
+                return apply_and_concat_func(*apply_args)
 
             else:
                 if len(entry_in_output_names) > 0:
@@ -924,7 +967,7 @@ class SignalFactory(IndicatorFactory):
                 else:
                     _exit_param_tuples = ()
 
-                return apply_and_concat_func(
+                apply_args = (
                     n_params,
                     apply_func,
                     input_shape,
@@ -939,12 +982,10 @@ class SignalFactory(IndicatorFactory):
                     *_entry_param_tuples,
                     *_exit_param_tuples,
                     entry_args + entry_more_args + entry_cache,
-                    exit_args + exit_more_args + exit_cache
+                    exit_args + exit_more_args + exit_cache,
                 )
+                if not numba_loop:
+                    apply_args += (engine,)
+                return apply_and_concat_func(*apply_args)
 
-        return self.from_custom_func(
-            custom_func,
-            as_lists=True,
-            require_input_shape=require_input_shape,
-            **kwargs
-        )
+        return self.from_custom_func(custom_func, as_lists=True, require_input_shape=require_input_shape, **kwargs)

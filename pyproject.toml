@@ -47,17 +47,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-full = [
-    "yfinance>=0.2.22",
-    "python-binance",
-    "ccxt>=4.0.14",
-    "alpaca-py",
-    "ray>=1.4.1",
-    "ta",
-    "pandas-ta-classic",
-    "TA-Lib",
-    "python-telegram-bot>=13.4,<20.0",
-    "quantstats>=0.0.37",
+rust = [
+    "vectorbt-rust==1.0.0",
 ]
 full-no-talib = [
     "yfinance>=0.2.22",
@@ -70,17 +61,31 @@ full-no-talib = [
     "python-telegram-bot>=13.4,<20.0",
     "quantstats>=0.0.37",
 ]
-cov = [
+full = [
+    "vectorbt[full-no-talib]",
+    "TA-Lib",
+]
+test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
     "codecov",
 ]
+test-rust = [
+    "vectorbt[test]",
+    "maturin>=1.7,<2.0",
+]
 docs = [
     "mkdocs-material",
     "mkdocs-minify-plugin",
     "ruamel.yaml",
-    "mako"
+    "mako",
+]
+all = [
+    "vectorbt[rust]",
+    "vectorbt[full]",
+    "vectorbt[test]",
+    "vectorbt[docs]",
 ]
 
 [project.urls]
@@ -94,3 +99,6 @@ include = ["vectorbt*"]
 
 [tool.setuptools.package-data]
 vectorbt = ["templates/*.json"]
+
+[tool.black]
+line-length = 120

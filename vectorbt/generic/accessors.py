@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Custom pandas accessors for generic data.
@@ -216,7 +216,7 @@ from sklearn.preprocessing import (
     RobustScaler,
     StandardScaler,
     QuantileTransformer,
-    PowerTransformer
+    PowerTransformer,
 )
 from sklearn.utils.validation import check_is_fitted
 
@@ -224,12 +224,17 @@ from vectorbt import _typing as tp
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic import plotting, nb
+from vectorbt.generic import plotting, nb, dispatch
 from vectorbt.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.plots_builder import PlotsBuilderMixin
 from vectorbt.generic.ranges import Ranges
-from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
+from vectorbt.generic.splitters import (
+    SplitterT,
+    RangeSplitter,
+    RollingSplitter,
+    ExpandingSplitter,
+)
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.utils import checks
@@ -271,42 +276,48 @@ SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigu
 
 
 class TransformerT(tp.Protocol):
-    def __init__(self, **kwargs) -> None:
-        ...
+    def __init__(self, **kwargs) -> None: ...
 
-    def transform(self, *args, **kwargs) -> tp.Array2d:
-        ...
+    def transform(self, *args, **kwargs) -> tp.Array2d: ...
 
-    def fit_transform(self, *args, **kwargs) -> tp.Array2d:
-        ...
+    def fit_transform(self, *args, **kwargs) -> tp.Array2d: ...
 
 
 nb_config = Config(
     {
-        'shuffle': dict(func=nb.shuffle_nb, path='vectorbt.generic.nb.shuffle_nb'),
-        'fillna': dict(func=nb.fillna_nb, path='vectorbt.generic.nb.fillna_nb'),
-        'bshift': dict(func=nb.bshift_nb, path='vectorbt.generic.nb.bshift_nb'),
-        'fshift': dict(func=nb.fshift_nb, path='vectorbt.generic.nb.fshift_nb'),
-        'diff': dict(func=nb.diff_nb, path='vectorbt.generic.nb.diff_nb'),
-        'pct_change': dict(func=nb.pct_change_nb, path='vectorbt.generic.nb.pct_change_nb'),
-        'bfill': dict(func=nb.bfill_nb, path='vectorbt.generic.nb.bfill_nb'),
-        'ffill': dict(func=nb.ffill_nb, path='vectorbt.generic.nb.ffill_nb'),
-        'cumsum': dict(func=nb.nancumsum_nb, path='vectorbt.generic.nb.nancumsum_nb'),
-        'cumprod': dict(func=nb.nancumprod_nb, path='vectorbt.generic.nb.nancumprod_nb'),
-        'rolling_min': dict(func=nb.rolling_min_nb, path='vectorbt.generic.nb.rolling_min_nb'),
-        'rolling_max': dict(func=nb.rolling_max_nb, path='vectorbt.generic.nb.rolling_max_nb'),
-        'rolling_mean': dict(func=nb.rolling_mean_nb, path='vectorbt.generic.nb.rolling_mean_nb'),
-        'expanding_min': dict(func=nb.expanding_min_nb, path='vectorbt.generic.nb.expanding_min_nb'),
-        'expanding_max': dict(func=nb.expanding_max_nb, path='vectorbt.generic.nb.expanding_max_nb'),
-        'expanding_mean': dict(func=nb.expanding_mean_nb, path='vectorbt.generic.nb.expanding_mean_nb'),
-        'product': dict(func=nb.nanprod_nb, is_reducing=True, path='vectorbt.generic.nb.nanprod_nb')
+        "shuffle": dict(func=dispatch.shuffle, path="vectorbt.generic.dispatch.shuffle"),
+        "fillna": dict(func=dispatch.fillna, path="vectorbt.generic.dispatch.fillna"),
+        "bshift": dict(func=dispatch.bshift, path="vectorbt.generic.dispatch.bshift"),
+        "fshift": dict(func=dispatch.fshift, path="vectorbt.generic.dispatch.fshift"),
+        "diff": dict(func=dispatch.diff, path="vectorbt.generic.dispatch.diff"),
+        "pct_change": dict(func=dispatch.pct_change, path="vectorbt.generic.dispatch.pct_change"),
+        "bfill": dict(func=dispatch.bfill, path="vectorbt.generic.dispatch.bfill"),
+        "ffill": dict(func=dispatch.ffill, path="vectorbt.generic.dispatch.ffill"),
+        "cumsum": dict(func=dispatch.nancumsum, path="vectorbt.generic.dispatch.nancumsum"),
+        "cumprod": dict(func=dispatch.nancumprod, path="vectorbt.generic.dispatch.nancumprod"),
+        "rolling_min": dict(func=dispatch.rolling_min, path="vectorbt.generic.dispatch.rolling_min"),
+        "rolling_max": dict(func=dispatch.rolling_max, path="vectorbt.generic.dispatch.rolling_max"),
+        "rolling_mean": dict(func=dispatch.rolling_mean, path="vectorbt.generic.dispatch.rolling_mean"),
+        "expanding_min": dict(func=dispatch.expanding_min, path="vectorbt.generic.dispatch.expanding_min"),
+        "expanding_max": dict(func=dispatch.expanding_max, path="vectorbt.generic.dispatch.expanding_max"),
+        "expanding_mean": dict(
+            func=dispatch.expanding_mean,
+            path="vectorbt.generic.dispatch.expanding_mean",
+        ),
+        "product": dict(
+            func=dispatch.nanprod,
+            is_reducing=True,
+            path="vectorbt.generic.dispatch.nanprod",
+        ),
     },
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['nb_config'] = f"""Config of Numba methods to be added to `GenericAccessor`.
+__pdoc__[
+    "nb_config"
+] = f"""Config of Numba methods to be added to `GenericAccessor`.
 
 ```json
 {nb_config.to_doc()}
@@ -315,45 +326,41 @@ __pdoc__['nb_config'] = f"""Config of Numba methods to be added to `GenericAcces
 
 transform_config = Config(
     {
-        'binarize': dict(
-            transformer=Binarizer,
-            docstring="See `sklearn.preprocessing.Binarizer`."
-        ),
-        'minmax_scale': dict(
+        "binarize": dict(transformer=Binarizer, docstring="See `sklearn.preprocessing.Binarizer`."),
+        "minmax_scale": dict(
             transformer=MinMaxScaler,
-            docstring="See `sklearn.preprocessing.MinMaxScaler`."
+            docstring="See `sklearn.preprocessing.MinMaxScaler`.",
         ),
-        'maxabs_scale': dict(
+        "maxabs_scale": dict(
             transformer=MaxAbsScaler,
-            docstring="See `sklearn.preprocessing.MaxAbsScaler`."
+            docstring="See `sklearn.preprocessing.MaxAbsScaler`.",
         ),
-        'normalize': dict(
-            transformer=Normalizer,
-            docstring="See `sklearn.preprocessing.Normalizer`."
-        ),
-        'robust_scale': dict(
+        "normalize": dict(transformer=Normalizer, docstring="See `sklearn.preprocessing.Normalizer`."),
+        "robust_scale": dict(
             transformer=RobustScaler,
-            docstring="See `sklearn.preprocessing.RobustScaler`."
+            docstring="See `sklearn.preprocessing.RobustScaler`.",
         ),
-        'scale': dict(
+        "scale": dict(
             transformer=StandardScaler,
-            docstring="See `sklearn.preprocessing.StandardScaler`."
+            docstring="See `sklearn.preprocessing.StandardScaler`.",
         ),
-        'quantile_transform': dict(
+        "quantile_transform": dict(
             transformer=QuantileTransformer,
-            docstring="See `sklearn.preprocessing.QuantileTransformer`."
+            docstring="See `sklearn.preprocessing.QuantileTransformer`.",
         ),
-        'power_transform': dict(
+        "power_transform": dict(
             transformer=PowerTransformer,
-            docstring="See `sklearn.preprocessing.PowerTransformer`."
-        )
+            docstring="See `sklearn.preprocessing.PowerTransformer`.",
+        ),
     },
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['transform_config'] = f"""Config of transform methods to be added to `GenericAccessor`.
+__pdoc__[
+    "transform_config"
+] = f"""Config of transform methods to be added to `GenericAccessor`.
 
 ```json
 {transform_config.to_doc()}
@@ -368,19 +375,31 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+    def __init__(
+        self,
+        obj: tp.SeriesFrame,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        BaseAccessor.__init__(self, obj, mapping=mapping, engine=engine, **kwargs)
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
 
         if mapping is not None:
             if isinstance(mapping, str):
-                if mapping.lower() == 'index':
+                if mapping.lower() == "index":
                     mapping = self.wrapper.index
-                elif mapping.lower() == 'columns':
+                elif mapping.lower() == "columns":
                     mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         self._mapping = mapping
+        self._engine = engine
+
+    @property
+    def engine(self) -> tp.Optional[str]:
+        """Engine preference for dispatch functions."""
+        return self._engine
 
     @property
     def sr_accessor_cls(self) -> tp.Type["GenericSRAccessor"]:
@@ -401,48 +420,97 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """See `vectorbt.utils.mapping.apply_mapping`."""
         return apply_mapping(self.obj, self.mapping, **kwargs)
 
-    def rolling_std(self, window: int, minp: tp.Optional[int] = None, ddof: int = 1,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbt.generic.nb.rolling_std_nb`."""
-        out = nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof)
+    def rolling_std(
+        self,
+        window: int,
+        minp: tp.Optional[int] = None,
+        ddof: int = 1,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:  # pragma: no cover
+        """See `vectorbt.generic.dispatch.rolling_std`."""
+        engine = engine if engine is not None else self.engine
+        out = dispatch.rolling_std(self.to_2d_array(), window, minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def expanding_std(self, minp: tp.Optional[int] = 1, ddof: int = 1,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbt.generic.nb.expanding_std_nb`."""
-        out = nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof)
+    def expanding_std(
+        self,
+        minp: tp.Optional[int] = 1,
+        ddof: int = 1,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:  # pragma: no cover
+        """See `vectorbt.generic.dispatch.expanding_std`."""
+        engine = engine if engine is not None else self.engine
+        out = dispatch.expanding_std(self.to_2d_array(), minp=minp, ddof=ddof, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def ewm_mean(self, span: int, minp: tp.Optional[int] = 0, adjust: bool = True,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbt.generic.nb.ewm_mean_nb`."""
-        out = nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust)
+    def ewm_mean(
+        self,
+        span: int,
+        minp: tp.Optional[int] = 0,
+        adjust: bool = True,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:  # pragma: no cover
+        """See `vectorbt.generic.dispatch.ewm_mean`."""
+        engine = engine if engine is not None else self.engine
+        out = dispatch.ewm_mean(self.to_2d_array(), span, minp=minp, adjust=adjust, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def ewm_std(self, span: int, minp: tp.Optional[int] = 0, adjust: bool = True, ddof: int = 1,
-                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbt.generic.nb.ewm_std_nb`."""
-        out = nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
+    def ewm_std(
+        self,
+        span: int,
+        minp: tp.Optional[int] = 0,
+        adjust: bool = True,
+        ddof: int = 1,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:  # pragma: no cover
+        """See `vectorbt.generic.dispatch.ewm_std`."""
+        engine = engine if engine is not None else self.engine
+        out = dispatch.ewm_std(
+            self.to_2d_array(),
+            span,
+            minp=minp,
+            adjust=adjust,
+            ddof=ddof,
+            engine=engine,
+        )
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def apply_along_axis(self, apply_func_nb: tp.Union[tp.ApplyFunc, tp.RowApplyFunc], *args, axis: int = 0,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Apply a function `apply_func_nb` along an axis."""
-        checks.assert_numba_func(apply_func_nb)
+    def apply_along_axis(
+        self,
+        apply_func: tp.Union[tp.ApplyFunc, tp.RowApplyFunc],
+        *args,
+        axis: int = 0,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Apply a function `apply_func` along an axis."""
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if axis == 0:
-            out = nb.apply_nb(self.to_2d_array(), apply_func_nb, *args)
+            out = dispatch.apply(self.to_2d_array(), apply_func, *args, engine=engine)
         elif axis == 1:
-            out = nb.row_apply_nb(self.to_2d_array(), apply_func_nb, *args)
+            out = dispatch.row_apply(self.to_2d_array(), apply_func, *args, engine=engine)
         else:
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def rolling_apply(self, window: int, apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
-                      *args, minp: tp.Optional[int] = None, on_matrix: bool = False,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.rolling_apply_nb` and
-        `vectorbt.generic.nb.rolling_matrix_apply_nb` for `on_matrix=True`.
+    def rolling_apply(
+        self,
+        window: int,
+        apply_func: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
+        *args,
+        minp: tp.Optional[int] = None,
+        on_matrix: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.rolling_apply` and
+        `vectorbt.generic.dispatch.rolling_matrix_apply` for `on_matrix=True`.
 
         Usage:
             ```pycon
@@ -465,19 +533,26 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.666667  2.666667  2.666667
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
-            out = nb.rolling_matrix_apply_nb(self.to_2d_array(), window, minp, apply_func_nb, *args)
+            out = dispatch.rolling_matrix_apply(self.to_2d_array(), window, minp, apply_func, *args, engine=engine)
         else:
-            out = nb.rolling_apply_nb(self.to_2d_array(), window, minp, apply_func_nb, *args)
+            out = dispatch.rolling_apply(self.to_2d_array(), window, minp, apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def expanding_apply(self, apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
-                        *args, minp: tp.Optional[int] = 1, on_matrix: bool = False,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.expanding_apply_nb` and
-        `vectorbt.generic.nb.expanding_matrix_apply_nb` for `on_matrix=True`.
+    def expanding_apply(
+        self,
+        apply_func: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
+        *args,
+        minp: tp.Optional[int] = 1,
+        on_matrix: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.expanding_apply` and
+        `vectorbt.generic.dispatch.expanding_matrix_apply` for `on_matrix=True`.
 
         Usage:
             ```pycon
@@ -500,20 +575,27 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.600000  2.600000  2.600000
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
         if on_matrix:
-            out = nb.expanding_matrix_apply_nb(self.to_2d_array(), minp, apply_func_nb, *args)
+            out = dispatch.expanding_matrix_apply(self.to_2d_array(), minp, apply_func, *args, engine=engine)
         else:
-            out = nb.expanding_apply_nb(self.to_2d_array(), minp, apply_func_nb, *args)
+            out = dispatch.expanding_apply(self.to_2d_array(), minp, apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def groupby_apply(self, by: tp.PandasGroupByLike,
-                      apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
-                      *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
-                      **kwargs) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.groupby_apply_nb` and
-        `vectorbt.generic.nb.groupby_matrix_apply_nb` for `on_matrix=True`.
+    def groupby_apply(
+        self,
+        by: tp.PandasGroupByLike,
+        apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
+        *args,
+        on_matrix: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.groupby_apply` and
+        `vectorbt.generic.dispatch.groupby_matrix_apply` for `on_matrix=True`.
 
         For `by`, see `pd.DataFrame.groupby`.
 
@@ -534,25 +616,32 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             3  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
         regrouped = self.obj.groupby(by, axis=0, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = nb.groupby_matrix_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         else:
-            out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index=list(regrouped.indices.keys())), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def resample_apply(self, freq: tp.PandasFrequencyLike,
-                       apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
-                       *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
-                       **kwargs) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.groupby_apply_nb` and
-        `vectorbt.generic.nb.groupby_matrix_apply_nb` for `on_matrix=True`.
+    def resample_apply(
+        self,
+        freq: tp.PandasFrequencyLike,
+        apply_func: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
+        *args,
+        on_matrix: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.groupby_apply` and
+        `vectorbt.generic.dispatch.groupby_matrix_apply` for `on_matrix=True`.
 
         For `freq`, see `pd.DataFrame.resample`.
 
@@ -573,30 +662,36 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  2.333333  2.333333  2.333333
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
         resampled = self.obj.resample(freq, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = nb.groupby_matrix_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = dispatch.groupby_matrix_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         else:
-            out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = dispatch.groupby_apply(self.to_2d_array(), groups, apply_func, *args, engine=engine)
         out_obj = self.wrapper.wrap(out, group_by=False, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrapper.wrap(
             resampled_arr,
             index=resampled.asfreq().index,
             group_by=False,
-            **merge_dicts({}, wrap_kwargs)
+            **merge_dicts({}, wrap_kwargs),
         )
         resampled_obj.loc[out_obj.index] = out_obj.values
         return resampled_obj
 
-    def applymap(self, apply_func_nb: tp.ApplyMapFunc, *args,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.applymap_nb`.
+    def applymap(
+        self,
+        apply_func: tp.ApplyMapFunc,
+        *args,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.applymap`.
 
         Usage:
             ```pycon
@@ -610,14 +705,20 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  25.0   1.0  1.0
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
 
-        out = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
+        out = dispatch.applymap(self.to_2d_array(), apply_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def filter(self, filter_func_nb: tp.FilterFunc, *args,
-               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.filter_nb`.
+    def filter(
+        self,
+        filter_func: tp.FilterFunc,
+        *args,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.filter`.
 
         Usage:
             ```pycon
@@ -631,15 +732,22 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             2020-01-05  5.0  NaN  NaN
             ```
         """
-        checks.assert_numba_func(filter_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(filter_func, engine=engine)
 
-        out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
+        out = dispatch.filter(self.to_2d_array(), filter_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def apply_and_reduce(self, apply_func_nb: tp.ApplyFunc, reduce_func_nb: tp.ReduceFunc,
-                         apply_args: tp.Optional[tuple] = None, reduce_args: tp.Optional[tuple] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """See `vectorbt.generic.nb.apply_and_reduce_nb`.
+    def apply_and_reduce(
+        self,
+        apply_func: tp.ApplyFunc,
+        reduce_func: tp.ReduceFunc,
+        apply_args: tp.Optional[tuple] = None,
+        reduce_args: tp.Optional[tuple] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """See `vectorbt.generic.dispatch.apply_and_reduce`.
 
         Usage:
             ```pycon
@@ -652,44 +760,55 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: float64
             ```
         """
-        checks.assert_numba_func(apply_func_nb)
-        checks.assert_numba_func(reduce_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(apply_func, engine=engine)
+        checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
         if apply_args is None:
             apply_args = ()
         if reduce_args is None:
             reduce_args = ()
 
-        out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, apply_args, reduce_func_nb, reduce_args)
-        wrap_kwargs = merge_dicts(dict(name_or_index='apply_and_reduce'), wrap_kwargs)
+        out = dispatch.apply_and_reduce(
+            self.to_2d_array(),
+            apply_func,
+            apply_args,
+            reduce_func,
+            reduce_args,
+            engine=engine,
+        )
+        wrap_kwargs = merge_dicts(dict(name_or_index="apply_and_reduce"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def reduce(self,
-               reduce_func_nb: tp.Union[
-                   tp.FlatGroupReduceFunc,
-                   tp.FlatGroupReduceArrayFunc,
-                   tp.GroupReduceFunc,
-                   tp.GroupReduceArrayFunc,
-                   tp.ReduceFunc,
-                   tp.ReduceArrayFunc
-               ],
-               *args,
-               returns_array: bool = False,
-               returns_idx: bool = False,
-               flatten: bool = False,
-               order: str = 'C',
-               to_index: bool = True,
-               group_by: tp.GroupByLike = None,
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame[float]:
+    def reduce(
+        self,
+        reduce_func: tp.Union[
+            tp.FlatGroupReduceFunc,
+            tp.FlatGroupReduceArrayFunc,
+            tp.GroupReduceFunc,
+            tp.GroupReduceArrayFunc,
+            tp.ReduceFunc,
+            tp.ReduceArrayFunc,
+        ],
+        *args,
+        returns_array: bool = False,
+        returns_idx: bool = False,
+        flatten: bool = False,
+        order: str = "C",
+        to_index: bool = True,
+        engine: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeriesFrame[float]:
         """Reduce by column.
 
-        See `vectorbt.generic.nb.flat_reduce_grouped_to_array_nb` if grouped, `returns_array` is True and `flatten` is True.
-        See `vectorbt.generic.nb.flat_reduce_grouped_nb` if grouped, `returns_array` is False and `flatten` is True.
-        See `vectorbt.generic.nb.reduce_grouped_to_array_nb` if grouped, `returns_array` is True and `flatten` is False.
-        See `vectorbt.generic.nb.reduce_grouped_nb` if grouped, `returns_array` is False and `flatten` is False.
-        See `vectorbt.generic.nb.reduce_to_array_nb` if not grouped and `returns_array` is True.
-        See `vectorbt.generic.nb.reduce_nb` if not grouped and `returns_array` is False.
+        See `vectorbt.generic.dispatch.flat_reduce_grouped_to_array` if grouped, `returns_array` is True and `flatten` is True.
+        See `vectorbt.generic.dispatch.flat_reduce_grouped` if grouped, `returns_array` is False and `flatten` is True.
+        See `vectorbt.generic.dispatch.reduce_grouped_to_array` if grouped, `returns_array` is True and `flatten` is False.
+        See `vectorbt.generic.dispatch.reduce_grouped` if grouped, `returns_array` is False and `flatten` is False.
+        See `vectorbt.generic.dispatch.reduce_to_array` if not grouped and `returns_array` is True.
+        See `vectorbt.generic.dispatch.reduce` if not grouped and `returns_array` is False.
 
-        Set `returns_idx` to True if values returned by `reduce_func_nb` are indices/positions.
+        Set `returns_idx` to True if values returned by `reduce_func` are indices/positions.
         Set `to_index` to False to return raw positions instead of labels.
 
         Usage:
@@ -735,19 +854,32 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             max      5.0     3.0
             ```
         """
-        checks.assert_numba_func(reduce_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(reduce_func, engine=engine, func_suffix="_reduce")
 
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             if flatten:
-                checks.assert_in(order.upper(), ['C', 'F'])
-                in_c_order = order.upper() == 'C'
+                checks.assert_in(order.upper(), ["C", "F"])
+                in_c_order = order.upper() == "C"
                 if returns_array:
-                    out = nb.flat_reduce_grouped_to_array_nb(
-                        self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
+                    out = dispatch.flat_reduce_grouped_to_array(
+                        self.to_2d_array(),
+                        group_lens,
+                        in_c_order,
+                        reduce_func,
+                        *args,
+                        engine=engine,
+                    )
                 else:
-                    out = nb.flat_reduce_grouped_nb(
-                        self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
+                    out = dispatch.flat_reduce_grouped(
+                        self.to_2d_array(),
+                        group_lens,
+                        in_c_order,
+                        reduce_func,
+                        *args,
+                        engine=engine,
+                    )
                 if returns_idx:
                     if in_c_order:
                         out //= group_lens  # flattened in C order
@@ -755,33 +887,56 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                         out %= self.wrapper.shape[0]  # flattened in F order
             else:
                 if returns_array:
-                    out = nb.reduce_grouped_to_array_nb(
-                        self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                    out = dispatch.reduce_grouped_to_array(
+                        self.to_2d_array(),
+                        group_lens,
+                        reduce_func,
+                        *args,
+                        engine=engine,
+                    )
                 else:
-                    out = nb.reduce_grouped_nb(
-                        self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                    out = dispatch.reduce_grouped(
+                        self.to_2d_array(),
+                        group_lens,
+                        reduce_func,
+                        *args,
+                        engine=engine,
+                    )
         else:
             if returns_array:
-                out = nb.reduce_to_array_nb(
-                    self.to_2d_array(), reduce_func_nb, *args)
+                out = dispatch.reduce_to_array(self.to_2d_array(), reduce_func, *args, engine=engine)
             else:
-                out = nb.reduce_nb(
-                    self.to_2d_array(), reduce_func_nb, *args)
+                out = dispatch.reduce(self.to_2d_array(), reduce_func, *args, engine=engine)
 
         # Perform post-processing
-        wrap_kwargs = merge_dicts(dict(
-            name_or_index='reduce' if not returns_array else None,
-            to_index=returns_idx and to_index,
-            fillna=-1 if returns_idx else None,
-            dtype=np.int64 if returns_idx else None
-        ), wrap_kwargs)
+        wrap_kwargs = merge_dicts(
+            dict(
+                name_or_index="reduce" if not returns_array else None,
+                to_index=returns_idx and to_index,
+                fillna=-1 if returns_idx else None,
+                dtype=np.int64 if returns_idx else None,
+            ),
+            wrap_kwargs,
+        )
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
-    def min(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def min(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return min of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="min"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.min_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.min_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -791,11 +946,23 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nanmin = nanmin
         return self.wrapper.wrap_reduced(_nanmin(arr, axis=0), group_by=False, **wrap_kwargs)
 
-    def max(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def max(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return max of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="max"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.max_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.max_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -805,12 +972,23 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nanmax = nanmax
         return self.wrapper.wrap_reduced(_nanmax(arr, axis=0), group_by=False, **wrap_kwargs)
 
-    def mean(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def mean(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return mean of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="mean"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                nb.mean_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+                dispatch.mean_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -820,11 +998,23 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nanmean = nanmean
         return self.wrapper.wrap_reduced(_nanmean(arr, axis=0), group_by=False, **wrap_kwargs)
 
-    def median(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def median(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return median of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="median"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.median_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.median_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -834,12 +1024,25 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nanmedian = nanmedian
         return self.wrapper.wrap_reduced(_nanmedian(arr, axis=0), group_by=False, **wrap_kwargs)
 
-    def std(self, ddof: int = 1, group_by: tp.GroupByLike = None,
-            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def std(
+        self,
+        ddof: int = 1,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return standard deviation of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='std'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="std"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.std_reduce_nb, ddof, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.std_reduce,
+                ddof,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -849,11 +1052,23 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nanstd = nanstd
         return self.wrapper.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), group_by=False, **wrap_kwargs)
 
-    def sum(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def sum(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return sum of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="sum"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.sum_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.sum_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
@@ -863,26 +1078,45 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             _nansum = nansum
         return self.wrapper.wrap_reduced(_nansum(arr, axis=0), group_by=False, **wrap_kwargs)
 
-    def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def count(
+        self,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return count of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='count', dtype=np.int64), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="count", dtype=np.int64), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.reduce(nb.count_reduce_nb, group_by=group_by, flatten=True, wrap_kwargs=wrap_kwargs)
+            return self.reduce(
+                dispatch.count_reduce,
+                group_by=group_by,
+                flatten=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
 
         return self.wrapper.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), group_by=False, **wrap_kwargs)
 
-    def idxmin(self, group_by: tp.GroupByLike = None, order: str = 'C',
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def idxmin(
+        self,
+        group_by: tp.GroupByLike = None,
+        order: str = "C",
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return labeled index of min of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="idxmin"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                nb.argmin_reduce_nb,
+                dispatch.argmin_reduce,
                 group_by=group_by,
                 flatten=True,
                 returns_idx=True,
                 order=order,
-                wrap_kwargs=wrap_kwargs
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
             )
 
         obj = self.to_2d_array()
@@ -891,18 +1125,25 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         out[~nan_mask] = self.wrapper.index[nanargmin(obj[:, ~nan_mask], axis=0)]
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def idxmax(self, group_by: tp.GroupByLike = None, order: str = 'C',
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def idxmax(
+        self,
+        group_by: tp.GroupByLike = None,
+        order: str = "C",
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Return labeled index of max of non-NaN elements."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        wrap_kwargs = merge_dicts(dict(name_or_index="idxmax"), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                nb.argmax_reduce_nb,
+                dispatch.argmax_reduce,
                 group_by=group_by,
                 flatten=True,
                 returns_idx=True,
                 order=order,
-                wrap_kwargs=wrap_kwargs
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
             )
 
         obj = self.to_2d_array()
@@ -911,9 +1152,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         out[~nan_mask] = self.wrapper.index[nanargmax(obj[:, ~nan_mask], axis=0)]
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1,
-                 group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbt.generic.nb.describe_reduce_nb`.
+    def describe(
+        self,
+        percentiles: tp.Optional[tp.ArrayLike] = None,
+        ddof: int = 1,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbt.generic.dispatch.describe_reduce`.
 
         For `percentiles`, see `pd.DataFrame.describe`.
 
@@ -940,28 +1187,43 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             percentiles.append(0.5)
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
-        index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
+        index = pd.Index(["count", "mean", "std", "min", *perc_formatted, "max"])
         wrap_kwargs = merge_dicts(dict(name_or_index=index), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                nb.describe_reduce_nb, percentiles, ddof,
-                group_by=group_by, flatten=True, returns_array=True,
-                wrap_kwargs=wrap_kwargs)
+                dispatch.describe_reduce,
+                percentiles,
+                ddof,
+                group_by=group_by,
+                flatten=True,
+                returns_array=True,
+                engine=engine,
+                wrap_kwargs=wrap_kwargs,
+            )
         return self.reduce(
-            nb.describe_reduce_nb, percentiles, ddof,
-            returns_array=True, wrap_kwargs=wrap_kwargs)
+            dispatch.describe_reduce,
+            percentiles,
+            ddof,
+            returns_array=True,
+            engine=engine,
+            wrap_kwargs=wrap_kwargs,
+        )
 
-    def value_counts(self,
-                     normalize: bool = False,
-                     sort_uniques: bool = True,
-                     sort: bool = False,
-                     ascending: bool = False,
-                     dropna: bool = False,
-                     group_by: tp.GroupByLike = None,
-                     mapping: tp.Optional[tp.MappingLike] = None,
-                     incl_all_keys: bool = False,
-                     wrap_kwargs: tp.KwargsLike = None,
-                     **kwargs) -> tp.SeriesFrame:
+    def value_counts(
+        self,
+        normalize: bool = False,
+        sort_uniques: bool = True,
+        sort: bool = False,
+        ascending: bool = False,
+        dropna: bool = False,
+        group_by: tp.GroupByLike = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        incl_all_keys: bool = False,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Return a Series/DataFrame containing counts of unique values.
 
         * Enable `normalize` flag to return the relative frequencies of the unique values.
@@ -971,19 +1233,21 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         * Enable `dropna` flag to exclude counts of NaN.
         * Enable `incl_all_keys` to include all mapping keys, no only those that are present in the array.
 
-        Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
+        Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`.
+        """
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):
-            if mapping.lower() == 'index':
+            if mapping.lower() == "index":
                 mapping = self.wrapper.index
-            elif mapping.lower() == 'columns':
+            elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
+        engine = engine if engine is not None else self.engine
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         codes = codes.reshape(self.wrapper.shape_2d)
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        value_counts = nb.value_counts_nb(codes, len(uniques), group_lens)
+        value_counts = dispatch.value_counts(codes, len(uniques), group_lens, engine=engine)
         if incl_all_keys and mapping is not None:
             missing_keys = []
             for x in mapping:
@@ -998,7 +1262,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts[~nan_mask]
             uniques = uniques[~nan_mask]
         if sort_uniques:
-            new_indices = uniques.argsort(kind='stable')
+            new_indices = uniques.argsort(kind="stable")
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_sum = value_counts.sum(axis=1)
@@ -1006,16 +1270,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             value_counts = value_counts / value_counts_sum.sum()
         if sort:
             if ascending:
-                new_indices = value_counts_sum.argsort(kind='stable')
+                new_indices = value_counts_sum.argsort(kind="stable")
             else:
-                new_indices = (-value_counts_sum).argsort(kind='stable')
+                new_indices = (-value_counts_sum).argsort(kind="stable")
             value_counts = value_counts[new_indices]
             uniques = uniques[new_indices]
         value_counts_pd = self.wrapper.wrap(
             value_counts,
             index=uniques,
             group_by=group_by,
-            **merge_dicts({}, wrap_kwargs)
+            **merge_dicts({}, wrap_kwargs),
         )
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
@@ -1023,11 +1287,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Resolution ############# #
 
-    def resolve_self(self: GenericAccessorT,
-                     cond_kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
-                     impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> GenericAccessorT:
+    def resolve_self(
+        self: GenericAccessorT,
+        cond_kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
+        impacts_caching: bool = True,
+        silence_warnings: bool = False,
+    ) -> GenericAccessorT:
         """Resolve self.
 
         See `vectorbt.base.array_wrapper.Wrapping.resolve_self`.
@@ -1043,21 +1309,24 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             cond_kwargs=cond_kwargs,
             custom_arg_names=custom_arg_names,
             impacts_caching=impacts_caching,
-            silence_warnings=silence_warnings
+            silence_warnings=silence_warnings,
         )
-        if 'mapping' in cond_kwargs:
-            self_copy = reself.replace(mapping=cond_kwargs['mapping'])
+        if "mapping" in cond_kwargs:
+            self_copy = reself.replace(mapping=cond_kwargs["mapping"])
 
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:
-                    warnings.warn(f"Changing the mapping will create a copy of this object. "
-                                  f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
+                    warnings.warn(
+                        "Changing the mapping will create a copy of this object. "
+                        "Consider setting it upon object creation to re-use existing cache.",
+                        stacklevel=2,
+                    )
                 for alias in reself.self_aliases:
                     if alias not in custom_arg_names:
                         cond_kwargs[alias] = self_copy
-                cond_kwargs['mapping'] = self_copy.mapping
+                cond_kwargs["mapping"] = self_copy.mapping
                 if impacts_caching:
-                    cond_kwargs['use_caching'] = False
+                    cond_kwargs["use_caching"] = False
                 return self_copy
         return reself
 
@@ -1070,93 +1339,91 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `generic.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        generic_stats_cfg = settings['generic']['stats']
 
-        return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
-            generic_stats_cfg
-        )
+        generic_stats_cfg = settings["generic"]["stats"]
+
+        return merge_dicts(StatsBuilderMixin.stats_defaults.__get__(self), generic_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
-                title='Start',
+                title="Start",
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             end=dict(
-                title='End',
+                title="End",
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             count=dict(
-                title='Count',
-                calc_func='count',
+                title="Count",
+                calc_func="count",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             mean=dict(
-                title='Mean',
-                calc_func='mean',
+                title="Mean",
+                calc_func="mean",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             std=dict(
-                title='Std',
-                calc_func='std',
+                title="Std",
+                calc_func="std",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             min=dict(
-                title='Min',
-                calc_func='min',
+                title="Min",
+                calc_func="min",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             median=dict(
-                title='Median',
-                calc_func='median',
+                title="Median",
+                calc_func="median",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             max=dict(
-                title='Max',
-                calc_func='max',
+                title="Max",
+                calc_func="max",
                 inv_check_has_mapping=True,
-                tags=['generic', 'describe']
+                tags=["generic", "describe"],
             ),
             idx_min=dict(
-                title='Min Index',
-                calc_func='idxmin',
+                title="Min Index",
+                calc_func="idxmin",
                 agg_func=None,
                 inv_check_has_mapping=True,
-                tags=['generic', 'index']
+                tags=["generic", "index"],
             ),
             idx_max=dict(
-                title='Max Index',
-                calc_func='idxmax',
+                title="Max Index",
+                calc_func="idxmax",
                 agg_func=None,
                 inv_check_has_mapping=True,
-                tags=['generic', 'index']
+                tags=["generic", "index"],
             ),
             value_counts=dict(
-                title='Value Counts',
-                calc_func=lambda value_counts: reshape_fns.to_dict(value_counts, orient='index_series'),
+                title="Value Counts",
+                calc_func=lambda value_counts: reshape_fns.to_dict(value_counts, orient="index_series"),
                 resolve_value_counts=True,
                 check_has_mapping=True,
-                tags=['generic', 'value_counts']
-            )
+                tags=["generic", "value_counts"],
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -1165,9 +1432,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Conversion ############# #
 
-    def drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def drawdown(self, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Drawdown series."""
-        out = self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1
+        engine = engine if engine is not None else self.engine
+        out = self.to_2d_array() / dispatch.expanding_max(self.to_2d_array(), engine=engine) - 1
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
@@ -1180,6 +1448,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbt.generic.ranges.Ranges`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        kwargs.setdefault("engine", self.engine)
         return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     @property
@@ -1192,15 +1461,18 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
+        kwargs.setdefault("engine", self.engine)
         return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
-    def to_mapped(self,
-                  dropna: bool = True,
-                  dtype: tp.Optional[tp.DTypeLike] = None,
-                  group_by: tp.GroupByLike = None,
-                  **kwargs) -> MappedArray:
+    def to_mapped(
+        self,
+        dropna: bool = True,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> MappedArray:
         """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
-        mapped_arr = self.to_2d_array().flatten(order='F')
+        mapped_arr = self.to_2d_array().flatten(order="F")
         col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
         idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
         if dropna and np.isnan(mapped_arr).any():
@@ -1208,12 +1480,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
             idx_arr = idx_arr[not_nan_mask]
+        kwargs.setdefault("engine", self.engine)
         return MappedArray(
             self.wrapper,
             np.asarray(mapped_arr, dtype=dtype),
             col_arr,
             idx_arr=idx_arr,
-            **kwargs
+            **kwargs,
         ).regroup(group_by)
 
     def to_returns(self, **kwargs) -> tp.SeriesFrame:
@@ -1222,14 +1495,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Crossover ############# #
 
-    def crossed_above(self,
-                      other: tp.SeriesFrame,
-                      wait: int = 0,
-                      broadcast_kwargs: tp.KwargsLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def crossed_above(
+        self,
+        other: tp.SeriesFrame,
+        wait: int = 0,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Generate crossover above another array.
 
-        See `vectorbt.generic.nb.crossed_above_nb`.
+        See `vectorbt.generic.dispatch.crossed_above`.
 
         Usage:
             ```pycon
@@ -1256,20 +1532,35 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             dtype: bool
             ```
         """
+        engine = engine if engine is not None else self.engine
         self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        out = nb.crossed_above_nb(reshape_fns.to_2d_array(self_obj), reshape_fns.to_2d_array(other_obj), wait=wait)
+        out = dispatch.crossed_above(
+            reshape_fns.to_2d_array(self_obj),
+            reshape_fns.to_2d_array(other_obj),
+            wait=wait,
+            engine=engine,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def crossed_below(self,
-                      other: tp.SeriesFrame,
-                      wait: int = 0,
-                      broadcast_kwargs: tp.KwargsLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def crossed_below(
+        self,
+        other: tp.SeriesFrame,
+        wait: int = 0,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Generate crossover below another array.
 
-        See `vectorbt.generic.nb.crossed_above_nb` but in reversed order."""
+        See `vectorbt.generic.dispatch.crossed_above` but in reversed order."""
+        engine = engine if engine is not None else self.engine
         self_obj, other_obj = reshape_fns.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        out = nb.crossed_above_nb(reshape_fns.to_2d_array(other_obj), reshape_fns.to_2d_array(self_obj), wait=wait)
+        out = dispatch.crossed_above(
+            reshape_fns.to_2d_array(other_obj),
+            reshape_fns.to_2d_array(self_obj),
+            wait=wait,
+            engine=engine,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Transformation ############# #
@@ -1321,20 +1612,28 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
         return self.scale(with_mean=True, with_std=True, **kwargs)
 
-    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def rebase(self, base: float, wrap_kwargs: tp.KwargsLike = None, engine: tp.Optional[str] = None) -> tp.SeriesFrame:
         """Rebase all series to a given intial base.
 
         This makes comparing/plotting different series together easier.
         Will forward and backward fill NaN values."""
-        result = nb.bfill_nb(nb.ffill_nb(self.to_2d_array()))
+        engine = engine if engine is not None else self.engine
+        result = dispatch.bfill(dispatch.ffill(self.to_2d_array(), engine=engine), engine=engine)
         result = result / result[0] * base
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Splitting ############# #
 
-    def split(self, splitter: SplitterT, stack_kwargs: tp.KwargsLike = None, keys: tp.Optional[tp.IndexLike] = None,
-              plot: bool = False, trace_names: tp.TraceNames = None, heatmap_kwargs: tp.KwargsLike = None,
-              **kwargs) -> SplitOutputT:
+    def split(
+        self,
+        splitter: SplitterT,
+        stack_kwargs: tp.KwargsLike = None,
+        keys: tp.Optional[tp.IndexLike] = None,
+        plot: bool = False,
+        trace_names: tp.TraceNames = None,
+        heatmap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> SplitOutputT:
         """Split using a splitter.
 
         Returns a tuple of tuples, each corresponding to a set and composed of a dataframe and split indexes.
@@ -1404,13 +1703,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 if keys is not None:
                     split_name = keys[split_idx]
                 else:
-                    split_name = 'split_' + str(split_idx)
+                    split_name = "split_" + str(split_idx)
                 split_indexes.append(pd.Index(self.wrapper.index[idxs], name=split_name))
             set_df = pd.concat(split_dfs, axis=1).reset_index(drop=True)
             if keys is not None:
                 split_columns = keys
             else:
-                split_columns = pd.Index(np.arange(len(split_indexes)), name='split_idx')
+                split_columns = pd.Index(np.arange(len(split_indexes)), name="split_idx")
             split_columns = index_fns.repeat_index(split_columns, len(self.wrapper.columns))
             if stack_kwargs is None:
                 stack_kwargs = {}
@@ -1422,28 +1721,35 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 trace_names = list(range(len(results)))
             if isinstance(trace_names, str):
                 trace_names = [trace_names]
-            nan_df = pd.DataFrame(np.nan, columns=pd.RangeIndex(stop=len(results[0][1])), index=self.wrapper.index)
+            nan_df = pd.DataFrame(
+                np.nan,
+                columns=pd.RangeIndex(stop=len(results[0][1])),
+                index=self.wrapper.index,
+            )
             fig = None
             for i, (_, split_indexes) in enumerate(results):
                 heatmap_df = nan_df.copy()
                 for j in range(len(split_indexes)):
                     heatmap_df.loc[split_indexes[j], j] = i
                 _heatmap_kwargs = resolve_dict(heatmap_kwargs, i=i)
-                fig = heatmap_df.vbt.ts_heatmap(fig=fig, **merge_dicts(
-                    dict(
-                        trace_kwargs=dict(
-                            showscale=False,
-                            name=str(trace_names[i]),
-                            showlegend=True
-                        )
+                fig = heatmap_df.vbt.ts_heatmap(
+                    fig=fig,
+                    **merge_dicts(
+                        dict(
+                            trace_kwargs=dict(
+                                showscale=False,
+                                name=str(trace_names[i]),
+                                showlegend=True,
+                            )
+                        ),
+                        _heatmap_kwargs,
                     ),
-                    _heatmap_kwargs
-                ))
+                )
                 if fig.layout.colorway is not None:
                     colorway = fig.layout.colorway
                 else:
                     colorway = fig.layout.template.layout.colorway
-                if 'colorscale' not in _heatmap_kwargs:
+                if "colorscale" not in _heatmap_kwargs:
                     fig.data[-1].update(colorscale=[colorway[i], colorway[i]])
             return fig
 
@@ -1598,11 +1904,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             trace_names: tp.TraceNames = None,
-             x_labels: tp.Optional[tp.Labels] = None,
-             return_fig: bool = True,
-             **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot(
+        self,
+        trace_names: tp.TraceNames = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Scatter` and return the figure.
 
         Usage:
@@ -1621,7 +1929,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             data=self.to_2d_array(),
             trace_names=trace_names,
             x_labels=x_labels,
-            **kwargs
+            **kwargs,
         )
         if return_fig:
             return scatter.fig
@@ -1637,7 +1945,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
             ![](/assets/images/df_lineplot.svg)
         """
-        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
+        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
     def scatterplot(self, **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """`GenericAccessor.plot` with 'markers' mode.
@@ -1649,13 +1957,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
             ![](/assets/images/df_scatterplot.svg)
         """
-        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='markers')), kwargs))
+        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
-    def barplot(self,
-                trace_names: tp.TraceNames = None,
-                x_labels: tp.Optional[tp.Labels] = None,
-                return_fig: bool = True,
-                **kwargs) -> tp.Union[tp.BaseFigure, plotting.Bar]:  # pragma: no cover
+    def barplot(
+        self,
+        trace_names: tp.TraceNames = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Bar]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Bar` and return the figure.
 
         Usage:
@@ -1674,17 +1984,19 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             data=self.to_2d_array(),
             trace_names=trace_names,
             x_labels=x_labels,
-            **kwargs
+            **kwargs,
         )
         if return_fig:
             return bar.fig
         return bar
 
-    def histplot(self,
-                 trace_names: tp.TraceNames = None,
-                 group_by: tp.GroupByLike = None,
-                 return_fig: bool = True,
-                 **kwargs) -> tp.Union[tp.BaseFigure, plotting.Histogram]:  # pragma: no cover
+    def histplot(
+        self,
+        trace_names: tp.TraceNames = None,
+        group_by: tp.GroupByLike = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Histogram]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Histogram` and return the figure.
 
         Usage:
@@ -1700,20 +2012,18 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
-        hist = plotting.Histogram(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            **kwargs
-        )
+        hist = plotting.Histogram(data=self.to_2d_array(), trace_names=trace_names, **kwargs)
         if return_fig:
             return hist.fig
         return hist
 
-    def boxplot(self,
-                trace_names: tp.TraceNames = None,
-                group_by: tp.GroupByLike = None,
-                return_fig: bool = True,
-                **kwargs) -> tp.Union[tp.BaseFigure, plotting.Box]:  # pragma: no cover
+    def boxplot(
+        self,
+        trace_names: tp.TraceNames = None,
+        group_by: tp.GroupByLike = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Box]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Box` and return the figure.
 
         Usage:
@@ -1729,11 +2039,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
-        box = plotting.Box(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            **kwargs
-        )
+        box = plotting.Box(data=self.to_2d_array(), trace_names=trace_names, **kwargs)
         if return_fig:
             return box.fig
         return box
@@ -1745,23 +2051,21 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         Merges `vectorbt.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `generic.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        generic_plots_cfg = settings['generic']['plots']
 
-        return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
-            generic_plots_cfg
-        )
+        generic_plots_cfg = settings["generic"]["plots"]
+
+        return merge_dicts(PlotsBuilderMixin.plots_defaults.__get__(self), generic_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             plot=dict(
                 check_is_not_grouped=True,
-                plot_func='plot',
+                plot_func="plot",
                 pass_trace_names=False,
-                tags='generic'
+                tags="generic",
             )
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -1782,38 +2086,49 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         BaseSRAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
-    def squeeze_grouped(self,
-                        squeeze_func_nb: tp.GroupSqueezeFunc, *args,
-                        group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def squeeze_grouped(
+        self,
+        squeeze_func: tp.GroupSqueezeFunc,
+        *args,
+        engine: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Squeeze each group of elements into a single element.
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.squeeze_grouped`."""
+        engine = engine if engine is not None else self.engine
         obj_frame = self.obj.to_frame().transpose()
-        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func_nb, *args, group_by=group_by).iloc[0]
+        squeezed = obj_frame.vbt.squeeze_grouped(squeeze_func, *args, engine=engine, group_by=group_by).iloc[0]
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
         return ArrayWrapper.from_obj(obj_frame).wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
 
-    def flatten_grouped(self,
-                        group_by: tp.GroupByLike = None,
-                        order: str = 'C',
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def flatten_grouped(
+        self,
+        group_by: tp.GroupByLike = None,
+        order: str = "C",
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeSeries:
         """Flatten each group of elements.
 
         Based on `vectorbt.generic.accessors.GenericDFAccessor.flatten_grouped`."""
+        engine = engine if engine is not None else self.engine
         obj_frame = self.obj.to_frame().transpose()
-        return obj_frame.vbt.flatten_grouped(group_by=group_by, order=order, wrap_kwargs=wrap_kwargs)
+        return obj_frame.vbt.flatten_grouped(group_by=group_by, order=order, wrap_kwargs=wrap_kwargs, engine=engine)
 
-    def plot_against(self,
-                     other: tp.ArrayLike,
-                     trace_kwargs: tp.KwargsLike = None,
-                     other_trace_kwargs: tp.Union[str, tp.KwargsLike] = None,
-                     pos_trace_kwargs: tp.KwargsLike = None,
-                     neg_trace_kwargs: tp.KwargsLike = None,
-                     hidden_trace_kwargs: tp.KwargsLike = None,
-                     add_trace_kwargs: tp.KwargsLike = None,
-                     fig: tp.Optional[tp.BaseFigure] = None,
-                     **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_against(
+        self,
+        other: tp.ArrayLike,
+        trace_kwargs: tp.KwargsLike = None,
+        other_trace_kwargs: tp.Union[str, tp.KwargsLike] = None,
+        pos_trace_kwargs: tp.KwargsLike = None,
+        neg_trace_kwargs: tp.KwargsLike = None,
+        hidden_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot Series as a line against another line.
 
         Args:
@@ -1846,7 +2161,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_trace_kwargs = {}
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
-        obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
+        obj, other = reshape_fns.broadcast(self.obj, other, columns_from="keep")
         checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_figure()
@@ -1859,35 +2174,35 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             pos_obj = self.obj.copy()
             pos_obj[~pos_mask] = other[~pos_mask]
             other.vbt.plot(
-                trace_kwargs=merge_dicts(dict(
-                    line=dict(
-                        color='rgba(0, 0, 0, 0)',
-                        width=0
+                trace_kwargs=merge_dicts(
+                    dict(
+                        line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                        opacity=0,
+                        hoverinfo="skip",
+                        showlegend=False,
+                        name=None,
                     ),
-                    opacity=0,
-                    hoverinfo='skip',
-                    showlegend=False,
-                    name=None,
-                ), hidden_trace_kwargs),
+                    hidden_trace_kwargs,
+                ),
                 add_trace_kwargs=add_trace_kwargs,
-                fig=fig
+                fig=fig,
             )
             pos_obj.vbt.plot(
-                trace_kwargs=merge_dicts(dict(
-                    fillcolor='rgba(0, 128, 0, 0.3)',
-                    line=dict(
-                        color='rgba(0, 0, 0, 0)',
-                        width=0
+                trace_kwargs=merge_dicts(
+                    dict(
+                        fillcolor="rgba(0, 128, 0, 0.3)",
+                        line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                        opacity=0,
+                        fill="tonexty",
+                        connectgaps=False,
+                        hoverinfo="skip",
+                        showlegend=False,
+                        name=None,
                     ),
-                    opacity=0,
-                    fill='tonexty',
-                    connectgaps=False,
-                    hoverinfo='skip',
-                    showlegend=False,
-                    name=None
-                ), pos_trace_kwargs),
+                    pos_trace_kwargs,
+                ),
                 add_trace_kwargs=add_trace_kwargs,
-                fig=fig
+                fig=fig,
             )
         neg_mask = self.obj < other
         if neg_mask.any():
@@ -1895,60 +2210,59 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_obj = self.obj.copy()
             neg_obj[~neg_mask] = other[~neg_mask]
             other.vbt.plot(
-                trace_kwargs=merge_dicts(dict(
-                    line=dict(
-                        color='rgba(0, 0, 0, 0)',
-                        width=0
+                trace_kwargs=merge_dicts(
+                    dict(
+                        line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                        opacity=0,
+                        hoverinfo="skip",
+                        showlegend=False,
+                        name=None,
                     ),
-                    opacity=0,
-                    hoverinfo='skip',
-                    showlegend=False,
-                    name=None
-                ), hidden_trace_kwargs),
+                    hidden_trace_kwargs,
+                ),
                 add_trace_kwargs=add_trace_kwargs,
-                fig=fig
+                fig=fig,
             )
             neg_obj.vbt.plot(
-                trace_kwargs=merge_dicts(dict(
-                    line=dict(
-                        color='rgba(0, 0, 0, 0)',
-                        width=0
+                trace_kwargs=merge_dicts(
+                    dict(
+                        line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                        fillcolor="rgba(255, 0, 0, 0.3)",
+                        opacity=0,
+                        fill="tonexty",
+                        connectgaps=False,
+                        hoverinfo="skip",
+                        showlegend=False,
+                        name=None,
                     ),
-                    fillcolor='rgba(255, 0, 0, 0.3)',
-                    opacity=0,
-                    fill='tonexty',
-                    connectgaps=False,
-                    hoverinfo='skip',
-                    showlegend=False,
-                    name=None
-                ), neg_trace_kwargs),
+                    neg_trace_kwargs,
+                ),
                 add_trace_kwargs=add_trace_kwargs,
-                fig=fig
+                fig=fig,
             )
 
         # Plot main traces
         self.plot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        if other_trace_kwargs == 'hidden':
+        if other_trace_kwargs == "hidden":
             other_trace_kwargs = dict(
-                line=dict(
-                    color='rgba(0, 0, 0, 0)',
-                    width=0
-                ),
-                opacity=0.,
-                hoverinfo='skip',
+                line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                opacity=0.0,
+                hoverinfo="skip",
                 showlegend=False,
-                name=None
+                name=None,
             )
         other.vbt.plot(trace_kwargs=other_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         return fig
 
-    def overlay_with_heatmap(self,
-                             other: tp.ArrayLike,
-                             trace_kwargs: tp.KwargsLike = None,
-                             heatmap_kwargs: tp.KwargsLike = None,
-                             add_trace_kwargs: tp.KwargsLike = None,
-                             fig: tp.Optional[tp.BaseFigure] = None,
-                             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def overlay_with_heatmap(
+        self,
+        other: tp.ArrayLike,
+        trace_kwargs: tp.KwargsLike = None,
+        heatmap_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot Series as a line and overlays it with a heatmap.
 
         Args:
@@ -1967,7 +2281,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             ![](/assets/images/sr_overlay_with_heatmap.svg)
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1976,35 +2291,40 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
 
-        obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
+        obj, other = reshape_fns.broadcast(self.obj, other, columns_from="keep")
         checks.assert_instance_of(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
-            if 'width' in plotting_cfg['layout']:
-                fig.update_layout(width=plotting_cfg['layout']['width'] + 100)
+            if "width" in plotting_cfg["layout"]:
+                fig.update_layout(width=plotting_cfg["layout"]["width"] + 100)
         fig.update_layout(**layout_kwargs)
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         self.plot(
-            trace_kwargs=merge_dicts(dict(line=dict(color=plotting_cfg['color_schema']['blue'])), trace_kwargs),
+            trace_kwargs=merge_dicts(
+                dict(line=dict(color=plotting_cfg["color_schema"]["blue"])),
+                trace_kwargs,
+            ),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),
-            fig=fig
+            fig=fig,
         )
         return fig
 
-    def heatmap(self,
-                x_level: tp.Optional[tp.Level] = None,
-                y_level: tp.Optional[tp.Level] = None,
-                symmetric: bool = False,
-                sort: bool = True,
-                x_labels: tp.Optional[tp.Labels] = None,
-                y_labels: tp.Optional[tp.Labels] = None,
-                slider_level: tp.Optional[tp.Level] = None,
-                active: int = 0,
-                slider_labels: tp.Optional[tp.Labels] = None,
-                return_fig: bool = True,
-                fig: tp.Optional[tp.BaseFigure] = None,
-                **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
+    def heatmap(
+        self,
+        x_level: tp.Optional[tp.Level] = None,
+        y_level: tp.Optional[tp.Level] = None,
+        symmetric: bool = False,
+        sort: bool = True,
+        x_labels: tp.Optional[tp.Labels] = None,
+        y_labels: tp.Optional[tp.Labels] = None,
+        slider_level: tp.Optional[tp.Level] = None,
+        active: int = 0,
+        slider_labels: tp.Optional[tp.Labels] = None,
+        return_fig: bool = True,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Create a heatmap figure based on object's multi-index and values.
 
         If index is not a multi-index, converts Series into a DataFrame and calls `GenericDFAccessor.heatmap`.
@@ -2062,36 +2382,49 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         """
         if not isinstance(self.wrapper.index, pd.MultiIndex):
             return self.obj.to_frame().vbt.heatmap(
-                x_labels=x_labels, y_labels=y_labels,
-                return_fig=return_fig, fig=fig, **kwargs)
+                x_labels=x_labels,
+                y_labels=y_labels,
+                return_fig=return_fig,
+                fig=fig,
+                **kwargs,
+            )
 
         (x_level, y_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
             required_levels=(x_level, y_level),
-            optional_levels=(slider_level,)
+            optional_levels=(slider_level,),
         )
 
         x_level_vals = self.wrapper.index.get_level_values(x_level)
         y_level_vals = self.wrapper.index.get_level_values(y_level)
-        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
-        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                hovertemplate=f"{x_name}: %{{x}}<br>" +
-                              f"{y_name}: %{{y}}<br>" +
-                              "value: %{z}<extra></extra>"
+        x_name = x_level_vals.name if x_level_vals.name is not None else "x"
+        y_name = y_level_vals.name if y_level_vals.name is not None else "y"
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(
+                    hovertemplate=f"{x_name}: %{{x}}<br>" + f"{y_name}: %{{y}}<br>" + "value: %{z}<extra></extra>"
+                ),
+                xaxis_title=x_level_vals.name,
+                yaxis_title=y_level_vals.name,
             ),
-            xaxis_title=x_level_vals.name,
-            yaxis_title=y_level_vals.name
-        ), kwargs)
+            kwargs,
+        )
 
         if slider_level is None:
             # No grouping
             df = self.unstack_to_df(
-                index_levels=y_level, column_levels=x_level,
-                symmetric=symmetric, sort=sort
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
             )
-            return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
+            return df.vbt.heatmap(
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                return_fig=return_fig,
+                **kwargs,
+            )
 
         # Requires grouping
         # See https://plotly.com/python/sliders/
@@ -2103,71 +2436,78 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 name = slider_labels[i]
             _slider_labels.append(name)
             df = group.vbt.unstack_to_df(
-                index_levels=y_level, column_levels=x_level,
-                symmetric=symmetric, sort=sort
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
             )
             if x_labels is None:
                 x_labels = df.columns
             if y_labels is None:
                 y_labels = df.index
-            _kwargs = merge_dicts(dict(
-                trace_kwargs=dict(
-                    name=str(name) if name is not None else None,
-                    visible=False
+            _kwargs = merge_dicts(
+                dict(
+                    trace_kwargs=dict(name=str(name) if name is not None else None, visible=False),
                 ),
-            ), kwargs)
-            default_size = fig is None and 'height' not in _kwargs
+                kwargs,
+            )
+            default_size = fig is None and "height" not in _kwargs
             fig = plotting.Heatmap(
                 data=reshape_fns.to_2d_array(df),
                 x_labels=x_labels,
                 y_labels=y_labels,
                 fig=fig,
-                **_kwargs
+                **_kwargs,
             ).fig
             if default_size:
-                fig.layout['height'] += 100  # slider takes up space
+                fig.layout["height"] += 100  # slider takes up space
         fig.data[active].visible = True
         steps = []
         for i in range(len(fig.data)):
             step = dict(
                 method="update",
                 args=[{"visible": [False] * len(fig.data)}, {}],
-                label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
+                label=str(_slider_labels[i]) if _slider_labels[i] is not None else None,
             )
             step["args"][0]["visible"][i] = True
             steps.append(step)
-        prefix = f'{self.wrapper.index.names[slider_level]}: ' \
-            if self.wrapper.index.names[slider_level] is not None else None
-        sliders = [dict(
-            active=active,
-            currentvalue={"prefix": prefix},
-            pad={"t": 50},
-            steps=steps
-        )]
-        fig.update_layout(
-            sliders=sliders
+        prefix = (
+            f"{self.wrapper.index.names[slider_level]}: "
+            if self.wrapper.index.names[slider_level] is not None
+            else None
         )
+        sliders = [
+            dict(
+                active=active,
+                currentvalue={"prefix": prefix},
+                pad={"t": 50},
+                steps=steps,
+            )
+        ]
+        fig.update_layout(sliders=sliders)
         return fig
 
     def ts_heatmap(self, **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.to_frame().vbt.ts_heatmap(**kwargs)
 
-    def volume(self,
-               x_level: tp.Optional[tp.Level] = None,
-               y_level: tp.Optional[tp.Level] = None,
-               z_level: tp.Optional[tp.Level] = None,
-               x_labels: tp.Optional[tp.Labels] = None,
-               y_labels: tp.Optional[tp.Labels] = None,
-               z_labels: tp.Optional[tp.Labels] = None,
-               slider_level: tp.Optional[tp.Level] = None,
-               slider_labels: tp.Optional[tp.Labels] = None,
-               active: int = 0,
-               scene_name: str = 'scene',
-               fillna: tp.Optional[tp.Number] = None,
-               fig: tp.Optional[tp.BaseFigure] = None,
-               return_fig: bool = True,
-               **kwargs) -> tp.Union[tp.BaseFigure, plotting.Volume]:  # pragma: no cover
+    def volume(
+        self,
+        x_level: tp.Optional[tp.Level] = None,
+        y_level: tp.Optional[tp.Level] = None,
+        z_level: tp.Optional[tp.Level] = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        y_labels: tp.Optional[tp.Labels] = None,
+        z_labels: tp.Optional[tp.Labels] = None,
+        slider_level: tp.Optional[tp.Level] = None,
+        slider_labels: tp.Optional[tp.Labels] = None,
+        active: int = 0,
+        scene_name: str = "scene",
+        fillna: tp.Optional[tp.Number] = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Volume]:  # pragma: no cover
         """Create a 3D volume figure based on object's multi-index and values.
 
         If multi-index contains more than three levels or you want them in specific order, pass
@@ -2198,7 +2538,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
             required_levels=(x_level, y_level, z_level),
-            optional_levels=(slider_level,)
+            optional_levels=(slider_level,),
         )
 
         x_level_vals = self.wrapper.index.get_level_values(x_level)
@@ -2212,22 +2552,22 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if z_labels is None:
             z_labels = np.unique(z_level_vals)
 
-        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
-        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
-        z_name = z_level_vals.name if z_level_vals.name is not None else 'z'
+        x_name = x_level_vals.name if x_level_vals.name is not None else "x"
+        y_name = y_level_vals.name if y_level_vals.name is not None else "y"
+        z_name = z_level_vals.name if z_level_vals.name is not None else "z"
         def_kwargs = dict()
-        def_kwargs['trace_kwargs'] = dict(
-            hovertemplate=f"{x_name}: %{{x}}<br>" +
-                          f"{y_name}: %{{y}}<br>" +
-                          f"{z_name}: %{{z}}<br>" +
-                          "value: %{value}<extra></extra>"
+        def_kwargs["trace_kwargs"] = dict(
+            hovertemplate=f"{x_name}: %{{x}}<br>"
+            + f"{y_name}: %{{y}}<br>"
+            + f"{z_name}: %{{z}}<br>"
+            + "value: %{value}<extra></extra>"
         )
         def_kwargs[scene_name] = dict(
             xaxis_title=x_level_vals.name,
             yaxis_title=y_level_vals.name,
-            zaxis_title=z_level_vals.name
+            zaxis_title=z_level_vals.name,
         )
-        def_kwargs['scene_name'] = scene_name
+        def_kwargs["scene_name"] = scene_name
         kwargs = merge_dicts(def_kwargs, kwargs)
 
         contains_nan = False
@@ -2244,7 +2584,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 y_labels=y_labels,
                 z_labels=z_labels,
                 fig=fig,
-                **kwargs
+                **kwargs,
             )
             if return_fig:
                 fig = volume.fig
@@ -2265,59 +2605,64 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                     v = np.nan_to_num(v, nan=fillna)
                 if np.isnan(v).any():
                     contains_nan = True
-                _kwargs = merge_dicts(dict(
-                    trace_kwargs=dict(
-                        name=str(name) if name is not None else None,
-                        visible=False
-                    )
-                ), kwargs)
-                default_size = fig is None and 'height' not in _kwargs
+                _kwargs = merge_dicts(
+                    dict(trace_kwargs=dict(name=str(name) if name is not None else None, visible=False)),
+                    kwargs,
+                )
+                default_size = fig is None and "height" not in _kwargs
                 fig = plotting.Volume(
                     data=v,
                     x_labels=x_labels,
                     y_labels=y_labels,
                     z_labels=z_labels,
                     fig=fig,
-                    **_kwargs
+                    **_kwargs,
                 ).fig
                 if default_size:
-                    fig.layout['height'] += 100  # slider takes up space
+                    fig.layout["height"] += 100  # slider takes up space
             fig.data[active].visible = True
             steps = []
             for i in range(len(fig.data)):
                 step = dict(
                     method="update",
                     args=[{"visible": [False] * len(fig.data)}, {}],
-                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
+                    label=(str(_slider_labels[i]) if _slider_labels[i] is not None else None),
                 )
                 step["args"][0]["visible"][i] = True
                 steps.append(step)
-            prefix = f'{self.wrapper.index.names[slider_level]}: ' \
-                if self.wrapper.index.names[slider_level] is not None else None
-            sliders = [dict(
-                active=active,
-                currentvalue={"prefix": prefix},
-                pad={"t": 50},
-                steps=steps
-            )]
-            fig.update_layout(
-                sliders=sliders
+            prefix = (
+                f"{self.wrapper.index.names[slider_level]}: "
+                if self.wrapper.index.names[slider_level] is not None
+                else None
             )
+            sliders = [
+                dict(
+                    active=active,
+                    currentvalue={"prefix": prefix},
+                    pad={"t": 50},
+                    steps=steps,
+                )
+            ]
+            fig.update_layout(sliders=sliders)
 
         if contains_nan:
-            warnings.warn("Data contains NaNs. Use `fillna` argument or "
-                          "`show` method in case of visualization issues.", stacklevel=2)
+            warnings.warn(
+                "Data contains NaNs. Use `fillna` argument or " "`show` method in case of visualization issues.",
+                stacklevel=2,
+            )
         return fig
 
-    def qqplot(self,
-               sparams: tp.Union[tp.Iterable, tuple, None] = (),
-               dist: str = 'norm',
-               plot_line: bool = True,
-               line_shape_kwargs: tp.KwargsLike = None,
-               xref: str = 'x',
-               yref: str = 'y',
-               fig: tp.Optional[tp.BaseFigure] = None,
-               **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def qqplot(
+        self,
+        sparams: tp.Union[tp.Iterable, tuple, None] = (),
+        dist: str = "norm",
+        plot_line: bool = True,
+        line_shape_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot probability plot using `scipy.stats.probplot`.
 
         `**kwargs` are passed to `GenericAccessor.scatterplot`.
@@ -2337,18 +2682,21 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 line_shape_kwargs = {}
             x = np.array([qq[0][0][0], qq[0][0][-1]])
             y = qq[1][1] + qq[1][0] * x
-            fig.add_shape(**merge_dicts(dict(
-                type="line",
-                xref=xref,
-                yref=yref,
-                x0=x[0],
-                y0=y[0],
-                x1=x[1],
-                y1=y[1],
-                line=dict(
-                    color='red'
+            fig.add_shape(
+                **merge_dicts(
+                    dict(
+                        type="line",
+                        xref=xref,
+                        yref=yref,
+                        x0=x[0],
+                        y0=y[0],
+                        x1=x[1],
+                        y1=y[1],
+                        line=dict(color="red"),
+                    ),
+                    line_shape_kwargs,
                 )
-            ), line_shape_kwargs))
+            )
 
         return fig
 
@@ -2362,13 +2710,17 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         BaseDFAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
-    def squeeze_grouped(self,
-                        squeeze_func_nb: tp.GroupSqueezeFunc, *args,
-                        group_by: tp.GroupByLike = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def squeeze_grouped(
+        self,
+        squeeze_func: tp.GroupSqueezeFunc,
+        *args,
+        engine: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Squeeze each group of columns into a single column.
 
-        See `vectorbt.generic.nb.squeeze_grouped_nb`.
+        See `vectorbt.generic.dispatch.squeeze_grouped`.
 
         Usage:
             ```pycon
@@ -2383,22 +2735,26 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             2020-01-05    3.0     1.0
             ```
         """
+        engine = engine if engine is not None else self.engine
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
-        checks.assert_numba_func(squeeze_func_nb)
+        checks.assert_engine_func(squeeze_func, engine=engine, func_suffix="_squeeze")
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, squeeze_func_nb, *args)
+        out = dispatch.squeeze_grouped(self.to_2d_array(), group_lens, squeeze_func, *args, engine=engine)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def flatten_grouped(self,
-                        group_by: tp.GroupByLike = None,
-                        order: str = 'C',
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def flatten_grouped(
+        self,
+        group_by: tp.GroupByLike = None,
+        order: str = "C",
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.SeriesFrame:
         """Flatten each group of columns.
 
-        See `vectorbt.generic.nb.flatten_grouped_nb`.
-        If all groups have the same length, see `vectorbt.generic.nb.flatten_uniform_grouped_nb`.
+        See `vectorbt.generic.dispatch.flatten_grouped`.
+        If all groups have the same length, see `vectorbt.generic.dispatch.flatten_uniform_grouped`.
 
         !!! warning
             Make sure that the distribution of group lengths is close to uniform, otherwise
@@ -2434,29 +2790,32 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             2020-01-05    1.0     NaN
             ```
         """
+        engine = engine if engine is not None else self.engine
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
-        checks.assert_in(order.upper(), ['C', 'F'])
+        checks.assert_in(order.upper(), ["C", "F"])
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         if np.all(group_lens == group_lens.item(0)):
-            func = nb.flatten_uniform_grouped_nb
+            func = dispatch.flatten_uniform_grouped
         else:
-            func = nb.flatten_grouped_nb
-        if order.upper() == 'C':
-            out = func(self.to_2d_array(), group_lens, True)
+            func = dispatch.flatten_grouped
+        if order.upper() == "C":
+            out = func(self.to_2d_array(), group_lens, True, engine=engine)
             new_index = index_fns.repeat_index(self.wrapper.index, np.max(group_lens))
         else:
-            out = func(self.to_2d_array(), group_lens, False)
+            out = func(self.to_2d_array(), group_lens, False, engine=engine)
             new_index = index_fns.tile_index(self.wrapper.index, np.max(group_lens))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
 
-    def heatmap(self,
-                x_labels: tp.Optional[tp.Labels] = None,
-                y_labels: tp.Optional[tp.Labels] = None,
-                return_fig: bool = True,
-                **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
+    def heatmap(
+        self,
+        x_labels: tp.Optional[tp.Labels] = None,
+        y_labels: tp.Optional[tp.Labels] = None,
+        return_fig: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Create `vectorbt.generic.plotting.Heatmap` and return the figure.
 
         Usage:
@@ -2475,17 +2834,15 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             x_labels = self.wrapper.columns
         if y_labels is None:
             y_labels = self.wrapper.index
-        heatmap = plotting.Heatmap(
-            data=self.to_2d_array(),
-            x_labels=x_labels,
-            y_labels=y_labels,
-            **kwargs
-        )
+        heatmap = plotting.Heatmap(data=self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, **kwargs)
         if return_fig:
             return heatmap.fig
         return heatmap
 
-    def ts_heatmap(self, is_y_category: bool = True,
-                   **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
+    def ts_heatmap(
+        self,
+        is_y_category: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)

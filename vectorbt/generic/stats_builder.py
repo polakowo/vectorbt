@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Mixin for building statistics out of performance metrics."""
@@ -43,7 +43,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     @property
     def writeable_attrs(self) -> tp.Set[str]:
         """Set of writeable attributes that will be saved/copied along with the config."""
-        return {'_metrics'}
+        return {"_metrics"}
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -51,36 +51,24 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         See `stats_builder` in `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        stats_builder_cfg = settings['stats_builder']
 
-        return merge_dicts(
-            stats_builder_cfg,
-            dict(settings=dict(freq=self.wrapper.freq))
-        )
+        stats_builder_cfg = settings["stats_builder"]
+
+        return merge_dicts(stats_builder_cfg, dict(settings=dict(freq=self.wrapper.freq)))
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
-            )
+                tags="wrapper",
+            ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -98,17 +86,19 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         or overwrite the instance variable `${cls_name}._metrics`."""
         return self._metrics
 
-    def stats(self,
-              metrics: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
-              tags: tp.Optional[tp.MaybeIterable[str]] = None,
-              column: tp.Optional[tp.Label] = None,
-              group_by: tp.GroupByLike = None,
-              agg_func: tp.Optional[tp.Callable] = np.mean,
-              silence_warnings: tp.Optional[bool] = None,
-              template_mapping: tp.Optional[tp.Mapping] = None,
-              settings: tp.KwargsLike = None,
-              filters: tp.KwargsLike = None,
-              metric_settings: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
+    def stats(
+        self,
+        metrics: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
+        tags: tp.Optional[tp.MaybeIterable[str]] = None,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        agg_func: tp.Optional[tp.Callable] = np.mean,
+        silence_warnings: tp.Optional[bool] = None,
+        template_mapping: tp.Optional[tp.Mapping] = None,
+        settings: tp.KwargsLike = None,
+        filters: tp.KwargsLike = None,
+        metric_settings: tp.KwargsLike = None,
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Compute various metrics on this object.
 
         Args:
@@ -246,11 +236,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         """
         # Resolve defaults
         if silence_warnings is None:
-            silence_warnings = self.stats_defaults.get('silence_warnings', False)
-        template_mapping = merge_dicts(self.stats_defaults.get('template_mapping', {}), template_mapping)
-        filters = merge_dicts(self.stats_defaults.get('filters', {}), filters)
-        settings = merge_dicts(self.stats_defaults.get('settings', {}), settings)
-        metric_settings = merge_dicts(self.stats_defaults.get('metric_settings', {}), metric_settings)
+            silence_warnings = self.stats_defaults.get("silence_warnings", False)
+        template_mapping = merge_dicts(self.stats_defaults.get("template_mapping", {}), template_mapping)
+        filters = merge_dicts(self.stats_defaults.get("filters", {}), filters)
+        settings = merge_dicts(self.stats_defaults.get("settings", {}), settings)
+        metric_settings = merge_dicts(self.stats_defaults.get("metric_settings", {}), metric_settings)
 
         # Replace templates globally (not used at metric level)
         if len(template_mapping) > 0:
@@ -259,16 +249,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             sub_settings = settings
 
         # Resolve self
-        reself = self.resolve_self(
-            cond_kwargs=sub_settings,
-            impacts_caching=False,
-            silence_warnings=silence_warnings
-        )
+        reself = self.resolve_self(cond_kwargs=sub_settings, impacts_caching=False, silence_warnings=silence_warnings)
 
         # Prepare metrics
         if metrics is None:
-            metrics = reself.stats_defaults.get('metrics', 'all')
-        if metrics == 'all':
+            metrics = reself.stats_defaults.get("metrics", "all")
+        if metrics == "all":
             metrics = reself.metrics
         if isinstance(metrics, dict):
             metrics = list(metrics.items())
@@ -277,8 +263,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Prepare tags
         if tags is None:
-            tags = reself.stats_defaults.get('tags', 'all')
-        if isinstance(tags, str) and tags == 'all':
+            tags = reself.stats_defaults.get("tags", "all")
+        if isinstance(tags, str) and tags == "all":
             tags = None
         if isinstance(tags, (str, tuple)):
             tags = [tags]
@@ -300,7 +286,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         for i, (metric_name, _metric_settings) in enumerate(metrics):
             if metric_counts[metric_name] > 1:
                 metric_i[metric_name] += 1
-                metric_name = metric_name + '_' + str(metric_i[metric_name])
+                metric_name = metric_name + "_" + str(metric_i[metric_name])
             metrics_dct[metric_name] = _metric_settings
 
         # Check metric_settings
@@ -322,18 +308,14 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     metric_name=metric_name,
                     agg_func=agg_func,
                     silence_warnings=silence_warnings,
-                    to_timedelta=None
+                    to_timedelta=None,
                 ),
-                settings
+                settings,
             )
             _metric_settings = _metric_settings.copy()
             passed_metric_settings = metric_settings.get(metric_name, {})
-            merged_settings = merge_dicts(
-                opt_settings,
-                _metric_settings,
-                passed_metric_settings
-            )
-            metric_template_mapping = merged_settings.pop('template_mapping', {})
+            merged_settings = merge_dicts(opt_settings, _metric_settings, passed_metric_settings)
+            metric_template_mapping = merged_settings.pop("template_mapping", {})
             template_mapping_merged = merge_dicts(template_mapping, metric_template_mapping)
             template_mapping_merged = deep_substitute(template_mapping_merged, mapping=merged_settings)
             mapping = merge_dicts(template_mapping_merged, merged_settings)
@@ -341,7 +323,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
             # Filter by tag
             if tags is not None:
-                in_tags = merged_settings.get('tags', None)
+                in_tags = merged_settings.get("tags", None)
                 if in_tags is None or not match_tags(tags, in_tags):
                     metrics_dct.pop(metric_name, None)
                     continue
@@ -352,7 +334,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 cond_kwargs=merged_settings,
                 custom_arg_names=custom_arg_names,
                 impacts_caching=True,
-                silence_warnings=merged_settings['silence_warnings']
+                silence_warnings=merged_settings["silence_warnings"],
             )
 
             metrics_dct[metric_name] = merged_settings
@@ -365,15 +347,15 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         for metric_name, _metric_settings in list(metrics_dct.items()):
             custom_reself = resolved_self_dct[metric_name]
             mapping = mapping_dct[metric_name]
-            _silence_warnings = _metric_settings.get('silence_warnings')
+            _silence_warnings = _metric_settings.get("silence_warnings")
 
             metric_filters = set()
             for k in _metric_settings.keys():
                 filter_name = None
-                if k.startswith('check_'):
-                    filter_name = k[len('check_'):]
-                elif k.startswith('inv_check_'):
-                    filter_name = k[len('inv_check_'):]
+                if k.startswith("check_"):
+                    filter_name = k[len("check_") :]
+                elif k.startswith("inv_check_"):
+                    filter_name = k[len("inv_check_") :]
                 if filter_name is not None:
                     if filter_name not in filters:
                         raise ValueError(f"Metric '{metric_name}' requires filter '{filter_name}'")
@@ -382,11 +364,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             for filter_name in metric_filters:
                 filter_settings = filters[filter_name]
                 _filter_settings = deep_substitute(filter_settings, mapping=mapping)
-                filter_func = _filter_settings['filter_func']
-                warning_message = _filter_settings.get('warning_message', None)
-                inv_warning_message = _filter_settings.get('inv_warning_message', None)
-                to_check = _metric_settings.get('check_' + filter_name, False)
-                inv_to_check = _metric_settings.get('inv_check_' + filter_name, False)
+                filter_func = _filter_settings["filter_func"]
+                warning_message = _filter_settings.get("warning_message", None)
+                inv_warning_message = _filter_settings.get("inv_warning_message", None)
+                to_check = _metric_settings.get("check_" + filter_name, False)
+                inv_to_check = _metric_settings.get("inv_check_" + filter_name, False)
 
                 if to_check or inv_to_check:
                     whether_true = filter_func(custom_reself, _metric_settings)
@@ -423,51 +405,53 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):
-                    if k.startswith('check_') or k.startswith('inv_check_') or k in ('tags',):
+                    if k.startswith("check_") or k.startswith("inv_check_") or k in ("tags",):
                         final_kwargs.pop(k, None)
 
                 # Get metric-specific values
-                _column = final_kwargs.get('column')
-                _group_by = final_kwargs.get('group_by')
-                _agg_func = final_kwargs.get('agg_func')
-                _silence_warnings = final_kwargs.get('silence_warnings')
-                if final_kwargs['to_timedelta'] is None:
-                    final_kwargs['to_timedelta'] = custom_reself.wrapper.freq is not None
-                to_timedelta = final_kwargs.get('to_timedelta')
-                title = final_kwargs.pop('title', metric_name)
-                calc_func = final_kwargs.pop('calc_func')
-                resolve_calc_func = final_kwargs.pop('resolve_calc_func', True)
-                post_calc_func = final_kwargs.pop('post_calc_func', None)
-                use_caching = final_kwargs.pop('use_caching', True)
-                fill_wrap_kwargs = final_kwargs.pop('fill_wrap_kwargs', False)
+                _column = final_kwargs.get("column")
+                _group_by = final_kwargs.get("group_by")
+                _agg_func = final_kwargs.get("agg_func")
+                _silence_warnings = final_kwargs.get("silence_warnings")
+                if final_kwargs["to_timedelta"] is None:
+                    final_kwargs["to_timedelta"] = custom_reself.wrapper.freq is not None
+                to_timedelta = final_kwargs.get("to_timedelta")
+                title = final_kwargs.pop("title", metric_name)
+                calc_func = final_kwargs.pop("calc_func")
+                resolve_calc_func = final_kwargs.pop("resolve_calc_func", True)
+                post_calc_func = final_kwargs.pop("post_calc_func", None)
+                use_caching = final_kwargs.pop("use_caching", True)
+                fill_wrap_kwargs = final_kwargs.pop("fill_wrap_kwargs", False)
                 if fill_wrap_kwargs:
-                    final_kwargs['wrap_kwargs'] = merge_dicts(
+                    final_kwargs["wrap_kwargs"] = merge_dicts(
                         dict(to_timedelta=to_timedelta, silence_warnings=_silence_warnings),
-                        final_kwargs.get('wrap_kwargs', None)
+                        final_kwargs.get("wrap_kwargs", None),
                     )
-                apply_to_timedelta = final_kwargs.pop('apply_to_timedelta', False)
+                apply_to_timedelta = final_kwargs.pop("apply_to_timedelta", False)
 
                 # Resolve calc_func
                 if resolve_calc_func:
                     if not callable(calc_func):
                         passed_kwargs_out = {}
 
-                        def _getattr_func(obj: tp.Any,
-                                          attr: str,
-                                          args: tp.ArgsLike = None,
-                                          kwargs: tp.KwargsLike = None,
-                                          call_attr: bool = True,
-                                          _final_kwargs: tp.Kwargs = final_kwargs,
-                                          _opt_arg_names: tp.Set[str] = opt_arg_names,
-                                          _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
+                        def _getattr_func(
+                            obj: tp.Any,
+                            attr: str,
+                            args: tp.ArgsLike = None,
+                            kwargs: tp.KwargsLike = None,
+                            call_attr: bool = True,
+                            _final_kwargs: tp.Kwargs = final_kwargs,
+                            _opt_arg_names: tp.Set[str] = opt_arg_names,
+                            _custom_arg_names: tp.Set[str] = custom_arg_names,
+                            _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                        ) -> tp.Any:
                             if attr in final_kwargs:
                                 return final_kwargs[attr]
                             if args is None:
                                 args = ()
                             if kwargs is None:
                                 kwargs = {}
-                            if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
+                            if obj is custom_reself and _final_kwargs.pop("resolve_path_" + attr, True):
                                 if call_attr:
                                     return custom_reself.resolve_attr(
                                         attr,
@@ -477,7 +461,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                         custom_arg_names=_custom_arg_names,
                                         cache_dct=_arg_cache_dct,
                                         use_caching=use_caching,
-                                        passed_kwargs_out=passed_kwargs_out
+                                        passed_kwargs_out=passed_kwargs_out,
                                     )
                                 return getattr(obj, attr)
                             out = getattr(obj, attr)
@@ -488,39 +472,39 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         calc_func = custom_reself.deep_getattr(
                             calc_func,
                             getattr_func=_getattr_func,
-                            call_last_attr=False
+                            call_last_attr=False,
                         )
 
-                        if 'group_by' in passed_kwargs_out:
-                            if 'pass_group_by' not in final_kwargs:
-                                final_kwargs.pop('group_by', None)
+                        if "group_by" in passed_kwargs_out:
+                            if "pass_group_by" not in final_kwargs:
+                                final_kwargs.pop("group_by", None)
 
                     # Resolve arguments
                     if callable(calc_func):
                         func_arg_names = get_func_arg_names(calc_func)
                         for k in func_arg_names:
                             if k not in final_kwargs:
-                                if final_kwargs.pop('resolve_' + k, False):
+                                if final_kwargs.pop("resolve_" + k, False):
                                     try:
                                         arg_out = custom_reself.resolve_attr(
                                             k,
                                             cond_kwargs=final_kwargs,
                                             custom_arg_names=custom_arg_names,
                                             cache_dct=arg_cache_dct,
-                                            use_caching=use_caching
+                                            use_caching=use_caching,
                                         )
                                     except AttributeError:
                                         continue
                                     final_kwargs[k] = arg_out
                         for k in list(final_kwargs.keys()):
                             if k in opt_arg_names:
-                                if 'pass_' + k in final_kwargs:
-                                    if not final_kwargs.get('pass_' + k):  # first priority
+                                if "pass_" + k in final_kwargs:
+                                    if not final_kwargs.get("pass_" + k):  # first priority
                                         final_kwargs.pop(k, None)
                                 elif k not in func_arg_names:  # second priority
                                     final_kwargs.pop(k, None)
                         for k in list(final_kwargs.keys()):
-                            if k.startswith('pass_') or k.startswith('resolve_'):
+                            if k.startswith("pass_") or k.startswith("resolve_"):
                                 final_kwargs.pop(k, None)  # cleanup
 
                         # Call calc_func
@@ -547,15 +531,17 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         if title is None:
                             t = str(k)
                         else:
-                            t = title + ': ' + str(k)
+                            t = title + ": " + str(k)
                     else:
                         t = title
 
                     # Check result type
                     if checks.is_any_array(v) and not checks.is_series(v):
-                        raise TypeError("calc_func must return either a scalar for one column/group, "
-                                        "pd.Series for multiple columns/groups, or a dict of such. "
-                                        f"Not {type(v)}.")
+                        raise TypeError(
+                            "calc_func must return either a scalar for one column/group, "
+                            "pd.Series for multiple columns/groups, or a dict of such. "
+                            f"Not {type(v)}."
+                        )
 
                     # Handle apply_to_timedelta
                     if apply_to_timedelta and to_timedelta:
@@ -565,14 +551,20 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     if checks.is_series(v):
                         if _column is not None:
                             v = custom_reself.select_one_from_obj(
-                                v, custom_reself.wrapper.regroup(_group_by), column=_column)
+                                v,
+                                custom_reself.wrapper.regroup(_group_by),
+                                column=_column,
+                            )
                         elif _agg_func is not None and agg_func is not None:
                             v = _agg_func(v)
                             used_agg_func = True
                         elif _agg_func is None and agg_func is not None:
                             if not _silence_warnings:
-                                warnings.warn(f"Metric '{metric_name}' returned multiple values "
-                                              f"despite having no aggregation function", stacklevel=2)
+                                warnings.warn(
+                                    f"Metric '{metric_name}' returned multiple values "
+                                    f"despite having no aggregation function",
+                                    stacklevel=2,
+                                )
                             continue
 
                     # Store metric
@@ -591,9 +583,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             return pd.Series(stats_dct, name=column)
         if agg_func is not None:
             if used_agg_func and not silence_warnings:
-                warnings.warn(f"Object has multiple columns. Aggregating using {agg_func}. "
-                              f"Pass column to select a single column/group.", stacklevel=2)
-            return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__)
+                warnings.warn(
+                    f"Object has multiple columns. Aggregating using {agg_func}. "
+                    f"Pass column to select a single column/group.",
+                    stacklevel=2,
+                )
+            return pd.Series(stats_dct, name="agg_func_" + agg_func.__name__)
         new_index = reself.wrapper.grouper.get_columns(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
@@ -605,16 +600,14 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         """Build metrics documentation."""
         if source_cls is None:
             source_cls = StatsBuilderMixin
-        return string.Template(
-            inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
-        ).substitute(
-            {'metrics': cls.metrics.to_doc(), 'cls_name': cls.__name__}
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "metrics").__doc__)).substitute(
+            {"metrics": cls.metrics.to_doc(), "cls_name": cls.__name__},
         )
 
     @classmethod
     def override_metrics_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
         """Call this method on each subclass that overrides `metrics`."""
-        __pdoc__[cls.__name__ + '.metrics'] = cls.build_metrics_doc(source_cls=source_cls)
+        __pdoc__[cls.__name__ + ".metrics"] = cls.build_metrics_doc(source_cls=source_cls)
 
 
 __pdoc__ = dict()

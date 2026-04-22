@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Messaging using `python-telegram-bot`."""
@@ -27,7 +27,7 @@ from telegram.ext import (
     MessageHandler,
     Filters,
     PicklePersistence,
-    Defaults
+    Defaults,
 )
 from telegram.utils.helpers import effective_message_type
 
@@ -46,8 +46,8 @@ class LogHandler(Handler):
             message = update.effective_message
             message_type = effective_message_type(message)
             if message_type is not None:
-                if message_type == 'text':
-                    logger.info(f"{message.chat_id} - User: \"%s\"", message.text)
+                if message_type == "text":
+                    logger.info(f'{message.chat_id} - User: "%s"', message.text)
                 else:
                     logger.info(f"{message.chat_id} - User: %s", message_type)
             return False
@@ -149,14 +149,11 @@ class TelegramBot(Configured):
 
     def __init__(self, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         from vectorbt._settings import settings
-        telegram_cfg = settings['messaging']['telegram']
-        giphy_cfg = settings['messaging']['giphy']
 
-        Configured.__init__(
-            self,
-            giphy_kwargs=giphy_kwargs,
-            **kwargs
-        )
+        telegram_cfg = settings["messaging"]["telegram"]
+        giphy_cfg = settings["messaging"]["giphy"]
+
+        Configured.__init__(self, giphy_kwargs=giphy_kwargs, **kwargs)
 
         # Resolve kwargs
         giphy_kwargs = merge_dicts(giphy_cfg, giphy_kwargs)
@@ -169,10 +166,10 @@ class TelegramBot(Configured):
             if k in kwargs:
                 passed_kwargs[k] = kwargs.pop(k)
         updater_kwargs = merge_dicts(default_kwargs, passed_kwargs)
-        persistence = updater_kwargs.pop('persistence', None)
+        persistence = updater_kwargs.pop("persistence", None)
         if isinstance(persistence, str):
             persistence = PicklePersistence(persistence)
-        defaults = updater_kwargs.pop('defaults', None)
+        defaults = updater_kwargs.pop("defaults", None)
         if isinstance(defaults, dict):
             defaults = Defaults(**defaults)
 
@@ -185,7 +182,7 @@ class TelegramBot(Configured):
 
         # Register handlers
         self.dispatcher.add_handler(self.log_handler)
-        self.dispatcher.add_handler(CommandHandler('start', self.start_callback))
+        self.dispatcher.add_handler(CommandHandler("start", self.start_callback))
         self.dispatcher.add_handler(CommandHandler("help", self.help_callback))
         for handler in self.custom_handlers:
             self.dispatcher.add_handler(handler)
@@ -194,10 +191,10 @@ class TelegramBot(Configured):
         self.dispatcher.add_error_handler(self_decorator(self, self.__class__.error_callback))
 
         # Set up data
-        if 'chat_ids' not in self.dispatcher.bot_data:
-            self.dispatcher.bot_data['chat_ids'] = []
+        if "chat_ids" not in self.dispatcher.bot_data:
+            self.dispatcher.bot_data["chat_ids"] = []
         else:
-            logger.info("Loaded chat ids %s", str(self.dispatcher.bot_data['chat_ids']))
+            logger.info("Loaded chat ids %s", str(self.dispatcher.bot_data["chat_ids"]))
 
     @property
     def updater(self) -> Updater:
@@ -226,7 +223,7 @@ class TelegramBot(Configured):
         """Chat ids that ever interacted with this bot.
 
         A chat id is added upon receiving the "/start" command."""
-        return self.dispatcher.bot_data['chat_ids']
+        return self.dispatcher.bot_data["chat_ids"]
 
     def start(self, in_background: bool = False, **kwargs) -> None:
         """Start the bot.
@@ -234,7 +231,8 @@ class TelegramBot(Configured):
         `**kwargs` are passed to `telegram.ext.updater.Updater.start_polling`
         and override settings under `messaging.telegram` in `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        telegram_cfg = settings['messaging']['telegram']
+
+        telegram_cfg = settings["messaging"]["telegram"]
 
         # Resolve kwargs
         default_kwargs = dict()
@@ -266,7 +264,7 @@ class TelegramBot(Configured):
     def send(self, kind: str, chat_id: int, *args, log_msg: tp.Optional[str] = None, **kwargs) -> None:
         """Send message of any kind to `chat_id`."""
         try:
-            getattr(self.updater.bot, 'send_' + kind)(chat_id, *args, **kwargs)
+            getattr(self.updater.bot, "send_" + kind)(chat_id, *args, **kwargs)
             if log_msg is None:
                 log_msg = kind
             logger.info(f"{chat_id} - Bot: %s", log_msg)
@@ -278,7 +276,7 @@ class TelegramBot(Configured):
             self.chat_ids.append(new_id)
             # Resend to new chat id
             self.send(kind, new_id, *args, log_msg=log_msg, **kwargs)
-        except Unauthorized as e:
+        except Unauthorized:
             logger.info(f"{chat_id} - Unauthorized to send the %s", kind)
 
     def send_to_all(self, kind: str, *args, **kwargs) -> None:
@@ -288,29 +286,29 @@ class TelegramBot(Configured):
 
     def send_message(self, chat_id: int, text: str, *args, **kwargs) -> None:
         """Send text message to `chat_id`."""
-        log_msg = "\"%s\"" % text
-        self.send('message', chat_id, text, *args, log_msg=log_msg, **kwargs)
+        log_msg = '"%s"' % text
+        self.send("message", chat_id, text, *args, log_msg=log_msg, **kwargs)
 
     def send_message_to_all(self, text: str, *args, **kwargs) -> None:
         """Send text message to all in `TelegramBot.chat_ids`."""
-        log_msg = "\"%s\"" % text
-        self.send_to_all('message', text, *args, log_msg=log_msg, **kwargs)
+        log_msg = '"%s"' % text
+        self.send_to_all("message", text, *args, log_msg=log_msg, **kwargs)
 
     def send_giphy(self, chat_id: int, text: str, *args, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         """Send GIPHY from text to `chat_id`."""
         if giphy_kwargs is None:
             giphy_kwargs = self.giphy_kwargs
         gif_url = text_to_giphy_url(text, **giphy_kwargs)
-        log_msg = "\"%s\" as GIPHY %s" % (text, gif_url)
-        self.send('animation', chat_id, gif_url, *args, log_msg=log_msg, **kwargs)
+        log_msg = '"%s" as GIPHY %s' % (text, gif_url)
+        self.send("animation", chat_id, gif_url, *args, log_msg=log_msg, **kwargs)
 
     def send_giphy_to_all(self, text: str, *args, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         """Send GIPHY from text to all in `TelegramBot.chat_ids`."""
         if giphy_kwargs is None:
             giphy_kwargs = self.giphy_kwargs
         gif_url = text_to_giphy_url(text, **giphy_kwargs)
-        log_msg = "\"%s\" as GIPHY %s" % (text, gif_url)
-        self.send_to_all('animation', gif_url, *args, log_msg=log_msg, **kwargs)
+        log_msg = '"%s" as GIPHY %s' % (text, gif_url)
+        self.send_to_all("animation", gif_url, *args, log_msg=log_msg, **kwargs)
 
     @property
     def start_message(self) -> str:
@@ -354,12 +352,12 @@ class TelegramBot(Configured):
         """Unknown command callback."""
         if isinstance(update, Update) and update.effective_chat:
             chat_id = update.effective_chat.id
-            logger.info(f"{chat_id} - Unknown command \"{update.message}\"")
+            logger.info(f'{chat_id} - Unknown command "{update.message}"')
             self.send_message(chat_id, "Sorry, I didn't understand that command.")
 
     def error_callback(self, update: object, context: CallbackContext, *args) -> None:
         """Error callback."""
-        logger.error("Exception while handling an update \"%s\": ", update, exc_info=context.error)
+        logger.error('Exception while handling an update "%s": ', update, exc_info=context.error)
         if isinstance(update, Update) and update.effective_chat:
             chat_id = update.effective_chat.id
             self.send_message(chat_id, "Sorry, an error happened.")

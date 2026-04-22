@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Modules for working with signals, such as entry and exit signals."""
@@ -16,22 +16,22 @@ from vectorbt.signals.generators import (
     STX,
     STCX,
     OHLCSTX,
-    OHLCSTCX
+    OHLCSTCX,
 )
 
 __all__ = [
-    'SignalFactory',
-    'RAND',
-    'RANDX',
-    'RANDNX',
-    'RPROB',
-    'RPROBX',
-    'RPROBCX',
-    'RPROBNX',
-    'STX',
-    'STCX',
-    'OHLCSTX',
-    'OHLCSTCX'
+    "SignalFactory",
+    "RAND",
+    "RANDX",
+    "RANDNX",
+    "RPROB",
+    "RPROBX",
+    "RPROBCX",
+    "RPROBNX",
+    "STX",
+    "STCX",
+    "OHLCSTX",
+    "OHLCSTCX",
 ]
 
 __pdoc__ = {k: False for k in __all__}

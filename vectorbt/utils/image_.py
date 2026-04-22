@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for images."""
@@ -17,7 +17,7 @@ def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     h2, w2, _ = b.shape
     c = np.full((max(h1, h2), w1 + w2, d), 255, np.uint8)
     c[:h1, :w1, :] = a
-    c[:h2, w1:w1 + w2, :] = b
+    c[:h2, w1 : w1 + w2, :] = b
     return c
 
 
@@ -27,22 +27,24 @@ def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     h2, w2, _ = b.shape
     c = np.full((h1 + h2, max(w1, w2), d), 255, np.uint8)
     c[:h1, :w1, :] = a
-    c[h1:h1 + h2, :w2, :] = b
+    c[h1 : h1 + h2, :w2, :] = b
     return c
 
 
-def save_animation(fname: str,
-                   index: tp.ArrayLikeSequence,
-                   plot_func: tp.Callable,
-                   *args,
-                   delta: tp.Optional[int] = None,
-                   step: int = 1,
-                   fps: int = 3,
-                   writer_kwargs: dict = None,
-                   show_progress: bool = True,
-                   tqdm_kwargs: tp.KwargsLike = None,
-                   to_image_kwargs: tp.KwargsLike = None,
-                   **kwargs) -> None:
+def save_animation(
+    fname: str,
+    index: tp.ArrayLikeSequence,
+    plot_func: tp.Callable,
+    *args,
+    delta: tp.Optional[int] = None,
+    step: int = 1,
+    fps: int = 3,
+    writer_kwargs: dict = None,
+    show_progress: bool = True,
+    tqdm_kwargs: tp.KwargsLike = None,
+    to_image_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> None:
     """Save animation to a file.
 
     Args:
@@ -77,7 +79,7 @@ def save_animation(fname: str,
 
     with imageio.get_writer(fname, **writer_kwargs) as writer:
         for i in tqdm(range(0, len(index) - delta, step), disable=not show_progress, **tqdm_kwargs):
-            fig = plot_func(index[i:i + delta], *args, **kwargs)
+            fig = plot_func(index[i : i + delta], *args, **kwargs)
             if isinstance(fig, (go.Figure, go.FigureWidget)):
                 fig = fig.to_image(format="png", **to_image_kwargs)
             if not isinstance(fig, np.ndarray):

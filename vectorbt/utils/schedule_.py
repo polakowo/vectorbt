@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for scheduling jobs."""
@@ -20,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 class CancelledError(asyncio.CancelledError):
     """Thrown for the operation to be cancelled."""
+
     pass
 
 
 class AsyncJob(Job):
     async def async_run(self) -> tp.Any:
         """Async `Job.run`."""
-        logger.info('Running job %s', self)
+        logger.info("Running job %s", self)
         ret = self.job_func()
         if inspect.isawaitable(ret):
             ret = await ret
@@ -43,8 +44,7 @@ class AsyncScheduler(Scheduler):
 
     async def async_run_all(self, delay_seconds: int = 0) -> None:
         """Async `Scheduler.run_all`."""
-        logger.info('Running *all* %i jobs with %is delay in-between',
-                    len(self.jobs), delay_seconds)
+        logger.info("Running *all* %i jobs with %is delay in-between", len(self.jobs), delay_seconds)
         for job in self.jobs[:]:
             await self._async_run_job(job)
             await asyncio.sleep(delay_seconds)
@@ -74,7 +74,7 @@ class ScheduleManager:
         "day",
         "days",
         "week",
-        "weeks"
+        "weeks",
     )
 
     weekdays: tp.ClassVar[tp.Tuple[str, ...]] = (
@@ -105,8 +105,7 @@ class ScheduleManager:
         """Current async task."""
         return self._async_task
 
-    def every(self, *args, to: tp.Optional[int] = None,
-              tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AsyncJob:
+    def every(self, *args, to: tp.Optional[int] = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AsyncJob:
         """Create a new job that runs every `interval` units of time.
 
         `*args` can include at most four different arguments: `interval`, `unit`, `start_day`, and `at`,
@@ -184,33 +183,33 @@ class ScheduleManager:
             return isinstance(arg, str) and arg in self.weekdays
 
         def _is_arg_at(arg):
-            return (isinstance(arg, str) and ':' in arg) or isinstance(arg, dt_time)
+            return (isinstance(arg, str) and ":" in arg) or isinstance(arg, dt_time)
 
-        expected_args = ['interval', 'unit', 'start_day', 'at']
+        expected_args = ["interval", "unit", "start_day", "at"]
         for i, arg in enumerate(args):
-            if 'interval' in expected_args and _is_arg_interval(arg):
+            if "interval" in expected_args and _is_arg_interval(arg):
                 interval = arg
-                expected_args = expected_args[expected_args.index('interval') + 1:]
+                expected_args = expected_args[expected_args.index("interval") + 1 :]
                 continue
-            if 'unit' in expected_args and _is_arg_unit(arg):
+            if "unit" in expected_args and _is_arg_unit(arg):
                 unit = arg
-                expected_args = expected_args[expected_args.index('unit') + 1:]
+                expected_args = expected_args[expected_args.index("unit") + 1 :]
                 continue
-            if 'start_day' in expected_args and _is_arg_start_day(arg):
+            if "start_day" in expected_args and _is_arg_start_day(arg):
                 start_day = arg
-                expected_args = expected_args[expected_args.index('start_day') + 1:]
+                expected_args = expected_args[expected_args.index("start_day") + 1 :]
                 continue
-            if 'at' in expected_args and _is_arg_at(arg):
+            if "at" in expected_args and _is_arg_at(arg):
                 at = arg
-                expected_args = expected_args[expected_args.index('at') + 1:]
+                expected_args = expected_args[expected_args.index("at") + 1 :]
                 continue
             raise ValueError(f"Arg at index {i} is unexpected")
 
         if at is not None:
             if unit is None and start_day is None:
-                unit = 'days'
+                unit = "days"
         if unit is None and start_day is None:
-            unit = 'seconds'
+            unit = "seconds"
 
         job = self.scheduler.every(interval)
         if unit is not None:
@@ -224,9 +223,9 @@ class ScheduleManager:
                         at = tzaware_to_naive_time(at, None)
                 at = at.isoformat()
                 if job.unit == "hours":
-                    at = ':'.join(at.split(':')[1:])
+                    at = ":".join(at.split(":")[1:])
                 if job.unit == "minutes":
-                    at = ':' + at.split(':')[2]
+                    at = ":" + at.split(":")[2]
             job = job.at(at)
         if to is not None:
             job = job.to(to)

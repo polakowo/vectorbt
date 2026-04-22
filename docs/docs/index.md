@@ -19,11 +19,15 @@ title: Getting started
 
 VectorBT is a Python package for quantitative analysis that takes a novel approach to backtesting: 
 it operates entirely on pandas and NumPy objects, and is accelerated by [Numba](https://github.com/numba/numba) 
-to analyze any data at speed and scale. This allows for testing of many thousands of strategies in **seconds**.
+and [Rust](https://www.rust-lang.org/) to analyze any data at speed and scale. This allows for testing
+of many thousands of strategies in **seconds**.
 
 In contrast to other backtesters, VectorBT represents complex data as (structured) NumPy arrays.
-This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
-compiled operations with Numba. It also integrates [Plotly](https://github.com/plotly/plotly.py) and 
+This enables superfast computation using vectorized operations with NumPy, non-vectorized but dynamically 
+compiled operations with Numba, and optional precompiled Rust kernels with Python bindings via
+[PyO3](https://pyo3.rs/) for the most performance-critical paths.
+
+It also integrates [Plotly](https://github.com/plotly/plotly.py) and 
 [Jupyter Widgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
 to Tableau right in the Jupyter notebook. Due to high performance, VectorBT can process large amounts of 
 data even without GPU and parallelization and enables the user to interact with data-hungry widgets 
@@ -117,8 +121,12 @@ but harder to analyze and also require additional effort to do it quickly.
 Thanks to the time-series nature of trading data, most of the aspects related to backtesting can be 
 translated into vectors. Instead of processing one element at a time, vectorization allows us to avoid 
 naive looping and perform the same operation on all elements at the same time. The path-dependency 
-problem related to vectorization is solved by using Numba - it allows both writing iterative code 
-and compiling slow Python loops to be run at the native machine code speed.
+problem related to vectorization is solved by using compiled backends:
+
+- **Numba** is used to compile Python code on the fly, which allows for writing complex logic
+in Python and still achieving C-like performance.
+- **Rust** is used to precompile the most performance-critical paths, which can be enabled
+with a single argument.
 
 ## Example
 
@@ -386,5 +394,6 @@ modeling portfolio performance and visualizing results.
 
 ## Disclaimer
 
-This software is for educational purposes only. Do not risk money which you are afraid to lose.
-USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
+This software is for educational purposes only. Do not risk money you cannot afford to lose.
+
+Use the software at your own risk. The authors and affiliates assume no responsibility for your trading results.
