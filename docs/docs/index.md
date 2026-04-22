@@ -102,10 +102,22 @@ With VectorBT, you can
 
 ## Quick start
 
+=== "Core features"
+
+    ```sh
+    pip install -U vectorbt
+    ```
+
+=== "Core features + Rust"
+
+    ```sh
+    pip install -U "vectorbt[rust]"
+    ```
+
 === "All features"
 
     ```sh
-    pip install -U vectorbt[full]
+    pip install -U "vectorbt[full]"
     ```
 
 === "All features + Rust"
