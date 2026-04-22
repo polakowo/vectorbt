@@ -1340,7 +1340,7 @@ fn execute_order(
     };
 
     if order.reject_prob > 0.0 {
-        if rng.gen::<f64>() < order.reject_prob {
+        if rng.random::<f64>() < order.reject_prob {
             return Ok((
                 exec_state,
                 order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_RANDOM_EVENT),
@@ -1751,7 +1751,7 @@ pub fn execute_order_py(
     state: ProcessOrderState,
     order: Order,
 ) -> PyResult<(ExecuteOrderState, OrderResult)> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     execute_order(&state, &order, &mut rng).map_err(|err| portfolio_sim_error_to_pyerr(py, err))
 }
 
@@ -1967,7 +1967,7 @@ pub fn shuffle_call_seq_py<'py>(
 
     let mut rng: Box<dyn rand::RngCore> = match seed {
         Some(s) => Box::new(ChaCha8Rng::seed_from_u64(s)),
-        None => Box::new(rand::thread_rng()),
+        None => Box::new(rand::rng()),
     };
 
     let mut from_col: usize = 0;
@@ -1978,7 +1978,7 @@ pub fn shuffle_call_seq_py<'py>(
             let slice = &mut data[start..start + group_len];
             // Fisher-Yates shuffle
             for j in (1..slice.len()).rev() {
-                let k = rng.gen_range(0..=j);
+                let k = rng.random_range(0..=j);
                 slice.swap(j, k);
             }
         }
@@ -2003,7 +2003,7 @@ pub fn build_call_seq_py<'py>(
         .allow_threads(|| {
             let gl_usize = validate_group_lens_raw(&gl)?;
             let mut out = vec![0i64; nrows * ncols];
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let mut from_col: usize = 0;
             for group in 0..gl_usize.len() {
                 let group_len = gl_usize[group];
@@ -2021,7 +2021,7 @@ pub fn build_call_seq_py<'py>(
                         let start = i * ncols + from_col;
                         let slice = &mut out[start..start + group_len];
                         for j in (1..slice.len()).rev() {
-                            let k = rng.gen_range(0..=j);
+                            let k = rng.random_range(0..=j);
                             slice.swap(j, k);
                         }
                     }

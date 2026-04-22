@@ -575,7 +575,7 @@ class TestAccessors:
             pd.Series.vbt.signals.generate_random(
                 5, n=3, seed=seed, index=mask["a"].index, name=mask["a"].name, engine="rust"
             ),
-            pd.Series(np.array([True, False, True, True, False]), index=mask["a"].index, name=mask["a"].name),
+            pd.Series(np.array([True, False, True, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
@@ -584,11 +584,11 @@ class TestAccessors:
             pd.DataFrame(
                 np.array(
                     [
-                        [True, False, True],
-                        [False, True, True],
                         [True, False, False],
-                        [True, True, False],
+                        [False, False, True],
+                        [True, True, True],
                         [False, True, True],
+                        [True, True, False],
                     ]
                 ),
                 index=mask.index,
@@ -602,10 +602,10 @@ class TestAccessors:
             pd.DataFrame(
                 np.array(
                     [
-                        [False, False, False],
+                        [False, False, True],
                         [False, True, False],
                         [False, False, True],
-                        [False, False, True],
+                        [False, False, False],
                         [False, False, False],
                     ]
                 ),
@@ -933,8 +933,8 @@ class TestAccessors:
                     [
                         [True, False, True],
                         [False, True, False],
-                        [False, False, False],
-                        [True, True, True],
+                        [False, False, True],
+                        [True, True, False],
                         [False, False, False],
                     ]
                 ),
@@ -948,8 +948,8 @@ class TestAccessors:
                 np.array(
                     [
                         [False, False, False],
-                        [False, False, False],
-                        [True, True, True],
+                        [False, False, True],
+                        [True, True, False],
                         [False, False, False],
                         [True, True, True],
                     ]
@@ -966,9 +966,9 @@ class TestAccessors:
             pd.DataFrame(
                 np.array(
                     [
+                        [False, True, True],
                         [False, False, False],
-                        [False, False, True],
-                        [False, True, False],
+                        [False, False, False],
                         [False, False, True],
                         [False, False, False],
                     ]
@@ -1369,7 +1369,7 @@ class TestAccessors:
         # rust
         pd.testing.assert_series_equal(
             mask["a"].vbt.signals.generate_random_exits(seed=seed, engine="rust"),
-            pd.Series(np.array([False, False, True, False, True]), index=mask["a"].index, name=mask["a"].name),
+            pd.Series(np.array([False, True, False, False, True]), index=mask["a"].index, name=mask["a"].name),
         )
         pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_random_exits(seed=seed, engine="rust"),
@@ -1377,10 +1377,10 @@ class TestAccessors:
                 np.array(
                     [
                         [False, False, False],
+                        [True, False, False],
+                        [False, True, False],
                         [False, False, False],
-                        [True, False, False],
-                        [False, True, True],
-                        [True, False, False],
+                        [True, False, True],
                     ]
                 ),
                 index=mask.index,
@@ -1392,9 +1392,9 @@ class TestAccessors:
             pd.DataFrame(
                 np.array(
                     [
-                        [False, False, False],
-                        [False, True, False],
                         [True, False, False],
+                        [False, True, False],
+                        [False, False, False],
                         [False, False, False],
                         [True, True, True],
                     ]
@@ -3220,9 +3220,9 @@ class TestGenerators:
             pd.DataFrame(
                 np.array(
                     [
-                        [False, False, False],
-                        [True, True, False],
                         [False, False, True],
+                        [True, True, False],
+                        [False, False, False],
                         [False, False, True],
                         [False, True, False],
                         [False, False, True],
@@ -3257,10 +3257,10 @@ class TestGenerators:
                 np.array(
                     [
                         [False, False, False],
+                        [True, False, False],
+                        [False, True, False],
                         [False, False, False],
-                        [True, False, False],
-                        [False, True, True],
-                        [True, False, False],
+                        [True, False, True],
                     ]
                 ),
                 columns=mask.columns,
@@ -3355,8 +3355,8 @@ class TestGenerators:
                         [False, True, True],
                         [True, False, False],
                         [False, False, True],
-                        [False, True, False],
-                        [False, False, True],
+                        [False, False, False],
+                        [False, True, True],
                         [False, False, False],
                     ]
                 ),
