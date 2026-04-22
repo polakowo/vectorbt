@@ -468,8 +468,8 @@ Run the notebooks locally to interact with widgets and dynamic charts.
         <img src="https://img.youtube.com/vi/RKE1ZXm00NY/hqdefault.jpg" alt="Walk-forward optimization with VectorBT video thumbnail">
         <span class="resource-kicker">Trade Science on YouTube</span>
         <strong>Walk-forward optimization</strong>
-        <p>Trade Science shows how to run walk-forward optimization in Python with VectorBT.</p>
-        <span class="resource-tags">Validation</span>
+        <p>Trade Science shows how to run walk-forward optimization in Python with VectorBT PRO.</p>
+        <span class="resource-tag-row"><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Validation</span></span>
     </a>
     <a class="resource-card resource-card--media" href="https://www.youtube.com/watch?v=_BSSPZplLHs">
         <img src="https://img.youtube.com/vi/_BSSPZplLHs/hqdefault.jpg" alt="Cross validation in VectorBT PRO video thumbnail">
@@ -498,6 +498,13 @@ Run the notebooks locally to interact with widgets and dynamic charts.
         <strong>Install guide and subscriber perks</strong>
         <p>Chad Thackray covers installation, member resources, and how to approach learning VectorBT PRO.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Setup</span></span>
+    </a>
+    <a class="resource-card resource-card--media" href="https://www.youtube.com/watch?v=q4W3fkjB1aw&list=PLnSVMZC68_e6ZJOp__mNzPlNDgAYstsyy&index=1">
+        <img src="https://img.youtube.com/vi/q4W3fkjB1aw/hqdefault.jpg" alt="VectorBT PRO multi strategy portfolios video thumbnail">
+        <span class="resource-kicker">Chad Thackray on YouTube</span>
+        <strong>Multi strategy portfolios</strong>
+        <p>Build and analyze multi-strategy portfolios with VectorBT PRO.</p>
+        <span class="resource-tag-row"><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Portfolio</span></span>
     </a>
     <a class="resource-card resource-card--media" href="https://www.youtube.com/watch?v=Mek2Q6JZwTw">
         <img src="https://img.youtube.com/vi/Mek2Q6JZwTw/hqdefault.jpg" alt="Custom Plotly dashboard with VectorBT PRO video thumbnail">
