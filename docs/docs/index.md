@@ -20,7 +20,7 @@ title: Getting started
 VectorBT is a Python package for quantitative analysis that takes a novel approach to backtesting: 
 it operates entirely on pandas and NumPy objects, accelerated by [Numba](https://github.com/numba/numba) 
 and [Rust](https://www.rust-lang.org/) to analyze any data at speed and scale. This makes it possible 
-to test many thousands of strategies in **seconds**.
+to test many thousands of strategies in *seconds*.
 
 Unlike other backtesters, VectorBT represents complex data as structured NumPy arrays.
 This enables ultra-fast computation through vectorized operations with NumPy, dynamically 

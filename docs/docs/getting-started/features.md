@@ -2,7 +2,7 @@
 title: Features
 ---
 
-# Features :zap:
+# Features
 
 ## Pandas
 
