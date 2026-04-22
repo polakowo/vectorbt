@@ -252,7 +252,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
 
-Visit the website￼[website](https://vectorbt.dev/) for more examples, documentation, and guides.
+Visit the [website](https://vectorbt.dev/) for more examples, documentation, and guides.
 
 ## Example apps
 

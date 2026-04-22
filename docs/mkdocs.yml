@@ -1,6 +1,6 @@
 # Project information
 site_name: VectorBT
-site_description: Find your trading edge, using the fastest engine for backtesting, algorithmic trading, and research
+site_description: Python library for backtesting and analyzing trading strategies at scale
 site_author: Oleg Polakow
 site_url: https://vectorbt.dev/
 
@@ -10,7 +10,7 @@ repo_url: https://github.com/polakowo/vectorbt
 edit_uri: ""
 
 # Copyright
-copyright: Copyright &copy; 2021 Oleg Polakow. All rights reserved.
+copyright: Copyright &copy; 2017-2026 Oleg Polakow. All rights reserved.
 
 # Configuration
 theme:
@@ -24,8 +24,11 @@ theme:
     - navigation.indexes
     - navigation.tabs
     - navigation.instant
+    - navigation.top
+    - navigation.sections
     - search.suggest
     - search.share
+    - content.code.copy
   palette:
     scheme: default
     primary: indigo
