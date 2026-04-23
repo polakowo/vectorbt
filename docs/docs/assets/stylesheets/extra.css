@@ -188,3 +188,28 @@ footer.sponsorship:not(:hover) .twemoji.heart-throb-hover svg {
         min-height: auto;
     }
 }
+
+.feature-embed {
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+}
+
+.feature-embed__iframe {
+    display: block;
+    width: 100%;
+    height: 350px;
+    border: 0;
+    overflow: hidden;
+}
+
+.feature-embed__iframe--rolling-split {
+    height: 394px;
+}
+
+.feature-embed__iframe--volume {
+    height: 490px;
+}
+
+.feature-embed__iframe--portfolio-plot {
+    height: 960px;
+}

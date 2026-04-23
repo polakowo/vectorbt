@@ -113,10 +113,18 @@ timestamp
 ...     start='2020-01-01',
 ...     end='2021-01-01'
 ... )
->>> gbm_data.plot(showlegend=False)
+>>> gbm_data.plot(showlegend=False).show()
 ```
 
-![](/assets/images/features_gbm_data.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_gbm_data.html"
+    title="GBM data chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Scheduled data updates**: Can periodically update any previously downloaded data.
 
@@ -148,19 +156,35 @@ Data updated with 5 data points
 ...     set_lens=(1, 1), 
 ...     left_to_right=False, 
 ...     plot=True, 
-...     trace_names=['train', 'valid', 'test'])
+...     trace_names=['train', 'valid', 'test']).show()
 ```
 
-![](/assets/images/features_rolling_split.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--rolling-split"
+    src="/assets/interactive/features_rolling_split.html"
+    title="Rolling split chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Labeling for ML**: Discrete and continuous label generation for effective training of ML models.
 
 ```pycon title="Identify local extrema"
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
->>> vbt.LEXLB.run(price, 0.2, 0.2).plot()
+>>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
 ```
 
-![](/assets/images/features_local_extrema.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_local_extrema.html"
+    title="Local extrema chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Indicators
 
@@ -338,10 +362,18 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 >>> fig = price.vbt.plot(trace_kwargs=dict(name='Close'))
 >>> fast_ma.ma.vbt.plot(trace_kwargs=dict(name='Fast MA'), fig=fig)
 >>> slow_ma.ma.vbt.plot(trace_kwargs=dict(name='Slow MA'), fig=fig)
->>> pf.positions.plot(close_trace_kwargs=dict(visible=False), fig=fig)
+>>> pf.positions.plot(close_trace_kwargs=dict(visible=False), fig=fig).show()
 ```
 
-![](/assets/images/features_golden_crossover.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_golden_crossover.html"
+    title="Golden crossover chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Analysis
 
@@ -428,10 +460,18 @@ dtype: float64
 
 ```pycon title="Plot 3 deepest price dips"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
->>> price.vbt.drawdowns.plot(top_n=3)
+>>> price.vbt.drawdowns.plot(top_n=3).show()
 ```
 
-![](/assets/images/features_top_drawdowns.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_top_drawdowns.html"
+    title="Top drawdowns chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Plotting
 
@@ -440,10 +480,18 @@ dtype: float64
 ```pycon title="Plot time series against each other"
 >>> sr1 = pd.Series(np.cumprod(np.random.normal(0, 0.01, 100) + 1))
 >>> sr2 = pd.Series(np.cumprod(np.random.normal(0, 0.01, 100) + 1))
->>> sr1.vbt.plot_against(sr2)
+>>> sr1.vbt.plot_against(sr2).show()
 ```
 
-![](/assets/images/features_plot_against.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_plot_against.html"
+    title="Plot against chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Figures and widgets**: Custom interactive figures and widgets using **[Plotly](https://github.com/plotly/plotly.py)**, such as Heatmap and Volume. All custom widgets have dedicated methods for efficiently updating their state.
 
@@ -454,20 +502,36 @@ dtype: float64
 ...     y_labels=['d', 'e', 'f'],
 ...     z_labels=['g', 'h', 'i']
 ... )
->>> volume_widget.fig
+>>> volume_widget.fig.show()
 ```
 
-![](/assets/images/features_volume.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--volume"
+    src="/assets/interactive/features_volume.html"
+    title="Volume widget"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Plots builder**: Class for building plots out of custom subplots. Implements a preset of tailored subplots for many backtesting components, such as signals, returns, and portfolio.
 
 ```pycon title="Plot various portfolio balances"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
 >>> pf = vbt.Portfolio.from_random_signals(price, n=5)
->>> pf.plot(subplots=['cash', 'assets', 'value']).show_svg()
+>>> pf.plot(subplots=['cash', 'assets', 'value']).show()
 ```
 
-![](/assets/images/features_portfolio_plot.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--portfolio-plot"
+    src="/assets/interactive/features_portfolio_plot.html"
+    title="Portfolio balances chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Extra
 
