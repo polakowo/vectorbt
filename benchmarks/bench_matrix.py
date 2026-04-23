@@ -133,15 +133,43 @@ def make_overall_table(stats: dict[str, float], metric: str) -> str:
     return "\n".join(lines)
 
 
+def make_per_config_table(stats_by_label: dict[str, dict[str, float]], labels: list[str], metric: str) -> str:
+    """Create a markdown table for statistics computed per configuration."""
+    stat_width = max(len("Statistic"), *(len(name) for name in STAT_NAMES))
+    col_widths = []
+    for label in labels:
+        value_widths = [
+            len(format_stat(name, metric, value))
+            for name, value in stats_by_label[label].items()
+        ]
+        col_widths.append(max(len(label), *value_widths, 6))
+
+    lines = [
+        f"| {'Statistic':<{stat_width}} |"
+        + "|".join(f" {label:>{w}} " for label, w in zip(labels, col_widths))
+        + "|",
+        f"|{'-' * (stat_width + 2)}|"
+        + "|".join(f"{'-' * (w + 2)}" for w in col_widths)
+        + "|",
+    ]
+    for name in STAT_NAMES:
+        row = f"| {name:<{stat_width}} |"
+        for label, w in zip(labels, col_widths):
+            value = stats_by_label[label].get(name)
+            cell = "-" if value is None else format_stat(name, metric, value)
+            row += f" {cell:>{w}} |"
+        lines.append(row)
+    return "\n".join(lines)
+
+
 def make_matrix(
     labels: list[str],
     all_funcs: list[str],
     all_results: dict[str, dict[str, dict[str, float]]],
     metric: str,
-) -> tuple[str, str]:
-    """Create a markdown matrix and overall statistics table for one metric."""
-    stat_labels = [f"stats.{name}" for name in STAT_NAMES]
-    func_width = max([*(len(fn) for fn in all_funcs), *(len(label) for label in stat_labels)], default=20)
+) -> tuple[str, str, str]:
+    """Create a markdown matrix plus per-config and overall statistics tables."""
+    func_width = max([*(len(fn) for fn in all_funcs)], default=20)
     per_config_stats = {
         label: calc_stats([values[metric] for values in all_results[label].values()]) for label in labels
     }
@@ -151,9 +179,6 @@ def make_matrix(
     col_widths = []
     for label in labels:
         value_widths = [len(format_metric_value(metric, values[metric])) for values in all_results[label].values()]
-        value_widths.extend(
-            len(format_stat(name, metric, value)) for name, value in per_config_stats[label].items()
-        )
         col_widths.append(max(len(label), *value_widths, 6))
 
     lines = []
@@ -172,16 +197,11 @@ def make_matrix(
             row += f" {cell:>{w}} |"
         lines.append(row)
 
-    lines.append(sep)
-    for name, stat_label in zip(STAT_NAMES, stat_labels):
-        row = f"| {stat_label:<{func_width}} |"
-        for label, w in zip(labels, col_widths):
-            value = per_config_stats[label].get(name)
-            cell = "-" if value is None else format_stat(name, metric, value)
-            row += f" {cell:>{w}} |"
-        lines.append(row)
-
-    return "\n".join(lines), make_overall_table(overall_stats, metric)
+    return (
+        "\n".join(lines),
+        make_per_config_table(per_config_stats, labels, metric),
+        make_overall_table(overall_stats, metric),
+    )
 
 
 def companion_output_path(output_path: Path, suffix: str) -> Path:
@@ -195,6 +215,7 @@ def write_matrix_file(
     description: str,
     notes: list[str],
     table: str,
+    per_config_table: str,
     overall_table: str,
     layout: str,
     suite: str,
@@ -210,6 +231,8 @@ def write_matrix_file(
             f.write(f"- {note}\n")
         f.write("\n")
         f.write(table + "\n")
+        f.write("\n## Per-Config Statistics\n\n")
+        f.write(per_config_table + "\n")
         f.write("\n## Overall Statistics\n\n")
         f.write(overall_table + "\n")
 
@@ -257,13 +280,14 @@ def write_report_files(
 
     written: dict[str, Path] = {}
     for metric, report in reports.items():
-        table, overall_table = make_matrix(labels, all_funcs, all_results, metric)
+        table, per_config_table, overall_table = make_matrix(labels, all_funcs, all_results, metric)
         write_matrix_file(
             report["path"],
             report["title"],
             report["description"],
             report["notes"],
             table,
+            per_config_table,
             overall_table,
             layout,
             suite,
@@ -304,8 +328,10 @@ def main() -> None:
 
     labels = [cfg["label"] for cfg in CONFIGS]
     written = write_report_files(args.output, labels, all_funcs, all_results, args.layout, args.suite)
-    table, overall_table = make_matrix(labels, all_funcs, all_results, "speedup")
+    table, per_config_table, overall_table = make_matrix(labels, all_funcs, all_results, "speedup")
     print(table)
+    print()
+    print(per_config_table)
     print()
     print(overall_table)
     for path in written.values():
