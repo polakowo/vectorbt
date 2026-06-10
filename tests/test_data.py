@@ -840,6 +840,27 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
+
+        class UnnamedSeriesData(vbt.Data):
+            @classmethod
+            def download_symbol(cls, symbol):
+                return pd.Series(
+                    [1.0, 2.0, 3.0],
+                    index=pd.date_range("2021-01-01", "2021-01-03"),
+                )
+
+        pd.testing.assert_series_equal(
+            UnnamedSeriesData.download(["RANDNX1", "RANDNX2"]).get(column="RANDNX1"),
+            pd.Series(
+                [1.0, 2.0, 3.0],
+                index=pd.DatetimeIndex(
+                    ["2021-01-01 00:00:00", "2021-01-02 00:00:00", "2021-01-03 00:00:00"],
+                    freq="D",
+                    tz=timezone.utc,
+                ),
+                name="RANDNX1",
+            ),
+        )
         pd.testing.assert_frame_equal(
             MyData.download([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0"),
             pd.DataFrame(

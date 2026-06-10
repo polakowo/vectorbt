@@ -706,7 +706,14 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
         concat_data = self.concat(**kwargs)
         if len(concat_data) == 1:
-            return tuple(concat_data.values())[0]
+            single_data = tuple(concat_data.values())[0]
+            if column is not None:
+                if isinstance(column, list):
+                    if isinstance(single_data, pd.DataFrame) and all(c in single_data.columns for c in column):
+                        return single_data[column]
+                elif isinstance(single_data, pd.DataFrame) and column in single_data.columns:
+                    return single_data[column]
+            return single_data
         if column is not None:
             if isinstance(column, list):
                 return tuple([concat_data[c] for c in column])
