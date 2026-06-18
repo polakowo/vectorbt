@@ -6,7 +6,7 @@ title: Features
 
 ## Pandas
 
-- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy, Numba, and optional Rust kernels. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
+- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resampling. For best performance, most operations are done strictly using NumPy, Numba, and optional Rust kernels. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
 
 ```pycon title="Compute the rolling z-score"
 >>> import vectorbt as vbt
@@ -82,7 +82,7 @@ z  7  8  9
 
 ## Data
 
-- [x] **Data acquisition**: Supports various data providers, such as **[Yahoo Finance](https://github.com/ranaroussi/yfinance)**, **[Binance](https://github.com/sammchardy/python-binance)**, **[CCXT](https://github.com/ccxt/ccxt)** and **[Alpaca](https://github.com/alpacahq/alpaca-trade-api-python)**. Can merge multiple symbols with different index, as well as update them.
+- [x] **Data acquisition**: Supports various data providers, such as **[Yahoo Finance](https://github.com/ranaroussi/yfinance)**, **[Binance](https://github.com/sammchardy/python-binance)**, **[CCXT](https://github.com/ccxt/ccxt)** and **[Alpaca](https://github.com/alpacahq/alpaca-trade-api-python)**. Can merge multiple symbols with different indexes, as well as update them.
 
 ```pycon title="Download Alpaca data"
 >>> alpaca_data = vbt.AlpacaData.download(
@@ -188,7 +188,7 @@ Data updated with 5 data points
 
 ## Indicators
 
-- [x] **Technical indicators**: Most popular technical indicators with full Numba support and optional Rust acceleration for built-in kernels, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
+- [x] **Technical indicators**: Most popular technical indicators with full Numba support and optional Rust acceleration for built-in kernels, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% of indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
 
 ```pycon title="Compute 2 moving averages at once"
 >>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
@@ -230,7 +230,7 @@ sma_timeperiod    2    3
 4               4.5  4.0
 ```
 
-- [x] **Indicator factory**: Sophisticated factory for building custom technical indicators of any complexity. Takes a function and does all the magic for you: generates an indicator skeleton that takes inputs and parameters of any shape and type, and runs the VectorBT's indicator engine. The easiest and most flexible way to create indicators you will find in open source.
+- [x] **Indicator factory**: Sophisticated factory for building custom technical indicators of any complexity. Takes a function and does all the magic for you: generates an indicator skeleton that takes inputs and parameters of any shape and type, and runs the VectorBT indicator engine. The easiest and most flexible way to create indicators you will find in open source.
 
 ```pycon title="Construct a random indicator"
 >>> @njit
@@ -440,7 +440,7 @@ Date
 dtype: float64
 ```
 
-- [x] **Trade analysis**: Retrospective analysis of trades from various view points. Supports entry trades, exit trades, and positions.
+- [x] **Trade analysis**: Retrospective analysis of trades from various viewpoints. Supports entry trades, exit trades, and positions.
 
 ```pycon title="Get the projected return of each buy order"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
@@ -610,7 +610,7 @@ dtype: float64
 0.01081395149230957
 ```
 
-- [x] **Persistance**: Most Python objects including data and portfolio can be saved to a file and retrieved back using **[Dill](https://github.com/uqfoundation/dill)**.
+- [x] **Persistence**: Most Python objects including data and portfolio can be saved to a file and retrieved using **[Dill](https://github.com/uqfoundation/dill)**.
 
 ```pycon title="Simulate, save, and load back a portfolio"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
