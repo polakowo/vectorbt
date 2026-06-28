@@ -175,8 +175,7 @@ class TestMappedArray:
             mapped_array.top_n_mask(1), np.array([False, False, True, False, True, False, True, False, False])
         )
         np.testing.assert_array_equal(
-            mapped_array.top_n_mask(0),
-            np.array([False, False, False, False, False, False, False, False, False])
+            mapped_array.top_n_mask(0), np.array([False, False, False, False, False, False, False, False, False])
         )
 
     def test_bottom_n_mask(self):
@@ -184,8 +183,7 @@ class TestMappedArray:
             mapped_array.bottom_n_mask(1), np.array([True, False, False, True, False, False, False, False, True])
         )
         np.testing.assert_array_equal(
-            mapped_array.bottom_n_mask(0),
-            np.array([False, False, False, False, False, False, False, False, False])
+            mapped_array.bottom_n_mask(0), np.array([False, False, False, False, False, False, False, False, False])
         )
 
     def test_top_n(self):
