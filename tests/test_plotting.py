@@ -1221,6 +1221,14 @@ class TestPortfolioPlotSmoke:
         assert isinstance(nt["Value"], go.Scatter)
         assert len(nt["Value"].y) == len(index_5)
 
+    def test_plot_cum_returns_accepts_custom_benchmark_for_selected_column(self):
+        """Custom benchmark returns should work when plotting a selected portfolio column."""
+        fig = pf_multi.plot_cum_returns(column="a", benchmark_rets=pf_multi["b"].returns())
+        nt = named_traces(fig)
+        assert "Benchmark" in nt
+        assert isinstance(nt["Benchmark"], go.Scatter)
+        assert len(nt["Benchmark"].y) == len(index_5)
+
     def test_smoke_plot_drawdowns(self):
         self._assert_fig(
             pf_multi.plot_drawdowns(column="a"),

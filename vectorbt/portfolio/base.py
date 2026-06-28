@@ -5385,7 +5385,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_returns(group_by=group_by)
         else:
-            benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+            benchmark_rets = broadcast_to(benchmark_rets, self.wrapper.dummy(group_by=group_by))
         benchmark_rets = self.select_one_from_obj(benchmark_rets, self.wrapper.regroup(group_by), column=column)
         kwargs = merge_dicts(
             dict(
