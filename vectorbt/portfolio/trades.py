@@ -634,8 +634,8 @@ class Trades(Ranges):
     @cached_method
     def profit_factor(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Profit factor."""
-        total_win = to_1d_array(self.winning.pnl.sum(group_by=group_by))
-        total_loss = to_1d_array(self.losing.pnl.sum(group_by=group_by))
+        total_win = to_1d_array(self.winning.pnl.sum(group_by=group_by)).copy()
+        total_loss = to_1d_array(self.losing.pnl.sum(group_by=group_by)).copy()
 
         # Otherwise columns with only wins or losses will become NaNs
         has_values = to_1d_array(self.count(group_by=group_by)) > 0
@@ -651,8 +651,8 @@ class Trades(Ranges):
     def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability."""
         win_rate = to_1d_array(self.win_rate(group_by=group_by))
-        avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by))
-        avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by))
+        avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by)).copy()
+        avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by)).copy()
 
         # Otherwise columns with only wins or losses will become NaNs
         has_values = to_1d_array(self.count(group_by=group_by)) > 0
