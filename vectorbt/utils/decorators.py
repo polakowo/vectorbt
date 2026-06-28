@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Class and function decorators."""
@@ -28,7 +28,7 @@ class classproperty(object):
 
     def __init__(self, func: tp.Callable) -> None:
         self.func = func
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.func(owner)
@@ -43,7 +43,7 @@ class class_or_instanceproperty(object):
 
     def __init__(self, func: tp.Callable) -> None:
         self.func = func
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
@@ -87,7 +87,7 @@ class custom_property:
         self.func = func
         self.name = func.__name__
         self.flags = flags
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
@@ -144,7 +144,7 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
     9) `func` and `flags`
     10) `func`
     11) `flags`
-    
+
     This function goes through all conditions of type `CacheCondition` in `whitelist` and `blacklist`
     and finds the one with the lowest (best) rank. If the search yields the same rank for both lists,
     global caching flag `enabled` decides.
@@ -188,7 +188,8 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
         ```
     """
     from vectorbt._settings import settings
-    caching_cfg = settings['caching']
+
+    caching_cfg = settings["caching"]
 
     start_rank = 100
 
@@ -203,7 +204,7 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
             if isinstance(cond.func, cached_property):  # cached_property
                 if func != cond.func.func:
                     return start_rank
-            elif callable(cond.func) and hasattr(func, 'func') and hasattr(cond.func, 'func'):  # cached_method
+            elif callable(cond.func) and hasattr(func, "func") and hasattr(cond.func, "func"):  # cached_method
                 if func.func != cond.func.func:
                     return start_rank
             elif isinstance(cond.func, str):
@@ -274,17 +275,17 @@ def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable
         return start_rank
 
     white_rank = start_rank
-    if len(caching_cfg['whitelist']) > 0:
-        for cond in caching_cfg['whitelist']:
+    if len(caching_cfg["whitelist"]) > 0:
+        for cond in caching_cfg["whitelist"]:
             white_rank = min(white_rank, _get_condition_rank(cond))
 
     black_rank = start_rank
-    if len(caching_cfg['blacklist']) > 0:
-        for cond in caching_cfg['blacklist']:
+    if len(caching_cfg["blacklist"]) > 0:
+        for cond in caching_cfg["blacklist"]:
             black_rank = min(black_rank, _get_condition_rank(cond))
 
     if white_rank == black_rank:  # none of the conditions met
-        return caching_cfg['enabled']  # global caching decides
+        return caching_cfg["enabled"]  # global caching decides
     return white_rank < black_rank
 
 
@@ -317,7 +318,7 @@ class cached_property(custom_property):
     @property
     def attrname(self) -> str:
         """Get name of cached attribute."""
-        return '__cached_' + self.name
+        return "__cached_" + self.name
 
     def __set_name__(self, owner: tp.Type, name: str) -> None:
         self.name = name
@@ -338,16 +339,14 @@ class cached_property(custom_property):
                     cache[self.attrname] = val
         return val
 
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+    def __call__(self, *args, **kwargs) -> tp.Any: ...
 
 
 class custom_methodT(tp.Protocol):
     func: tp.Callable
     flags: tp.Dict
 
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+    def __call__(self, *args, **kwargs) -> tp.Any: ...
 
 
 def custom_method(*args, **flags) -> tp.Union[tp.Callable, custom_methodT]:
@@ -390,12 +389,10 @@ class cached_methodT(custom_methodT):
     lock: RLock
     clear_cache: tp.Callable[[object], None]
 
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+    def __call__(self, *args, **kwargs) -> tp.Any: ...
 
 
-def cached_method(*args, maxsize: int = 128, typed: bool = False,
-                  **flags) -> tp.Union[tp.Callable, cached_methodT]:
+def cached_method(*args, maxsize: int = 128, typed: bool = False, **flags) -> tp.Union[tp.Callable, cached_methodT]:
     """Extends `custom_method` with caching.
 
     Internally uses `functools.lru_cache`.
@@ -452,7 +449,7 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False,
         wrapper.maxsize = maxsize
         wrapper.typed = typed
         wrapper.name = func.__name__
-        wrapper.attrname = '__cached_' + func.__name__
+        wrapper.attrname = "__cached_" + func.__name__
         wrapper.lock = RLock()
         wrapper.clear_cache = clear_cache
 
@@ -473,41 +470,43 @@ __pdoc__ = {}
 
 binary_magic_config = Config(
     {
-        '__eq__': dict(func=np.equal),
-        '__ne__': dict(func=np.not_equal),
-        '__lt__': dict(func=np.less),
-        '__gt__': dict(func=np.greater),
-        '__le__': dict(func=np.less_equal),
-        '__ge__': dict(func=np.greater_equal),
+        "__eq__": dict(func=np.equal),
+        "__ne__": dict(func=np.not_equal),
+        "__lt__": dict(func=np.less),
+        "__gt__": dict(func=np.greater),
+        "__le__": dict(func=np.less_equal),
+        "__ge__": dict(func=np.greater_equal),
         # arithmetic ops
-        '__add__': dict(func=np.add),
-        '__sub__': dict(func=np.subtract),
-        '__mul__': dict(func=np.multiply),
-        '__pow__': dict(func=np.power),
-        '__mod__': dict(func=np.mod),
-        '__floordiv__': dict(func=np.floor_divide),
-        '__truediv__': dict(func=np.true_divide),
-        '__radd__': dict(func=lambda x, y: np.add(y, x)),
-        '__rsub__': dict(func=lambda x, y: np.subtract(y, x)),
-        '__rmul__': dict(func=lambda x, y: np.multiply(y, x)),
-        '__rpow__': dict(func=lambda x, y: np.power(y, x)),
-        '__rmod__': dict(func=lambda x, y: np.mod(y, x)),
-        '__rfloordiv__': dict(func=lambda x, y: np.floor_divide(y, x)),
-        '__rtruediv__': dict(func=lambda x, y: np.true_divide(y, x)),
+        "__add__": dict(func=np.add),
+        "__sub__": dict(func=np.subtract),
+        "__mul__": dict(func=np.multiply),
+        "__pow__": dict(func=np.power),
+        "__mod__": dict(func=np.mod),
+        "__floordiv__": dict(func=np.floor_divide),
+        "__truediv__": dict(func=np.true_divide),
+        "__radd__": dict(func=lambda x, y: np.add(y, x)),
+        "__rsub__": dict(func=lambda x, y: np.subtract(y, x)),
+        "__rmul__": dict(func=lambda x, y: np.multiply(y, x)),
+        "__rpow__": dict(func=lambda x, y: np.power(y, x)),
+        "__rmod__": dict(func=lambda x, y: np.mod(y, x)),
+        "__rfloordiv__": dict(func=lambda x, y: np.floor_divide(y, x)),
+        "__rtruediv__": dict(func=lambda x, y: np.true_divide(y, x)),
         # mask ops
-        '__and__': dict(func=np.bitwise_and),
-        '__or__': dict(func=np.bitwise_or),
-        '__xor__': dict(func=np.bitwise_xor),
-        '__rand__': dict(func=lambda x, y: np.bitwise_and(y, x)),
-        '__ror__': dict(func=lambda x, y: np.bitwise_or(y, x)),
-        '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
+        "__and__": dict(func=np.bitwise_and),
+        "__or__": dict(func=np.bitwise_or),
+        "__xor__": dict(func=np.bitwise_xor),
+        "__rand__": dict(func=lambda x, y: np.bitwise_and(y, x)),
+        "__ror__": dict(func=lambda x, y: np.bitwise_or(y, x)),
+        "__rxor__": dict(func=lambda x, y: np.bitwise_xor(y, x)),
     },
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added to a class.
+__pdoc__[
+    "binary_magic_config"
+] = f"""Config of binary magic methods to be added to a class.
 
 ```json
 {binary_magic_config.to_doc()}
@@ -517,8 +516,10 @@ __pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added
 BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 
-def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
-                                config: tp.Optional[Config] = None) -> WrapperFuncT:
+def attach_binary_magic_methods(
+    translate_func: BinaryTranslateFuncT,
+    config: tp.Optional[Config] = None,
+) -> WrapperFuncT:
     """Class decorator to add binary magic methods to a class.
 
     `translate_func` should
@@ -537,12 +538,14 @@ def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         for target_name, settings in config.items():
-            func = settings['func']
+            func = settings["func"]
 
-            def new_method(self,
-                           other: tp.Any,
-                           _translate_func: BinaryTranslateFuncT = translate_func,
-                           _func: tp.Callable = func) -> tp.SeriesFrame:
+            def new_method(
+                self,
+                other: tp.Any,
+                _translate_func: BinaryTranslateFuncT = translate_func,
+                _func: tp.Callable = func,
+            ) -> tp.SeriesFrame:
                 return _translate_func(self, other, _func)
 
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"
@@ -555,17 +558,19 @@ def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
 
 unary_magic_config = Config(
     {
-        '__neg__': dict(func=np.negative),
-        '__pos__': dict(func=np.positive),
-        '__abs__': dict(func=np.absolute),
-        '__invert__': dict(func=np.invert)
+        "__neg__": dict(func=np.negative),
+        "__pos__": dict(func=np.positive),
+        "__abs__": dict(func=np.absolute),
+        "__invert__": dict(func=np.invert),
     },
     readonly=True,
-    as_attrs=False
+    as_attrs=False,
 )
 """_"""
 
-__pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added to a class.
+__pdoc__[
+    "unary_magic_config"
+] = f"""Config of unary magic methods to be added to a class.
 
 ```json
 {unary_magic_config.to_doc()}
@@ -575,8 +580,7 @@ __pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added t
 UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
 
 
-def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
-                               config: tp.Optional[Config] = None) -> WrapperFuncT:
+def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT, config: tp.Optional[Config] = None) -> WrapperFuncT:
     """Class decorator to add unary magic methods to a class.
 
     `translate_func` should
@@ -595,11 +599,13 @@ def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         for target_name, settings in config.items():
-            func = settings['func']
+            func = settings["func"]
 
-            def new_method(self,
-                           _translate_func: UnaryTranslateFuncT = translate_func,
-                           _func: tp.Callable = func) -> tp.SeriesFrame:
+            def new_method(
+                self,
+                _translate_func: UnaryTranslateFuncT = translate_func,
+                _func: tp.Callable = func,
+            ) -> tp.SeriesFrame:
                 return _translate_func(self, _func)
 
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"

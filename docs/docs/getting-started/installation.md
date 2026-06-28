@@ -12,10 +12,22 @@ You can install VectorBT with pip, the Python package manager, or with Docker.
 pip install -U vectorbt
 ```
 
-To also install optional dependencies:
+To install the optional Rust engine:
+
+```sh
+pip install -U "vectorbt[rust]"
+```
+
+To install all optional integrations (TA-Lib, Pandas TA, etc.):
 
 ```sh
 pip install -U "vectorbt[full]"
+```
+
+To install all optional integrations together with the Rust engine:
+
+```sh
+pip install -U "vectorbt[full,rust]"
 ```
 
 ## With Docker
@@ -36,9 +48,11 @@ working directory inside the container remain available in the working directory
 (because the current directory is mounted into the container). See [Jupyter Docker Stacks -
 Quick Start](https://github.com/jupyter/docker-stacks#quick-start).
 
-There are two types of images in [polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt):
-the vanilla version and the full version (with optional dependencies). To use the vanilla version,
-use `polakowo/vectorbt:latest` instead of `polakowo/vectorbt:latest-full`.
+There are four types of images in [polakowo/vectorbt](https://hub.docker.com/r/polakowo/vectorbt):
+the vanilla version, the Rust-engine version, the full version (with optional integrations),
+and the full version with the Rust engine. To use another image, replace
+`polakowo/vectorbt:latest-full` with `polakowo/vectorbt:latest`,
+`polakowo/vectorbt:latest-rust`, or `polakowo/vectorbt:latest-full-rust`.
 
 Each Docker image is based on [jupyter/scipy-notebook](https://hub.docker.com/r/jupyter/scipy-notebook)
 and comes with a Jupyter environment, vectorbt, and other scientific packages installed.

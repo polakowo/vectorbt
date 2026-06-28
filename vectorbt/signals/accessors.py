@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Custom pandas accessors for signals data.
@@ -197,6 +197,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
+from vectorbt._engine import broadcast_2d_to_shape, broadcast_to_shape
 from vectorbt.base import reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
@@ -205,7 +206,7 @@ from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, Gener
 from vectorbt.generic.ranges import Ranges
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
-from vectorbt.signals import nb
+from vectorbt.signals import dispatch
 from vectorbt.utils import checks
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.config import merge_dicts, Config
@@ -258,11 +259,15 @@ class SignalsAccessor(GenericAccessor):
     # ############# Generation ############# #
 
     @classmethod
-    def generate(cls,
-                 shape: tp.RelaxedShape,
-                 choice_func_nb: tp.ChoiceFunc, *args,
-                 pick_first: bool = False,
-                 **kwargs) -> tp.SeriesFrame:
+    def generate(
+        cls,
+        shape: tp.RelaxedShape,
+        choice_func: tp.ChoiceFunc,
+        *args,
+        pick_first: bool = False,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -272,11 +277,11 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def choice_func_nb(from_i, to_i, col):
+            ... def choice_func(from_i, to_i, col):
             ...     return col + from_i
 
             >>> pd.DataFrame.vbt.signals.generate((5, 3),
-            ...     choice_func_nb, index=mask.index, columns=mask.columns)
+            ...     choice_func, index=mask.index, columns=mask.columns)
                             a      b      c
             2020-01-01   True  False  False
             2020-01-02  False   True  False
@@ -285,14 +290,14 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
-        checks.assert_numba_func(choice_func_nb)
+        checks.assert_engine_func(choice_func, engine=engine)
 
         if not isinstance(shape, tuple):
             shape = (shape, 1)
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        result = nb.generate_nb(shape, pick_first, choice_func_nb, *args)
+        result = dispatch.generate(shape, pick_first, choice_func, *args, engine=engine)
 
         if cls.is_series():
             if shape[1] > 1:
@@ -301,17 +306,20 @@ class SignalsAccessor(GenericAccessor):
         return pd.DataFrame(result, **kwargs)
 
     @classmethod
-    def generate_both(cls,
-                      shape: tp.RelaxedShape,
-                      entry_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
-                      entry_args: tp.ArgsLike = None,
-                      exit_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
-                      exit_args: tp.ArgsLike = None,
-                      entry_wait: int = 1,
-                      exit_wait: int = 1,
-                      entry_pick_first: bool = True,
-                      exit_pick_first: bool = True,
-                      **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
+    def generate_both(
+        cls,
+        shape: tp.RelaxedShape,
+        entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+        entry_args: tp.ArgsLike = None,
+        exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+        exit_args: tp.ArgsLike = None,
+        entry_wait: int = 1,
+        exit_wait: int = 1,
+        entry_pick_first: bool = True,
+        exit_pick_first: bool = True,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -322,12 +330,12 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def entry_choice_func_nb(from_i, to_i, col, temp_idx_arr):
+            ... def entry_choice_func(from_i, to_i, col, temp_idx_arr):
             ...     temp_idx_arr[0] = from_i
             ...     return temp_idx_arr[:1]  # array with one signal
 
             >>> @njit
-            ... def exit_choice_func_nb(from_i, to_i, col, temp_idx_arr):
+            ... def exit_choice_func(from_i, to_i, col, temp_idx_arr):
             ...     wait = col
             ...     temp_idx_arr[0] = from_i + wait
             ...     if temp_idx_arr[0] < to_i:
@@ -337,8 +345,8 @@ class SignalsAccessor(GenericAccessor):
             >>> temp_idx_arr = np.empty((1,), dtype=np.int64)  # reuse memory
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3),
-            ...     entry_choice_func_nb, (temp_idx_arr,),
-            ...     exit_choice_func_nb, (temp_idx_arr,),
+            ...     entry_choice_func, (temp_idx_arr,),
+            ...     exit_choice_func, (temp_idx_arr,),
             ...     index=mask.index, columns=mask.columns)
             >>> en
                             a      b      c
@@ -356,10 +364,10 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
-        checks.assert_not_none(entry_choice_func_nb)
-        checks.assert_not_none(exit_choice_func_nb)
-        checks.assert_numba_func(entry_choice_func_nb)
-        checks.assert_numba_func(exit_choice_func_nb)
+        checks.assert_not_none(entry_choice_func)
+        checks.assert_not_none(exit_choice_func)
+        checks.assert_engine_func(entry_choice_func, engine=engine)
+        checks.assert_engine_func(exit_choice_func, engine=engine)
         if entry_args is None:
             entry_args = ()
         if exit_args is None:
@@ -370,14 +378,17 @@ class SignalsAccessor(GenericAccessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        result1, result2 = nb.generate_enex_nb(
+        result1, result2 = dispatch.generate_enex(
             shape,
             entry_wait,
             exit_wait,
             entry_pick_first,
             exit_pick_first,
-            entry_choice_func_nb, entry_args,
-            exit_choice_func_nb, exit_args
+            entry_choice_func,
+            entry_args,
+            exit_choice_func,
+            exit_args,
+            engine=engine,
         )
         if cls.is_series():
             if shape[1] > 1:
@@ -385,13 +396,17 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_exits(self,
-                       exit_choice_func_nb: tp.ChoiceFunc, *args,
-                       wait: int = 1,
-                       until_next: bool = True,
-                       skip_until_exit: bool = False,
-                       pick_first: bool = False,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def generate_exits(
+        self,
+        exit_choice_func: tp.ChoiceFunc,
+        *args,
+        wait: int = 1,
+        until_next: bool = True,
+        skip_until_exit: bool = False,
+        pick_first: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_ex_nb`.
 
         Usage:
@@ -399,11 +414,11 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def exit_choice_func_nb(from_i, to_i, col, temp_range):
+            ... def exit_choice_func(from_i, to_i, col, temp_range):
             ...     return temp_range[from_i:to_i]
 
             >>> temp_range = np.arange(mask.shape[0])  # reuse memory
-            >>> mask.vbt.signals.generate_exits(exit_choice_func_nb, temp_range)
+            >>> mask.vbt.signals.generate_exits(exit_choice_func, temp_range)
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02   True   True  False
@@ -412,51 +427,58 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   True  False   True
             ```
         """
-        checks.assert_numba_func(exit_choice_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_engine_func(exit_choice_func, engine=engine)
 
-        exits = nb.generate_ex_nb(
+        exits = dispatch.generate_ex(
             self.to_2d_array(),
             wait,
             until_next,
             skip_until_exit,
             pick_first,
-            exit_choice_func_nb,
-            *args
+            exit_choice_func,
+            *args,
+            engine=engine,
         )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Filtering ############# #
 
     @class_or_instancemethod
-    def clean(cls_or_self,
-              *args,
-              entry_first: bool = True,
-              broadcast_kwargs: tp.KwargsLike = None,
-              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def clean(
+        cls_or_self,
+        *args,
+        entry_first: bool = True,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Clean signals.
 
         If one array passed, see `SignalsAccessor.first`.
         If two arrays passed, entries and exits, see `vectorbt.signals.nb.clean_enex_nb`."""
         if not isinstance(cls_or_self, type):
+            engine = engine if engine is not None else cls_or_self.engine
             args = (cls_or_self.obj, *args)
         if len(args) == 1:
             obj = args[0]
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
                 wrapper = ArrayWrapper.from_shape(np.asarray(obj).shape)
                 obj = wrapper.wrap(obj)
-            return obj.vbt.signals.first(wrap_kwargs=wrap_kwargs)
+            return obj.vbt.signals.first(engine=engine, wrap_kwargs=wrap_kwargs)
         elif len(args) == 2:
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}
             entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
-            entries_out, exits_out = nb.clean_enex_nb(
+            entries_out, exits_out = dispatch.clean_enex(
                 reshape_fns.to_2d_array(entries),
                 reshape_fns.to_2d_array(exits),
-                entry_first
+                entry_first,
+                engine=engine,
             )
             return (
                 ArrayWrapper.from_obj(entries).wrap(entries_out, group_by=False, **merge_dicts({}, wrap_kwargs)),
-                ArrayWrapper.from_obj(exits).wrap(exits_out, group_by=False, **merge_dicts({}, wrap_kwargs))
+                ArrayWrapper.from_obj(exits).wrap(exits_out, group_by=False, **merge_dicts({}, wrap_kwargs)),
             )
         else:
             raise ValueError("Either one or two arrays must be passed")
@@ -464,13 +486,16 @@ class SignalsAccessor(GenericAccessor):
     # ############# Random ############# #
 
     @classmethod
-    def generate_random(cls,
-                        shape: tp.RelaxedShape,
-                        n: tp.Optional[tp.ArrayLike] = None,
-                        prob: tp.Optional[tp.ArrayLike] = None,
-                        pick_first: bool = False,
-                        seed: tp.Optional[int] = None,
-                        **kwargs) -> tp.SeriesFrame:
+    def generate_random(
+        cls,
+        shape: tp.RelaxedShape,
+        n: tp.Optional[tp.ArrayLike] = None,
+        prob: tp.Optional[tp.ArrayLike] = None,
+        pick_first: bool = False,
+        seed: tp.Optional[int] = None,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Generate signals randomly.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_nb`.
@@ -519,10 +544,10 @@ class SignalsAccessor(GenericAccessor):
             raise ValueError("Either n or prob should be set, not both")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
-            result = nb.generate_rand_nb(shape, n, seed=seed)
+            result = dispatch.generate_rand(shape, n, seed=seed, engine=engine)
         elif prob is not None:
-            prob = np.broadcast_to(prob, shape)
-            result = nb.generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
+            prob = broadcast_to_shape(prob, shape, np.float64)
+            result = dispatch.generate_rand_by_prob(shape, prob, pick_first, flex_2d, seed=seed, engine=engine)
         else:
             raise ValueError("At least n or prob should be set")
 
@@ -535,17 +560,20 @@ class SignalsAccessor(GenericAccessor):
     # ############# Exits ############# #
 
     @classmethod
-    def generate_random_both(cls,
-                             shape: tp.RelaxedShape,
-                             n: tp.Optional[tp.ArrayLike] = None,
-                             entry_prob: tp.Optional[tp.ArrayLike] = None,
-                             exit_prob: tp.Optional[tp.ArrayLike] = None,
-                             seed: tp.Optional[int] = None,
-                             entry_wait: int = 1,
-                             exit_wait: int = 1,
-                             entry_pick_first: bool = True,
-                             exit_pick_first: bool = True,
-                             **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
+    def generate_random_both(
+        cls,
+        shape: tp.RelaxedShape,
+        n: tp.Optional[tp.ArrayLike] = None,
+        entry_prob: tp.Optional[tp.ArrayLike] = None,
+        exit_prob: tp.Optional[tp.ArrayLike] = None,
+        seed: tp.Optional[int] = None,
+        entry_wait: int = 1,
+        exit_wait: int = 1,
+        entry_pick_first: bool = True,
+        exit_pick_first: bool = True,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """Generate chain of entry and exit signals randomly.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
@@ -608,12 +636,19 @@ class SignalsAccessor(GenericAccessor):
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or any of the entry_prob and exit_prob should be set, not both")
         if n is not None:
-            n = np.broadcast_to(n, shape[1])
-            entries, exits = nb.generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
+            n = np.broadcast_to(np.asarray(n, dtype=np.int64), shape[1])
+            entries, exits = dispatch.generate_rand_enex(
+                shape,
+                n,
+                entry_wait,
+                exit_wait,
+                seed=seed,
+                engine=engine,
+            )
         elif entry_prob is not None and exit_prob is not None:
-            entry_prob = np.broadcast_to(entry_prob, shape)
-            exit_prob = np.broadcast_to(exit_prob, shape)
-            entries, exits = nb.generate_rand_enex_by_prob_nb(
+            entry_prob = broadcast_to_shape(entry_prob, shape, np.float64)
+            exit_prob = broadcast_to_shape(exit_prob, shape, np.float64)
+            entries, exits = dispatch.generate_rand_enex_by_prob(
                 shape,
                 entry_prob,
                 exit_prob,
@@ -622,7 +657,8 @@ class SignalsAccessor(GenericAccessor):
                 entry_pick_first,
                 exit_pick_first,
                 flex_2d,
-                seed=seed
+                seed=seed,
+                engine=engine,
             )
         else:
             raise ValueError("At least n, or entry_prob and exit_prob should be set")
@@ -633,13 +669,16 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_random_exits(self,
-                              prob: tp.Optional[tp.ArrayLike] = None,
-                              seed: tp.Optional[int] = None,
-                              wait: int = 1,
-                              until_next: bool = True,
-                              skip_until_exit: bool = False,
-                              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def generate_random_exits(
+        self,
+        prob: tp.Optional[tp.ArrayLike] = None,
+        seed: tp.Optional[int] = None,
+        wait: int = 1,
+        until_next: bool = True,
+        skip_until_exit: bool = False,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Generate exit signals randomly.
 
         If `prob` is None, see `vectorbt.signals.nb.generate_rand_ex_nb`.
@@ -670,39 +709,47 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False   True
             ```
         """
+        engine = engine if engine is not None else self.engine
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
-            exits = nb.generate_rand_ex_by_prob_nb(
-                reshape_fns.to_2d_array(obj),
+            entries_2d = reshape_fns.to_2d_array(obj)
+            prob = broadcast_to_shape(prob, entries_2d.shape, np.float64)
+            exits = dispatch.generate_rand_ex_by_prob(
+                entries_2d,
                 prob,
                 wait,
                 until_next,
                 skip_until_exit,
                 obj.ndim == 2,
-                seed=seed
+                seed=seed,
+                engine=engine,
             )
             return ArrayWrapper.from_obj(obj).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
-        exits = nb.generate_rand_ex_nb(
+        exits = dispatch.generate_rand_ex(
             self.to_2d_array(),
             wait,
             until_next,
             skip_until_exit,
-            seed=seed
+            seed=seed,
+            engine=engine,
         )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def generate_stop_exits(self,
-                            ts: tp.ArrayLike,
-                            stop: tp.ArrayLike,
-                            trailing: tp.ArrayLike = False,
-                            entry_wait: int = 1,
-                            exit_wait: int = 1,
-                            until_next: bool = True,
-                            skip_until_exit: bool = False,
-                            pick_first: bool = True,
-                            chain: bool = False,
-                            broadcast_kwargs: tp.KwargsLike = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def generate_stop_exits(
+        self,
+        ts: tp.ArrayLike,
+        stop: tp.ArrayLike,
+        trailing: tp.ArrayLike = False,
+        entry_wait: int = 1,
+        exit_wait: int = 1,
+        until_next: bool = True,
+        skip_until_exit: bool = False,
+        pick_first: bool = True,
+        chain: bool = False,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when `ts` hits the stop.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
@@ -747,64 +794,83 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
 
-        keep_raw = (False, True, True, True)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements="W")), broadcast_kwargs)
         entries, ts, stop, trailing = reshape_fns.broadcast(
-            entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
+            entries,
+            ts,
+            stop,
+            trailing,
+            **broadcast_kwargs,
+            keep_raw=False,
+        )
+        flex_2d = entries.ndim == 2
+        entries_2d = reshape_fns.to_2d_array(entries)
+        ts_2d = broadcast_2d_to_shape(ts, entries_2d.shape, np.float64)
+        stop_2d = broadcast_2d_to_shape(stop, entries_2d.shape, np.float64)
+        trailing_2d = broadcast_2d_to_shape(trailing, entries_2d.shape, np.bool_)
 
         # Perform generation
         if chain:
-            new_entries, exits = nb.generate_stop_enex_nb(
-                reshape_fns.to_2d_array(entries),
-                ts,
-                stop,
-                trailing,
+            new_entries, exits = dispatch.generate_stop_enex(
+                entries_2d,
+                ts_2d,
+                stop_2d,
+                trailing_2d,
                 entry_wait,
                 exit_wait,
                 pick_first,
-                entries.ndim == 2
+                flex_2d,
+                engine=engine,
             )
-            return ArrayWrapper.from_obj(entries).wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
-                   ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            return ArrayWrapper.from_obj(entries).wrap(
+                new_entries,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            ), ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
-            exits = nb.generate_stop_ex_nb(
-                reshape_fns.to_2d_array(entries),
-                ts,
-                stop,
-                trailing,
+            exits = dispatch.generate_stop_ex(
+                entries_2d,
+                ts_2d,
+                stop_2d,
+                trailing_2d,
                 exit_wait,
                 until_next,
                 skip_until_exit,
                 pick_first,
-                entries.ndim == 2
+                flex_2d,
+                engine=engine,
             )
             return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def generate_ohlc_stop_exits(self,
-                                 open: tp.ArrayLike,
-                                 high: tp.Optional[tp.ArrayLike] = None,
-                                 low: tp.Optional[tp.ArrayLike] = None,
-                                 close: tp.Optional[tp.ArrayLike] = None,
-                                 is_open_safe: bool = True,
-                                 out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
-                                 sl_stop: tp.ArrayLike = np.nan,
-                                 sl_trail: tp.ArrayLike = False,
-                                 tp_stop: tp.ArrayLike = np.nan,
-                                 reverse: tp.ArrayLike = False,
-                                 entry_wait: int = 1,
-                                 exit_wait: int = 1,
-                                 until_next: bool = True,
-                                 skip_until_exit: bool = False,
-                                 pick_first: bool = True,
-                                 chain: bool = False,
-                                 broadcast_kwargs: tp.KwargsLike = None,
-                                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def generate_ohlc_stop_exits(
+        self,
+        open: tp.ArrayLike,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
+        close: tp.Optional[tp.ArrayLike] = None,
+        is_open_safe: bool = True,
+        out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
+        sl_stop: tp.ArrayLike = np.nan,
+        sl_trail: tp.ArrayLike = False,
+        tp_stop: tp.ArrayLike = np.nan,
+        reverse: tp.ArrayLike = False,
+        entry_wait: int = 1,
+        exit_wait: int = 1,
+        until_next: bool = True,
+        skip_until_exit: bool = False,
+        pick_first: bool = True,
+        chain: bool = False,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        engine: tp.Optional[str] = None,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
 
         !!! hint
@@ -948,6 +1014,7 @@ class SignalsAccessor(GenericAccessor):
                 The last two examples above make entries dependent upon exits - this makes only sense
                 if you have no other exit arrays to combine this stop exit array with.
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
@@ -962,95 +1029,136 @@ class SignalsAccessor(GenericAccessor):
             out_dict = {}
         else:
             out_dict_passed = True
-        stop_price_out = out_dict.get('stop_price', np.nan if out_dict_passed else None)
-        stop_type_out = out_dict.get('stop_type', -1 if out_dict_passed else None)
+        stop_price_out = out_dict.get("stop_price", np.nan if out_dict_passed else None)
+        stop_type_out = out_dict.get("stop_type", -1 if out_dict_passed else None)
         out_args = ()
         if stop_price_out is not None:
             out_args += (stop_price_out,)
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
-        keep_raw = (False, True, True, True, True, True, True, True, True) + (False,) * len(out_args)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements="W")), broadcast_kwargs)
         entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args = reshape_fns.broadcast(
-            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args,
-            **broadcast_kwargs, keep_raw=keep_raw)
+            entries,
+            open,
+            high,
+            low,
+            close,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            reverse,
+            *out_args,
+            **broadcast_kwargs,
+            keep_raw=False,
+        )
+        flex_2d = entries.ndim == 2
+        entries_2d = reshape_fns.to_2d_array(entries)
+        shape = entries_2d.shape
+        open_2d = broadcast_2d_to_shape(open, shape, np.float64)
+        high_2d = broadcast_2d_to_shape(high, shape, np.float64)
+        low_2d = broadcast_2d_to_shape(low, shape, np.float64)
+        close_2d = broadcast_2d_to_shape(close, shape, np.float64)
+        sl_stop_2d = broadcast_2d_to_shape(sl_stop, shape, np.float64)
+        sl_trail_2d = broadcast_2d_to_shape(sl_trail, shape, np.bool_)
+        tp_stop_2d = broadcast_2d_to_shape(tp_stop, shape, np.float64)
+        reverse_2d = broadcast_2d_to_shape(reverse, shape, np.bool_)
         if stop_price_out is None:
-            stop_price_out = np.empty_like(entries, dtype=np.float64)
+            stop_price_out = np.empty(shape, dtype=np.float64)
         else:
             stop_price_out = out_args[0]
             out_args = out_args[1:]
         if stop_type_out is None:
-            stop_type_out = np.empty_like(entries, dtype=np.int64)
+            stop_type_out = np.empty(shape, dtype=np.int64)
         else:
             stop_type_out = out_args[0]
-        stop_price_out = reshape_fns.to_2d_array(stop_price_out)
-        stop_type_out = reshape_fns.to_2d_array(stop_type_out)
+        stop_price_out = np.ascontiguousarray(reshape_fns.to_2d_array(stop_price_out), dtype=np.float64)
+        stop_type_out = np.ascontiguousarray(reshape_fns.to_2d_array(stop_type_out), dtype=np.int64)
 
         # Perform generation
         if chain:
-            new_entries, exits = nb.generate_ohlc_stop_enex_nb(
-                reshape_fns.to_2d_array(entries),
-                open,
-                high,
-                low,
-                close,
+            new_entries, exits = dispatch.generate_ohlc_stop_enex(
+                entries_2d,
+                open_2d,
+                high_2d,
+                low_2d,
+                close_2d,
                 stop_price_out,
                 stop_type_out,
-                sl_stop,
-                sl_trail,
-                tp_stop,
-                reverse,
+                sl_stop_2d,
+                sl_trail_2d,
+                tp_stop_2d,
+                reverse_2d,
                 is_open_safe,
                 entry_wait,
                 exit_wait,
                 pick_first,
-                entries.ndim == 2
+                flex_2d,
+                engine=engine,
             )
-            out_dict['stop_price'] = ArrayWrapper.from_obj(entries).wrap(
-                stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            out_dict['stop_type'] = ArrayWrapper.from_obj(entries).wrap(
-                stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            return ArrayWrapper.from_obj(entries).wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
-                   ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
+            out_dict["stop_price"] = ArrayWrapper.from_obj(entries).wrap(
+                stop_price_out,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            )
+            out_dict["stop_type"] = ArrayWrapper.from_obj(entries).wrap(
+                stop_type_out,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            )
+            return ArrayWrapper.from_obj(entries).wrap(
+                new_entries,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            ), ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
-            exits = nb.generate_ohlc_stop_ex_nb(
-                reshape_fns.to_2d_array(entries),
-                open,
-                high,
-                low,
-                close,
+            exits = dispatch.generate_ohlc_stop_ex(
+                entries_2d,
+                open_2d,
+                high_2d,
+                low_2d,
+                close_2d,
                 stop_price_out,
                 stop_type_out,
-                sl_stop,
-                sl_trail,
-                tp_stop,
-                reverse,
+                sl_stop_2d,
+                sl_trail_2d,
+                tp_stop_2d,
+                reverse_2d,
                 is_open_safe,
                 exit_wait,
                 until_next,
                 skip_until_exit,
                 pick_first,
-                entries.ndim == 2
+                flex_2d,
+                engine=engine,
             )
-            out_dict['stop_price'] = ArrayWrapper.from_obj(entries).wrap(
-                stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
-            out_dict['stop_type'] = ArrayWrapper.from_obj(entries).wrap(
-                stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
+            out_dict["stop_price"] = ArrayWrapper.from_obj(entries).wrap(
+                stop_price_out,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            )
+            out_dict["stop_type"] = ArrayWrapper.from_obj(entries).wrap(
+                stop_type_out,
+                group_by=False,
+                **merge_dicts({}, wrap_kwargs),
+            )
             return ArrayWrapper.from_obj(entries).wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Ranges ############# #
 
-    def between_ranges(self,
-                       other: tp.Optional[tp.ArrayLike] = None,
-                       from_other: bool = False,
-                       broadcast_kwargs: tp.KwargsLike = None,
-                       group_by: tp.GroupByLike = None,
-                       attach_ts: bool = True,
-                       attach_other: bool = False,
-                       **kwargs) -> Ranges:
+    def between_ranges(
+        self,
+        other: tp.Optional[tp.ArrayLike] = None,
+        from_other: bool = False,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        attach_other: bool = False,
+        **kwargs,
+    ) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.between_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
@@ -1111,32 +1219,36 @@ class SignalsAccessor(GenericAccessor):
             array([0, 2])
             ```
         """
+        engine = engine if engine is not None else self.engine
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
         if other is None:
             # One input array
-            range_records = nb.between_ranges_nb(self.to_2d_array())
+            range_records = dispatch.between_ranges(self.to_2d_array(), engine=engine)
             wrapper = self.wrapper
             to_attach = self.obj
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
-            range_records = nb.between_two_ranges_nb(
+            range_records = dispatch.between_two_ranges(
                 reshape_fns.to_2d_array(obj),
                 reshape_fns.to_2d_array(other),
-                from_other=from_other
+                from_other=from_other,
+                engine=engine,
             )
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
-        return Ranges(
-            wrapper,
-            range_records,
-            ts=to_attach if attach_ts else None,
-            **kwargs
-        ).regroup(group_by)
+        kwargs.setdefault("engine", engine)
+        return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
 
-    def partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+    def partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.partition_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
@@ -1152,15 +1264,18 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                4              5    Open
             ```
         """
-        range_records = nb.partition_ranges_nb(self.to_2d_array())
-        return Ranges(
-            self.wrapper,
-            range_records,
-            ts=self.obj if attach_ts else None,
-            **kwargs
-        ).regroup(group_by)
+        engine = engine if engine is not None else self.engine
+        range_records = dispatch.partition_ranges(self.to_2d_array(), engine=engine)
+        kwargs.setdefault("engine", engine)
+        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
-    def between_partition_ranges(self, group_by: tp.GroupByLike = None, attach_ts: bool = True, **kwargs) -> Ranges:
+    def between_partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        engine: tp.Optional[str] = None,
+        **kwargs,
+    ) -> Ranges:
         """Wrap the result of `vectorbt.signals.nb.between_partition_ranges_nb`
         with `vectorbt.generic.ranges.Ranges`.
 
@@ -1173,25 +1288,26 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                3              5  Closed
             ```
         """
-        range_records = nb.between_partition_ranges_nb(self.to_2d_array())
-        return Ranges(
-            self.wrapper,
-            range_records,
-            ts=self.obj if attach_ts else None,
-            **kwargs
-        ).regroup(group_by)
+        engine = engine if engine is not None else self.engine
+        range_records = dispatch.between_partition_ranges(self.to_2d_array(), engine=engine)
+        kwargs.setdefault("engine", engine)
+        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
 
     # ############# Ranking ############# #
 
-    def rank(self,
-             rank_func_nb: tp.RankFunc, *args,
-             prepare_func: tp.Optional[tp.Callable] = None,
-             reset_by: tp.Optional[tp.ArrayLike] = None,
-             after_false: bool = False,
-             broadcast_kwargs: tp.KwargsLike = None,
-             wrap_kwargs: tp.KwargsLike = None,
-             as_mapped: bool = False,
-             **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+    def rank(
+        self,
+        rank_func: tp.RankFunc,
+        *args,
+        prepare_func: tp.Optional[tp.Callable] = None,
+        reset_by: tp.Optional[tp.ArrayLike] = None,
+        after_false: bool = False,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        as_mapped: bool = False,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """See `vectorbt.signals.nb.rank_nb`.
 
         Will broadcast with `reset_by` using `vectorbt.base.reshape_fns.broadcast` and `broadcast_kwargs`.
@@ -1200,8 +1316,9 @@ class SignalsAccessor(GenericAccessor):
         It should take both broadcasted arrays (`reset_by` can be None) and return a tuple.
 
         Set `as_mapped` to True to return an instance of `vectorbt.records.mapped_array.MappedArray`."""
-        checks.assert_not_none(rank_func_nb)
-        checks.assert_numba_func(rank_func_nb)
+        engine = engine if engine is not None else self.engine
+        checks.assert_not_none(rank_func)
+        checks.assert_engine_func(rank_func, engine=engine)
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
 
@@ -1215,25 +1332,24 @@ class SignalsAccessor(GenericAccessor):
             temp_arrs = prepare_func(obj_arr, reset_by)
         else:
             temp_arrs = ()
-        rank = nb.rank_nb(
-            obj_arr,
-            reset_by,
-            after_false,
-            rank_func_nb,
-            *temp_arrs,
-            *args
-        )
+        rank = dispatch.rank(obj_arr, reset_by, after_false, rank_func, *temp_arrs, *args, engine=engine)
         rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
-            return rank_wrapped.vbt.to_mapped(
-                dropna=True,
-                dtype=np.int64,
-                **kwargs
-            )
+            return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
         return rank_wrapped
 
-    def pos_rank(self, allow_gaps: bool = False, **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+    def pos_rank(
+        self,
+        allow_gaps: bool = False,
+        reset_by: tp.Optional[tp.ArrayLike] = None,
+        after_false: bool = False,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        as_mapped: bool = False,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """Get signal position ranks.
 
         Uses `SignalsAccessor.rank` with `vectorbt.signals.nb.sig_pos_rank_nb`.
@@ -1275,15 +1391,38 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
-        return self.rank(
-            nb.sig_pos_rank_nb,
-            allow_gaps,
-            prepare_func=prepare_func,
-            **kwargs
-        )
+        engine = engine if engine is not None else self.engine
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
 
-    def partition_pos_rank(self, **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+        if reset_by is not None:
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
+            reset_by = reshape_fns.to_2d_array(reset_by)
+        else:
+            obj = self.obj
+        rank = dispatch.sig_pos_rank(
+            reshape_fns.to_2d_array(obj),
+            reset_by,
+            after_false,
+            allow_gaps,
+            engine=engine,
+        )
+        rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
+        if as_mapped:
+            rank_wrapped = rank_wrapped.replace(-1, np.nan)
+            return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
+        return rank_wrapped
+
+    def partition_pos_rank(
+        self,
+        reset_by: tp.Optional[tp.ArrayLike] = None,
+        after_false: bool = False,
+        engine: tp.Optional[str] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        as_mapped: bool = False,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """Get partition position ranks.
 
         Uses `SignalsAccessor.rank` with `vectorbt.signals.nb.part_pos_rank_nb`.
@@ -1317,26 +1456,60 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int64),)
-        return self.rank(
-            nb.part_pos_rank_nb,
-            prepare_func=prepare_func,
-            **kwargs
-        )
+        engine = engine if engine is not None else self.engine
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
 
-    def first(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        if reset_by is not None:
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
+            reset_by = reshape_fns.to_2d_array(reset_by)
+        else:
+            obj = self.obj
+        rank = dispatch.part_pos_rank(
+            reshape_fns.to_2d_array(obj),
+            reset_by,
+            after_false,
+            engine=engine,
+        )
+        rank_wrapped = ArrayWrapper.from_obj(obj).wrap(rank, group_by=False, **merge_dicts({}, wrap_kwargs))
+        if as_mapped:
+            rank_wrapped = rank_wrapped.replace(-1, np.nan)
+            return rank_wrapped.vbt.to_mapped(dropna=True, dtype=np.int64, **kwargs)
+        return rank_wrapped
+
+    def first(
+        self,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == 0`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        engine = engine if engine is not None else self.engine
+        pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def nth(
+        self,
+        n: int,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == n`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        engine = engine if engine is not None else self.engine
+        pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
-    def from_nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def from_nth(
+        self,
+        n: int,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank >= n`."""
-        pos_rank = self.pos_rank(**kwargs).values
+        engine = engine if engine is not None else self.engine
+        pos_rank = self.pos_rank(engine=engine, **kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
@@ -1353,8 +1526,14 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Index ############# #
 
-    def nth_index(self, n: int, return_labels: bool = True, group_by: tp.GroupByLike = None,
-                  wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def nth_index(
+        self,
+        n: int,
+        return_labels: bool = True,
+        group_by: tp.GroupByLike = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.nth_index_nb`.
 
         Usage:
@@ -1381,21 +1560,27 @@ class SignalsAccessor(GenericAccessor):
             Timestamp('2020-01-05 00:00:00')
             ```
         """
+        engine = engine if engine is not None else self.engine
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
-            squeezed = self.squeeze_grouped(generic_nb.any_squeeze_nb, group_by=group_by)
+            squeezed = self.squeeze_grouped(generic_nb.any_squeeze_nb, group_by=group_by, engine=engine)
             arr = reshape_fns.to_2d_array(squeezed)
         else:
             arr = self.to_2d_array()
-        nth_index = nb.nth_index_nb(arr, n)
+        nth_index = dispatch.nth_index(arr, n, engine=engine)
         if return_labels:
             minus_one_mask = nth_index == -1
             nth_index = nth_index.astype(object)
             nth_index[minus_one_mask] = np.nan
             nth_index[~minus_one_mask] = self.wrapper.index[nth_index[~minus_one_mask].astype(np.int64)]
-        wrap_kwargs = merge_dicts(dict(name_or_index='nth_index'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="nth_index"), wrap_kwargs)
         return self.wrapper.wrap_reduced(nth_index, group_by=group_by, **wrap_kwargs)
 
-    def norm_avg_index(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def norm_avg_index(
+        self,
+        group_by: tp.GroupByLike = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.norm_avg_index_nb`.
 
         Normalized average index measures the average signal location relative to the middle of the column.
@@ -1421,8 +1606,9 @@ class SignalsAccessor(GenericAccessor):
             0.0
             ```
         """
-        norm_avg_index = nb.norm_avg_index_nb(self.to_2d_array())
-        wrap_kwargs = merge_dicts(dict(name_or_index='norm_avg_index'), wrap_kwargs)
+        engine = engine if engine is not None else self.engine
+        norm_avg_index = dispatch.norm_avg_index(self.to_2d_array(), engine=engine)
+        wrap_kwargs = merge_dicts(dict(name_or_index="norm_avg_index"), wrap_kwargs)
         norm_avg_index = self.wrapper.wrap_reduced(norm_avg_index, group_by=False, **wrap_kwargs)
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             # Group index is a weighted average of column indexes in the group
@@ -1430,10 +1616,8 @@ class SignalsAccessor(GenericAccessor):
                 group_by = self.wrapper.grouper.group_by
             col_total = self.total(group_by=False)
             norm_avg_index *= col_total
-            norm_avg_index = norm_avg_index.vbt.squeeze_grouped(
-                generic_nb.sum_squeeze_nb, group_by=group_by)
-            group_total = col_total.vbt.squeeze_grouped(
-                generic_nb.sum_squeeze_nb, group_by=group_by)
+            norm_avg_index = norm_avg_index.vbt.squeeze_grouped(generic_nb.sum_squeeze_nb, group_by=group_by)
+            group_total = col_total.vbt.squeeze_grouped(generic_nb.sum_squeeze_nb, group_by=group_by)
             norm_avg_index /= group_total
         return norm_avg_index
 
@@ -1447,39 +1631,40 @@ class SignalsAccessor(GenericAccessor):
         indices = np.tile(indices, (1, len(self.wrapper.columns)))
         indices = reshape_fns.soft_to_ndim(indices, self.wrapper.ndim)
         indices[~self.obj.values] = np.nan
-        return self.wrapper.wrap(indices).vbt.to_mapped(
-            dropna=True,
-            dtype=np.int64,
-            group_by=group_by,
-            **kwargs
-        )
+        return self.wrapper.wrap(indices).vbt.to_mapped(dropna=True, dtype=np.int64, group_by=group_by, **kwargs)
 
-    def total(self, wrap_kwargs: tp.KwargsLike = None,
-              group_by: tp.GroupByLike = None) -> tp.MaybeSeries:
+    def total(self, wrap_kwargs: tp.KwargsLike = None, group_by: tp.GroupByLike = None) -> tp.MaybeSeries:
         """Total number of True values in each column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='total'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total"), wrap_kwargs)
         return self.sum(group_by=group_by, wrap_kwargs=wrap_kwargs)
 
-    def rate(self, wrap_kwargs: tp.KwargsLike = None,
-             group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
+    def rate(self, wrap_kwargs: tp.KwargsLike = None, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """`SignalsAccessor.total` divided by the total index length in each column/group."""
         total = reshape_fns.to_1d_array(self.total(group_by=group_by, **kwargs))
-        wrap_kwargs = merge_dicts(dict(name_or_index='rate'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="rate"), wrap_kwargs)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         return self.wrapper.wrap_reduced(total / total_steps, group_by=group_by, **wrap_kwargs)
 
-    def total_partitions(self, wrap_kwargs: tp.KwargsLike = None,
-                         group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
+    def total_partitions(
+        self,
+        wrap_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Total number of partitions of True values in each column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_partitions'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_partitions"), wrap_kwargs)
         return self.partition_ranges(**kwargs).count(group_by=group_by, wrap_kwargs=wrap_kwargs)
 
-    def partition_rate(self, wrap_kwargs: tp.KwargsLike = None,
-                       group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
+    def partition_rate(
+        self,
+        wrap_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """`SignalsAccessor.total_partitions` divided by `SignalsAccessor.total` in each column/group."""
         total_partitions = reshape_fns.to_1d_array(self.total_partitions(group_by=group_by, *kwargs))
         total = reshape_fns.to_1d_array(self.total(group_by=group_by, *kwargs))
-        wrap_kwargs = merge_dicts(dict(name_or_index='partition_rate'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="partition_rate"), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_partitions / total, group_by=group_by, **wrap_kwargs)
 
     # ############# Logical operations ############# #
@@ -1529,130 +1714,109 @@ class SignalsAccessor(GenericAccessor):
         Merges `vectorbt.generic.accessors.GenericAccessor.stats_defaults` and
         `signals.stats` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        signals_stats_cfg = settings['signals']['stats']
 
-        return merge_dicts(
-            GenericAccessor.stats_defaults.__get__(self),
-            signals_stats_cfg
-        )
+        signals_stats_cfg = settings["signals"]["stats"]
+
+        return merge_dicts(GenericAccessor.stats_defaults.__get__(self), signals_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = Config(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            total=dict(
-                title='Total',
-                calc_func='total',
-                tags='signals'
-            ),
+            total=dict(title="Total", calc_func="total", tags="signals"),
             rate=dict(
-                title='Rate [%]',
-                calc_func='rate',
+                title="Rate [%]",
+                calc_func="rate",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='signals'
+                tags="signals",
             ),
             total_overlapping=dict(
-                title='Total Overlapping',
-                calc_func=lambda self, other, group_by:
-                (self & other).vbt.signals.total(group_by=group_by),
+                title="Total Overlapping",
+                calc_func=lambda self, other, group_by: (self & other).vbt.signals.total(group_by=group_by),
                 check_silent_has_other=True,
-                tags=['signals', 'other']
+                tags=["signals", "other"],
             ),
             overlapping_rate=dict(
-                title='Overlapping Rate [%]',
-                calc_func=lambda self, other, group_by:
-                (self & other).vbt.signals.total(group_by=group_by) /
-                (self | other).vbt.signals.total(group_by=group_by),
+                title="Overlapping Rate [%]",
+                calc_func=lambda self, other, group_by: (self & other).vbt.signals.total(group_by=group_by)
+                / (self | other).vbt.signals.total(group_by=group_by),
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_silent_has_other=True,
-                tags=['signals', 'other']
+                tags=["signals", "other"],
             ),
             first_index=dict(
-                title='First Index',
-                calc_func='nth_index',
+                title="First Index",
+                calc_func="nth_index",
                 n=0,
                 return_labels=True,
-                tags=['signals', 'index']
+                tags=["signals", "index"],
             ),
             last_index=dict(
-                title='Last Index',
-                calc_func='nth_index',
+                title="Last Index",
+                calc_func="nth_index",
                 n=-1,
                 return_labels=True,
-                tags=['signals', 'index']
+                tags=["signals", "index"],
             ),
-            norm_avg_index=dict(
-                title='Norm Avg Index [-1, 1]',
-                calc_func='norm_avg_index',
-                tags=['signals', 'index']
-            ),
+            norm_avg_index=dict(title="Norm Avg Index [-1, 1]", calc_func="norm_avg_index", tags=["signals", "index"]),
             distance=dict(
-                title=RepEval("f'Distance {\"<-\" if from_other else \"->\"} {other_name}' "
-                              "if other is not None else 'Distance'"),
-                calc_func='between_ranges.duration',
+                title=RepEval(
+                    'f\'Distance {"<-" if from_other else "->"} {other_name}\' ' "if other is not None else 'Distance'"
+                ),
+                calc_func="between_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
-                    'Min': out.min(),
-                    'Max': out.max(),
-                    'Mean': out.mean(),
-                    'Std': out.std(ddof=settings.get('ddof', 1))
+                    "Min": out.min(),
+                    "Max": out.max(),
+                    "Mean": out.mean(),
+                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
-                tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']")
+                tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']"),
             ),
             total_partitions=dict(
-                title='Total Partitions',
-                calc_func='total_partitions',
-                tags=['signals', 'partitions']
+                title="Total Partitions",
+                calc_func="total_partitions",
+                tags=["signals", "partitions"],
             ),
             partition_rate=dict(
-                title='Partition Rate [%]',
-                calc_func='partition_rate',
+                title="Partition Rate [%]",
+                calc_func="partition_rate",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=['signals', 'partitions']
+                tags=["signals", "partitions"],
             ),
             partition_len=dict(
-                title='Partition Length',
-                calc_func='partition_ranges.duration',
+                title="Partition Length",
+                calc_func="partition_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
-                    'Min': out.min(),
-                    'Max': out.max(),
-                    'Mean': out.mean(),
-                    'Std': out.std(ddof=settings.get('ddof', 1))
+                    "Min": out.min(),
+                    "Max": out.max(),
+                    "Mean": out.mean(),
+                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
-                tags=['signals', 'partitions', 'distance']
+                tags=["signals", "partitions", "distance"],
             ),
             partition_distance=dict(
-                title='Partition Distance',
-                calc_func='between_partition_ranges.duration',
+                title="Partition Distance",
+                calc_func="between_partition_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
-                    'Min': out.min(),
-                    'Max': out.max(),
-                    'Mean': out.mean(),
-                    'Std': out.std(ddof=settings.get('ddof', 1))
+                    "Min": out.min(),
+                    "Max": out.max(),
+                    "Mean": out.mean(),
+                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
-                tags=['signals', 'partitions', 'distance']
+                tags=["signals", "partitions", "distance"],
             ),
         ),
-        copy_kwargs=dict(copy_mode='deep')
+        copy_kwargs=dict(copy_mode="deep"),
     )
 
     @property
@@ -1661,7 +1825,7 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Plotting ############# #
 
-    def plot(self, yref: str = 'y', **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot(self, yref: str = "y", **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals.
 
         Args:
@@ -1676,11 +1840,7 @@ class SignalsAccessor(GenericAccessor):
             ![](/assets/images/signals_df_plot.svg)
         """
         default_layout = dict()
-        default_layout['yaxis' + yref[1:]] = dict(
-            tickmode='array',
-            tickvals=[0, 1],
-            ticktext=['false', 'true']
-        )
+        default_layout["yaxis" + yref[1:]] = dict(tickmode="array", tickvals=[0, 1], ticktext=["false", "true"])
         return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
 
     @property
@@ -1690,12 +1850,10 @@ class SignalsAccessor(GenericAccessor):
         Merges `vectorbt.generic.accessors.GenericAccessor.plots_defaults` and
         `signals.plots` from `vectorbt._settings.settings`."""
         from vectorbt._settings import settings
-        signals_plots_cfg = settings['signals']['plots']
 
-        return merge_dicts(
-            GenericAccessor.plots_defaults.__get__(self),
-            signals_plots_cfg
-        )
+        signals_plots_cfg = settings["signals"]["plots"]
+
+        return merge_dicts(GenericAccessor.plots_defaults.__get__(self), signals_plots_cfg)
 
     @property
     def subplots(self) -> Config:
@@ -1706,7 +1864,7 @@ SignalsAccessor.override_metrics_doc(__pdoc__)
 SignalsAccessor.override_subplots_doc(__pdoc__)
 
 
-@register_series_vbt_accessor('signals')
+@register_series_vbt_accessor("signals")
 class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
     """Accessor on top of signal series. For Series only.
 
@@ -1716,8 +1874,11 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         GenericSRAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
 
-    def plot_as_markers(self, y: tp.Optional[tp.ArrayLike] = None,
-                        **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot_as_markers(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot Series as markers.
 
         Args:
@@ -1735,75 +1896,92 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             ![](/assets/images/signals_plot_as_markers.svg)
         """
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         if y is None:
             y = pd.Series.vbt.empty_like(self.obj, 1)
         else:
             y = reshape_fns.to_pd_array(y)
 
-        return y[self.obj].vbt.scatterplot(**merge_dicts(dict(
-            trace_kwargs=dict(
-                marker=dict(
-                    symbol='circle',
-                    color=plotting_cfg['contrast_color_schema']['blue'],
-                    size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
+        return y[self.obj].vbt.scatterplot(
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="circle",
+                            color=plotting_cfg["contrast_color_schema"]["blue"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                        )
                     )
-                )
+                ),
+                kwargs,
             )
-        ), kwargs))
+        )
 
-    def plot_as_entry_markers(self, y: tp.Optional[tp.ArrayLike] = None,
-                              **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot_as_entry_markers(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals as entry markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        return self.plot_as_markers(y=y, **merge_dicts(dict(
-            trace_kwargs=dict(
-                marker=dict(
-                    symbol='triangle-up',
-                    color=plotting_cfg['contrast_color_schema']['green'],
-                    size=8,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="triangle-up",
+                            color=plotting_cfg["contrast_color_schema"]["green"],
+                            size=8,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                        ),
+                        name="Entry",
                     )
                 ),
-                name='Entry'
-            )
-        ), kwargs))
+                kwargs,
+            ),
+        )
 
-    def plot_as_exit_markers(self, y: tp.Optional[tp.ArrayLike] = None,
-                             **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
+    def plot_as_exit_markers(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals as exit markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
         from vectorbt._settings import settings
-        plotting_cfg = settings['plotting']
 
-        return self.plot_as_markers(y=y, **merge_dicts(dict(
-            trace_kwargs=dict(
-                marker=dict(
-                    symbol='triangle-down',
-                    color=plotting_cfg['contrast_color_schema']['red'],
-                    size=8,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['red'])
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="triangle-down",
+                            color=plotting_cfg["contrast_color_schema"]["red"],
+                            size=8,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
+                        ),
+                        name="Exit",
                     )
                 ),
-                name='Exit'
-            )
-        ), kwargs))
+                kwargs,
+            ),
+        )
 
 
-@register_dataframe_vbt_accessor('signals')
+@register_dataframe_vbt_accessor("signals")
 class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 

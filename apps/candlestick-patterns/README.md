@@ -1,8 +1,8 @@
-# candlestick-patterns
+# Candlestick Patterns
 
 A [Dash](https://github.com/plotly/dash) app to visualize and backtest candlestick patterns.
 
-## ✨ Features
+## Features
 
 - Fetches market data via [yfinance](https://github.com/ranaroussi/yfinance)
 - Detects candlestick patterns via [TA-Lib](https://github.com/TA-Lib/ta-lib-python)
@@ -13,7 +13,7 @@ A [Dash](https://github.com/plotly/dash) app to visualize and backtest candlesti
 - Compares strategy vs buy & hold and random trading
 - Responsive UI with [Dash Bootstrap Components](https://github.com/facultyai/dash-bootstrap-components)
 
-## 🌪️ Using `uv`
+## Using `uv`
 
 [`uv`](https://github.com/astral-sh/uv) is a fast, modern replacement for `pip` + `venv` workflows.
 
@@ -47,7 +47,7 @@ Then open: http://127.0.0.1:8050/
 >
 > Then run `python app.py`.
 
-## 🐳 Using Docker
+## Using Docker
 
 Build and run:
 
@@ -61,6 +61,6 @@ Open: http://127.0.0.1:8050/
 > [!NOTE]
 > The first run can take a while because of Numba JIT compilation.
 
-## 🖼️ Screenshot
+## Screenshot
 
 ![screenshot.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/screenshot.png)

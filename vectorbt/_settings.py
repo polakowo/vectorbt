@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Global settings.
@@ -80,9 +80,6 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.column_grouper import ColumnGrouper
-from vectorbt.records.col_mapper import ColumnMapper
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
@@ -96,110 +93,71 @@ class SettingsConfig(Config):
 
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
-        pio.templates['vbt_' + theme] = go.layout.Template(self['plotting']['themes'][theme]['template'])
+        pio.templates["vbt_" + theme] = go.layout.Template(self["plotting"]["themes"][theme]["template"])
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
-        for theme in self['plotting']['themes']:
+        for theme in self["plotting"]["themes"]:
             self.register_template(theme)
 
     def set_theme(self, theme: str) -> None:
         """Set default theme."""
         self.register_template(theme)
-        self['plotting']['color_schema'].update(self['plotting']['themes'][theme]['color_schema'])
-        self['plotting']['layout']['template'] = 'vbt_' + theme
+        self["plotting"]["color_schema"].update(self["plotting"]["themes"][theme]["color_schema"])
+        self["plotting"]["layout"]["template"] = "vbt_" + theme
 
     def reset_theme(self) -> None:
         """Reset to default theme."""
-        self.set_theme('light')
+        self.set_theme("light")
 
 
 settings = SettingsConfig(
     dict(
-        numba=dict(
-            check_func_type=True,
-            check_func_suffix=False
-        ),
+        engine="auto",  # 'auto', 'numba', 'rust'
+        numba=dict(check_func_type=True, check_func_suffix=False),
         config=Config(),  # flex
         configured=dict(
-            config=Config(  # flex
-                dict(
-                    readonly=True
-                )
-            ),
+            config=Config(dict(readonly=True)),  # flex
         ),
         caching=dict(
             enabled=True,
             whitelist=[
-                CacheCondition(base_cls=ArrayWrapper),
-                CacheCondition(base_cls=ColumnGrouper),
-                CacheCondition(base_cls=ColumnMapper)
+                CacheCondition(base_cls="ArrayWrapper"),
+                CacheCondition(base_cls="ColumnGrouper"),
+                CacheCondition(base_cls="ColumnMapper"),
             ],
-            blacklist=[]
+            blacklist=[],
         ),
         broadcasting=dict(
             align_index=False,
             align_columns=True,
-            index_from='strict',
-            columns_from='stack',
+            index_from="strict",
+            columns_from="stack",
             ignore_sr_names=True,
             drop_duplicates=True,
-            keep='last',
+            keep="last",
             drop_redundant=True,
-            ignore_default=True
+            ignore_default=True,
         ),
-        array_wrapper=dict(
-            column_only_select=False,
-            group_select=True,
-            freq=None,
-            silence_warnings=False
-        ),
-        datetime=dict(
-            naive_tz=get_local_tz(),
-            to_py_timezone=True
-        ),
+        array_wrapper=dict(column_only_select=False, group_select=True, freq=None, silence_warnings=False),
+        datetime=dict(naive_tz=get_local_tz(), to_py_timezone=True),
         data=dict(
             tz_localize=get_utc_tz(),
             tz_convert=get_utc_tz(),
-            missing_index='nan',
-            missing_columns='raise',
-            alpaca=Config(
-                dict(
-                    api_key=None,
-                    secret_key=None
-                )
-            ),
-            binance=Config(  # flex
-                dict(
-                    api_key=None,
-                    api_secret=None
-                )
-            ),
-            ccxt=Config(  # flex
-                dict(
-                    enableRateLimit=True
-                )
-            ),
+            missing_index="nan",
+            missing_columns="raise",
+            alpaca=Config(dict(api_key=None, secret_key=None)),
+            binance=Config(dict(api_key=None, api_secret=None)),  # flex
+            ccxt=Config(dict(enableRateLimit=True)),  # flex
             stats=Config(),  # flex
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
         plotting=dict(
             use_widgets=True,
             show_kwargs=Config(),  # flex
-            color_schema=Config(  # flex
-                dict(
-                    increasing="#1b9e76",
-                    decreasing="#d95f02"
-                )
-            ),
+            color_schema=Config(dict(increasing="#1b9e76", decreasing="#d95f02")),  # flex
             contrast_color_schema=Config(  # flex
-                dict(
-                    blue="#4285F4",
-                    orange="#FFAA00",
-                    green="#37B13F",
-                    red="#EA4335",
-                    gray="#E2E2E2"
-                )
+                dict(blue="#4285F4", orange="#FFAA00", green="#37B13F", red="#EA4335", gray="#E2E2E2")
             ),
             themes=dict(
                 light=dict(
@@ -214,7 +172,7 @@ settings = SettingsConfig(
                             pink="#e377c2",
                             gray="#7f7f7f",
                             yellow="#bcbd22",
-                            cyan="#17becf"
+                            cyan="#17becf",
                         )
                     ),
                     template=Config(json.loads(pkgutil.get_data(__name__, "templates/light.json"))),  # flex
@@ -231,7 +189,7 @@ settings = SettingsConfig(
                             pink="#e377c2",
                             gray="#7f7f7f",
                             yellow="#bcbd22",
-                            cyan="#17becf"
+                            cyan="#17becf",
                         )
                     ),
                     template=Config(json.loads(pkgutil.get_data(__name__, "templates/dark.json"))),  # flex
@@ -248,7 +206,7 @@ settings = SettingsConfig(
                             pink="#e377c2",
                             gray="#7f7f7f",
                             yellow="#bcbd22",
-                            cyan="#17becf"
+                            cyan="#17becf",
                         )
                     ),
                     template=Config(json.loads(pkgutil.get_data(__name__, "templates/seaborn.json"))),  # flex
@@ -258,76 +216,62 @@ settings = SettingsConfig(
                 dict(
                     width=700,
                     height=350,
-                    margin=dict(
-                        t=30, b=30, l=30, r=30
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1,
-                        traceorder='normal'
-                    )
+                    margin=dict(t=30, b=30, l=30, r=30),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, traceorder="normal"),
                 )
             ),
         ),
         stats_builder=dict(
-            metrics='all',
-            tags='all',
+            metrics="all",
+            tags="all",
             silence_warnings=False,
             template_mapping=Config(),  # flex
             filters=Config(  # flex
                 dict(
                     is_not_grouped=dict(
-                        filter_func=lambda self, metric_settings:
-                        not self.wrapper.grouper.is_grouped(group_by=metric_settings['group_by']),
-                        warning_message=Sub("Metric '$metric_name' does not support grouped data")
+                        filter_func=lambda self, metric_settings: not self.wrapper.grouper.is_grouped(
+                            group_by=metric_settings["group_by"]
+                        ),
+                        warning_message=Sub("Metric '$metric_name' does not support grouped data"),
                     ),
                     has_freq=dict(
-                        filter_func=lambda self, metric_settings:
-                        self.wrapper.freq is not None,
-                        warning_message=Sub("Metric '$metric_name' requires frequency to be set")
-                    )
+                        filter_func=lambda self, metric_settings: self.wrapper.freq is not None,
+                        warning_message=Sub("Metric '$metric_name' requires frequency to be set"),
+                    ),
                 )
             ),
-            settings=Config(  # flex
-                dict(
-                    to_timedelta=None,
-                    use_caching=True
-                )
-            ),
+            settings=Config(dict(to_timedelta=None, use_caching=True)),  # flex
             metric_settings=Config(),  # flex
         ),
         plots_builder=dict(
-            subplots='all',
-            tags='all',
+            subplots="all",
+            tags="all",
             silence_warnings=False,
             template_mapping=Config(),  # flex
             filters=Config(  # flex
                 dict(
                     is_not_grouped=dict(
-                        filter_func=lambda self, subplot_settings:
-                        not self.wrapper.grouper.is_grouped(group_by=subplot_settings['group_by']),
-                        warning_message=Sub("Subplot '$subplot_name' does not support grouped data")
+                        filter_func=lambda self, subplot_settings: not self.wrapper.grouper.is_grouped(
+                            group_by=subplot_settings["group_by"]
+                        ),
+                        warning_message=Sub("Subplot '$subplot_name' does not support grouped data"),
                     ),
                     has_freq=dict(
-                        filter_func=lambda self, subplot_settings:
-                        self.wrapper.freq is not None,
-                        warning_message=Sub("Subplot '$subplot_name' requires frequency to be set")
-                    )
+                        filter_func=lambda self, subplot_settings: self.wrapper.freq is not None,
+                        warning_message=Sub("Subplot '$subplot_name' requires frequency to be set"),
+                    ),
                 )
             ),
             settings=Config(  # flex
                 dict(
                     use_caching=True,
                     hline_shape_kwargs=dict(
-                        type='line',
+                        type="line",
                         line=dict(
-                            color='gray',
+                            color="gray",
                             dash="dash",
-                        )
-                    )
+                        ),
+                    ),
                 )
             ),
             subplot_settings=Config(),  # flex
@@ -342,148 +286,109 @@ settings = SettingsConfig(
                 dict(
                     filters=dict(
                         has_mapping=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings.get('mapping', self.mapping) is not None
+                            filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping)
+                            is not None
                         )
                     ),
-                    settings=dict(
-                        incl_all_keys=False
-                    )
+                    settings=dict(incl_all_keys=False),
                 )
             ),
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
-        ranges=dict(
-            stats=Config(),  # flex
-            plots=Config()  # flex
-        ),
-        drawdowns=dict(
-            stats=Config(  # flex
-                dict(
-                    settings=dict(
-                        incl_active=False
-                    )
-                )
-            ),
-            plots=Config()  # flex
-        ),
+        ranges=dict(stats=Config(), plots=Config()),  # flex  # flex
+        drawdowns=dict(stats=Config(dict(settings=dict(incl_active=False))), plots=Config()),  # flex  # flex
         ohlcv=dict(
-            plot_type='OHLC',
-            column_names=dict(
-                open='Open',
-                high='High',
-                low='Low',
-                close='Close',
-                volume='Volume'
-            ),
+            plot_type="OHLC",
+            column_names=dict(open="Open", high="High", low="Low", close="Close", volume="Volume"),
             stats=Config(),  # flex
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
         signals=dict(
             stats=Config(
                 dict(
                     filters=dict(
                         silent_has_other=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings.get('other', None) is not None
+                            filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
                         ),
                     ),
-                    settings=dict(
-                        other=None,
-                        other_name='Other',
-                        from_other=False
-                    )
+                    settings=dict(other=None, other_name="Other", from_other=False),
                 )
             ),  # flex
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
         returns=dict(
-            year_freq='365 days',
+            year_freq="365 days",
             defaults=Config(  # flex
                 dict(
-                    start_value=0.,
+                    start_value=0.0,
                     window=10,
                     minp=None,
                     ddof=1,
-                    risk_free=0.,
-                    levy_alpha=2.,
-                    required_return=0.,
-                    cutoff=0.05
+                    risk_free=0.0,
+                    levy_alpha=2.0,
+                    required_return=0.0,
+                    cutoff=0.05,
                 )
             ),
             stats=Config(  # flex
                 dict(
                     filters=dict(
                         has_year_freq=dict(
-                            filter_func=lambda self, metric_settings:
-                            self.year_freq is not None,
-                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                            filter_func=lambda self, metric_settings: self.year_freq is not None,
+                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                         ),
                         has_benchmark_rets=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings.get('benchmark_rets', self.benchmark_rets) is not None,
-                            warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
-                        )
+                            filter_func=lambda self, metric_settings: metric_settings.get(
+                                "benchmark_rets",
+                                self.benchmark_rets,
+                            )
+                            is not None,
+                            warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set"),
+                        ),
                     ),
-                    settings=dict(
-                        check_is_not_grouped=True
-                    )
+                    settings=dict(check_is_not_grouped=True),
                 )
             ),
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
         qs_adapter=dict(
             defaults=Config(),  # flex
         ),
-        records=dict(
-            stats=Config(),  # flex
-            plots=Config()  # flex
-        ),
+        records=dict(stats=Config(), plots=Config()),  # flex  # flex
         mapped_array=dict(
             stats=Config(  # flex
                 dict(
                     filters=dict(
                         has_mapping=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings.get('mapping', self.mapping) is not None
+                            filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping)
+                            is not None
                         )
                     ),
-                    settings=dict(
-                        incl_all_keys=False
-                    )
+                    settings=dict(incl_all_keys=False),
                 )
             ),
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
-        orders=dict(
-            stats=Config(),  # flex
-            plots=Config()  # flex
-        ),
+        orders=dict(stats=Config(), plots=Config()),  # flex  # flex
         trades=dict(
             stats=Config(  # flex
                 dict(
-                    settings=dict(
-                        incl_open=False
-                    ),
-                    template_mapping=dict(
-                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-                    )
+                    settings=dict(incl_open=False),
+                    template_mapping=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
                 )
             ),
-            plots=Config()  # flex
+            plots=Config(),  # flex
         ),
-        logs=dict(
-            stats=Config()  # flex
-        ),
+        logs=dict(stats=Config()),  # flex
         portfolio=dict(
-            call_seq='default',
-            init_cash=100.,
+            call_seq="default",
+            init_cash=100.0,
             size=np.inf,
-            size_type='amount',
-            fees=0.,
-            fixed_fees=0.,
-            slippage=0.,
-            reject_prob=0.,
+            size_type="amount",
+            fees=0.0,
+            fixed_fees=0.0,
+            slippage=0.0,
+            reject_prob=0.0,
             min_size=1e-8,
             max_size=np.inf,
             size_granularity=np.nan,
@@ -495,19 +400,19 @@ settings = SettingsConfig(
             sl_stop=np.nan,
             sl_trail=False,
             tp_stop=np.nan,
-            stop_entry_price='close',
-            stop_exit_price='stoplimit',
-            stop_conflict_mode='exit',
-            upon_stop_exit='close',
-            upon_stop_update='override',
+            stop_entry_price="close",
+            stop_exit_price="stoplimit",
+            stop_conflict_mode="exit",
+            upon_stop_exit="close",
+            upon_stop_update="override",
             use_stops=None,
             log=False,
-            upon_long_conflict='ignore',
-            upon_short_conflict='ignore',
-            upon_dir_conflict='ignore',
-            upon_opposite_entry='reversereduce',
-            signal_direction='longonly',
-            order_direction='both',
+            upon_long_conflict="ignore",
+            upon_short_conflict="ignore",
+            upon_dir_conflict="ignore",
+            upon_opposite_entry="reversereduce",
+            signal_direction="longonly",
+            order_direction="both",
             cash_sharing=False,
             call_pre_segment=False,
             call_post_segment=False,
@@ -521,56 +426,40 @@ settings = SettingsConfig(
             freq=None,
             attach_call_seq=False,
             fillna_close=True,
-            trades_type='exittrades',
+            trades_type="exittrades",
             stats=Config(  # flex
                 dict(
                     filters=dict(
                         has_year_freq=dict(
-                            filter_func=lambda self, metric_settings:
-                            metric_settings['year_freq'] is not None,
-                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                            filter_func=lambda self, metric_settings: metric_settings["year_freq"] is not None,
+                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                         )
                     ),
-                    settings=dict(
-                        use_asset_returns=False,
-                        incl_open=False
-                    ),
-                    template_mapping=dict(
-                        incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-                    )
+                    settings=dict(use_asset_returns=False, incl_open=False),
+                    template_mapping=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
                 )
             ),
             plots=Config(  # flex
-                dict(
-                    subplots=['orders', 'trade_pnl', 'cum_returns'],
-                    settings=dict(
-                        use_asset_returns=False
-                    )
-                )
-            )
+                dict(subplots=["orders", "trade_pnl", "cum_returns"], settings=dict(use_asset_returns=False))
+            ),
         ),
         messaging=dict(
             telegram=Config(  # flex
                 dict(
                     token=None,
                     use_context=True,
-                    persistence='telegram_bot.pickle',
+                    persistence="telegram_bot.pickle",
                     defaults=Config(),  # flex
-                    drop_pending_updates=True
+                    drop_pending_updates=True,
                 )
             ),
-            giphy=dict(
-                api_key=None,
-                weirdness=5
-            ),
+            giphy=dict(api_key=None, weirdness=5),
         ),
     ),
-    copy_kwargs=dict(
-        copy_mode='deep'
-    ),
+    copy_kwargs=dict(copy_mode="deep"),
     frozen_keys=True,
     nested=True,
-    convert_dicts=Config
+    convert_dicts=Config,
 )
 """_"""
 
@@ -578,7 +467,9 @@ settings.reset_theme()
 settings.make_checkpoint()
 settings.register_templates()
 
-__pdoc__['settings'] = f"""Global settings config.
+__pdoc__[
+    "settings"
+] = f"""Global settings config.
 
 __numba__
 

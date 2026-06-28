@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 __pdoc__ = {}
@@ -35,4 +35,5 @@ warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
 
 import_submodules(__name__)
 
-__pdoc__['_settings'] = True
+__pdoc__["_settings"] = True
+__pdoc__["_engine"] = True

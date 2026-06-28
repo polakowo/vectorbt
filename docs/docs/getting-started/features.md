@@ -2,11 +2,11 @@
 title: Features
 ---
 
-# Features :zap:
+# Features
 
 ## Pandas
 
-- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy and Numba. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
+- [x] **Pandas acceleration**: Compiled versions of most popular pandas functions, such as mapping, reducing, rolling, grouping, and resamping. For best performance, most operations are done strictly using NumPy, Numba, and optional Rust kernels. Attaches a custom accessor on top of Pandas to easily switch between Pandas and VectorBT functionality.
 
 ```pycon title="Compute the rolling z-score"
 >>> import vectorbt as vbt
@@ -31,6 +31,22 @@ title: Features
 
 >>> %timeit big_ts.vbt.rolling_apply(2, vbt_zscore_nb)
 33.1 ms ± 1.17 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+```
+
+- [x] **Optional Rust engine**: Precompiled Rust kernels are available for supported generic, indicator, signal, records, returns, labels, and portfolio paths. Use `engine="rust"` per call or `vbt.settings["engine"] = "rust"` globally. With the default `engine="auto"`, VectorBT uses Rust only when the optional extension is installed and the specific call is supported, otherwise it falls back to Numba.
+
+```pycon title="Process one million orders"
+>>> big_close = pd.DataFrame(100 + np.random.uniform(size=(1000, 1000)))
+>>> big_entries = pd.DataFrame(np.full(big_close.shape, False))
+>>> big_entries.iloc[0::2] = True
+>>> big_exits = pd.DataFrame(np.full(big_close.shape, False))
+>>> big_exits.iloc[1::2] = True
+
+%timeit vbt.Portfolio.from_signals(big_close, big_entries, big_exits, engine="numba")
+53.8 ms ± 2.03 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+%timeit vbt.Portfolio.from_signals(big_close, big_entries, big_exits, engine="rust")
+42.4 ms ± 106 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
 - [x] **Flexible broadcasting**: Mechanism for broadcasting array-like objects of arbitrary shapes, including pandas objects with MultiIndex.
@@ -97,10 +113,18 @@ timestamp
 ...     start='2020-01-01',
 ...     end='2021-01-01'
 ... )
->>> gbm_data.plot(showlegend=False)
+>>> gbm_data.plot(showlegend=False).show()
 ```
 
-![](/assets/images/features_gbm_data.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_gbm_data.html"
+    title="GBM data chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Scheduled data updates**: Can periodically update any previously downloaded data.
 
@@ -132,23 +156,39 @@ Data updated with 5 data points
 ...     set_lens=(1, 1), 
 ...     left_to_right=False, 
 ...     plot=True, 
-...     trace_names=['train', 'valid', 'test'])
+...     trace_names=['train', 'valid', 'test']).show()
 ```
 
-![](/assets/images/features_rolling_split.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--rolling-split"
+    src="/assets/interactive/features_rolling_split.html"
+    title="Rolling split chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Labeling for ML**: Discrete and continuous label generation for effective training of ML models.
 
 ```pycon title="Identify local extrema"
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
->>> vbt.LEXLB.run(price, 0.2, 0.2).plot()
+>>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
 ```
 
-![](/assets/images/features_local_extrema.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_local_extrema.html"
+    title="Local extrema chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Indicators
 
-- [x] **Technical indicators**: Most popular technical indicators with full Numba support, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
+- [x] **Technical indicators**: Most popular technical indicators with full Numba support and optional Rust acceleration for built-in kernels, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
 
 ```pycon title="Compute 2 moving averages at once"
 >>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
@@ -228,7 +268,7 @@ custom_sigma       0.01        0.01
 array([3, 2])
 ```
 
-- [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support.
+- [x] **Signal generators**: Random and stop loss (SL, TSL, TP, etc.) signal generators with full Numba support and optional Rust acceleration for supported generators.
 
 ```pycon title="Generate entries and exits using different probabilities"
 >>> rprobnx = vbt.RPROBNX.run(
@@ -290,7 +330,7 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 
 ## Modeling
 
-- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
+- [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports optional Rust acceleration for supported vectorized simulation, order, trade, position, and portfolio metric paths. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
 
 ```pycon title="Backtest the Golden Cross"
 >>> price = vbt.YFData.download('BTC-USD', start='2018-01-01').get('Close')
@@ -322,14 +362,22 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 >>> fig = price.vbt.plot(trace_kwargs=dict(name='Close'))
 >>> fast_ma.ma.vbt.plot(trace_kwargs=dict(name='Fast MA'), fig=fig)
 >>> slow_ma.ma.vbt.plot(trace_kwargs=dict(name='Slow MA'), fig=fig)
->>> pf.positions.plot(close_trace_kwargs=dict(visible=False), fig=fig)
+>>> pf.positions.plot(close_trace_kwargs=dict(visible=False), fig=fig).show()
 ```
 
-![](/assets/images/features_golden_crossover.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_golden_crossover.html"
+    title="Golden crossover chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Analysis
 
-- [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their rolling versions. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**.
+- [x] **Performance metrics**: Numba-compiled versions of metrics from **[empyrical](https://github.com/quantopian/empyrical)** and their rolling versions, with optional Rust acceleration for supported returns metrics. Adapter for **[QuantStats](https://github.com/ranaroussi/quantstats)**.
 
 ```pycon title="Visualize performance using QuantStats"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
@@ -370,7 +418,7 @@ Partition Distance: Std                           NaT
 dtype: object
 ```
 
-- [x] **Records and mapped arrays**: In-house data structures for analyzing complex data, such as simulation logs. Fully compiled with Numba.
+- [x] **Records and mapped arrays**: In-house data structures for analyzing complex data, such as simulation logs. Fully compiled with Numba and optionally accelerated with Rust for supported mapped-array and record-selection kernels.
 
 ```pycon title="Parse 5 highest slippage values from logs"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
@@ -412,10 +460,18 @@ dtype: float64
 
 ```pycon title="Plot 3 deepest price dips"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
->>> price.vbt.drawdowns.plot(top_n=3)
+>>> price.vbt.drawdowns.plot(top_n=3).show()
 ```
 
-![](/assets/images/features_top_drawdowns.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_top_drawdowns.html"
+    title="Top drawdowns chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Plotting
 
@@ -424,10 +480,18 @@ dtype: float64
 ```pycon title="Plot time series against each other"
 >>> sr1 = pd.Series(np.cumprod(np.random.normal(0, 0.01, 100) + 1))
 >>> sr2 = pd.Series(np.cumprod(np.random.normal(0, 0.01, 100) + 1))
->>> sr1.vbt.plot_against(sr2)
+>>> sr1.vbt.plot_against(sr2).show()
 ```
 
-![](/assets/images/features_plot_against.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe"
+    src="/assets/interactive/features_plot_against.html"
+    title="Plot against chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Figures and widgets**: Custom interactive figures and widgets using **[Plotly](https://github.com/plotly/plotly.py)**, such as Heatmap and Volume. All custom widgets have dedicated methods for efficiently updating their state.
 
@@ -438,20 +502,36 @@ dtype: float64
 ...     y_labels=['d', 'e', 'f'],
 ...     z_labels=['g', 'h', 'i']
 ... )
->>> volume_widget.fig
+>>> volume_widget.fig.show()
 ```
 
-![](/assets/images/features_volume.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--volume"
+    src="/assets/interactive/features_volume.html"
+    title="Volume widget"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 - [x] **Plots builder**: Class for building plots out of custom subplots. Implements a preset of tailored subplots for many backtesting components, such as signals, returns, and portfolio.
 
 ```pycon title="Plot various portfolio balances"
 >>> price = vbt.YFData.download('BTC-USD').get('Close')
 >>> pf = vbt.Portfolio.from_random_signals(price, n=5)
->>> pf.plot(subplots=['cash', 'assets', 'value']).show_svg()
+>>> pf.plot(subplots=['cash', 'assets', 'value']).show()
 ```
 
-![](/assets/images/features_portfolio_plot.svg)
+<div class="feature-embed">
+  <iframe
+    class="feature-embed__iframe feature-embed__iframe--portfolio-plot"
+    src="/assets/interactive/features_portfolio_plot.html"
+    title="Portfolio balances chart"
+    loading="lazy"
+    scrolling="no">
+  </iframe>
+</div>
 
 ## Extra
 

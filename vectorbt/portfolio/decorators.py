@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Class and function decorators."""
@@ -26,24 +26,26 @@ def attach_returns_acc_methods(config: Config) -> WrapperFuncT:
         checks.assert_subclass_of(cls, "Portfolio")
 
         for target_name, settings in config.items():
-            source_name = settings.get('source_name', target_name)
-            docstring = settings.get('docstring', f"See `vectorbt.returns.accessors.ReturnsAccessor.{source_name}`.")
+            source_name = settings.get("source_name", target_name)
+            docstring = settings.get("docstring", f"See `vectorbt.returns.accessors.ReturnsAccessor.{source_name}`.")
 
-            def new_method(self,
-                           *,
-                           group_by: tp.GroupByLike = None,
-                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-                           freq: tp.Optional[tp.FrequencyLike] = None,
-                           year_freq: tp.Optional[tp.FrequencyLike] = None,
-                           use_asset_returns: bool = False,
-                           _source_name: str = source_name,
-                           **kwargs) -> tp.Any:
+            def new_method(
+                self,
+                *,
+                group_by: tp.GroupByLike = None,
+                benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                freq: tp.Optional[tp.FrequencyLike] = None,
+                year_freq: tp.Optional[tp.FrequencyLike] = None,
+                use_asset_returns: bool = False,
+                _source_name: str = source_name,
+                **kwargs,
+            ) -> tp.Any:
                 returns_acc = self.get_returns_acc(
                     group_by=group_by,
                     benchmark_rets=benchmark_rets,
                     freq=freq,
                     year_freq=year_freq,
-                    use_asset_returns=use_asset_returns
+                    use_asset_returns=use_asset_returns,
                 )
                 return getattr(returns_acc, _source_name)(**kwargs)
 

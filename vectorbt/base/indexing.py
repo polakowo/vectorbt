@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Classes for indexing.
@@ -165,7 +165,7 @@ class ParamLoc(LocBase):
     def __init__(self, mapper: tp.Series, indexing_func: tp.Callable, level_name: tp.Level = None, **kwargs) -> None:
         checks.assert_instance_of(mapper, pd.Series)
 
-        if mapper.dtype == 'O':
+        if mapper.dtype == "O":
             # If params are objects, we must cast them to string first
             # The original mapper isn't touched
             # Normalize numpy scalars to Python scalars for consistent string representation
@@ -187,7 +187,7 @@ class ParamLoc(LocBase):
 
     def get_indices(self, key: tp.Any) -> tp.Array1d:
         """Get array of indices affected by this key."""
-        if self.mapper.dtype == 'O':
+        if self.mapper.dtype == "O":
             # We must also cast the key to string
             # Normalize numpy scalars to Python scalars for consistent string representation
             if isinstance(key, slice):
@@ -223,8 +223,11 @@ class ParamLoc(LocBase):
         return self.indexing_func(pd_indexing_func, **self.indexing_kwargs)
 
 
-def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
-                       pd_indexing_func: tp.Callable) -> tp.Optional[tp.Series]:
+def indexing_on_mapper(
+    mapper: tp.Series,
+    ref_obj: tp.SeriesFrame,
+    pd_indexing_func: tp.Callable,
+) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
     checks.assert_instance_of(mapper, pd.Series)
     checks.assert_instance_of(ref_obj, (pd.Series, pd.DataFrame))
@@ -239,8 +242,11 @@ def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
     return None
 
 
-def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamIndexer',
-                        module_name: tp.Optional[str] = None) -> tp.Type[IndexingBase]:
+def build_param_indexer(
+    param_names: tp.Sequence[str],
+    class_name: str = "ParamIndexer",
+    module_name: tp.Optional[str] = None,
+) -> tp.Type[IndexingBase]:
     """A factory to create a class with parameter indexing.
 
     Parameter indexer enables accessing a group of rows and columns by a parameter array (similar to `loc`).
@@ -295,25 +301,30 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
     """
 
     class ParamIndexer(IndexingBase):
-        def __init__(self, param_mappers: tp.Sequence[tp.Series],
-                     level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
+        def __init__(
+            self,
+            param_mappers: tp.Sequence[tp.Series],
+            level_names: tp.Optional[tp.LevelSequence] = None,
+            **kwargs,
+        ) -> None:
             checks.assert_len_equal(param_names, param_mappers)
 
             for i, param_name in enumerate(param_names):
                 level_name = level_names[i] if level_names is not None else None
                 _param_loc = ParamLoc(param_mappers[i], self.indexing_func, level_name=level_name, **kwargs)
-                setattr(self, f'_{param_name}_loc', _param_loc)
+                setattr(self, f"_{param_name}_loc", _param_loc)
 
     for i, param_name in enumerate(param_names):
+
         def param_loc(self, _param_name=param_name) -> ParamLoc:
-            return getattr(self, f'_{_param_name}_loc')
+            return getattr(self, f"_{_param_name}_loc")
 
         param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pd.Series.loc`.
         
         Forwards this operation to each Series/DataFrame and returns a new class instance.
         """
 
-        setattr(ParamIndexer, param_name + '_loc', property(param_loc))
+        setattr(ParamIndexer, param_name + "_loc", property(param_loc))
 
     ParamIndexer.__name__ = class_name
     ParamIndexer.__qualname__ = class_name

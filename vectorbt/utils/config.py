@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Utilities for configuration."""
@@ -45,11 +45,7 @@ def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
 def get_func_kwargs(func: tp.Callable) -> dict:
     """Get keyword arguments with defaults of a function."""
     signature = inspect.signature(func)
-    return {
-        k: v.default
-        for k, v in signature.parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
+    return {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
 
 
 def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> tp.List[str]:
@@ -58,18 +54,13 @@ def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[in
     if arg_kind is not None and isinstance(arg_kind, int):
         arg_kind = (arg_kind,)
     if arg_kind is None:
-        return [
-            p.name for p in signature.parameters.values()
-            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
-        ]
-    return [
-        p.name for p in signature.parameters.values()
-        if p.kind in arg_kind
-    ]
+        return [p.name for p in signature.parameters.values() if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD]
+    return [p.name for p in signature.parameters.values() if p.kind in arg_kind]
 
 
 class atomic_dict(dict):
     """Dict that behaves like a single value when merging."""
+
     pass
 
 
@@ -107,7 +98,7 @@ def set_dict_item(dct: dict, k: tp.Any, v: tp.Any, force: bool = False) -> None:
         dct[k] = v
 
 
-def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = True) -> OutConfigLikeT:
+def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = True) -> OutConfigLikeT:
     """Copy dict based on a copy mode.
 
     The following modes are supported:
@@ -121,22 +112,19 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
         dct = {}
     checks.assert_instance_of(copy_mode, str)
     copy_mode = copy_mode.lower()
-    if copy_mode not in ['shallow', 'hybrid', 'deep']:
+    if copy_mode not in ["shallow", "hybrid", "deep"]:
         raise ValueError(f"Copy mode '{copy_mode}' not supported")
 
-    if copy_mode == 'deep':
+    if copy_mode == "deep":
         return deepcopy(dct)
     if isinstance(dct, Config):
-        return dct.copy(
-            copy_mode=copy_mode,
-            nested=nested
-        )
+        return dct.copy(copy_mode=copy_mode, nested=nested)
     dct_copy = copy(dct)  # copy structure using shallow copy
     for k, v in dct_copy.items():
         if nested and isinstance(v, dict):
             _v = copy_dict(v, copy_mode=copy_mode, nested=nested)
         else:
-            if copy_mode == 'hybrid':
+            if copy_mode == "hybrid":
                 _v = copy(v)  # copy values using shallow copy
             else:
                 _v = v
@@ -144,11 +132,13 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     return dct_copy
 
 
-def update_dict(x: InConfigLikeT,
-                y: InConfigLikeT,
-                nested: bool = True,
-                force: bool = False,
-                same_keys: bool = False) -> None:
+def update_dict(
+    x: InConfigLikeT,
+    y: InConfigLikeT,
+    nested: bool = True,
+    force: bool = False,
+    same_keys: bool = False,
+) -> None:
     """Update dict with keys and values from other dict.
 
     Set `nested` to True to update all child dicts in recursive manner.
@@ -166,11 +156,7 @@ def update_dict(x: InConfigLikeT,
     checks.assert_instance_of(y, dict)
 
     for k, v in y.items():
-        if nested \
-                and k in x \
-                and isinstance(x[k], dict) \
-                and isinstance(v, dict) \
-                and not isinstance(v, atomic_dict):
+        if nested and k in x and isinstance(x[k], dict) and isinstance(v, dict) and not isinstance(v, atomic_dict):
             update_dict(x[k], v, force=force)
         else:
             if same_keys and k not in x:
@@ -178,11 +164,13 @@ def update_dict(x: InConfigLikeT,
             set_dict_item(x, k, v, force=force)
 
 
-def merge_dicts(*dicts: InConfigLikeT,
-                to_dict: bool = True,
-                copy_mode: tp.Optional[str] = 'shallow',
-                nested: bool = True,
-                same_keys: bool = False) -> OutConfigLikeT:
+def merge_dicts(
+    *dicts: InConfigLikeT,
+    to_dict: bool = True,
+    copy_mode: tp.Optional[str] = "shallow",
+    nested: bool = True,
+    same_keys: bool = False,
+) -> OutConfigLikeT:
     """Merge dicts.
 
     Args:
@@ -197,7 +185,7 @@ def merge_dicts(*dicts: InConfigLikeT,
     if to_dict:
         dicts = tuple([convert_to_dict(dct, nested=nested) for dct in dicts])
     if copy_mode is not None:
-        if not to_dict or copy_mode != 'shallow':
+        if not to_dict or copy_mode != "shallow":
             # to_dict already does a shallow copy
             dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
     x, y = dicts[0], dicts[1]
@@ -212,18 +200,19 @@ def merge_dicts(*dicts: InConfigLikeT,
         update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
     if len(dicts) > 2:
         return merge_dicts(
-            x, *dicts[2:],
+            x,
+            *dicts[2:],
             to_dict=False,  # executed only once
             copy_mode=None,  # executed only once
             nested=nested,
-            same_keys=same_keys
+            same_keys=same_keys,
         )
     return x
 
 
 _RaiseKeyError = object()
 
-DumpTuple = namedtuple('DumpTuple', ('cls', 'dumps'))
+DumpTuple = namedtuple("DumpTuple", ("cls", "dumps"))
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
@@ -340,19 +329,22 @@ class Config(PickleableDict, Documented):
     _convert_dicts_: tp.Union[bool, tp.Type["Config"]]
     _as_attrs_: bool
 
-    def __init__(self,
-                 dct: tp.DictLike = None,
-                 copy_kwargs: tp.KwargsLike = None,
-                 reset_dct: tp.DictLike = None,
-                 reset_dct_copy_kwargs: tp.KwargsLike = None,
-                 frozen_keys: tp.Optional[bool] = None,
-                 readonly: tp.Optional[bool] = None,
-                 nested: tp.Optional[bool] = None,
-                 convert_dicts: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
-                 as_attrs: tp.Optional[bool] = None) -> None:
+    def __init__(
+        self,
+        dct: tp.DictLike = None,
+        copy_kwargs: tp.KwargsLike = None,
+        reset_dct: tp.DictLike = None,
+        reset_dct_copy_kwargs: tp.KwargsLike = None,
+        frozen_keys: tp.Optional[bool] = None,
+        readonly: tp.Optional[bool] = None,
+        nested: tp.Optional[bool] = None,
+        convert_dicts: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
+        as_attrs: tp.Optional[bool] = None,
+    ) -> None:
         try:
             from vectorbt._settings import settings
-            configured_cfg = settings['config']
+
+            configured_cfg = settings["config"]
         except ImportError:
             configured_cfg = {}
 
@@ -362,7 +354,7 @@ class Config(PickleableDict, Documented):
         # Resolve params
         def _resolve_param(pname: str, p: tp.Any, default: tp.Any, merge: bool = False) -> tp.Any:
             cfg_default = configured_cfg.get(pname, None)
-            dct_p = getattr(dct, pname + '_') if isinstance(dct, Config) else None
+            dct_p = getattr(dct, pname + "_") if isinstance(dct, Config) else None
 
             if merge and isinstance(default, dict):
                 return merge_dicts(default, cfg_default, dct_p, p)
@@ -374,30 +366,24 @@ class Config(PickleableDict, Documented):
                 return cfg_default
             return default
 
-        reset_dct = _resolve_param('reset_dct', reset_dct, None)
-        frozen_keys = _resolve_param('frozen_keys', frozen_keys, False)
-        readonly = _resolve_param('readonly', readonly, False)
-        nested = _resolve_param('nested', nested, False)
-        convert_dicts = _resolve_param('convert_dicts', convert_dicts, False)
-        as_attrs = _resolve_param('as_attrs', as_attrs, frozen_keys or readonly)
+        reset_dct = _resolve_param("reset_dct", reset_dct, None)
+        frozen_keys = _resolve_param("frozen_keys", frozen_keys, False)
+        readonly = _resolve_param("readonly", readonly, False)
+        nested = _resolve_param("nested", nested, False)
+        convert_dicts = _resolve_param("convert_dicts", convert_dicts, False)
+        as_attrs = _resolve_param("as_attrs", as_attrs, frozen_keys or readonly)
         reset_dct_copy_kwargs = merge_dicts(copy_kwargs, reset_dct_copy_kwargs)
         copy_kwargs = _resolve_param(
-            'copy_kwargs',
+            "copy_kwargs",
             copy_kwargs,
-            dict(
-                copy_mode='shallow' if readonly else 'hybrid',
-                nested=nested
-            ),
-            merge=True
+            dict(copy_mode="shallow" if readonly else "hybrid", nested=nested),
+            merge=True,
         )
         reset_dct_copy_kwargs = _resolve_param(
-            'reset_dct_copy_kwargs',
+            "reset_dct_copy_kwargs",
             reset_dct_copy_kwargs,
-            dict(
-                copy_mode='shallow' if readonly else 'hybrid',
-                nested=nested
-            ),
-            merge=True
+            dict(copy_mode="shallow" if readonly else "hybrid", nested=nested),
+            merge=True,
         )
 
         # Copy dict
@@ -423,7 +409,7 @@ class Config(PickleableDict, Documented):
                         readonly=readonly,
                         nested=nested,
                         convert_dicts=convert_dicts,
-                        as_attrs=as_attrs
+                        as_attrs=as_attrs,
                     )
 
         # Copy initial config
@@ -443,14 +429,14 @@ class Config(PickleableDict, Documented):
         checks.assert_instance_of(convert_dicts, (bool, type))
         checks.assert_instance_of(as_attrs, bool)
 
-        self.__dict__['_copy_kwargs_'] = copy_kwargs
-        self.__dict__['_reset_dct_'] = reset_dct
-        self.__dict__['_reset_dct_copy_kwargs_'] = reset_dct_copy_kwargs
-        self.__dict__['_frozen_keys_'] = frozen_keys
-        self.__dict__['_readonly_'] = readonly
-        self.__dict__['_nested_'] = nested
-        self.__dict__['_convert_dicts_'] = convert_dicts
-        self.__dict__['_as_attrs_'] = as_attrs
+        self.__dict__["_copy_kwargs_"] = copy_kwargs
+        self.__dict__["_reset_dct_"] = reset_dct
+        self.__dict__["_reset_dct_copy_kwargs_"] = reset_dct_copy_kwargs
+        self.__dict__["_frozen_keys_"] = frozen_keys
+        self.__dict__["_readonly_"] = readonly
+        self.__dict__["_nested_"] = nested
+        self.__dict__["_convert_dicts_"] = convert_dicts
+        self.__dict__["_as_attrs_"] = as_attrs
 
         # Set keys as attributes for autocomplete
         if as_attrs:
@@ -521,7 +507,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         dict.__delitem__(self, k)
         if self.as_attrs_:
             del self.__dict__[k]
@@ -537,7 +523,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         if v is _RaiseKeyError:
             result = dict.pop(self, k)
@@ -551,7 +537,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         result = dict.popitem(self)
         self._clear_attrs(prior_keys)
@@ -562,7 +548,7 @@ class Config(PickleableDict, Documented):
         if not force and self.readonly_:
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
-            raise KeyError(f"Config keys are frozen")
+            raise KeyError("Config keys are frozen")
         prior_keys = list(self.keys())
         dict.clear(self)
         self._clear_attrs(prior_keys)
@@ -614,7 +600,7 @@ class Config(PickleableDict, Documented):
 
         reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, copy_kwargs, reset_dct_copy_kwargs)
         reset_dct = copy_dict(dict(self.reset_dct_), **reset_dct_copy_kwargs)
-        self.__dict__['_reset_dct_'] = reset_dct
+        self.__dict__["_reset_dct_"] = reset_dct
 
         copy_kwargs = merge_dicts(self.copy_kwargs_, copy_kwargs)
         dct = copy_dict(dict(self), **copy_kwargs)
@@ -622,10 +608,7 @@ class Config(PickleableDict, Documented):
 
         return self_copy
 
-    def merge_with(self: ConfigT,
-                   other: InConfigLikeT,
-                   nested: tp.Optional[bool] = None,
-                   **kwargs) -> OutConfigLikeT:
+    def merge_with(self: ConfigT, other: InConfigLikeT, nested: tp.Optional[bool] = None, **kwargs) -> OutConfigLikeT:
         """Merge with another dict into one single dict.
 
         See `merge_dicts`."""
@@ -647,7 +630,7 @@ class Config(PickleableDict, Documented):
         reset_dct = copy_dict(dict(self.reset_dct_), **reset_dct_copy_kwargs)
         self.clear(force=True)
         self.update(self.reset_dct_, nested=False, force=True)
-        self.__dict__['_reset_dct_'] = reset_dct
+        self.__dict__["_reset_dct_"] = reset_dct
 
     def make_checkpoint(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
         """Replace `reset_dct` by the current state.
@@ -657,36 +640,39 @@ class Config(PickleableDict, Documented):
             raise TypeError("Config is read-only")
         reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
         reset_dct = copy_dict(dict(self), **reset_dct_copy_kwargs)
-        self.__dict__['_reset_dct_'] = reset_dct
+        self.__dict__["_reset_dct_"] = reset_dct
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        return dill.dumps(dict(
-            dct=PickleableDict(self).dumps(**kwargs),
-            copy_kwargs=self.copy_kwargs_,
-            reset_dct=PickleableDict(self.reset_dct_).dumps(**kwargs),
-            reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
-            frozen_keys=self.frozen_keys_,
-            readonly=self.readonly_,
-            nested=self.nested_,
-            convert_dicts=self.convert_dicts_,
-            as_attrs=self.as_attrs_
-        ), **kwargs)
+        return dill.dumps(
+            dict(
+                dct=PickleableDict(self).dumps(**kwargs),
+                copy_kwargs=self.copy_kwargs_,
+                reset_dct=PickleableDict(self.reset_dct_).dumps(**kwargs),
+                reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
+                frozen_keys=self.frozen_keys_,
+                readonly=self.readonly_,
+                nested=self.nested_,
+                convert_dicts=self.convert_dicts_,
+                as_attrs=self.as_attrs_,
+            ),
+            **kwargs,
+        )
 
     @classmethod
     def loads(cls: tp.Type[ConfigT], dumps: bytes, **kwargs) -> ConfigT:
         """Unpickle from bytes."""
         obj = dill.loads(dumps, **kwargs)
         return cls(
-            dct=PickleableDict.loads(obj['dct'], **kwargs),
-            copy_kwargs=obj['copy_kwargs'],
-            reset_dct=PickleableDict.loads(obj['reset_dct'], **kwargs),
-            reset_dct_copy_kwargs=obj['reset_dct_copy_kwargs'],
-            frozen_keys=obj['frozen_keys'],
-            readonly=obj['readonly'],
-            nested=obj['nested'],
-            convert_dicts=obj['convert_dicts'],
-            as_attrs=obj['as_attrs']
+            dct=PickleableDict.loads(obj["dct"], **kwargs),
+            copy_kwargs=obj["copy_kwargs"],
+            reset_dct=PickleableDict.loads(obj["reset_dct"], **kwargs),
+            reset_dct_copy_kwargs=obj["reset_dct_copy_kwargs"],
+            frozen_keys=obj["frozen_keys"],
+            readonly=obj["readonly"],
+            nested=obj["nested"],
+            convert_dicts=obj["convert_dicts"],
+            as_attrs=obj["as_attrs"],
         )
 
     def load_update(self, fname: tp.FileName, **kwargs) -> None:
@@ -707,21 +693,25 @@ class Config(PickleableDict, Documented):
         """Convert to a doc."""
         doc = self.__class__.__name__ + "(" + to_doc(dict(self), **kwargs) + ")"
         if with_params:
-            doc += " with params " + to_doc(dict(
-                copy_kwargs=self.copy_kwargs_,
-                reset_dct=self.reset_dct_,
-                reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
-                frozen_keys=self.frozen_keys_,
-                readonly=self.readonly_,
-                nested=self.nested_,
-                convert_dicts=self.convert_dicts_,
-                as_attrs=self.as_attrs_
-            ), **kwargs)
+            doc += " with params " + to_doc(
+                dict(
+                    copy_kwargs=self.copy_kwargs_,
+                    reset_dct=self.reset_dct_,
+                    reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
+                    frozen_keys=self.frozen_keys_,
+                    readonly=self.readonly_,
+                    nested=self.nested_,
+                    convert_dicts=self.convert_dicts_,
+                    as_attrs=self.as_attrs_,
+                ),
+                **kwargs,
+            )
         return doc
 
 
 class AtomicConfig(Config, atomic_dict):
     """Config that behaves like a single value when merging."""
+
     pass
 
 
@@ -743,9 +733,10 @@ class Configured(Pickleable, Documented):
 
     def __init__(self, **config) -> None:
         from vectorbt._settings import settings
-        configured_cfg = settings['configured']
 
-        self._config = Config(config, **configured_cfg['config'])
+        configured_cfg = settings["configured"]
+
+        self._config = Config(config, **configured_cfg["config"])
 
     @property
     def config(self) -> Config:
@@ -761,11 +752,13 @@ class Configured(Pickleable, Documented):
             if isinstance(base_cls, Configured)
         }
 
-    def replace(self: ConfiguredT,
-                copy_mode_: tp.Optional[str] = 'shallow',
-                nested_: tp.Optional[bool] = None,
-                cls_: tp.Optional[type] = None,
-                **new_config) -> ConfiguredT:
+    def replace(
+        self: ConfiguredT,
+        copy_mode_: tp.Optional[str] = "shallow",
+        nested_: tp.Optional[bool] = None,
+        cls_: tp.Optional[type] = None,
+        **new_config,
+    ) -> ConfiguredT:
         """Create a new instance by copying and (optionally) changing the config.
 
         !!! warning
@@ -778,23 +771,22 @@ class Configured(Pickleable, Documented):
         for attr in self.writeable_attrs:
             attr_obj = getattr(self, attr)
             if isinstance(attr_obj, Config):
-                attr_obj = attr_obj.copy(
-                    copy_mode=copy_mode_,
-                    nested=nested_
-                )
+                attr_obj = attr_obj.copy(copy_mode=copy_mode_, nested=nested_)
             else:
                 if copy_mode_ is not None:
-                    if copy_mode_ == 'hybrid':
+                    if copy_mode_ == "hybrid":
                         attr_obj = copy(attr_obj)
-                    elif copy_mode_ == 'deep':
+                    elif copy_mode_ == "deep":
                         attr_obj = deepcopy(attr_obj)
             setattr(new_instance, attr, attr_obj)
         return new_instance
 
-    def copy(self: ConfiguredT,
-             copy_mode: tp.Optional[str] = 'shallow',
-             nested: tp.Optional[bool] = None,
-             cls: tp.Optional[type] = None) -> ConfiguredT:
+    def copy(
+        self: ConfiguredT,
+        copy_mode: tp.Optional[str] = "shallow",
+        nested: tp.Optional[bool] = None,
+        cls: tp.Optional[type] = None,
+    ) -> ConfiguredT:
         """Create a new instance by copying the config.
 
         See `Configured.replace`."""

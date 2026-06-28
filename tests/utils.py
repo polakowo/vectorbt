@@ -3,7 +3,7 @@ import hashlib
 import numpy as np
 
 # non-randomized hash function
-hash = lambda s: int(hashlib.sha512(s.encode('utf-8')).hexdigest()[:16], 16)
+hash = lambda s: int(hashlib.sha512(s.encode("utf-8")).hexdigest()[:16], 16)
 
 
 def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Custom data classes that subclass `vectorbt.data.base.Data`."""
@@ -14,12 +14,7 @@ from tqdm.auto import tqdm
 from vectorbt import _typing as tp
 from vectorbt.data.base import Data
 from vectorbt.utils.config import merge_dicts, get_func_kwargs
-from vectorbt.utils.datetime_ import (
-    get_utc_tz,
-    get_local_tz,
-    to_tzaware_datetime,
-    datetime_to_ms
-)
+from vectorbt.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
 
 try:
     from binance.client import Client as ClientT
@@ -40,13 +35,15 @@ class SyntheticData(Data):
         raise NotImplementedError
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: tp.Label,
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now',
-                        freq: tp.Union[None, str, pd.DateOffset] = None,
-                        date_range_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.SeriesFrame:
+    def download_symbol(
+        cls,
+        symbol: tp.Label,
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now",
+        freq: tp.Union[None, str, pd.DateOffset] = None,
+        date_range_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Download the symbol.
 
         Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
@@ -57,7 +54,7 @@ class SyntheticData(Data):
             start=to_tzaware_datetime(start, tz=get_utc_tz()),
             end=to_tzaware_datetime(end, tz=get_utc_tz()),
             freq=freq,
-            **date_range_kwargs
+            **date_range_kwargs,
         )
         if len(index) == 0:
             raise ValueError("Date range is empty")
@@ -68,13 +65,20 @@ class SyntheticData(Data):
 
         `**kwargs` will override keyword arguments passed to `SyntheticData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
+        download_kwargs["start"] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
 
 
-def generate_gbm_paths(S0: float, mu: float, sigma: float, T: int, M: int, I: int,
-                       seed: tp.Optional[int] = None) -> tp.Array2d:
+def generate_gbm_paths(
+    S0: float,
+    mu: float,
+    sigma: float,
+    T: int,
+    M: int,
+    I: int,
+    seed: tp.Optional[int] = None,
+) -> tp.Array2d:
     """Generate using Geometric Brownian Motion (GBM).
 
     See https://stackoverflow.com/a/45036114/8141780."""
@@ -86,7 +90,7 @@ def generate_gbm_paths(S0: float, mu: float, sigma: float, T: int, M: int, I: in
     paths[0] = S0
     for t in range(1, M + 1):
         rand = np.random.standard_normal(I)
-        paths[t] = paths[t - 1] * np.exp((mu - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * rand)
+        paths[t] = paths[t - 1] * np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * rand)
     return paths
 
 
@@ -127,15 +131,17 @@ class GBMData(SyntheticData):
     """
 
     @classmethod
-    def generate_symbol(cls,
-                        symbol: tp.Label,
-                        index: tp.Index,
-                        S0: float = 100.,
-                        mu: float = 0.,
-                        sigma: float = 0.05,
-                        T: tp.Optional[int] = None,
-                        I: int = 1,
-                        seed: tp.Optional[int] = None) -> tp.SeriesFrame:
+    def generate_symbol(
+        cls,
+        symbol: tp.Label,
+        index: tp.Index,
+        S0: float = 100.0,
+        mu: float = 0.0,
+        sigma: float = 0.05,
+        T: tp.Optional[int] = None,
+        I: int = 1,
+        seed: tp.Optional[int] = None,
+    ) -> tp.SeriesFrame:
         """Generate the symbol using `generate_gbm_paths`.
 
         Args:
@@ -157,7 +163,7 @@ class GBMData(SyntheticData):
         out = generate_gbm_paths(S0, mu, sigma, T, len(index), I, seed=seed)[1:]
         if out.shape[1] == 1:
             return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name='path')
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
         return pd.DataFrame(out, index=index, columns=columns)
 
     def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
@@ -165,11 +171,11 @@ class GBMData(SyntheticData):
 
         `**kwargs` will override keyword arguments passed to `GBMData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        _ = download_kwargs.pop('S0', None)
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        _ = download_kwargs.pop("S0", None)
         S0 = self.data[symbol].iloc[-2]
-        _ = download_kwargs.pop('T', None)
-        download_kwargs['seed'] = None
+        _ = download_kwargs.pop("T", None)
+        download_kwargs["seed"] = None
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, S0=S0, **kwargs)
 
@@ -244,13 +250,15 @@ class YFData(Data):
     """
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: tp.Label,
-                        period: str = 'max',
-                        start: tp.Optional[tp.DatetimeLike] = None,
-                        end: tp.Optional[tp.DatetimeLike] = None,
-                        ticker_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.Frame:
+    def download_symbol(
+        cls,
+        symbol: tp.Label,
+        period: str = "max",
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        ticker_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -282,7 +290,7 @@ class YFData(Data):
 
         `**kwargs` will override keyword arguments passed to `YFData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
+        download_kwargs["start"] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
 
@@ -399,14 +407,17 @@ class BinanceData(Data):
     """
 
     @classmethod
-    def download(cls: tp.Type[BinanceDataT],
-                 symbols: tp.Labels,
-                 client: tp.Optional["ClientT"] = None,
-                 **kwargs) -> BinanceDataT:
+    def download(
+        cls: tp.Type[BinanceDataT],
+        symbols: tp.Labels,
+        client: tp.Optional[ClientT] = None,
+        **kwargs,
+    ) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
         from binance.client import Client
         from vectorbt._settings import settings
-        binance_cfg = settings['data']['binance']
+
+        binance_cfg = settings["data"]["binance"]
 
         client_kwargs = dict()
         for k in get_func_kwargs(Client):
@@ -418,16 +429,18 @@ class BinanceData(Data):
         return super(BinanceData, cls).download(symbols, client=client, **kwargs)
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: str,
-                        client: tp.Optional["ClientT"] = None,
-                        interval: str = '1d',
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now UTC',
-                        delay: tp.Optional[float] = 500,
-                        limit: int = 500,
-                        show_progress: bool = True,
-                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
+    def download_symbol(
+        cls,
+        symbol: str,
+        client: tp.Optional[ClientT] = None,
+        interval: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        delay: tp.Optional[float] = 500,
+        limit: int = 500,
+        show_progress: bool = True,
+        tqdm_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -457,13 +470,7 @@ class BinanceData(Data):
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
-            first_data = client.get_klines(
-                symbol=symbol,
-                interval=interval,
-                limit=1,
-                startTime=0,
-                endTime=None
-            )
+            first_data = client.get_klines(symbol=symbol, interval=interval, limit=1, startTime=0, endTime=None)
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
         except:
@@ -484,7 +491,7 @@ class BinanceData(Data):
                     interval=interval,
                     limit=limit,
                     startTime=next_start_ts,
-                    endTime=end_ts
+                    endTime=end_ts,
                 )
                 if len(data) > 0:
                     next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
@@ -495,43 +502,43 @@ class BinanceData(Data):
                 if not len(next_data):
                     break
                 data += next_data
-                pbar.set_description("{} - {}".format(
-                    _ts_to_str(start_ts),
-                    _ts_to_str(next_data[-1][0])
-                ))
+                pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
                 pbar.update(1)
                 next_start_ts = next_data[-1][0]
                 if delay is not None:
                     time.sleep(delay / 1000)  # be kind to api
 
         # Convert data to a DataFrame
-        df = pd.DataFrame(data, columns=[
-            'Open time',
-            'Open',
-            'High',
-            'Low',
-            'Close',
-            'Volume',
-            'Close time',
-            'Quote volume',
-            'Number of trades',
-            'Taker base volume',
-            'Taker quote volume',
-            'Ignore'
-        ])
-        df.index = pd.to_datetime(df['Open time'], unit='ms', utc=True)
-        del df['Open time']
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
-        df['Close time'] = pd.to_datetime(df['Close time'], unit='ms', utc=True)
-        df['Quote volume'] = df['Quote volume'].astype(float)
-        df['Number of trades'] = df['Number of trades'].astype(int)
-        df['Taker base volume'] = df['Taker base volume'].astype(float)
-        df['Taker quote volume'] = df['Taker quote volume'].astype(float)
-        del df['Ignore']
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "Open time",
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume",
+                "Close time",
+                "Quote volume",
+                "Number of trades",
+                "Taker base volume",
+                "Taker quote volume",
+                "Ignore",
+            ],
+        )
+        df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
+        del df["Open time"]
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
+        df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
+        df["Quote volume"] = df["Quote volume"].astype(float)
+        df["Number of trades"] = df["Number of trades"].astype(int)
+        df["Taker base volume"] = df["Taker base volume"].astype(float)
+        df["Taker quote volume"] = df["Taker quote volume"].astype(float)
+        del df["Ignore"]
 
         return df
 
@@ -540,8 +547,8 @@ class BinanceData(Data):
 
         `**kwargs` will override keyword arguments passed to `BinanceData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        download_kwargs['show_progress'] = False
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        download_kwargs["show_progress"] = False
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
 
@@ -595,19 +602,21 @@ class CCXTData(Data):
     """
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: str,
-                        exchange: tp.Union[str, "ExchangeT"] = 'binance',
-                        config: tp.Optional[dict] = None,
-                        timeframe: str = '1d',
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now UTC',
-                        delay: tp.Optional[float] = None,
-                        limit: tp.Optional[int] = 500,
-                        retries: int = 3,
-                        show_progress: bool = True,
-                        params: tp.Optional[dict] = None,
-                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
+    def download_symbol(
+        cls,
+        symbol: str,
+        exchange: tp.Union[str, ExchangeT] = "binance",
+        config: tp.Optional[dict] = None,
+        timeframe: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        delay: tp.Optional[float] = None,
+        limit: tp.Optional[int] = 500,
+        retries: int = 3,
+        show_progress: bool = True,
+        params: tp.Optional[dict] = None,
+        tqdm_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -638,7 +647,8 @@ class CCXTData(Data):
         """
         import ccxt
         from vectorbt._settings import settings
-        ccxt_cfg = settings['data']['ccxt']
+
+        ccxt_cfg = settings["data"]["ccxt"]
 
         if config is None:
             config = {}
@@ -663,11 +673,11 @@ class CCXTData(Data):
         else:
             if len(config) > 0:
                 raise ValueError("Cannot apply config after instantiation of the exchange")
-        if not exchange.has['fetchOHLCV']:
+        if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
         if timeframe not in exchange.timeframes:
             raise ValueError(f"Exchange {exchange} does not support {timeframe} timeframe")
-        if exchange.has['fetchOHLCV'] == 'emulated':
+        if exchange.has["fetchOHLCV"] == "emulated":
             warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
         def _retry(method):
@@ -686,13 +696,7 @@ class CCXTData(Data):
 
         @_retry
         def _fetch(_since, _limit):
-            return exchange.fetch_ohlcv(
-                symbol,
-                timeframe=timeframe,
-                since=_since,
-                limit=_limit,
-                params=params
-            )
+            return exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=_since, limit=_limit, params=params)
 
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -723,31 +727,21 @@ class CCXTData(Data):
                 if not len(next_data):
                     break
                 data += next_data
-                pbar.set_description("{} - {}".format(
-                    _ts_to_str(start_ts),
-                    _ts_to_str(next_data[-1][0])
-                ))
+                pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
                 pbar.update(1)
                 next_start_ts = next_data[-1][0]
                 if delay is not None:
                     time.sleep(delay / 1000)  # be kind to api
 
         # Convert data to a DataFrame
-        df = pd.DataFrame(data, columns=[
-            'Open time',
-            'Open',
-            'High',
-            'Low',
-            'Close',
-            'Volume'
-        ])
-        df.index = pd.to_datetime(df['Open time'], unit='ms', utc=True)
-        del df['Open time']
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
+        df = pd.DataFrame(data, columns=["Open time", "Open", "High", "Low", "Close", "Volume"])
+        df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
+        del df["Open time"]
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
 
         return df
 
@@ -756,8 +750,8 @@ class CCXTData(Data):
 
         `**kwargs` will override keyword arguments passed to `CCXTData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        download_kwargs['show_progress'] = False
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        download_kwargs["show_progress"] = False
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
 
@@ -766,7 +760,7 @@ class AlpacaData(Data):
     """`Data` for data coming from `alpaca-py`.
 
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
-    
+
     Usage:
         * Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
 
@@ -812,15 +806,17 @@ class AlpacaData(Data):
     """
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: str,
-                        timeframe: str = '1d',
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now UTC',
-                        adjustment: tp.Optional[str] = 'all',
-                        limit: int = 500,
-                        feed: tp.Optional[str] = None,
-                        **kwargs) -> tp.Frame:
+    def download_symbol(
+        cls,
+        symbol: str,
+        timeframe: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        adjustment: tp.Optional[str] = "all",
+        limit: int = 500,
+        feed: tp.Optional[str] = None,
+        **kwargs,
+    ) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -839,7 +835,7 @@ class AlpacaData(Data):
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
-            adjustment (str): Specifies the corporate action adjustment for the stocks. 
+            adjustment (str): Specifies the corporate action adjustment for the stocks.
 
                 Allowed are `raw`, `split`, `dividend` or `all`.
             limit (int): The maximum number of returned items.
@@ -855,7 +851,7 @@ class AlpacaData(Data):
         from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
-        alpaca_cfg = settings['data']['alpaca']
+        alpaca_cfg = settings["data"]["alpaca"]
 
         if "/" in symbol:
             REST = CryptoHistoricalDataClient
@@ -871,7 +867,7 @@ class AlpacaData(Data):
 
         client = REST(**client_kwargs)
 
-        _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
+        _timeframe_units = {"d": TimeFrameUnit.Day, "h": TimeFrameUnit.Hour, "m": TimeFrameUnit.Minute}
 
         if len(timeframe) < 2:
             raise ValueError("invalid timeframe")
@@ -891,42 +887,49 @@ class AlpacaData(Data):
         end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
 
         if "/" in symbol:
-            df = client.get_crypto_bars(CryptoBarsRequest(
-                symbol_or_symbols=symbol,
-                timeframe=_timeframe,
-                start=start_ts,
-                end=end_ts,
-                limit=limit,
-            )).df
+            df = client.get_crypto_bars(
+                CryptoBarsRequest(
+                    symbol_or_symbols=symbol,
+                    timeframe=_timeframe,
+                    start=start_ts,
+                    end=end_ts,
+                    limit=limit,
+                )
+            ).df
         else:
-            df = client.get_stock_bars(StockBarsRequest(
-                symbol_or_symbols=symbol,
-                timeframe=_timeframe,
-                start=start_ts,
-                end=end_ts,
-                adjustment=adjustment,
-                limit=limit,
-                feed=feed,
-            )).df
+            df = client.get_stock_bars(
+                StockBarsRequest(
+                    symbol_or_symbols=symbol,
+                    timeframe=_timeframe,
+                    start=start_ts,
+                    end=end_ts,
+                    adjustment=adjustment,
+                    limit=limit,
+                    feed=feed,
+                )
+            ).df
 
         # filter for OHLCV
         # remove extra columns
-        df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
+        df.drop(["trade_count", "vwap"], axis=1, errors="ignore", inplace=True)
 
         # capitalize
-        df.rename(columns={
-            'open': 'Open',
-            'high': 'High',
-            'low': 'Low',
-            'close': 'Close',
-            'volume': 'Volume',
-        }, inplace=True)
+        df.rename(
+            columns={
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume",
+            },
+            inplace=True,
+        )
 
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
 
         return df
 
@@ -935,7 +938,7 @@ class AlpacaData(Data):
 
         `**kwargs` will override keyword arguments passed to `AlpacaData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        download_kwargs['show_progress'] = False
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        download_kwargs["show_progress"] = False
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)

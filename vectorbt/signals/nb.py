@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
 """Numba-compiled functions.
@@ -39,9 +39,7 @@ from vectorbt.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_in
 
 
 @njit
-def generate_nb(shape: tp.Shape,
-                pick_first: bool,
-                choice_func_nb: tp.ChoiceFunc, *args) -> tp.Array2d:
+def generate_nb(shape: tp.Shape, pick_first: bool, choice_func_nb: tp.ChoiceFunc, *args) -> tp.Array2d:
     """Create a boolean matrix of `shape` and pick signals using `choice_func_nb`.
 
     Args:
@@ -91,12 +89,15 @@ def generate_nb(shape: tp.Shape,
 
 
 @njit
-def generate_ex_nb(entries: tp.Array2d,
-                   wait: int,
-                   until_next: bool,
-                   skip_until_exit: bool,
-                   pick_first: bool,
-                   exit_choice_func_nb: tp.ChoiceFunc, *args) -> tp.Array2d:
+def generate_ex_nb(
+    entries: tp.Array2d,
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    pick_first: bool,
+    exit_choice_func_nb: tp.ChoiceFunc,
+    *args,
+) -> tp.Array2d:
     """Pick exit signals using `exit_choice_func_nb` after each signal in `entries`.
 
     Args:
@@ -155,16 +156,18 @@ def generate_ex_nb(entries: tp.Array2d,
 
 
 @njit
-def generate_enex_nb(shape: tp.Shape,
-                     entry_wait: int,
-                     exit_wait: int,
-                     entry_pick_first: bool,
-                     exit_pick_first: bool,
-                     entry_choice_func_nb: tp.ChoiceFunc,
-                     entry_args: tp.Args,
-                     exit_choice_func_nb: tp.ChoiceFunc,
-                     exit_args: tp.Args) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Pick entry signals using `entry_choice_func_nb` and exit signals using 
+def generate_enex_nb(
+    shape: tp.Shape,
+    entry_wait: int,
+    exit_wait: int,
+    entry_pick_first: bool,
+    exit_pick_first: bool,
+    entry_choice_func_nb: tp.ChoiceFunc,
+    entry_args: tp.Args,
+    exit_choice_func_nb: tp.ChoiceFunc,
+    exit_args: tp.Args,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Pick entry signals using `entry_choice_func_nb` and exit signals using
     `exit_choice_func_nb` one after another.
 
     Args:
@@ -253,9 +256,7 @@ def generate_enex_nb(shape: tp.Shape,
 
 
 @njit(cache=True)
-def clean_enex_1d_nb(entries: tp.Array1d,
-                     exits: tp.Array1d,
-                     entry_first: bool) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+def clean_enex_1d_nb(entries: tp.Array1d, exits: tp.Array1d, entry_first: bool) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Clean entry and exit arrays by picking the first signal out of each.
 
     Entry signal must be picked first. If both signals are present, selects none."""
@@ -279,9 +280,7 @@ def clean_enex_1d_nb(entries: tp.Array1d,
 
 
 @njit(cache=True)
-def clean_enex_nb(entries: tp.Array2d,
-                  exits: tp.Array2d,
-                  entry_first: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def clean_enex_nb(entries: tp.Array2d, exits: tp.Array2d, entry_first: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """2-dim version of `clean_enex_1d_nb`."""
     entries_out = np.empty(entries.shape, dtype=np.bool_)
     exits_out = np.empty(exits.shape, dtype=np.bool_)
@@ -313,21 +312,19 @@ def generate_rand_nb(shape: tp.Shape, n: tp.MaybeArray[int], seed: tp.Optional[i
     See `rand_choice_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_nb(
-        shape,
-        False,
-        rand_choice_nb, n
-    )
+    return generate_nb(shape, False, rand_choice_nb, n)
 
 
 @njit(cache=True)
-def rand_by_prob_choice_nb(from_i: int,
-                           to_i: int,
-                           col: int,
-                           prob: tp.MaybeArray[float],
-                           pick_first: bool,
-                           temp_idx_arr: tp.Array1d,
-                           flex_2d: bool) -> tp.Array1d:
+def rand_by_prob_choice_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    prob: tp.MaybeArray[float],
+    pick_first: bool,
+    temp_idx_arr: tp.Array1d,
+    flex_2d: bool,
+) -> tp.Array1d:
     """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probability `prob`.
 
     `prob` uses flexible indexing."""
@@ -343,11 +340,13 @@ def rand_by_prob_choice_nb(from_i: int,
 
 
 @njit
-def generate_rand_by_prob_nb(shape: tp.Shape,
-                             prob: tp.MaybeArray[float],
-                             pick_first: bool,
-                             flex_2d: bool,
-                             seed: tp.Optional[int] = None) -> tp.Array2d:
+def generate_rand_by_prob_nb(
+    shape: tp.Shape,
+    prob: tp.MaybeArray[float],
+    pick_first: bool,
+    flex_2d: bool,
+    seed: tp.Optional[int] = None,
+) -> tp.Array2d:
     """Create a boolean matrix of `shape` and pick signals randomly by probability `prob`.
 
     `prob` should be a 2-dim array of shape `shape`.
@@ -357,44 +356,38 @@ def generate_rand_by_prob_nb(shape: tp.Shape,
     if seed is not None:
         np.random.seed(seed)
     temp_idx_arr = np.empty((shape[0],), dtype=np.int64)
-    return generate_nb(
-        shape,
-        pick_first,
-        rand_by_prob_choice_nb, prob, pick_first, temp_idx_arr, flex_2d
-    )
+    return generate_nb(shape, pick_first, rand_by_prob_choice_nb, prob, pick_first, temp_idx_arr, flex_2d)
 
 
 # ############# Random exits ############# #
 
+
 @njit
-def generate_rand_ex_nb(entries: tp.Array2d,
-                        wait: int,
-                        until_next: bool,
-                        skip_until_exit: bool,
-                        seed: tp.Optional[int] = None) -> tp.Array2d:
+def generate_rand_ex_nb(
+    entries: tp.Array2d,
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    seed: tp.Optional[int] = None,
+) -> tp.Array2d:
     """Pick an exit after each entry in `entries`.
 
     Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_ex_nb(
-        entries,
-        wait,
-        until_next,
-        skip_until_exit,
-        True,
-        rand_choice_nb, 1
-    )
+    return generate_ex_nb(entries, wait, until_next, skip_until_exit, True, rand_choice_nb, 1)
 
 
 @njit
-def generate_rand_ex_by_prob_nb(entries: tp.Array2d,
-                                prob: tp.MaybeArray[float],
-                                wait: int,
-                                until_next: bool,
-                                skip_until_exit: bool,
-                                flex_2d: bool,
-                                seed: tp.Optional[int] = None) -> tp.Array2d:
+def generate_rand_ex_by_prob_nb(
+    entries: tp.Array2d,
+    prob: tp.MaybeArray[float],
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    flex_2d: bool,
+    seed: tp.Optional[int] = None,
+) -> tp.Array2d:
     """Pick an exit after each entry in `entries` by probability `prob`.
 
     `prob` should be a 2-dim array of shape `shape`.
@@ -408,16 +401,22 @@ def generate_rand_ex_by_prob_nb(entries: tp.Array2d,
         until_next,
         skip_until_exit,
         True,
-        rand_by_prob_choice_nb, prob, True, temp_idx_arr, flex_2d
+        rand_by_prob_choice_nb,
+        prob,
+        True,
+        temp_idx_arr,
+        flex_2d,
     )
 
 
 @njit
-def generate_rand_enex_nb(shape: tp.Shape,
-                          n: tp.MaybeArray[int],
-                          entry_wait: int,
-                          exit_wait: int,
-                          seed: tp.Optional[int] = None) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def generate_rand_enex_nb(
+    shape: tp.Shape,
+    n: tp.MaybeArray[int],
+    entry_wait: int,
+    exit_wait: int,
+    seed: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick a number of entries and the same number of exits one after another.
 
     Respects `entry_wait` and `exit_wait` constraints through a number of tricks.
@@ -512,24 +511,28 @@ def generate_rand_enex_nb(shape: tp.Shape,
     return entries, exits
 
 
-def rand_enex_apply_nb(input_shape: tp.Shape,
-                       n: tp.MaybeArray[int],
-                       entry_wait: int,
-                       exit_wait: int) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def rand_enex_apply_nb(
+    input_shape: tp.Shape,
+    n: tp.MaybeArray[int],
+    entry_wait: int,
+    exit_wait: int,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """`apply_func_nb` that calls `generate_rand_enex_nb`."""
     return generate_rand_enex_nb(input_shape, n, entry_wait, exit_wait)
 
 
 @njit
-def generate_rand_enex_by_prob_nb(shape: tp.Shape,
-                                  entry_prob: tp.MaybeArray[float],
-                                  exit_prob: tp.MaybeArray[float],
-                                  entry_wait: int,
-                                  exit_wait: int,
-                                  entry_pick_first: bool,
-                                  exit_pick_first: bool,
-                                  flex_2d: bool,
-                                  seed: tp.Optional[int] = None) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def generate_rand_enex_by_prob_nb(
+    shape: tp.Shape,
+    entry_prob: tp.MaybeArray[float],
+    exit_prob: tp.MaybeArray[float],
+    entry_wait: int,
+    exit_wait: int,
+    entry_pick_first: bool,
+    exit_pick_first: bool,
+    flex_2d: bool,
+    seed: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick entries by probability `entry_prob` and exits by probability `exit_prob` one after another.
 
     `entry_prob` and `exit_prob` should be 2-dim arrays of shape `shape`.
@@ -543,8 +546,10 @@ def generate_rand_enex_by_prob_nb(shape: tp.Shape,
         exit_wait,
         entry_pick_first,
         exit_pick_first,
-        rand_by_prob_choice_nb, (entry_prob, entry_pick_first, temp_idx_arr, flex_2d),
-        rand_by_prob_choice_nb, (exit_prob, exit_pick_first, temp_idx_arr, flex_2d)
+        rand_by_prob_choice_nb,
+        (entry_prob, entry_pick_first, temp_idx_arr, flex_2d),
+        rand_by_prob_choice_nb,
+        (exit_prob, exit_pick_first, temp_idx_arr, flex_2d),
     )
 
 
@@ -563,16 +568,18 @@ def first_choice_nb(from_i: int, to_i: int, col: int, a: tp.Array2d) -> tp.Array
 
 
 @njit(cache=True)
-def stop_choice_nb(from_i: int,
-                   to_i: int,
-                   col: int,
-                   ts: tp.ArrayLike,
-                   stop: tp.MaybeArray[float],
-                   trailing: tp.MaybeArray[bool],
-                   wait: int,
-                   pick_first: bool,
-                   temp_idx_arr: tp.Array1d,
-                   flex_2d: bool) -> tp.Array1d:
+def stop_choice_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    ts: tp.ArrayLike,
+    stop: tp.MaybeArray[float],
+    trailing: tp.MaybeArray[bool],
+    wait: int,
+    pick_first: bool,
+    temp_idx_arr: tp.Array1d,
+    flex_2d: bool,
+) -> tp.Array1d:
     """`choice_func_nb` that returns the indices of the stop being hit.
 
     Args:
@@ -637,15 +644,17 @@ def stop_choice_nb(from_i: int,
 
 
 @njit
-def generate_stop_ex_nb(entries: tp.Array2d,
-                        ts: tp.ArrayLike,
-                        stop: tp.MaybeArray[float],
-                        trailing: tp.MaybeArray[bool],
-                        wait: int,
-                        until_next: bool,
-                        skip_until_exit: bool,
-                        pick_first: bool,
-                        flex_2d: bool) -> tp.Array2d:
+def generate_stop_ex_nb(
+    entries: tp.Array2d,
+    ts: tp.ArrayLike,
+    stop: tp.MaybeArray[float],
+    trailing: tp.MaybeArray[bool],
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    pick_first: bool,
+    flex_2d: bool,
+) -> tp.Array2d:
     """Generate using `generate_ex_nb` and `stop_choice_nb`.
 
     Usage:
@@ -687,19 +696,21 @@ def generate_stop_ex_nb(entries: tp.Array2d,
         wait,
         pick_first,
         temp_idx_arr,
-        flex_2d
+        flex_2d,
     )
 
 
 @njit
-def generate_stop_enex_nb(entries: tp.Array2d,
-                          ts: tp.Array,
-                          stop: tp.MaybeArray[float],
-                          trailing: tp.MaybeArray[bool],
-                          entry_wait: int,
-                          exit_wait: int,
-                          pick_first: bool,
-                          flex_2d: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def generate_stop_enex_nb(
+    entries: tp.Array2d,
+    ts: tp.Array,
+    stop: tp.MaybeArray[float],
+    trailing: tp.MaybeArray[bool],
+    entry_wait: int,
+    exit_wait: int,
+    pick_first: bool,
+    flex_2d: bool,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Generate one after another using `generate_enex_nb` and `stop_choice_nb`.
 
     Returns two arrays: new entries and exits.
@@ -714,30 +725,34 @@ def generate_stop_enex_nb(entries: tp.Array2d,
         exit_wait,
         True,
         pick_first,
-        first_choice_nb, (entries,),
-        stop_choice_nb, (ts, stop, trailing, exit_wait, pick_first, temp_idx_arr, flex_2d)
+        first_choice_nb,
+        (entries,),
+        stop_choice_nb,
+        (ts, stop, trailing, exit_wait, pick_first, temp_idx_arr, flex_2d),
     )
 
 
 @njit(cache=True)
-def ohlc_stop_choice_nb(from_i: int,
-                        to_i: int,
-                        col: int,
-                        open: tp.ArrayLike,
-                        high: tp.ArrayLike,
-                        low: tp.ArrayLike,
-                        close: tp.ArrayLike,
-                        stop_price_out: tp.Array2d,
-                        stop_type_out: tp.Array2d,
-                        sl_stop: tp.MaybeArray[float],
-                        sl_trail: tp.MaybeArray[bool],
-                        tp_stop: tp.MaybeArray[float],
-                        reverse: tp.MaybeArray[bool],
-                        is_open_safe: bool,
-                        wait: int,
-                        pick_first: bool,
-                        temp_idx_arr: tp.Array1d,
-                        flex_2d: bool) -> tp.Array1d:
+def ohlc_stop_choice_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    open: tp.ArrayLike,
+    high: tp.ArrayLike,
+    low: tp.ArrayLike,
+    close: tp.ArrayLike,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.MaybeArray[float],
+    sl_trail: tp.MaybeArray[bool],
+    tp_stop: tp.MaybeArray[float],
+    reverse: tp.MaybeArray[bool],
+    is_open_safe: bool,
+    wait: int,
+    pick_first: bool,
+    temp_idx_arr: tp.Array1d,
+    flex_2d: bool,
+) -> tp.Array1d:
     """`choice_func_nb` that returns the indices of the stop price being hit within OHLC.
 
     Compared to `stop_choice_nb`, takes into account the whole bar, can check for both
@@ -748,7 +763,7 @@ def ohlc_stop_choice_nb(from_i: int,
         we can't determine whether SL was triggered before TP and vice versa. So some assumptions
         need to be made: 1) trailing stop can only be based on previous close/high, and
         2) we pessimistically assume that SL comes before TP.
-    
+
     Args:
         col (int): Current column.
         from_i (int): Index to start generation from (inclusive).
@@ -841,8 +856,9 @@ def ohlc_stop_choice_nb(from_i: int,
 
         exit_signal = False
         if not np.isnan(init_sl_stop):
-            if (not init_reverse and curr_low <= curr_sl_stop_price) or \
-                    (init_reverse and curr_high >= curr_sl_stop_price):
+            if (not init_reverse and curr_low <= curr_sl_stop_price) or (
+                init_reverse and curr_high >= curr_sl_stop_price
+            ):
                 exit_signal = True
                 stop_price_out[i, col] = curr_sl_stop_price
                 if init_sl_trail:
@@ -850,8 +866,9 @@ def ohlc_stop_choice_nb(from_i: int,
                 else:
                     stop_type_out[i, col] = StopType.StopLoss
         if not exit_signal and not np.isnan(init_tp_stop):
-            if (not init_reverse and curr_high >= curr_tp_stop_price) or \
-                    (init_reverse and curr_low <= curr_tp_stop_price):
+            if (not init_reverse and curr_high >= curr_tp_stop_price) or (
+                init_reverse and curr_low <= curr_tp_stop_price
+            ):
                 exit_signal = True
                 stop_price_out[i, col] = curr_tp_stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
@@ -872,23 +889,25 @@ def ohlc_stop_choice_nb(from_i: int,
 
 
 @njit
-def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
-                             open: tp.ArrayLike,
-                             high: tp.ArrayLike,
-                             low: tp.ArrayLike,
-                             close: tp.ArrayLike,
-                             stop_price_out: tp.Array2d,
-                             stop_type_out: tp.Array2d,
-                             sl_stop: tp.MaybeArray[float],
-                             sl_trail: tp.MaybeArray[bool],
-                             tp_stop: tp.MaybeArray[float],
-                             reverse: tp.MaybeArray[bool],
-                             is_open_safe: bool,
-                             wait: int,
-                             until_next: bool,
-                             skip_until_exit: bool,
-                             pick_first: bool,
-                             flex_2d: bool) -> tp.Array2d:
+def generate_ohlc_stop_ex_nb(
+    entries: tp.Array2d,
+    open: tp.ArrayLike,
+    high: tp.ArrayLike,
+    low: tp.ArrayLike,
+    close: tp.ArrayLike,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.MaybeArray[float],
+    sl_trail: tp.MaybeArray[bool],
+    tp_stop: tp.MaybeArray[float],
+    reverse: tp.MaybeArray[bool],
+    is_open_safe: bool,
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    pick_first: bool,
+    flex_2d: bool,
+) -> tp.Array2d:
     """Generate using `generate_ex_nb` and `ohlc_stop_choice_nb`.
 
     Usage:
@@ -973,27 +992,29 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         wait,
         pick_first,
         temp_idx_arr,
-        flex_2d
+        flex_2d,
     )
 
 
 @njit
-def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
-                               open: tp.ArrayLike,
-                               high: tp.ArrayLike,
-                               low: tp.ArrayLike,
-                               close: tp.ArrayLike,
-                               stop_price_out: tp.Array2d,
-                               stop_type_out: tp.Array2d,
-                               sl_stop: tp.MaybeArray[float],
-                               sl_trail: tp.MaybeArray[bool],
-                               tp_stop: tp.MaybeArray[float],
-                               reverse: tp.MaybeArray[bool],
-                               is_open_safe: bool,
-                               entry_wait: int,
-                               exit_wait: int,
-                               pick_first: bool,
-                               flex_2d: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def generate_ohlc_stop_enex_nb(
+    entries: tp.Array2d,
+    open: tp.ArrayLike,
+    high: tp.ArrayLike,
+    low: tp.ArrayLike,
+    close: tp.ArrayLike,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.MaybeArray[float],
+    sl_trail: tp.MaybeArray[bool],
+    tp_stop: tp.MaybeArray[float],
+    reverse: tp.MaybeArray[bool],
+    is_open_safe: bool,
+    entry_wait: int,
+    exit_wait: int,
+    pick_first: bool,
+    flex_2d: bool,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Generate one after another using `generate_enex_nb` and `ohlc_stop_choice_nb`.
 
     Returns two arrays: new entries and exits.
@@ -1008,8 +1029,10 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
         exit_wait,
         True,
         pick_first,
-        first_choice_nb, (entries,),
-        ohlc_stop_choice_nb, (
+        first_choice_nb,
+        (entries,),
+        ohlc_stop_choice_nb,
+        (
             open,
             high,
             low,
@@ -1024,8 +1047,8 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
             exit_wait,
             pick_first,
             temp_idx_arr,
-            flex_2d
-        )
+            flex_2d,
+        ),
     )
 
 
@@ -1044,11 +1067,11 @@ def between_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                range_records[ridx]['id'] = ridx
-                range_records[ridx]['col'] = col
-                range_records[ridx]['start_idx'] = from_i
-                range_records[ridx]['end_idx'] = to_i
-                range_records[ridx]['status'] = RangeStatus.Closed
+                range_records[ridx]["id"] = ridx
+                range_records[ridx]["col"] = col
+                range_records[ridx]["start_idx"] = from_i
+                range_records[ridx]["end_idx"] = to_i
+                range_records[ridx]["status"] = RangeStatus.Closed
                 ridx += 1
     return range_records[:ridx]
 
@@ -1067,31 +1090,37 @@ def between_two_ranges_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
-        if a_idxs.shape[0] > 0:
-            b_idxs = np.flatnonzero(b[:, col])
-            if b_idxs.shape[0] > 0:
-                if from_other:
-                    for j, to_i in enumerate(b_idxs):
-                        valid_a_idxs = a_idxs[a_idxs <= to_i]
-                        if len(valid_a_idxs) > 0:
-                            from_i = valid_a_idxs[-1]  # preceding in a
-                            range_records[ridx]['id'] = ridx
-                            range_records[ridx]['col'] = col
-                            range_records[ridx]['start_idx'] = from_i
-                            range_records[ridx]['end_idx'] = to_i
-                            range_records[ridx]['status'] = RangeStatus.Closed
-                            ridx += 1
-                else:
-                    for j, from_i in enumerate(a_idxs):
-                        valid_b_idxs = b_idxs[b_idxs >= from_i]
-                        if len(valid_b_idxs) > 0:
-                            to_i = valid_b_idxs[0]  # succeeding in b
-                            range_records[ridx]['id'] = ridx
-                            range_records[ridx]['col'] = col
-                            range_records[ridx]['start_idx'] = from_i
-                            range_records[ridx]['end_idx'] = to_i
-                            range_records[ridx]['status'] = RangeStatus.Closed
-                            ridx += 1
+        if a_idxs.shape[0] == 0:
+            continue
+        b_idxs = np.flatnonzero(b[:, col])
+        if b_idxs.shape[0] == 0:
+            continue
+        if from_other:
+            a_pos = 0
+            for to_i in b_idxs:
+                while a_pos + 1 < a_idxs.shape[0] and a_idxs[a_pos + 1] <= to_i:
+                    a_pos += 1
+                if a_idxs[a_pos] <= to_i:
+                    from_i = a_idxs[a_pos]  # preceding in a
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Closed
+                    ridx += 1
+        else:
+            b_pos = 0
+            for from_i in a_idxs:
+                while b_pos < b_idxs.shape[0] and b_idxs[b_pos] < from_i:
+                    b_pos += 1
+                if b_pos < b_idxs.shape[0]:
+                    to_i = b_idxs[b_pos]  # succeeding in b
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Closed
+                    ridx += 1
     return range_records[:ridx]
 
 
@@ -1111,21 +1140,21 @@ def partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
                 is_partition = True
             elif is_partition:
                 to_i = i
-                range_records[ridx]['id'] = ridx
-                range_records[ridx]['col'] = col
-                range_records[ridx]['start_idx'] = from_i
-                range_records[ridx]['end_idx'] = to_i
-                range_records[ridx]['status'] = RangeStatus.Closed
+                range_records[ridx]["id"] = ridx
+                range_records[ridx]["col"] = col
+                range_records[ridx]["start_idx"] = from_i
+                range_records[ridx]["end_idx"] = to_i
+                range_records[ridx]["status"] = RangeStatus.Closed
                 ridx += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
                     to_i = a.shape[0] - 1
-                    range_records[ridx]['id'] = ridx
-                    range_records[ridx]['col'] = col
-                    range_records[ridx]['start_idx'] = from_i
-                    range_records[ridx]['end_idx'] = to_i
-                    range_records[ridx]['status'] = RangeStatus.Open
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Open
                     ridx += 1
     return range_records[:ridx]
 
@@ -1143,11 +1172,11 @@ def between_partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
             if a[i, col]:
                 if not is_partition and from_i != -1:
                     to_i = i
-                    range_records[ridx]['id'] = ridx
-                    range_records[ridx]['col'] = col
-                    range_records[ridx]['start_idx'] = from_i
-                    range_records[ridx]['end_idx'] = to_i
-                    range_records[ridx]['status'] = RangeStatus.Closed
+                    range_records[ridx]["id"] = ridx
+                    range_records[ridx]["col"] = col
+                    range_records[ridx]["start_idx"] = from_i
+                    range_records[ridx]["end_idx"] = to_i
+                    range_records[ridx]["status"] = RangeStatus.Closed
                     ridx += 1
                 is_partition = True
                 from_i = i
@@ -1158,14 +1187,18 @@ def between_partition_ranges_nb(a: tp.Array2d) -> tp.RecordArray:
 
 # ############# Ranking ############# #
 
+
 @njit
-def rank_nb(a: tp.Array2d,
-            reset_by: tp.Optional[tp.Array1d],
-            after_false: bool,
-            rank_func_nb: tp.RankFunc, *args) -> tp.Array2d:
+def rank_nb(
+    a: tp.Array2d,
+    reset_by: tp.Optional[tp.Array1d],
+    after_false: bool,
+    rank_func_nb: tp.RankFunc,
+    *args,
+) -> tp.Array2d:
     """Rank each signal using `rank_func_nb`.
 
-    Applies `rank_func_nb` on each True value. Should accept index of the row, 
+    Applies `rank_func_nb` on each True value. Should accept index of the row,
     index of the column, index of the last reset signal, index of the end of the previous partition,
     index of the start of the current partition, and `*args`. Should return -1 for no rank, otherwise 0 or greater.
 
@@ -1197,8 +1230,15 @@ def rank_nb(a: tp.Array2d,
 
 
 @njit(cache=True)
-def sig_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
-                    sig_pos_temp: tp.Array1d, allow_gaps: bool) -> int:
+def sig_pos_rank_nb(
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    sig_pos_temp: tp.Array1d,
+    allow_gaps: bool,
+) -> int:
     """`rank_func_nb` that returns the rank of each signal by its position in the partition."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
         sig_pos_temp[col] = -1
@@ -1209,8 +1249,14 @@ def sig_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_s
 
 
 @njit(cache=True)
-def part_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
-                     part_pos_temp: tp.Array1d) -> int:
+def part_pos_rank_nb(
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    part_pos_temp: tp.Array1d,
+) -> int:
     """`rank_func_nb` that returns the rank of each partition by its position in the series."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
         part_pos_temp[col] = 0
