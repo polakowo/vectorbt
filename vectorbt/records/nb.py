@@ -221,14 +221,54 @@ def mapped_to_mask_nb(
 @njit(cache=True)
 def top_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_arr: tp.Array1d, n: int) -> None:
     """`inout_map_func_nb` that returns indices of top N elements."""
-    # TODO: np.argpartition
-    inout[idxs[np.argsort(mapped_arr)[-n:]]] = True
+    if n <= 0:
+        return
+    col_len = mapped_arr.shape[0]
+    if n >= col_len:
+        inout[idxs] = True
+        return
+    n_partition = col_len - n
+    pivot = np.partition(mapped_arr, n_partition)[n_partition]
+    n_greater = 0
+    for i in range(col_len):
+        if mapped_arr[i] > pivot:
+            n_greater += 1
+            inout[idxs[i]] = True
+    n_remaining = n - n_greater
+    if n_remaining <= 0:
+        return
+    for i in range(col_len - 1, -1, -1):
+        if mapped_arr[i] == pivot:
+            inout[idxs[i]] = True
+            n_remaining -= 1
+            if n_remaining == 0:
+                break
 
 
 @njit(cache=True)
 def bottom_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_arr: tp.Array1d, n: int) -> None:
     """`inout_map_func_nb` that returns indices of bottom N elements."""
-    inout[idxs[np.argsort(mapped_arr)[:n]]] = True
+    if n <= 0:
+        return
+    col_len = mapped_arr.shape[0]
+    if n >= col_len:
+        inout[idxs] = True
+        return
+    pivot = np.partition(mapped_arr, n - 1)[n - 1]
+    n_less = 0
+    for i in range(col_len):
+        if mapped_arr[i] < pivot:
+            n_less += 1
+            inout[idxs[i]] = True
+    n_remaining = n - n_less
+    if n_remaining <= 0:
+        return
+    for i in range(col_len):
+        if mapped_arr[i] == pivot:
+            inout[idxs[i]] = True
+            n_remaining -= 1
+            if n_remaining == 0:
+                break
 
 
 @njit
