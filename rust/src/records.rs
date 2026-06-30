@@ -651,19 +651,90 @@ fn top_n_mapped_mask(mapped_arr: &[f64], col_idxs: &[i64], col_lens: &[i64], n: 
             continue;
         }
         let col_start_idx = col_start_idxs[col];
-
-        // Collect (value, global_index) for this column
-        let mut items: Vec<(f64, usize)> = Vec::with_capacity(col_len);
-        for k in 0..col_len {
-            let global_idx = col_idxs[col_start_idx + k] as usize;
-            items.push((mapped_arr[global_idx], global_idx));
+        if n >= col_len {
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                out[global_idx] = true;
+            }
+            continue;
+        }
+        if n == 0 {
+            continue;
         }
 
-        // Sort ascending; top N = last N after sort
-        items.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        let start = if col_len > n { col_len - n } else { 0 };
-        for k in start..col_len {
-            out[items[k].1] = true;
+        // Collect non-NaN values for partitioning
+        let mut valid_values: Vec<f64> = Vec::with_capacity(col_len);
+        for k in 0..col_len {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() {
+                valid_values.push(value);
+            }
+        }
+
+        let n_valid = valid_values.len();
+        if n_valid == 0 {
+            let mut n_remaining = n;
+            for k in (0..col_len).rev() {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                out[global_idx] = true;
+                n_remaining -= 1;
+                if n_remaining == 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if n > n_valid {
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                if !mapped_arr[global_idx].is_nan() {
+                    out[global_idx] = true;
+                }
+            }
+            let mut n_remaining = n - n_valid;
+            for k in (0..col_len).rev() {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                if mapped_arr[global_idx].is_nan() {
+                    out[global_idx] = true;
+                    n_remaining -= 1;
+                    if n_remaining == 0 {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+
+        let n_partition = n_valid - n;
+        valid_values.select_nth_unstable_by(n_partition, |a, b| a.partial_cmp(b).unwrap());
+        let pivot = valid_values[n_partition];
+
+        let mut n_greater = 0usize;
+        for k in 0..col_len {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() && value > pivot {
+                out[global_idx] = true;
+                n_greater += 1;
+            }
+        }
+
+        let mut n_remaining = n - n_greater;
+        if n_remaining == 0 {
+            continue;
+        }
+        for k in (0..col_len).rev() {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() && value == pivot {
+                out[global_idx] = true;
+                n_remaining -= 1;
+                if n_remaining == 0 {
+                    break;
+                }
+            }
         }
     }
     out
@@ -701,19 +772,89 @@ fn bottom_n_mapped_mask(mapped_arr: &[f64], col_idxs: &[i64], col_lens: &[i64], 
             continue;
         }
         let col_start_idx = col_start_idxs[col];
-
-        // Collect (value, global_index) for this column
-        let mut items: Vec<(f64, usize)> = Vec::with_capacity(col_len);
-        for k in 0..col_len {
-            let global_idx = col_idxs[col_start_idx + k] as usize;
-            items.push((mapped_arr[global_idx], global_idx));
+        if n >= col_len {
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                out[global_idx] = true;
+            }
+            continue;
+        }
+        if n == 0 {
+            continue;
         }
 
-        // Sort ascending; bottom N = first N after sort
-        items.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        let take = if col_len < n { col_len } else { n };
-        for k in 0..take {
-            out[items[k].1] = true;
+        // Collect non-NaN values for partitioning
+        let mut valid_values: Vec<f64> = Vec::with_capacity(col_len);
+        for k in 0..col_len {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() {
+                valid_values.push(value);
+            }
+        }
+
+        let n_valid = valid_values.len();
+        if n_valid == 0 {
+            let mut n_remaining = n;
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                out[global_idx] = true;
+                n_remaining -= 1;
+                if n_remaining == 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if n > n_valid {
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                if !mapped_arr[global_idx].is_nan() {
+                    out[global_idx] = true;
+                }
+            }
+            let mut n_remaining = n - n_valid;
+            for k in 0..col_len {
+                let global_idx = col_idxs[col_start_idx + k] as usize;
+                if mapped_arr[global_idx].is_nan() {
+                    out[global_idx] = true;
+                    n_remaining -= 1;
+                    if n_remaining == 0 {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+
+        valid_values.select_nth_unstable_by(n - 1, |a, b| a.partial_cmp(b).unwrap());
+        let pivot = valid_values[n - 1];
+
+        let mut n_less = 0usize;
+        for k in 0..col_len {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() && value < pivot {
+                out[global_idx] = true;
+                n_less += 1;
+            }
+        }
+
+        let mut n_remaining = n - n_less;
+        if n_remaining == 0 {
+            continue;
+        }
+        for k in 0..col_len {
+            let global_idx = col_idxs[col_start_idx + k] as usize;
+            let value = mapped_arr[global_idx];
+            if !value.is_nan() && value == pivot {
+                out[global_idx] = true;
+                n_remaining -= 1;
+                if n_remaining == 0 {
+                    break;
+                }
+            }
         }
     }
     out

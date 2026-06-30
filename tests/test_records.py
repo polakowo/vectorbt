@@ -186,6 +186,47 @@ class TestMappedArray:
             mapped_array.bottom_n_mask(0), np.array([False, False, False, False, False, False, False, False, False])
         )
 
+    def test_top_bottom_n_mask_with_nan(self):
+        mapped_array_with_nan = mapped_array.replace(
+            mapped_arr=np.array([10.0, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, 10.0])
+        )
+        np.testing.assert_array_equal(
+            mapped_array_with_nan.top_n_mask(1, engine="numba"),
+            np.array([False, False, True, False, False, True, False, False, True]),
+        )
+        assert mapped_array_with_nan.top_n_mask(1, engine="numba").sum() == 3
+        np.testing.assert_array_equal(
+            mapped_array_with_nan.bottom_n_mask(2, engine="numba"),
+            np.array([True, False, True, True, False, True, True, False, True]),
+        )
+        assert mapped_array_with_nan.bottom_n_mask(2, engine="numba").sum() == 6
+
+    def test_top_bottom_n_mask_with_all_nan_column(self):
+        mapped_array_with_nan = mapped_array.replace(
+            mapped_arr=np.array([np.nan, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, np.nan])
+        )
+        top_mask = mapped_array_with_nan.top_n_mask(2, engine="numba")
+        bottom_mask = mapped_array_with_nan.bottom_n_mask(2, engine="numba")
+        np.testing.assert_array_equal(
+            np.bincount(mapped_array_with_nan.col_arr[top_mask], minlength=3),
+            np.array([2, 2, 2]),
+        )
+        np.testing.assert_array_equal(
+            np.bincount(mapped_array_with_nan.col_arr[bottom_mask], minlength=3),
+            np.array([2, 2, 2]),
+        )
+
+    def test_top_bottom_n_mask_tie_order(self):
+        mapped_array_with_ties = mapped_array.replace(mapped_arr=np.array([1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 5.0, 5.0, 5.0]))
+        np.testing.assert_array_equal(
+            mapped_array_with_ties.top_n_mask(2, engine="numba"),
+            np.array([False, True, True, False, True, True, False, True, True]),
+        )
+        np.testing.assert_array_equal(
+            mapped_array_with_ties.bottom_n_mask(2, engine="numba"),
+            np.array([True, True, False, True, True, False, True, True, False]),
+        )
+
     def test_top_n(self):
         np.testing.assert_array_equal(mapped_array.top_n(1).id_arr, np.array([2, 4, 6]))
         np.testing.assert_array_equal(mapped_array.top_n(0).id_arr, np.array([], dtype=np.int64))
