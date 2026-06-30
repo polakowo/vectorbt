@@ -227,18 +227,53 @@ def top_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_arr
     if n >= col_len:
         inout[idxs] = True
         return
-    n_partition = col_len - n
-    pivot = np.partition(mapped_arr, n_partition)[n_partition]
+
+    n_valid = 0
+    for i in range(col_len):
+        if mapped_arr[i] == mapped_arr[i]:
+            n_valid += 1
+
+    if n_valid == 0:
+        n_remaining = n
+        for i in range(col_len - 1, -1, -1):
+            inout[idxs[i]] = True
+            n_remaining -= 1
+            if n_remaining == 0:
+                break
+        return
+
+    valid_mapped_arr = np.empty(n_valid, dtype=mapped_arr.dtype)
+    j = 0
+    for i in range(col_len):
+        if mapped_arr[i] == mapped_arr[i]:
+            valid_mapped_arr[j] = mapped_arr[i]
+            j += 1
+
+    if n > n_valid:
+        for i in range(col_len):
+            if mapped_arr[i] == mapped_arr[i]:
+                inout[idxs[i]] = True
+        n_remaining = n - n_valid
+        for i in range(col_len - 1, -1, -1):
+            if mapped_arr[i] != mapped_arr[i]:
+                inout[idxs[i]] = True
+                n_remaining -= 1
+                if n_remaining == 0:
+                    break
+        return
+
+    n_partition = n_valid - n
+    pivot = np.partition(valid_mapped_arr, n_partition)[n_partition]
     n_greater = 0
     for i in range(col_len):
-        if mapped_arr[i] > pivot:
+        if mapped_arr[i] == mapped_arr[i] and mapped_arr[i] > pivot:
             n_greater += 1
             inout[idxs[i]] = True
     n_remaining = n - n_greater
     if n_remaining <= 0:
         return
     for i in range(col_len - 1, -1, -1):
-        if mapped_arr[i] == pivot:
+        if mapped_arr[i] == mapped_arr[i] and mapped_arr[i] == pivot:
             inout[idxs[i]] = True
             n_remaining -= 1
             if n_remaining == 0:
@@ -254,17 +289,52 @@ def bottom_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_
     if n >= col_len:
         inout[idxs] = True
         return
-    pivot = np.partition(mapped_arr, n - 1)[n - 1]
+
+    n_valid = 0
+    for i in range(col_len):
+        if mapped_arr[i] == mapped_arr[i]:
+            n_valid += 1
+
+    if n_valid == 0:
+        n_remaining = n
+        for i in range(col_len):
+            inout[idxs[i]] = True
+            n_remaining -= 1
+            if n_remaining == 0:
+                break
+        return
+
+    valid_mapped_arr = np.empty(n_valid, dtype=mapped_arr.dtype)
+    j = 0
+    for i in range(col_len):
+        if mapped_arr[i] == mapped_arr[i]:
+            valid_mapped_arr[j] = mapped_arr[i]
+            j += 1
+
+    if n > n_valid:
+        for i in range(col_len):
+            if mapped_arr[i] == mapped_arr[i]:
+                inout[idxs[i]] = True
+        n_remaining = n - n_valid
+        for i in range(col_len):
+            if mapped_arr[i] != mapped_arr[i]:
+                inout[idxs[i]] = True
+                n_remaining -= 1
+                if n_remaining == 0:
+                    break
+        return
+
+    pivot = np.partition(valid_mapped_arr, n - 1)[n - 1]
     n_less = 0
     for i in range(col_len):
-        if mapped_arr[i] < pivot:
+        if mapped_arr[i] == mapped_arr[i] and mapped_arr[i] < pivot:
             n_less += 1
             inout[idxs[i]] = True
     n_remaining = n - n_less
     if n_remaining <= 0:
         return
     for i in range(col_len):
-        if mapped_arr[i] == pivot:
+        if mapped_arr[i] == mapped_arr[i] and mapped_arr[i] == pivot:
             inout[idxs[i]] = True
             n_remaining -= 1
             if n_remaining == 0:
