@@ -1152,10 +1152,76 @@ def init_records_nb(
     else:
         _max_orders = max_orders
     order_records = np.empty(_max_orders, dtype=order_dt)
+    order_records["id"][:] = -1
+    order_records["col"][:] = -1
+    order_records["idx"][:] = -1
+    order_records["size"][:] = np.nan
+    order_records["price"][:] = np.nan
+    order_records["fees"][:] = np.nan
+    order_records["side"][:] = -1
     if max_logs == 0:
         max_logs = 1
     log_records = np.empty(max_logs, dtype=log_dt)
+    log_records["id"][:] = -1
+    log_records["group"][:] = -1
+    log_records["col"][:] = -1
+    log_records["idx"][:] = -1
+    log_records["cash"][:] = np.nan
+    log_records["position"][:] = np.nan
+    log_records["debt"][:] = np.nan
+    log_records["free_cash"][:] = np.nan
+    log_records["val_price"][:] = np.nan
+    log_records["value"][:] = np.nan
+    log_records["req_size"][:] = np.nan
+    log_records["req_price"][:] = np.nan
+    log_records["req_size_type"][:] = -1
+    log_records["req_direction"][:] = -1
+    log_records["req_fees"][:] = np.nan
+    log_records["req_fixed_fees"][:] = np.nan
+    log_records["req_slippage"][:] = np.nan
+    log_records["req_min_size"][:] = np.nan
+    log_records["req_max_size"][:] = np.nan
+    log_records["req_size_granularity"][:] = np.nan
+    log_records["req_reject_prob"][:] = np.nan
+    log_records["req_lock_cash"][:] = False
+    log_records["req_allow_partial"][:] = False
+    log_records["req_raise_reject"][:] = False
+    log_records["req_log"][:] = False
+    log_records["new_cash"][:] = np.nan
+    log_records["new_position"][:] = np.nan
+    log_records["new_debt"][:] = np.nan
+    log_records["new_free_cash"][:] = np.nan
+    log_records["new_val_price"][:] = np.nan
+    log_records["new_value"][:] = np.nan
+    log_records["res_size"][:] = np.nan
+    log_records["res_price"][:] = np.nan
+    log_records["res_fees"][:] = np.nan
+    log_records["res_side"][:] = -1
+    log_records["res_status"][:] = -1
+    log_records["res_status_info"][:] = -1
+    log_records["order_id"][:] = -1
     return order_records, log_records
+
+
+@njit(cache=True)
+def init_last_pos_record_nb(target_shape: tp.Shape) -> tp.RecordArray:
+    """Initialize last position records with predictable sentinel values."""
+    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
+    last_pos_record["id"][:] = -1
+    last_pos_record["col"][:] = -1
+    last_pos_record["size"][:] = np.nan
+    last_pos_record["entry_idx"][:] = -1
+    last_pos_record["entry_price"][:] = np.nan
+    last_pos_record["entry_fees"][:] = np.nan
+    last_pos_record["exit_idx"][:] = -1
+    last_pos_record["exit_price"][:] = np.nan
+    last_pos_record["exit_fees"][:] = np.nan
+    last_pos_record["pnl"][:] = np.nan
+    last_pos_record["return"][:] = np.nan
+    last_pos_record["direction"][:] = -1
+    last_pos_record["status"][:] = -1
+    last_pos_record["parent_id"][:] = -1
+    return last_pos_record
 
 
 @njit(cache=True)
@@ -3314,8 +3380,7 @@ def simulate_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record["id"][:] = -1
+    last_pos_record = init_last_pos_record_nb(target_shape)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -3937,8 +4002,7 @@ def simulate_row_wise_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record["id"][:] = -1
+    last_pos_record = init_last_pos_record_nb(target_shape)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -4634,8 +4698,7 @@ def flex_simulate_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record["id"][:] = -1
+    last_pos_record = init_last_pos_record_nb(target_shape)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
