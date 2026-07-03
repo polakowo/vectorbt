@@ -1802,10 +1802,41 @@ class TestRecordsRustParity:
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
         )
 
+    def test_top_n_mapped_mask_nan(self):
+        mapped_arr = np.array([np.nan, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, np.nan], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
+        )
+
     def test_bottom_n_mapped_mask(self):
         mapped_arr = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0], dtype=np.float64)
         col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
+        )
+
+    def test_bottom_n_mapped_mask_nan(self):
+        mapped_arr = np.array([np.nan, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, np.nan], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
+        )
+
+    def test_top_bottom_n_mapped_mask_nan_overflow(self):
+        mapped_arr = np.array([np.nan, 1.0, np.nan, 2.0, np.nan, 3.0, np.nan, np.nan, 4.0], dtype=np.float64)
+        col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
+        cm = records_nb.col_map_nb(col_arr, 3)
+        np.testing.assert_array_equal(
+            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
+            records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
+        )
         np.testing.assert_array_equal(
             records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
