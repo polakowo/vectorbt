@@ -53,6 +53,48 @@ def assert_same_tuple(tup1, tup2):
         assert tup1[i] == tup2[i] or np.isnan(tup1[i]) and np.isnan(tup2[i])
 
 
+def test_from_order_func_exposes_initialized_records():
+    close = pd.Series([1.0])
+    seen = {}
+
+    def order_func(c):
+        seen["order_records"] = c.order_records.copy()
+        seen["log_records"] = c.log_records.copy()
+        seen["last_pos_record"] = c.last_pos_record.copy()
+        seen["pos_record_now"] = c.pos_record_now.copy()
+        return nb.NoOrder
+
+    pf = vbt.Portfolio.from_order_func(close, order_func, use_numba=False)
+
+    assert pf.orders.count() == 0
+    record_arrays_close(
+        seen["order_records"],
+        np.array([( -1, -1, -1, np.nan, np.nan, np.nan, -1)], dtype=order_dt),
+    )
+    record_arrays_close(
+        seen["log_records"],
+        np.array(
+            [
+                (
+                    -1, -1, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                    np.nan, np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                    np.nan, False, False, False, False, np.nan, np.nan, np.nan, np.nan, np.nan,
+                    np.nan, np.nan, np.nan, np.nan, -1, -1, -1, -1
+                )
+            ],
+            dtype=log_dt,
+        ),
+    )
+    record_arrays_close(
+        seen["last_pos_record"],
+        np.array([(-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1)], dtype=trade_dt),
+    )
+    record_arrays_close(
+        seen["pos_record_now"],
+        np.array((-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1), dtype=trade_dt),
+    )
+
+
 def test_execute_order_nb():
     # Errors, ignored and rejected orders
     with pytest.raises(Exception):
