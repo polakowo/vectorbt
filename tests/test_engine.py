@@ -161,13 +161,13 @@ class TestEngineResolution:
         with pytest.raises(ImportError, match="vectorbt-rust is not installed"):
             _engine.resolve_engine("rust", _engine.RustSupport(True))
 
-    def test_resolve_engine_unsupported_rust_reason(self, monkeypatch):
+    def test_resolve_engine_unsupported_rust(self, monkeypatch):
         monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
 
         with pytest.raises(ValueError, match="requires float64"):
             _engine.resolve_engine("rust", _engine.RustSupport(False, "Rust engine requires float64 arrays."))
 
-    def test_ohlcv_stats_use_generic_dispatch_engine(self, monkeypatch):
+    def test_ohlcv_stats_use_dispatch_engine(self, monkeypatch):
         engines = []
         orig_bfill_1d = dispatch.bfill_1d
         orig_ffill_1d = dispatch.ffill_1d
@@ -204,14 +204,14 @@ class TestEngineResolution:
         assert stats["Last Volume"] == 200.0
         assert engines == ["rust", "rust", "rust", "rust"]
 
-    def test_callback_function_rejects_explicit_rust(self, monkeypatch):
+    def test_callback_rejects_explicit_rust(self, monkeypatch):
         monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
 
         with pytest.raises(ValueError, match="callback-accepting"):
             dispatch.apply(np.ones((2, 2)), lambda col, a: a, engine="rust")
 
     @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
-    def test_explicit_rust_accepts_safe_cast_arrays(self):
+    def test_rust_accepts_safe_cast_arrays(self):
         f32_arr = np.array([[1.0, np.nan], [3.0, 4.0]], dtype=np.float32)
 
         np.testing.assert_array_equal(
@@ -525,7 +525,7 @@ class TestGenericRustParity:
         assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
         np.testing.assert_array_equal(drawdowns, expected_drawdowns)
 
-    def test_dispatch_std_ddof_larger_than_window_len(self):
+    def test_dispatch_std_ddof_over_window(self):
         a_1d = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         a = np.column_stack((a_1d, a_1d + 1.0))
 
@@ -820,7 +820,7 @@ class TestReturnsRustParity:
         with pytest.raises(ValueError, match="same shape"):
             returns_dispatch.rolling_beta(returns, 3, None, benchmark[:, :1], engine="rust")
 
-    def test_dispatch_drawdown_edge_cases_match_numba(self):
+    def test_dispatch_drawdown_edges(self):
         returns = np.array([[np.inf, -np.inf], [0.1, -0.1]], dtype=np.float64)
 
         np.testing.assert_allclose(
@@ -1034,7 +1034,7 @@ class TestSignalsRustParity:
             np.testing.assert_array_equal(result_1d[0], expected_1d[0])
             np.testing.assert_array_equal(result_1d[1], expected_1d[1])
 
-    def test_dispatch_matches_numba_for_mask_layouts(self):
+    def test_dispatch_matches_mask_layouts(self):
         a_c = np.array(
             [
                 [True, False, False],
@@ -1829,7 +1829,7 @@ class TestRecordsRustParity:
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
         )
 
-    def test_top_bottom_n_mapped_mask_nan_overflow(self):
+    def test_top_bottom_mapped_mask_nan_over(self):
         mapped_arr = np.array([np.nan, 1.0, np.nan, 2.0, np.nan, 3.0, np.nan, np.nan, 4.0], dtype=np.float64)
         col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=np.int64)
         cm = records_nb.col_map_nb(col_arr, 3)

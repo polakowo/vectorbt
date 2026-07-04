@@ -55,7 +55,7 @@ def assert_same_tuple(tup1, tup2):
 
 @pytest.mark.parametrize("test_row_wise", [False, True])
 @pytest.mark.parametrize("test_flexible", [False, True])
-def test_from_order_func_exposes_initialized_records(test_row_wise, test_flexible):
+def test_order_func_init_records(test_row_wise, test_flexible):
     close = pd.Series([1.0])
     seen = {}
 
@@ -111,7 +111,7 @@ def test_from_order_func_exposes_initialized_records(test_row_wise, test_flexibl
         )
 
 
-def test_simulate_from_orders_accepts_init_temp_records_flag():
+def test_sim_orders_init_temp_records():
     order_records, log_records = nb.simulate_from_orders_nb(
         (1, 1),
         np.array([1]),
@@ -2509,7 +2509,7 @@ class TestFromSignals:
         )
         record_arrays_close(pf_base.order_records, pf.order_records)
 
-    def test_ls_mode_routes_entries_and_exits_as_long_signals(self):
+    def test_ls_mode_routes_long_signals(self):
         pf = vbt.Portfolio.from_signals(
             pd.Series([1.0, 2.0, 3.0]),
             entries=pd.Series([True, False, False]),
@@ -2526,7 +2526,7 @@ class TestFromSignals:
         )
 
     @pytest.mark.parametrize("simulate_func", [dispatch.simulate_from_signals, nb.simulate_from_signals_nb])
-    def test_static_signal_default_direction_is_longonly(self, simulate_func):
+    def test_static_signal_defaults_longonly(self, simulate_func):
         kwargs = dict(
             entries=np.array([[True], [False], [False]]),
             exits=np.array([[False], [True], [False]]),

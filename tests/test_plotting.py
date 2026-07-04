@@ -268,7 +268,7 @@ class TestFigureFactory:
         assert isinstance(fig, FigureWidget)
         assert isinstance(fig, BaseFigure)
 
-    def test_make_figure_returns_figure_when_widgets_disabled(self):
+    def test_make_figure_without_widgets(self):
         """Toggling use_widgets=False should return plain Figure."""
         old_val = vbt.settings.plotting["use_widgets"]
         try:
@@ -979,7 +979,7 @@ class TestPortfolioPlots:
         expected_names = {"Close", "Buy", "Sell"}
         assert set(nt.keys()) == expected_names
 
-    def test_plots_grouped_warns_for_not_grouped_subplots(self):
+    def test_plots_grouped_warns_ungrouped(self):
         """Grouped portfolio should warn for subplots that don't support grouping."""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")

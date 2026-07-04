@@ -201,7 +201,7 @@ class TestMappedArray:
         )
         assert mapped_array_with_nan.bottom_n_mask(2, engine="numba").sum() == 6
 
-    def test_top_bottom_n_mask_with_all_nan_column(self):
+    def test_top_bottom_n_mask_all_nan_col(self):
         mapped_array_with_nan = mapped_array.replace(
             mapped_arr=np.array([np.nan, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, np.nan])
         )
