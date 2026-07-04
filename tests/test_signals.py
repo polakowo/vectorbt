@@ -2288,9 +2288,9 @@ class TestAccessors:
 
     def test_pos_rank_fns(self):
         sr = pd.Series([True, False, True])
-        assert sr.vbt.signals.first(wrap_kwargs={"dtype": np.int_}).dtype == np.dtype(int)
-        assert sr.vbt.signals.nth(1, wrap_kwargs={"dtype": np.int_}).dtype == np.dtype(int)
-        assert sr.vbt.signals.from_nth(1, wrap_kwargs={"dtype": np.int_}).dtype == np.dtype(int)
+        assert sr.vbt.signals.first(wrap_kwargs={"dtype": np.int64}).dtype == np.dtype(int)
+        assert sr.vbt.signals.nth(1, wrap_kwargs={"dtype": np.int64}).dtype == np.dtype(int)
+        assert sr.vbt.signals.from_nth(1, wrap_kwargs={"dtype": np.int64}).dtype == np.dtype(int)
 
         pd.testing.assert_frame_equal(
             (~mask).vbt.signals.first(),
