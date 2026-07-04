@@ -1220,6 +1220,12 @@ class TestPortfolioPlotSmoke:
         assert "Value" in nt
         assert isinstance(nt["Value"], go.Scatter)
         assert len(nt["Value"].y) == len(index_5)
+        # Custom benchmark returns should also work when plotting a selected portfolio column.
+        fig = pf_multi.plot_cum_returns(column="a", benchmark_rets=pf_multi["b"].returns())
+        nt = named_traces(fig)
+        assert "Benchmark" in nt
+        assert isinstance(nt["Benchmark"], go.Scatter)
+        assert len(nt["Benchmark"].y) == len(index_5)
 
     def test_smoke_plot_drawdowns(self):
         self._assert_fig(
