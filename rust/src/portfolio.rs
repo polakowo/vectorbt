@@ -2109,6 +2109,7 @@ fn validate_group_lens_raw(gl: &[i64]) -> Result<Vec<usize>, String> {
     update_value = false,
     max_orders = None,
     max_logs = 0,
+    init_temp_records = false,
     seed = None,
     flex_2d = true,
 ))]
@@ -2141,9 +2142,11 @@ pub fn simulate_from_orders_py<'py>(
     update_value: bool,
     max_orders: Option<usize>,
     max_logs: usize,
+    init_temp_records: bool,
     seed: Option<u64>,
     flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
+    let _ = init_temp_records;
     let (nrows, ncols) = target_shape;
 
     // Extract slices
@@ -2394,6 +2397,7 @@ fn read_signals(
     update_value = false,
     max_orders = None,
     max_logs = 0,
+    init_temp_records = false,
     seed = None,
     flex_2d = true,
 ))]
@@ -2453,9 +2457,11 @@ pub fn simulate_from_signals_py<'py>(
     update_value: bool,
     max_orders: Option<usize>,
     max_logs: usize,
+    init_temp_records: bool,
     seed: Option<u64>,
     flex_2d: bool,
 ) -> PyResult<(Bound<'py, PyArray1<OrderRecord>>, Bound<'py, pyo3::PyAny>)> {
+    let _ = init_temp_records;
     let (nrows, ncols) = target_shape;
 
     let gl_cow = array1_as_slice_cow(&group_lens);

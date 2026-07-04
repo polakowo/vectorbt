@@ -2205,6 +2205,37 @@ class TestPortfolioRustParity:
         for field in numba_logs.dtype.names:
             np.testing.assert_allclose(rust_logs[field], numba_logs[field], equal_nan=True, err_msg=field)
 
+    def test_orders_init_temp_records(self):
+        target_shape = (1, 1)
+        group_lens = np.array([1], dtype=np.int64)
+        init_cash = np.array([100.0], dtype=np.float64)
+        call_seq = np.zeros(target_shape, dtype=np.int64)
+        close = np.ones(target_shape, dtype=np.float64)
+
+        rust_orders, rust_logs = portfolio_dispatch.simulate_from_orders(
+            target_shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            max_orders=1,
+            max_logs=1,
+            init_temp_records=True,
+            engine="rust",
+        )
+        numba_orders, numba_logs = portfolio_nb.simulate_from_orders_nb(
+            target_shape,
+            group_lens,
+            init_cash,
+            call_seq.copy(),
+            close=close,
+            max_orders=1,
+            max_logs=1,
+            init_temp_records=True,
+        )
+        record_arrays_close(rust_orders, numba_orders)
+        assert len(rust_logs) == len(numba_logs)
+
     def test_orders_raise_reject_exception(self):
         with pytest.raises(RejectedOrderError, match="Final size is less than requested"):
             portfolio_dispatch.simulate_from_orders(

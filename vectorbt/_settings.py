@@ -419,6 +419,7 @@ settings = SettingsConfig(
             ffill_val_price=True,
             update_value=False,
             fill_pos_record=True,
+            init_temp_records=False,
             row_wise=False,
             flexible=False,
             use_numba=True,

@@ -561,6 +561,7 @@ def simulate_from_orders(
     update_value: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
     seed: tp.Optional[int] = None,
     engine: tp.Optional[str] = None,
@@ -598,6 +599,7 @@ def simulate_from_orders(
                 update_value=update_value,
                 max_orders=max_orders,
                 max_logs=max_logs,
+                init_temp_records=init_temp_records,
                 flex_2d=flex_2d,
             )
     eng = resolve_engine(
@@ -695,6 +697,7 @@ def simulate_from_orders(
             update_value=update_value,
             max_orders=max_orders,
             max_logs=max_logs,
+            init_temp_records=init_temp_records,
             seed=seed,
             flex_2d=flex_2d,
         )
@@ -727,6 +730,7 @@ def simulate_from_orders(
         update_value=update_value,
         max_orders=max_orders,
         max_logs=max_logs,
+        init_temp_records=init_temp_records,
         flex_2d=flex_2d,
     )
 
@@ -780,6 +784,7 @@ def simulate_from_signals(
     update_value: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
     seed: tp.Optional[int] = None,
     engine: tp.Optional[str] = None,
@@ -839,6 +844,7 @@ def simulate_from_signals(
                 update_value=update_value,
                 max_orders=max_orders,
                 max_logs=max_logs,
+                init_temp_records=init_temp_records,
                 flex_2d=flex_2d,
             )
     eng = resolve_engine(
@@ -1084,6 +1090,7 @@ def simulate_from_signals(
             update_value=update_value,
             max_orders=max_orders,
             max_logs=max_logs,
+            init_temp_records=init_temp_records,
             seed=seed,
             flex_2d=flex_2d,
         )
@@ -1138,6 +1145,7 @@ def simulate_from_signals(
         update_value=update_value,
         max_orders=max_orders,
         max_logs=max_logs,
+        init_temp_records=init_temp_records,
         flex_2d=flex_2d,
     )
 

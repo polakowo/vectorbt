@@ -1145,6 +1145,7 @@ def init_records_nb(
     target_shape: tp.Shape,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Initialize order and log records."""
     if max_orders is None:
@@ -1152,62 +1153,66 @@ def init_records_nb(
     else:
         _max_orders = max_orders
     order_records = np.empty(_max_orders, dtype=order_dt)
-    order_records["id"][:] = -1
-    order_records["col"][:] = -1
-    order_records["idx"][:] = -1
-    order_records["size"][:] = np.nan
-    order_records["price"][:] = np.nan
-    order_records["fees"][:] = np.nan
-    order_records["side"][:] = -1
+    if init_temp_records:
+        order_records["id"][:] = -1
+        order_records["col"][:] = -1
+        order_records["idx"][:] = -1
+        order_records["size"][:] = np.nan
+        order_records["price"][:] = np.nan
+        order_records["fees"][:] = np.nan
+        order_records["side"][:] = -1
     if max_logs == 0:
         max_logs = 1
     log_records = np.empty(max_logs, dtype=log_dt)
-    log_records["id"][:] = -1
-    log_records["group"][:] = -1
-    log_records["col"][:] = -1
-    log_records["idx"][:] = -1
-    log_records["cash"][:] = np.nan
-    log_records["position"][:] = np.nan
-    log_records["debt"][:] = np.nan
-    log_records["free_cash"][:] = np.nan
-    log_records["val_price"][:] = np.nan
-    log_records["value"][:] = np.nan
-    log_records["req_size"][:] = np.nan
-    log_records["req_price"][:] = np.nan
-    log_records["req_size_type"][:] = -1
-    log_records["req_direction"][:] = -1
-    log_records["req_fees"][:] = np.nan
-    log_records["req_fixed_fees"][:] = np.nan
-    log_records["req_slippage"][:] = np.nan
-    log_records["req_min_size"][:] = np.nan
-    log_records["req_max_size"][:] = np.nan
-    log_records["req_size_granularity"][:] = np.nan
-    log_records["req_reject_prob"][:] = np.nan
-    log_records["req_lock_cash"][:] = False
-    log_records["req_allow_partial"][:] = False
-    log_records["req_raise_reject"][:] = False
-    log_records["req_log"][:] = False
-    log_records["new_cash"][:] = np.nan
-    log_records["new_position"][:] = np.nan
-    log_records["new_debt"][:] = np.nan
-    log_records["new_free_cash"][:] = np.nan
-    log_records["new_val_price"][:] = np.nan
-    log_records["new_value"][:] = np.nan
-    log_records["res_size"][:] = np.nan
-    log_records["res_price"][:] = np.nan
-    log_records["res_fees"][:] = np.nan
-    log_records["res_side"][:] = -1
-    log_records["res_status"][:] = -1
-    log_records["res_status_info"][:] = -1
-    log_records["order_id"][:] = -1
+    if init_temp_records:
+        log_records["id"][:] = -1
+        log_records["group"][:] = -1
+        log_records["col"][:] = -1
+        log_records["idx"][:] = -1
+        log_records["cash"][:] = np.nan
+        log_records["position"][:] = np.nan
+        log_records["debt"][:] = np.nan
+        log_records["free_cash"][:] = np.nan
+        log_records["val_price"][:] = np.nan
+        log_records["value"][:] = np.nan
+        log_records["req_size"][:] = np.nan
+        log_records["req_price"][:] = np.nan
+        log_records["req_size_type"][:] = -1
+        log_records["req_direction"][:] = -1
+        log_records["req_fees"][:] = np.nan
+        log_records["req_fixed_fees"][:] = np.nan
+        log_records["req_slippage"][:] = np.nan
+        log_records["req_min_size"][:] = np.nan
+        log_records["req_max_size"][:] = np.nan
+        log_records["req_size_granularity"][:] = np.nan
+        log_records["req_reject_prob"][:] = np.nan
+        log_records["req_lock_cash"][:] = False
+        log_records["req_allow_partial"][:] = False
+        log_records["req_raise_reject"][:] = False
+        log_records["req_log"][:] = False
+        log_records["new_cash"][:] = np.nan
+        log_records["new_position"][:] = np.nan
+        log_records["new_debt"][:] = np.nan
+        log_records["new_free_cash"][:] = np.nan
+        log_records["new_val_price"][:] = np.nan
+        log_records["new_value"][:] = np.nan
+        log_records["res_size"][:] = np.nan
+        log_records["res_price"][:] = np.nan
+        log_records["res_fees"][:] = np.nan
+        log_records["res_side"][:] = -1
+        log_records["res_status"][:] = -1
+        log_records["res_status_info"][:] = -1
+        log_records["order_id"][:] = -1
     return order_records, log_records
 
 
 @njit(cache=True)
-def init_last_pos_record_nb(target_shape: tp.Shape) -> tp.RecordArray:
+def init_last_pos_record_nb(target_shape: tp.Shape, init_temp_records: bool = False) -> tp.RecordArray:
     """Initialize last position records with predictable sentinel values."""
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
     last_pos_record["id"][:] = -1
+    if not init_temp_records:
+        return last_pos_record
     last_pos_record["col"][:] = -1
     last_pos_record["size"][:] = np.nan
     last_pos_record["entry_idx"][:] = -1
@@ -1372,6 +1377,7 @@ def simulate_from_orders_nb(
     update_value: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Creates on order out of each element.
@@ -1417,7 +1423,7 @@ def simulate_from_orders_nb(
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -1956,6 +1962,7 @@ def simulate_from_signals_nb(
     update_value: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Static version of `simulate_from_signal_func_nb` that takes signal arrays directly.
@@ -1993,7 +2000,7 @@ def simulate_from_signals_nb(
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -2456,6 +2463,7 @@ def simulate_from_signal_func_nb(
     update_value: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Creates an order out of each element by resolving entry and exit signals returned by `signal_func_nb`.
@@ -2511,7 +2519,7 @@ def simulate_from_signal_func_nb(
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -3027,6 +3035,7 @@ def simulate_nb(
     fill_pos_record: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Fill order and log records by iterating over a shape and calling a range of user-defined functions.
@@ -3369,7 +3378,7 @@ def simulate_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -3380,7 +3389,7 @@ def simulate_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = init_last_pos_record_nb(target_shape)
+    last_pos_record = init_last_pos_record_nb(target_shape, init_temp_records)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -3892,6 +3901,7 @@ def simulate_row_wise_nb(
     fill_pos_record: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `simulate_nb`, but iterates in row-major order.
@@ -3991,7 +4001,7 @@ def simulate_row_wise_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -4002,7 +4012,7 @@ def simulate_row_wise_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = init_last_pos_record_nb(target_shape)
+    last_pos_record = init_last_pos_record_nb(target_shape, init_temp_records)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -4516,6 +4526,7 @@ def flex_simulate_nb(
     fill_pos_record: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `simulate_nb`, but with no predefined call sequence.
@@ -4687,7 +4698,7 @@ def flex_simulate_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -4698,7 +4709,7 @@ def flex_simulate_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = init_last_pos_record_nb(target_shape)
+    last_pos_record = init_last_pos_record_nb(target_shape, init_temp_records)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0
@@ -5202,6 +5213,7 @@ def flex_simulate_row_wise_nb(
     fill_pos_record: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: int = 0,
+    init_temp_records: bool = False,
     flex_2d: bool = True,
 ) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `flex_simulate_nb`, but iterates using row-major order, with the rows
@@ -5210,7 +5222,7 @@ def flex_simulate_row_wise_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     check_group_init_cash_nb(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs, init_temp_records)
     init_cash = init_cash.astype(np.float64)
     last_cash = init_cash.copy()
     last_position = np.full(target_shape[1], 0.0, dtype=np.float64)
@@ -5221,8 +5233,7 @@ def flex_simulate_row_wise_nb(
     second_last_value = init_cash.copy()
     temp_value = init_cash.copy()
     last_return = np.full_like(last_value, np.nan)
-    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record["id"][:] = -1
+    last_pos_record = init_last_pos_record_nb(target_shape, init_temp_records)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int64)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int64)
     oidx = 0

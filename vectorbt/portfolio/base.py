@@ -1640,6 +1640,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         update_value: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
+        init_temp_records: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1784,6 +1785,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 otherwise to 1.
 
                 Set to a lower number if you run out of memory.
+            init_temp_records (bool): Whether to initialize temporary record buffers with sentinel values.
+
+                Disabled by default for speed. Enable to expose predictable unused records to callbacks.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
@@ -1949,6 +1953,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
+        if init_temp_records is None:
+            init_temp_records = portfolio_cfg["init_temp_records"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -2020,6 +2026,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             update_value=update_value,
             max_orders=max_orders,
             max_logs=max_logs,
+            init_temp_records=init_temp_records,
             flex_2d=close.ndim == 2,
             engine=engine,
         )
@@ -2090,6 +2097,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         update_value: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
+        init_temp_records: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -2848,6 +2856,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
+        if init_temp_records is None:
+            init_temp_records = portfolio_cfg["init_temp_records"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -2955,6 +2965,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 update_value=update_value,
                 max_orders=max_orders,
                 max_logs=max_logs,
+                init_temp_records=init_temp_records,
                 flex_2d=close.ndim == 2,
                 wrapper=wrapper,
             ),
@@ -3036,6 +3047,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     update_value=update_value,
                     max_orders=max_orders,
                     max_logs=max_logs,
+                    init_temp_records=init_temp_records,
                     flex_2d=close.ndim == 2,
                     seed=seed,
                     engine=engine,
@@ -3090,6 +3102,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     update_value=update_value,
                     max_orders=max_orders,
                     max_logs=max_logs,
+                    init_temp_records=init_temp_records,
                     flex_2d=close.ndim == 2,
                     seed=seed,
                     engine=engine,
@@ -3143,6 +3156,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 update_value=update_value,
                 max_orders=max_orders,
                 max_logs=max_logs,
+                init_temp_records=init_temp_records,
                 flex_2d=close.ndim == 2,
             )
 
@@ -3317,6 +3331,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
         fill_pos_record: tp.Optional[bool] = None,
+        init_temp_records: tp.Optional[bool] = None,
         row_wise: tp.Optional[bool] = None,
         use_numba: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
@@ -3442,6 +3457,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 Defaults to the number of elements in the broadcasted shape.
 
                 Set to a lower number if you run out of memory.
+            init_temp_records (bool): Whether to initialize temporary record buffers with sentinel values.
+
+                Disabled by default for speed. Enable to expose predictable unused records to callbacks.
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
             broadcast_named_args (dict): See `Portfolio.from_signals`.
@@ -3820,6 +3838,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             update_value = portfolio_cfg["update_value"]
         if fill_pos_record is None:
             fill_pos_record = portfolio_cfg["fill_pos_record"]
+        if init_temp_records is None:
+            init_temp_records = portfolio_cfg["init_temp_records"]
         if row_wise is None:
             row_wise = portfolio_cfg["row_wise"]
         if use_numba is None:
@@ -3921,6 +3941,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
                 fill_pos_record=fill_pos_record,
+                init_temp_records=init_temp_records,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=close.ndim == 2,
@@ -3984,6 +4005,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
+                    init_temp_records=init_temp_records,
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=close.ndim == 2,
@@ -4021,6 +4043,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
+                    init_temp_records=init_temp_records,
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=close.ndim == 2,
@@ -4058,6 +4081,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
+                    init_temp_records=init_temp_records,
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=close.ndim == 2,
@@ -4095,6 +4119,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
+                    init_temp_records=init_temp_records,
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=close.ndim == 2,
