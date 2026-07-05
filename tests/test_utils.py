@@ -2455,8 +2455,7 @@ class TestScheduleManager:
 
         manager = schedule_.ScheduleManager()
         manager.every().do(job_func, kwargs)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(manager.async_start())
+        asyncio.run(manager.async_start())
         assert kwargs["call_count"] == 5
 
 

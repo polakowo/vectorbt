@@ -1750,15 +1750,20 @@ class TestFactory:
         )
         ind = F.from_apply_func(lambda ts, in_out, p1, p2: (ts + in_out, ts + in_out)).run(ts, 100, 200)
         test_attr_list = dir(ind)
-        expected_attrs = [
-            "__annotations__",
-            "__class__",
-            "__delattr__",
-            "__dict__",
-            "__dir__",
-            "__doc__",
-            "__eq__",
-        ]
+        if sys.version_info >= (3, 14):
+            expected_attrs = ["__annotate_func__"]
+        else:
+            expected_attrs = ["__annotations__"]
+        expected_attrs.extend(
+            [
+                "__class__",
+                "__delattr__",
+                "__dict__",
+                "__dir__",
+                "__doc__",
+                "__eq__",
+            ]
+        )
         if sys.version_info >= (3, 13):
             expected_attrs.append("__firstlineno__")
         expected_attrs.extend(
@@ -1769,8 +1774,7 @@ class TestFactory:
                 "__getitem__",
             ]
         )
-        if sys.version_info >= (3, 11):
-            expected_attrs.append("__getstate__")
+        expected_attrs.append("__getstate__")
         expected_attrs.extend(
             [
                 "__gt__",
