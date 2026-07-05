@@ -1303,6 +1303,8 @@ def nth_index_nb(a: tp.Array2d, n: int) -> tp.Array1d:
 @njit(cache=True)
 def norm_avg_index_1d_nb(a: tp.Array1d) -> float:
     """Get mean index normalized to (-1, 1)."""
+    if len(a) <= 1 or not np.any(a):
+        return np.nan
     mean_index = np.mean(np.flatnonzero(a))
     return renormalize_nb(mean_index, (0, len(a) - 1), (-1, 1))
 

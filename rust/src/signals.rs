@@ -4,7 +4,7 @@
 use crate::generic::{array1_as_slice_cow, FlexArray, RangeRecord, RANGE_CLOSED, RANGE_OPEN};
 use ndarray::{Array2, ArrayView2};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn, PyReadwriteArray2};
-use pyo3::exceptions::{PyValueError, PyZeroDivisionError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::seq::index::sample;
 use rand::Rng;
@@ -1938,23 +1938,12 @@ pub fn nth_index_rs<'py>(
 pub fn norm_avg_index_1d_rs(a: PyReadonlyArray1<'_, bool>) -> PyResult<f64> {
     let a_cow = array1_as_slice_cow(&a);
     let a_slice = a_cow.as_ref();
-    if a_slice.len() <= 1 || !a_slice.iter().any(|&v| v) {
-        return Err(PyZeroDivisionError::new_err("division by zero"));
-    }
     Ok(norm_avg_index_1d(a_slice))
 }
 
 #[pyfunction]
 pub fn norm_avg_index_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, bool>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    if a_arr.nrows() <= 1 {
-        return Err(PyZeroDivisionError::new_err("division by zero"));
-    }
-    for col in 0..a_arr.ncols() {
-        if !a_arr.column(col).iter().any(|&v| v) {
-            return Err(PyZeroDivisionError::new_err("division by zero"));
-        }
-    }
     let result = py.allow_threads(|| norm_avg_index(a_arr));
     Ok(PyArray1::from_vec_bound(py, result))
 }

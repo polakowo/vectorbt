@@ -848,14 +848,16 @@ class TestReturnsRustParity:
             returns_dispatch.calmar_ratio(empty_returns, 365.0, engine="rust")
         with pytest.raises(ValueError, match="zero-size array"):
             returns_nb.calmar_ratio_nb(empty_returns, 365.0)
-        with pytest.raises(ZeroDivisionError):
-            returns_dispatch.annualized_return(empty_returns, 365.0, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            returns_nb.annualized_return_nb(empty_returns, 365.0)
-        with pytest.raises(ZeroDivisionError):
-            returns_dispatch.cond_value_at_risk(empty_returns, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            returns_nb.cond_value_at_risk_nb(empty_returns)
+        np.testing.assert_array_equal(
+            returns_dispatch.annualized_return(empty_returns, 365.0, engine="rust"),
+            np.full(2, np.nan),
+        )
+        np.testing.assert_array_equal(returns_nb.annualized_return_nb(empty_returns, 365.0), np.full(2, np.nan))
+        np.testing.assert_array_equal(
+            returns_dispatch.cond_value_at_risk(empty_returns, engine="rust"),
+            np.full(2, np.nan),
+        )
+        np.testing.assert_array_equal(returns_nb.cond_value_at_risk_nb(empty_returns), np.full(2, np.nan))
 
     def test_accessor_methods_match_numba(self):
         price = pd.DataFrame(
@@ -1147,22 +1149,14 @@ class TestSignalsRustParity:
         assert signal_dispatch.nth_index_1d(a_1d, 0, engine="rust") == signal_nb.nth_index_1d_nb(a_1d, 0)
         assert signal_dispatch.nth_index_1d(a_1d, -1, engine="rust") == signal_nb.nth_index_1d_nb(a_1d, -1)
         np.testing.assert_array_equal(signal_dispatch.nth_index(a, 1, engine="rust"), signal_nb.nth_index_nb(a, 1))
-        with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index_1d(single_signal, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            signal_nb.norm_avg_index_1d_nb(single_signal)
-        with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(no_signal_cols, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            signal_nb.norm_avg_index_nb(no_signal_cols)
-        with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(empty_rows, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            signal_nb.norm_avg_index_nb(empty_rows)
-        with pytest.raises(ZeroDivisionError):
-            signal_dispatch.norm_avg_index(single_row, engine="rust")
-        with pytest.raises(ZeroDivisionError):
-            signal_nb.norm_avg_index_nb(single_row)
+        assert np.isnan(signal_dispatch.norm_avg_index_1d(single_signal, engine="rust"))
+        assert np.isnan(signal_nb.norm_avg_index_1d_nb(single_signal))
+        np.testing.assert_array_equal(signal_dispatch.norm_avg_index(no_signal_cols, engine="rust"), np.full(2, np.nan))
+        np.testing.assert_array_equal(signal_nb.norm_avg_index_nb(no_signal_cols), np.full(2, np.nan))
+        np.testing.assert_array_equal(signal_dispatch.norm_avg_index(empty_rows, engine="rust"), np.full(2, np.nan))
+        np.testing.assert_array_equal(signal_nb.norm_avg_index_nb(empty_rows), np.full(2, np.nan))
+        np.testing.assert_array_equal(signal_dispatch.norm_avg_index(single_row, engine="rust"), np.full(2, np.nan))
+        np.testing.assert_array_equal(signal_nb.norm_avg_index_nb(single_row), np.full(2, np.nan))
 
     def test_auto_falls_back_for_bad_array(self):
         a = np.array([[1, 0], [0, 1]], dtype=np.int64)

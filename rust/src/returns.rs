@@ -4,7 +4,7 @@
 use crate::generic::{apply_2d_by_col, array1_as_slice_cow, nanstd_1d, reduce_2d_by_col, validate_window};
 use ndarray::{Array2, ArrayView2};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
-use pyo3::exceptions::{PyValueError, PyZeroDivisionError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::cmp::Ordering;
 
@@ -383,6 +383,9 @@ pub(crate) fn cum_returns_final_2d(returns: ArrayView2<'_, f64>, start_value: f6
 }
 
 pub(crate) fn annualized_return_1d(returns: &[f64], ann_factor: f64) -> f64 {
+    if returns.is_empty() {
+        return f64::NAN;
+    }
     let end_value = cum_returns_final_1d(returns, 1.0);
     end_value.powf(ann_factor / returns.len() as f64) - 1.0
 }
@@ -407,6 +410,9 @@ pub(crate) fn annualized_return_2d(returns: ArrayView2<'_, f64>, ann_factor: f64
 }
 
 fn annualized_return_from_product(product: f64, len: usize, ann_factor: f64) -> f64 {
+    if len == 0 {
+        return f64::NAN;
+    }
     product.powf(ann_factor / len as f64) - 1.0
 }
 
@@ -1025,9 +1031,6 @@ pub fn annualized_return_rs<'py>(
     ann_factor: f64,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let returns_arr = returns.as_array();
-    if returns_arr.dim().0 == 0 {
-        return Err(PyZeroDivisionError::new_err("division by zero"));
-    }
     let result = py.allow_threads(|| annualized_return_2d(returns_arr, ann_factor));
     Ok(PyArray1::from_vec_bound(py, result))
 }
@@ -1475,9 +1478,6 @@ pub fn cond_value_at_risk_rs<'py>(
     cutoff: f64,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let returns_arr = returns.as_array();
-    if returns_arr.dim().0 == 0 {
-        return Err(PyZeroDivisionError::new_err("division by zero"));
-    }
     let result = py.allow_threads(|| reduce_2d_by_col(returns_arr, |col| cond_value_at_risk_1d(col, cutoff)));
     Ok(PyArray1::from_vec_bound(py, result))
 }

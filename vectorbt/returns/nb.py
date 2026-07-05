@@ -133,6 +133,8 @@ def annualized_return_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
     """Mean annual growth rate of returns.
 
     This is equivalent to the compound annual growth rate."""
+    if returns.shape[0] == 0:
+        return np.nan
     end_value = cum_returns_final_1d_nb(returns, 1.0)
     return end_value ** (ann_factor / returns.shape[0]) - 1
 
@@ -631,6 +633,8 @@ def rolling_value_at_risk_nb(
 @njit(cache=True)
 def cond_value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
     """Conditional value at risk (CVaR) of a returns stream."""
+    if len(returns) == 0:
+        return np.nan
     cutoff_index = int((len(returns) - 1) * cutoff)
     return np.mean(np.partition(returns, cutoff_index)[: cutoff_index + 1])
 
