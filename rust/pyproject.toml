@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "vectorbt-rust"
-version = "1.0.0"
+version = "1.1.0"
 description = "Rust-accelerated kernels for vectorbt"
 readme = "README.md"
 license = {text = "Apache-2.0 WITH Commons-Clause-1.0"}

@@ -222,5 +222,6 @@ jobs:
     uses: ./.github/workflows/docker.yml
     with:
       ref: ${{ github.event.release.tag_name || github.ref }}
+      version: ${{ github.event.release.tag_name }}
       prerelease: ${{ github.event.release.prerelease || false }}
     secrets: inherit

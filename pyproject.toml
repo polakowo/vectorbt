@@ -48,7 +48,7 @@ dependencies = [
 
 [project.optional-dependencies]
 rust = [
-    "vectorbt-rust==1.0.0",
+    "vectorbt-rust==1.1.0",
 ]
 full = [
     "TA-Lib",

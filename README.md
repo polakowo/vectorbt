@@ -12,38 +12,59 @@
 <br>
 
 <p align="center">
-    <a href="https://pepy.tech/project/vectorbt" title="Downloads">
-        <img src="https://pepy.tech/badge/vectorbt" />
-    </a>
-    <a href="https://github.com/polakowo/vectorbt/stargazers" title="Stars">
-        <img src="https://img.shields.io/github/stars/polakowo/vectorbt?style=flat" />
-    </a>
-    <a href="https://github.com/polakowo/vectorbt/network/members" title="Forks">
-        <img src="https://img.shields.io/github/forks/polakowo/vectorbt?style=flat" />
-    </a>
-    <a href="https://github.com/polakowo/vectorbt/graphs/contributors" title="Contributors">
-        <img src="https://img.shields.io/github/contributors/polakowo/vectorbt?style=flat" />
-    </a>
     <a href="https://pypi.org/project/vectorbt" title="PyPI">
-        <img src="https://img.shields.io/pypi/v/vectorbt?color=blueviolet" />
+        <img src="https://img.shields.io/pypi/v/vectorbt?label=pypi&color=blueviolet" />
     </a>
-    <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" title="License">
-        <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
+    <a href="https://pypi.org/project/vectorbt" title="Supported Python versions">
+        <img src="https://img.shields.io/pypi/pyversions/vectorbt?logo=python&logoColor=white" />
+    </a>
+    <a href="https://pypi.org/project/vectorbt" title="Python implementation">
+        <img src="https://img.shields.io/pypi/implementation/vectorbt?label=implementation&color=3776ab&logo=python&logoColor=white" />
+    </a>
+    <a href="https://pypi.org/project/vectorbt" title="Wheel">
+        <img src="https://img.shields.io/pypi/wheel/vectorbt?color=4c1&logo=python&logoColor=white" />
+    </a>
+    <a href="https://pypi.org/project/vectorbt-rust" title="Rust engine">
+        <img src="https://img.shields.io/pypi/v/vectorbt-rust?label=rust%20engine&color=dea584&logo=rust" />
+    </a>
+    <a href="https://hub.docker.com/r/polakowo/vectorbt" title="Docker image version">
+        <img src="https://img.shields.io/docker/v/polakowo/vectorbt?sort=semver&label=docker&color=2496ed&logo=docker&logoColor=white" />
+    </a>
+    <a href="https://hub.docker.com/r/polakowo/vectorbt" title="Docker pulls">
+        <img src="https://img.shields.io/docker/pulls/polakowo/vectorbt?label=docker%20pulls&color=2496ed&logo=docker&logoColor=white" />
+    </a>
+    <a href="https://pepy.tech/project/vectorbt" title="Downloads">
+        <img src="https://img.shields.io/pepy/dt/vectorbt?label=downloads&color=blue" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/actions/workflows/tests.yml" title="Tests">
+        <img src="https://img.shields.io/github/actions/workflow/status/polakowo/vectorbt/tests.yml?branch=master&label=tests&logo=githubactions&logoColor=white" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/actions/workflows/pypi.yml" title="PyPI release">
+        <img src="https://img.shields.io/github/actions/workflow/status/polakowo/vectorbt/pypi.yml?label=release&logo=githubactions&logoColor=white" />
     </a>
     <a href="https://codecov.io/gh/polakowo/vectorbt" title="codecov">
         <img src="https://codecov.io/gh/polakowo/vectorbt/branch/master/graph/badge.svg?token=YTLNAI7PS3" />
     </a>
     <a href="https://vectorbt.dev/" title="Website">
-        <img src="https://img.shields.io/website?url=https://vectorbt.dev/" />
+        <img src="https://img.shields.io/website?url=https%3A%2F%2Fvectorbt.dev%2F&label=website" />
     </a>
     <a href="https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD?urlpath=lab" title="Launch Binder">
-        <img src="https://img.shields.io/badge/launch-binder-d6604a" />
+        <img src="https://img.shields.io/badge/launch-binder-d6604a?logo=jupyter&logoColor=white" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/stargazers" title="Stars">
+        <img src="https://img.shields.io/github/stars/polakowo/vectorbt?style=flat&color=yellow" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/network/members" title="Forks">
+        <img src="https://img.shields.io/github/forks/polakowo/vectorbt?style=flat&color=blue" />
+    </a>
+    <a href="https://github.com/polakowo/vectorbt/graphs/contributors" title="Contributors">
+        <img src="https://img.shields.io/github/contributors/polakowo/vectorbt?style=flat&color=blue" />
     </a>
     <a href="https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge" title="Join the chat">
-        <img src="https://badges.gitter.im/vectorbt.svg" />
+        <img src="https://img.shields.io/gitter/room/vectorbt/community?logo=gitter&logoColor=white" />
     </a>
-    <a href="https://pypi.org/project/vectorbt" title="Supported Python versions">
-        <img src="https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white" />
+    <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" title="License">
+        <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
     </a>
 </p>
 
