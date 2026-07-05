@@ -1801,6 +1801,10 @@ class TestRecordsRustParity:
             records_dispatch.top_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.top_n_inout_map_nb, 2),
         )
+        np.testing.assert_array_equal(
+            records_dispatch.top_n_mapped_mask(mapped_arr, cm, 0, engine="rust"),
+            np.zeros(mapped_arr.shape, dtype=np.bool_),
+        )
 
     def test_top_n_mapped_mask_nan(self):
         mapped_arr = np.array([np.nan, np.nan, 12.0, 13.0, np.nan, 13.0, np.nan, np.nan, np.nan], dtype=np.float64)
@@ -1818,6 +1822,10 @@ class TestRecordsRustParity:
         np.testing.assert_array_equal(
             records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 2, engine="rust"),
             records_nb.mapped_to_mask_nb(mapped_arr, cm, records_nb.bottom_n_inout_map_nb, 2),
+        )
+        np.testing.assert_array_equal(
+            records_dispatch.bottom_n_mapped_mask(mapped_arr, cm, 0, engine="rust"),
+            np.zeros(mapped_arr.shape, dtype=np.bool_),
         )
 
     def test_bottom_n_mapped_mask_nan(self):
