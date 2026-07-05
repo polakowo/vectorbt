@@ -90,9 +90,7 @@ jobs:
           images: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag,suffix=${{ matrix.tag_suffix }}
             type=semver,pattern={{version}}${{ matrix.tag_suffix }}
-            type=semver,pattern={{raw}}${{ matrix.tag_suffix }},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=semver,pattern={{version}}${{ matrix.tag_suffix }},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=${{ matrix.latest_tag }},enable=${{ !inputs.prerelease }}
 
