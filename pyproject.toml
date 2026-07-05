@@ -59,7 +59,7 @@ full = [
     "ray>=1.4.1",
     "ta",
     "pandas-ta-classic",
-    "python-telegram-bot>=13.4,<20.0",
+    "python-telegram-bot>=13.4",
     "quantstats>=0.0.37",
 ]
 test = [

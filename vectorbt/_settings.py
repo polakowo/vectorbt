@@ -690,7 +690,7 @@ Settings applied across `vectorbt.messaging`.
     
     Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
     For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
-    `telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
+    `telegram.ext.Updater` / `telegram.ext.ApplicationBuilder` and polling.
 
 * giphy:
     Settings applied to [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).

@@ -13,16 +13,8 @@ try:
 except ImportError:
     __blacklist__.append("telegram")
 else:
-    try:
-        from telegram import __version_info__
-    except ImportError:
-        __version_info__ = (0, 0)
+    from vectorbt.messaging.telegram import TelegramBot
 
-    if __version_info__ >= (20, 0):
-        __blacklist__.append("telegram")
-    else:
-        from vectorbt.messaging.telegram import TelegramBot
-
-        __all__.append("TelegramBot")
+    __all__.append("TelegramBot")
 
 __pdoc__ = {k: False for k in __all__}
