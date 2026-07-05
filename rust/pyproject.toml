@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
+requires = ["maturin>=1.14,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -11,15 +11,15 @@ license = {text = "Apache-2.0 WITH Commons-Clause-1.0"}
 authors = [
     {name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro"}
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.15"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Rust",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-dependencies = ["numpy>=1.23"]
+dependencies = ["numpy>=2.4.6"]
 
 [project.urls]
 Homepage = "https://github.com/polakowo/vectorbt"

@@ -541,7 +541,8 @@ class TestMappedArray:
 
     def test_idxmin(self):
         assert mapped_array["a"].idxmin() == mapped_array["a"].to_pd().idxmin()
-        pd.testing.assert_series_equal(mapped_array.idxmin(), mapped_array.to_pd().idxmin().rename("idxmin"))
+        expected = mapped_array.to_pd().apply(lambda sr: sr.idxmin() if sr.notna().any() else np.nan).rename("idxmin")
+        pd.testing.assert_series_equal(mapped_array.idxmin(), expected)
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmin(),
             pd.Series(np.array(["x", "z"], dtype=object), index=pd.Index(["g1", "g2"], dtype="object")).rename(
@@ -551,7 +552,8 @@ class TestMappedArray:
 
     def test_idxmax(self):
         assert mapped_array["a"].idxmax() == mapped_array["a"].to_pd().idxmax()
-        pd.testing.assert_series_equal(mapped_array.idxmax(), mapped_array.to_pd().idxmax().rename("idxmax"))
+        expected = mapped_array.to_pd().apply(lambda sr: sr.idxmax() if sr.notna().any() else np.nan).rename("idxmax")
+        pd.testing.assert_series_equal(mapped_array.idxmax(), expected)
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmax(),
             pd.Series(np.array(["y", "x"], dtype=object), index=pd.Index(["g1", "g2"], dtype="object")).rename(

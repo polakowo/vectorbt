@@ -10,6 +10,7 @@ one can manipulate complex classes with dozens of pandas objects using a single 
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_object_dtype, is_string_dtype
 
 from vectorbt import _typing as tp
 from vectorbt.base import index_fns, reshape_fns
@@ -165,7 +166,7 @@ class ParamLoc(LocBase):
     def __init__(self, mapper: tp.Series, indexing_func: tp.Callable, level_name: tp.Level = None, **kwargs) -> None:
         checks.assert_instance_of(mapper, pd.Series)
 
-        if mapper.dtype == "O":
+        if is_object_dtype(mapper.dtype):
             # If params are objects, we must cast them to string first
             # The original mapper isn't touched
             # Normalize numpy scalars to Python scalars for consistent string representation
@@ -187,7 +188,7 @@ class ParamLoc(LocBase):
 
     def get_indices(self, key: tp.Any) -> tp.Array1d:
         """Get array of indices affected by this key."""
-        if self.mapper.dtype == "O":
+        if is_object_dtype(self.mapper.dtype) or is_string_dtype(self.mapper.dtype):
             # We must also cast the key to string
             # Normalize numpy scalars to Python scalars for consistent string representation
             if isinstance(key, slice):
@@ -201,7 +202,10 @@ class ParamLoc(LocBase):
                 key = str(_normalize_numpy_scalars(key))
         # Use pandas to perform indexing
         mapper = pd.Series(np.arange(len(self.mapper.index)), index=self.mapper.values)
-        indices = mapper.loc.__getitem__(key)
+        if isinstance(key, (slice, list, np.ndarray)):
+            indices = mapper.loc.__getitem__(key)
+        else:
+            indices = mapper.loc[[key]]
         if isinstance(indices, pd.Series):
             indices = indices.values
         return indices

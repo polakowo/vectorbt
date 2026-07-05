@@ -90,8 +90,10 @@ def apply_mapping(
                 k = key_func(k)
             new_mapping[k] = v
 
-    def _compatible_types(x_type: type, item: tp.Any = None) -> bool:
+    def compatible_types(x_type: type, item: tp.Any = None) -> bool:
         if item is not None:
+            if isinstance(x_type, pd.StringDtype) or str(x_type) == "str":
+                x_type = str
             if np.dtype(x_type) == "O":
                 x_type = type(item)
         for y_type in ignore_type:
@@ -99,8 +101,10 @@ def apply_mapping(
                 return False
             if x_type is y_type:
                 return True
-            x_dtype = np.dtype(x_type)
             y_dtype = np.dtype(y_type)
+            if isinstance(x_type, pd.StringDtype) or str(x_type) == "str":
+                return np.issubdtype(y_dtype, np.flexible)
+            x_dtype = np.dtype(x_type)
             if x_dtype is y_dtype:
                 return True
             if np.issubdtype(x_dtype, np.integer) and np.issubdtype(y_dtype, np.integer):
@@ -113,7 +117,7 @@ def apply_mapping(
                 return True
         return False
 
-    def _converter(x: tp.Any) -> tp.Any:
+    def convert_value(x: tp.Any) -> tp.Any:
         if pd.isnull(x):
             return na_sentinel
         if isinstance(x, str):
@@ -143,33 +147,52 @@ def apply_mapping(
     if isinstance(obj, np.ndarray):
         if obj.size == 0:
             return obj
-        if ignore_type is None or not _compatible_types(obj.dtype, obj.item(0)):
+        if ignore_type is None or not compatible_types(obj.dtype, obj.item(0)):
             if obj.ndim == 1:
-                return pd.Series(obj).map(_converter).values
-            return np.vectorize(_converter)(obj)
+                out = pd.Series(obj).map(convert_value)
+                if na_sentinel is None:
+                    out = out.astype(object).where(~out.isna(), None)
+                return out.to_numpy(dtype=object)
+            out = np.vectorize(convert_value, otypes=[object])(obj)
+            if na_sentinel is None:
+                out[pd.isna(out)] = None
+            return out
         return obj
     if isinstance(obj, pd.Series):
         if obj.size == 0:
             return obj
-        if ignore_type is None or not _compatible_types(obj.dtype, obj.iloc[0]):
-            return obj.map(_converter)
+        if ignore_type is None or not compatible_types(obj.dtype, obj.iloc[0]):
+            out = obj.map(convert_value)
+            if na_sentinel is None:
+                out = out.astype(object).where(~out.isna(), None)
+            return out
         return obj
     if isinstance(obj, pd.Index):
         if obj.size == 0:
             return obj
-        if ignore_type is None or not _compatible_types(obj.dtype, obj[0]):
-            return obj.map(_converter)
+        if ignore_type is None or not compatible_types(obj.dtype, obj[0]):
+            out = obj.map(convert_value)
+            if na_sentinel is None:
+                out = pd.Index(
+                    [None if pd.isna(value) else value for value in out.astype(object)],
+                    dtype=object,
+                    name=out.name,
+                )
+            return out
         return obj
     if isinstance(obj, pd.DataFrame):
         if obj.size == 0:
             return obj
         series = []
         for sr_name, sr in obj.items():
-            if ignore_type is None or not _compatible_types(sr.dtype, sr.iloc[0]):
-                series.append(sr.map(_converter))
+            if ignore_type is None or not compatible_types(sr.dtype, sr.iloc[0]):
+                out = sr.map(convert_value)
+                if na_sentinel is None:
+                    out = out.astype(object).where(~out.isna(), None)
+                series.append(out)
             else:
                 series.append(sr)
         return pd.concat(series, axis=1, keys=obj.columns)
-    if ignore_type is None or not _compatible_types(type(obj)):
-        return _converter(obj)
+    if ignore_type is None or not compatible_types(type(obj)):
+        return convert_value(obj)
     return obj

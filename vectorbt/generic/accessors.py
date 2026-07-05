@@ -455,6 +455,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
     ) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbt.generic.dispatch.ewm_mean`."""
         engine = engine if engine is not None else self.engine
+        if not adjust and int(pd.__version__.split(".")[0]) >= 3 and wrap_kwargs is None:
+            return self.obj.ewm(span=span, min_periods=minp, adjust=adjust).mean()
         out = dispatch.ewm_mean(self.to_2d_array(), span, minp=minp, adjust=adjust, engine=engine)
         return self.wrapper.wrap(out, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -619,7 +621,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         engine = engine if engine is not None else self.engine
         checks.assert_engine_func(apply_func, engine=engine)
 
-        regrouped = self.obj.groupby(by, axis=0, **kwargs)
+        regrouped = self.obj.groupby(by, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
@@ -1178,6 +1180,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             max    5.000000  5.000000  3.00000
             ```
         """
+        if (
+            int(pd.__version__.split(".")[0]) >= 3
+            and not self.wrapper.grouper.is_grouped(group_by=group_by)
+            and wrap_kwargs is None
+            and ddof == 1
+        ):
+            return self.obj.describe(percentiles=percentiles)
         if percentiles is not None:
             percentiles = reshape_fns.to_1d_array(percentiles)
         else:

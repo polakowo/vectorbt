@@ -9,7 +9,7 @@ large spaces of hyperparameters, concatenating the results of each hyperparamete
 a single DataFrame is important. All functions are available in both Python and Numba-compiled form."""
 
 import numpy as np
-from numba import njit
+from numba import njit, literal_unroll
 from tqdm.auto import tqdm
 
 from vectorbt import _typing as tp
@@ -127,7 +127,7 @@ def to_2d_multiple_nb(a: tp.Iterable[tp.Array]) -> tp.List[tp.Array2d]:
         * `a` must be strictly homogeneous
     """
     lst = list()
-    for _a in a:
+    for _a in literal_unroll(a):
         lst.append(to_2d_one_nb(_a))
     return lst
 
@@ -210,9 +210,13 @@ def combine_multiple_nb(objs: tp.Sequence, combine_func_nb: tp.Callable, *args) 
         * `objs` must be strictly homogeneous
         * No support for `**kwargs`
     """
+    first = True
     result = objs[0]
-    for i in range(1, len(objs)):
-        result = combine_func_nb(result, objs[i], *args)
+    for obj in literal_unroll(objs):
+        if first:
+            first = False
+        else:
+            result = combine_func_nb(result, obj, *args)
     return result
 
 

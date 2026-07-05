@@ -10,11 +10,11 @@ name = "vectorbt_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["extension-module"] }
-numpy = "0.22"
-ndarray = "0.16"
-rand = "0.9"
-rand_chacha = "0.9"
+pyo3 = { version = "0.29", features = ["extension-module"] }
+numpy = "0.29"
+ndarray = "0.17"
+rand = "0.10"
+rand_chacha = "0.10"
 
 [profile.release]
 lto = true

@@ -20,6 +20,8 @@ def freq_to_timedelta(arg: tp.FrequencyLike) -> pd.Timedelta:
     if isinstance(arg, str) and not arg[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
         return pd.Timedelta(1, unit=arg)
+    if isinstance(arg, pd.DateOffset):
+        return pd.Timedelta(arg.nanos)
     return pd.Timedelta(arg)
 
 

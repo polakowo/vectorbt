@@ -16,36 +16,36 @@ mod signals;
 fn vectorbt_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
-    let generic = PyModule::new_bound(m.py(), "generic")?;
+    let generic = PyModule::new(m.py(), "generic")?;
     generic::register(&generic)?;
     m.add_submodule(&generic)?;
 
-    let indicators = PyModule::new_bound(m.py(), "indicators")?;
+    let indicators = PyModule::new(m.py(), "indicators")?;
     indicators::register(&indicators)?;
     m.add_submodule(&indicators)?;
 
-    let labels = PyModule::new_bound(m.py(), "labels")?;
+    let labels = PyModule::new(m.py(), "labels")?;
     labels::register(&labels)?;
     m.add_submodule(&labels)?;
 
-    let returns = PyModule::new_bound(m.py(), "returns")?;
+    let returns = PyModule::new(m.py(), "returns")?;
     returns::register(&returns)?;
     m.add_submodule(&returns)?;
 
-    let records = PyModule::new_bound(m.py(), "records")?;
+    let records = PyModule::new(m.py(), "records")?;
     records::register(&records)?;
     m.add_submodule(&records)?;
 
-    let portfolio = PyModule::new_bound(m.py(), "portfolio")?;
+    let portfolio = PyModule::new(m.py(), "portfolio")?;
     portfolio::register(&portfolio)?;
     m.add_submodule(&portfolio)?;
 
-    let signals = PyModule::new_bound(m.py(), "signals")?;
+    let signals = PyModule::new(m.py(), "signals")?;
     signals::register(&signals)?;
     m.add_submodule(&signals)?;
 
     // Register submodules in sys.modules so `from vectorbt_rust.<mod> import ...` works
-    let sys = m.py().import_bound("sys")?;
+    let sys = m.py().import("sys")?;
     let modules = sys.getattr("modules")?;
     modules.set_item("vectorbt_rust.generic", generic)?;
     modules.set_item("vectorbt_rust.indicators", indicators)?;

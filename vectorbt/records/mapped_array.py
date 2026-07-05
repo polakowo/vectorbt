@@ -973,6 +973,13 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         **kwargs,
     ) -> tp.SeriesFrame:
         """Return statistics by column/group."""
+        if (
+            int(pd.__version__.split(".")[0]) >= 3
+            and not self.wrapper.grouper.is_grouped(group_by=group_by)
+            and wrap_kwargs is None
+            and ddof == 1
+        ):
+            return self.to_pd().describe(percentiles=percentiles)
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
         else:
@@ -995,7 +1002,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             **kwargs,
         )
         if isinstance(out, pd.DataFrame):
-            out.loc["count"].fillna(0.0, inplace=True)
+            out.loc["count"] = out.loc["count"].fillna(0.0)
         else:
             if np.isnan(out.loc["count"]):
                 out.loc["count"] = 0.0

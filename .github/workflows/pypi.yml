@@ -79,9 +79,6 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            python-version: "3.10"
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
             python-version: "3.11"
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -90,8 +87,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
             python-version: "3.13"
           - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            python-version: "3.10"
+            target: x86_64-unknown-linux-gnu
+            python-version: "3.14"
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             python-version: "3.11"
@@ -101,9 +98,9 @@ jobs:
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             python-version: "3.13"
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            python-version: "3.10"
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            python-version: "3.14"
           - os: macos-latest
             target: x86_64-apple-darwin
             python-version: "3.11"
@@ -114,8 +111,8 @@ jobs:
             target: x86_64-apple-darwin
             python-version: "3.13"
           - os: macos-latest
-            target: aarch64-apple-darwin
-            python-version: "3.10"
+            target: x86_64-apple-darwin
+            python-version: "3.14"
           - os: macos-latest
             target: aarch64-apple-darwin
             python-version: "3.11"
@@ -125,9 +122,9 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             python-version: "3.13"
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            python-version: "3.10"
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            python-version: "3.14"
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             python-version: "3.11"
@@ -137,6 +134,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             python-version: "3.13"
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            python-version: "3.14"
 
     steps:
       - name: Checkout release tag

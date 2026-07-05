@@ -27,8 +27,8 @@ pub fn shuffle_1d_rs<'py>(
     seed: Option<u64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| shuffle_1d(a_cow.as_ref(), seed));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| shuffle_1d(a_cow.as_ref(), seed));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -39,7 +39,7 @@ pub fn shuffle_rs<'py>(
     seed: Option<u64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         let (nrows, ncols) = a_arr.dim();
         let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
         let mut col_buf = vec![0.0f64; nrows];
@@ -73,7 +73,7 @@ pub fn shuffle_rs<'py>(
         }
         out
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[repr(C)]
@@ -101,10 +101,10 @@ impl RangeRecord {
 unsafe impl Element for RangeRecord {
     const IS_COPY: bool = true;
 
-    fn get_dtype_bound(py: Python<'_>) -> Bound<'_, PyArrayDescr> {
-        py.import_bound("vectorbt.generic.enums")
+    fn get_dtype(py: Python<'_>) -> Bound<'_, PyArrayDescr> {
+        py.import("vectorbt.generic.enums")
             .and_then(|m| m.getattr("range_dt"))
-            .and_then(|dt| Ok(dt.downcast_into::<PyArrayDescr>()?))
+            .and_then(|dt| Ok(dt.cast_into::<PyArrayDescr>()?))
             .expect("vectorbt.generic.enums.range_dt must be a NumPy dtype")
     }
 
@@ -135,10 +135,10 @@ pub struct DrawdownRecord {
 unsafe impl Element for DrawdownRecord {
     const IS_COPY: bool = true;
 
-    fn get_dtype_bound(py: Python<'_>) -> Bound<'_, PyArrayDescr> {
-        py.import_bound("vectorbt.generic.enums")
+    fn get_dtype(py: Python<'_>) -> Bound<'_, PyArrayDescr> {
+        py.import("vectorbt.generic.enums")
             .and_then(|m| m.getattr("drawdown_dt"))
-            .and_then(|dt| Ok(dt.downcast_into::<PyArrayDescr>()?))
+            .and_then(|dt| Ok(dt.cast_into::<PyArrayDescr>()?))
             .expect("vectorbt.generic.enums.drawdown_dt must be a NumPy dtype")
     }
 
@@ -2027,13 +2027,13 @@ macro_rules! export_1d_array {
             $($arg: $argty,)*
         ) -> PyResult<Bound<'py, PyArray1<f64>>> {
             let result = match a.as_slice() {
-                Ok(a_slice) => py.allow_threads(|| $kernel(a_slice, $($arg),*)),
+                Ok(a_slice) => py.detach(|| $kernel(a_slice, $($arg),*)),
                 Err(_) => {
                     let a_vec = a.as_array().iter().copied().collect::<Vec<_>>();
-                    py.allow_threads(|| $kernel(&a_vec, $($arg),*))
+                    py.detach(|| $kernel(&a_vec, $($arg),*))
                 }
             };
-            Ok(PyArray1::from_vec_bound(py, result))
+            Ok(PyArray1::from_vec(py, result))
         }
     };
 }
@@ -2047,8 +2047,8 @@ pub fn set_by_mask_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_cow = array1_as_slice_cow(&a);
     let mask_cow = array1_as_slice_cow(&mask);
-    let result = py.allow_threads(|| set_by_mask_1d(a_cow.as_ref(), mask_cow.as_ref(), value));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| set_by_mask_1d(a_cow.as_ref(), mask_cow.as_ref(), value));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2061,7 +2061,7 @@ pub fn set_by_mask_rs<'py>(
     let a_arr = a.as_array();
     let mask_arr = mask.as_array();
     let (nrows, ncols) = a_arr.dim();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() && mask_arr.is_standard_layout() {
             let a_slice = a_arr.as_slice().expect("standard-layout array must be sliceable");
             let mask_slice = mask_arr.as_slice().expect("standard-layout array must be sliceable");
@@ -2080,7 +2080,7 @@ pub fn set_by_mask_rs<'py>(
         }
         out
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(fillna_1d_rs, fillna_1d, value: f64);
@@ -2095,8 +2095,8 @@ pub fn set_by_mask_mult_1d_rs<'py>(
     let a_cow = array1_as_slice_cow(&a);
     let mask_cow = array1_as_slice_cow(&mask);
     let values_cow = array1_as_slice_cow(&values);
-    let result = py.allow_threads(|| set_by_mask_mult_1d(a_cow.as_ref(), mask_cow.as_ref(), values_cow.as_ref()));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| set_by_mask_mult_1d(a_cow.as_ref(), mask_cow.as_ref(), values_cow.as_ref()));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 export_1d_array!(bshift_1d_rs, bshift_1d, n: usize, fill_value: f64);
@@ -2112,7 +2112,7 @@ pub fn set_by_mask_mult_rs<'py>(
     let mask_arr = mask.as_array();
     let values_arr = values.as_array();
     let (nrows, ncols) = a_arr.dim();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() && mask_arr.is_standard_layout() && values_arr.is_standard_layout() {
             let a_slice = a_arr.as_slice().expect("standard-layout array must be sliceable");
             let mask_slice = mask_arr.as_slice().expect("standard-layout array must be sliceable");
@@ -2137,7 +2137,7 @@ pub fn set_by_mask_mult_rs<'py>(
         }
         out
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(fshift_1d_rs, fshift_1d, n: usize, fill_value: f64);
@@ -2149,14 +2149,14 @@ pub fn fillna_rs<'py>(
     value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             fillna_2d_c(a_arr, value)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| fillna_1d_into(col, out, value))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(diff_1d_rs, diff_1d, n: usize);
@@ -2169,14 +2169,14 @@ pub fn bshift_rs<'py>(
     fill_value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             bshift_2d_c(a_arr, n, fill_value)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| bshift_1d_into(col, out, n, fill_value))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(pct_change_1d_rs, pct_change_1d, n: usize);
@@ -2189,14 +2189,14 @@ pub fn fshift_rs<'py>(
     fill_value: f64,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             fshift_2d_c(a_arr, n, fill_value)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| fshift_1d_into(col, out, n, fill_value))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(bfill_1d_rs, bfill_1d);
@@ -2204,14 +2204,14 @@ export_1d_array!(bfill_1d_rs, bfill_1d);
 #[pyfunction]
 pub fn diff_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>, n: usize) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             diff_2d_c(a_arr, n)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| diff_1d_into(col, out, n))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(ffill_1d_rs, ffill_1d);
@@ -2223,98 +2223,98 @@ pub fn pct_change_rs<'py>(
     n: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             pct_change_2d_c(a_arr, n)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| pct_change_1d_into(col, out, n))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn bfill_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             bfill_2d_c(a_arr)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| bfill_1d_into(col, out))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn ffill_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             ffill_2d_c(a_arr)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| ffill_1d_into(col, out))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn nanprod_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nanprod_2d_c(a_arr)
         } else {
             reduce_2d_by_col(a_arr, nanprod_1d)
         }
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nancumsum_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nancumsum_2d_c(a_arr)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| nancumsum_1d_into(col, out))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn nancumprod_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nancumprod_2d_c(a_arr)
         } else {
             apply_2d_by_col_inplace(a_arr, |col, out| nancumprod_1d_into(col, out))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn nansum_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nansum_2d_c(a_arr)
         } else {
             reduce_2d_by_col(a_arr, nansum_1d)
         }
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nancnt_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nancnt_2d_c(a_arr)
         } else {
@@ -2330,41 +2330,41 @@ pub fn nancnt_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResul
             out
         }
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nanmin_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmin_1d));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| reduce_2d_by_col(a_arr, nanmin_1d));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nanmax_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmax_1d));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| reduce_2d_by_col(a_arr, nanmax_1d));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nanmean_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nanmean_2d_c(a_arr)
         } else {
             reduce_2d_by_col(a_arr, nanmean_1d)
         }
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
 pub fn nanmedian_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| reduce_2d_by_col(a_arr, nanmedian_1d));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| reduce_2d_by_col(a_arr, nanmedian_1d));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2380,14 +2380,14 @@ pub fn nanstd_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             nanstd_2d_c(a_arr, ddof)
         } else {
             reduce_2d_by_col(a_arr, |col| nanstd_1d(col, ddof))
         }
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2401,8 +2401,8 @@ pub fn rolling_min_1d_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| rolling_min_1d(a_cow.as_ref(), window, minp));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| rolling_min_1d(a_cow.as_ref(), window, minp));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2416,8 +2416,8 @@ pub fn rolling_min_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_min_1d(col, window, minp)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| rolling_min_1d(col, window, minp)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2431,8 +2431,8 @@ pub fn rolling_max_1d_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| rolling_max_1d(a_cow.as_ref(), window, minp));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| rolling_max_1d(a_cow.as_ref(), window, minp));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2446,8 +2446,8 @@ pub fn rolling_max_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| rolling_max_1d(col, window, minp)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| rolling_max_1d(col, window, minp)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2461,8 +2461,8 @@ pub fn rolling_mean_1d_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| rolling_mean_1d(a_cow.as_ref(), window, minp));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| rolling_mean_1d(a_cow.as_ref(), window, minp));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2476,14 +2476,14 @@ pub fn rolling_mean_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             rolling_mean_2d_c(a_arr, window, minp)
         } else {
             apply_2d_by_col(a_arr, |col| rolling_mean_1d(col, window, minp))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2498,8 +2498,8 @@ pub fn rolling_std_1d_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| rolling_std_1d(a_cow.as_ref(), window, minp, ddof));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| rolling_std_1d(a_cow.as_ref(), window, minp, ddof));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2514,14 +2514,14 @@ pub fn rolling_std_rs<'py>(
     let minp = minp.unwrap_or(window);
     validate_window(minp, window, "window")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             rolling_std_2d_c(a_arr, window, minp, ddof)
         } else {
             apply_2d_by_col(a_arr, |col| rolling_std_1d(col, window, minp, ddof))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2535,8 +2535,8 @@ pub fn ewm_mean_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     validate_window(minp, span, "span")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| ewm_mean_1d(a_cow.as_ref(), span, minp, adjust));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| ewm_mean_1d(a_cow.as_ref(), span, minp, adjust));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2550,8 +2550,8 @@ pub fn ewm_mean_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     validate_window(minp, span, "span")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_mean_1d(col, span, minp, adjust)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| ewm_mean_1d(col, span, minp, adjust)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 export_1d_array!(expanding_min_1d_rs, expanding_min_1d, minp: usize);
@@ -2568,8 +2568,8 @@ pub fn ewm_std_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     validate_window(minp, span, "span")?;
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| ewm_std_1d(a_cow.as_ref(), span, minp, adjust, ddof));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| ewm_std_1d(a_cow.as_ref(), span, minp, adjust, ddof));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 export_1d_array!(expanding_max_1d_rs, expanding_max_1d, minp: usize);
@@ -2586,8 +2586,8 @@ pub fn ewm_std_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     validate_window(minp, span, "span")?;
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| ewm_std_1d(col, span, minp, adjust, ddof)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| ewm_std_1d(col, span, minp, adjust, ddof)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2597,8 +2597,8 @@ pub fn expanding_min_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| expanding_min_1d(col, minp)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| expanding_min_1d(col, minp)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2608,8 +2608,8 @@ pub fn expanding_max_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| apply_2d_by_col(a_arr, |col| expanding_max_1d(col, minp)));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| apply_2d_by_col(a_arr, |col| expanding_max_1d(col, minp)));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2619,8 +2619,8 @@ pub fn expanding_mean_1d_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| expanding_mean_1d(a_cow.as_ref(), minp));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| expanding_mean_1d(a_cow.as_ref(), minp));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2630,14 +2630,14 @@ pub fn expanding_mean_rs<'py>(
     minp: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             expanding_mean_2d_c(a_arr, minp)
         } else {
             apply_2d_by_col(a_arr, |col| expanding_mean_1d(col, minp))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2648,8 +2648,8 @@ pub fn expanding_std_1d_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_cow = array1_as_slice_cow(&a);
-    let result = py.allow_threads(|| expanding_std_1d(a_cow.as_ref(), minp, ddof));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| expanding_std_1d(a_cow.as_ref(), minp, ddof));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2660,21 +2660,21 @@ pub fn expanding_std_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if a_arr.is_standard_layout() {
             expanding_std_2d_c(a_arr, minp, ddof)
         } else {
             apply_2d_by_col(a_arr, |col| expanding_std_1d(col, minp, ddof))
         }
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
 pub fn flatten_forder_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, f64>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| flatten_forder(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| flatten_forder(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2687,8 +2687,8 @@ pub fn flatten_grouped_rs<'py>(
     let a_arr = a.as_array();
     let group_lens_cow = array1_as_slice_cow(&group_lens);
     let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
-    let result = py.allow_threads(|| flatten_grouped(a_arr, &group_lens_vec, in_c_order));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| flatten_grouped(a_arr, &group_lens_vec, in_c_order));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2701,8 +2701,8 @@ pub fn flatten_uniform_grouped_rs<'py>(
     let a_arr = a.as_array();
     let group_lens_cow = array1_as_slice_cow(&group_lens);
     let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
-    let result = py.allow_threads(|| flatten_uniform_grouped(a_arr, &group_lens_vec, in_c_order));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| flatten_uniform_grouped(a_arr, &group_lens_vec, in_c_order));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2784,8 +2784,8 @@ pub fn describe_reduce_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_cow = array1_as_slice_cow(&a);
     let perc_cow = array1_as_slice_cow(&perc);
-    let result = py.allow_threads(|| describe_reduce_1d(a_cow.as_ref(), perc_cow.as_ref(), ddof));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| describe_reduce_1d(a_cow.as_ref(), perc_cow.as_ref(), ddof));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2798,8 +2798,8 @@ pub fn value_counts_rs<'py>(
     let codes_arr = codes.as_array();
     let group_lens_cow = array1_as_slice_cow(&group_lens);
     let group_lens_vec = validate_group_lens(group_lens_cow.as_ref())?;
-    let result = py.allow_threads(|| value_counts(codes_arr, n_uniques, &group_lens_vec))?;
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| value_counts(codes_arr, n_uniques, &group_lens_vec))?;
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2833,8 +2833,8 @@ pub fn find_ranges_rs<'py>(
     gap_value: f64,
 ) -> PyResult<Bound<'py, PyArray1<RangeRecord>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| find_ranges(a_arr, gap_value));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| find_ranges(a_arr, gap_value));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2847,8 +2847,8 @@ pub fn range_duration_rs<'py>(
     let start_idx_cow = array1_as_slice_cow(&start_idx);
     let end_idx_cow = array1_as_slice_cow(&end_idx);
     let status_cow = array1_as_slice_cow(&status);
-    let result = py.allow_threads(|| range_duration(start_idx_cow.as_ref(), end_idx_cow.as_ref(), status_cow.as_ref()));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| range_duration(start_idx_cow.as_ref(), end_idx_cow.as_ref(), status_cow.as_ref()));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2868,7 +2868,7 @@ pub fn range_coverage_rs<'py>(
     let col_idxs_cow = array1_as_slice_cow(&col_map.0);
     let col_lens_cow = array1_as_slice_cow(&col_map.1);
     let index_lens_cow = array1_as_slice_cow(&index_lens);
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         range_coverage(
             start_idx_cow.as_ref(),
             end_idx_cow.as_ref(),
@@ -2880,7 +2880,7 @@ pub fn range_coverage_rs<'py>(
             normalize,
         )
     })?;
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2897,7 +2897,7 @@ pub fn ranges_to_mask_rs<'py>(
     let status_cow = array1_as_slice_cow(&status);
     let col_idxs_cow = array1_as_slice_cow(&col_map.0);
     let col_lens_cow = array1_as_slice_cow(&col_map.1);
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         ranges_to_mask(
             start_idx_cow.as_ref(),
             end_idx_cow.as_ref(),
@@ -2907,7 +2907,7 @@ pub fn ranges_to_mask_rs<'py>(
             index_len,
         )
     })?;
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -2916,8 +2916,8 @@ pub fn get_drawdowns_rs<'py>(
     a: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray1<DrawdownRecord>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| get_drawdowns(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| get_drawdowns(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2931,7 +2931,7 @@ pub fn dd_drawdown_rs<'py>(
     let peak_val_slice = peak_val_cow.as_ref();
     let valley_val_slice = valley_val_cow.as_ref();
     let out_len = broadcast_len2(peak_val_slice.len(), valley_val_slice.len())?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         (0..out_len)
             .map(|i| {
                 let peak = broadcast_get(peak_val_slice, i);
@@ -2940,7 +2940,7 @@ pub fn dd_drawdown_rs<'py>(
             })
             .collect::<Vec<f64>>()
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2954,7 +2954,7 @@ pub fn dd_decline_duration_rs<'py>(
     let start_idx_slice = start_idx_cow.as_ref();
     let valley_idx_slice = valley_idx_cow.as_ref();
     let out_len = broadcast_len2(start_idx_slice.len(), valley_idx_slice.len())?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         (0..out_len)
             .map(|i| {
                 let start = broadcast_get(start_idx_slice, i);
@@ -2963,7 +2963,7 @@ pub fn dd_decline_duration_rs<'py>(
             })
             .collect::<Vec<i64>>()
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -2977,7 +2977,7 @@ pub fn dd_recovery_duration_rs<'py>(
     let valley_idx_slice = valley_idx_cow.as_ref();
     let end_idx_slice = end_idx_cow.as_ref();
     let out_len = broadcast_len2(valley_idx_slice.len(), end_idx_slice.len())?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         (0..out_len)
             .map(|i| {
                 let valley = broadcast_get(valley_idx_slice, i);
@@ -2986,7 +2986,7 @@ pub fn dd_recovery_duration_rs<'py>(
             })
             .collect::<Vec<i64>>()
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -3003,7 +3003,7 @@ pub fn dd_recovery_duration_ratio_rs<'py>(
     let valley_idx_slice = valley_idx_cow.as_ref();
     let end_idx_slice = end_idx_cow.as_ref();
     let out_len = broadcast_len3(start_idx_slice.len(), valley_idx_slice.len(), end_idx_slice.len())?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         (0..out_len)
             .map(|i| {
                 let start = broadcast_get(start_idx_slice, i);
@@ -3013,7 +3013,7 @@ pub fn dd_recovery_duration_ratio_rs<'py>(
             })
             .collect::<Vec<f64>>()
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -3027,7 +3027,7 @@ pub fn dd_recovery_return_rs<'py>(
     let valley_val_slice = valley_val_cow.as_ref();
     let end_val_slice = end_val_cow.as_ref();
     let out_len = broadcast_len2(valley_val_slice.len(), end_val_slice.len())?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         (0..out_len)
             .map(|i| {
                 let valley = broadcast_get(valley_val_slice, i);
@@ -3036,7 +3036,7 @@ pub fn dd_recovery_return_rs<'py>(
             })
             .collect::<Vec<f64>>()
     });
-    Ok(PyArray1::from_vec_bound(py, result))
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -3048,8 +3048,8 @@ pub fn crossed_above_1d_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<bool>>> {
     let arr1_cow = array1_as_slice_cow(&arr1);
     let arr2_cow = array1_as_slice_cow(&arr2);
-    let result = py.allow_threads(|| crossed_above_1d(arr1_cow.as_ref(), arr2_cow.as_ref(), wait));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| crossed_above_1d(arr1_cow.as_ref(), arr2_cow.as_ref(), wait));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -3062,7 +3062,7 @@ pub fn crossed_above_rs<'py>(
     let arr1_arr = arr1.as_array();
     let arr2_arr = arr2.as_array();
     let (nrows, ncols) = arr1_arr.dim();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         let mut out = Array2::<bool>::from_elem((nrows, ncols), false);
         for col in 0..ncols {
             let col1 = arr1_arr.column(col);
@@ -3090,7 +3090,7 @@ pub fn crossed_above_rs<'py>(
         }
         out
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

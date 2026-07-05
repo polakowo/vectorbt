@@ -7,8 +7,8 @@ use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyAr
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::seq::index::sample;
-use rand::Rng;
 use rand::SeedableRng;
+use rand::{Rng, RngExt};
 use rand_chacha::ChaCha8Rng;
 
 pub(crate) fn clean_enex_1d(entries: &[bool], exits: &[bool], entry_first: bool) -> (Vec<bool>, Vec<bool>) {
@@ -1431,12 +1431,8 @@ pub fn clean_enex_1d_rs<'py>(
 ) -> PyResult<(Bound<'py, PyArray1<bool>>, Bound<'py, PyArray1<bool>>)> {
     let entries_cow = array1_as_slice_cow(&entries);
     let exits_cow = array1_as_slice_cow(&exits);
-    let (entries_out, exits_out) =
-        py.allow_threads(|| clean_enex_1d(entries_cow.as_ref(), exits_cow.as_ref(), entry_first));
-    Ok((
-        PyArray1::from_vec_bound(py, entries_out),
-        PyArray1::from_vec_bound(py, exits_out),
-    ))
+    let (entries_out, exits_out) = py.detach(|| clean_enex_1d(entries_cow.as_ref(), exits_cow.as_ref(), entry_first));
+    Ok((PyArray1::from_vec(py, entries_out), PyArray1::from_vec(py, exits_out)))
 }
 
 #[pyfunction]
@@ -1448,10 +1444,10 @@ pub fn clean_enex_rs<'py>(
 ) -> PyResult<(Bound<'py, PyArray2<bool>>, Bound<'py, PyArray2<bool>>)> {
     let entries_arr = entries.as_array();
     let exits_arr = exits.as_array();
-    let (entries_out, exits_out) = py.allow_threads(|| clean_enex_2d(entries_arr, exits_arr, entry_first));
+    let (entries_out, exits_out) = py.detach(|| clean_enex_2d(entries_arr, exits_arr, entry_first));
     Ok((
-        PyArray2::from_owned_array_bound(py, entries_out),
-        PyArray2::from_owned_array_bound(py, exits_out),
+        PyArray2::from_owned_array(py, entries_out),
+        PyArray2::from_owned_array(py, exits_out),
     ))
 }
 
@@ -1470,8 +1466,8 @@ pub fn generate_rand_rs<'py>(
         return Err(PyValueError::new_err("n must have length equal to ncols"));
     }
     let mut rng = make_rng(seed);
-    let result = py.allow_threads(|| generate_rand(nrows, ncols, n_slice, &mut rng));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| generate_rand(nrows, ncols, n_slice, &mut rng));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1487,8 +1483,8 @@ pub fn generate_rand_by_prob_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
-    let result = py.allow_threads(|| generate_rand_by_prob(nrows, ncols, &prob_flex, pick_first, &mut rng));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| generate_rand_by_prob(nrows, ncols, &prob_flex, pick_first, &mut rng));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1503,8 +1499,8 @@ pub fn generate_rand_ex_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<bool>>> {
     let entries_arr = entries.as_array();
     let mut rng = make_rng(seed);
-    let result = py.allow_threads(|| generate_rand_ex(entries_arr, wait, until_next, skip_until_exit, &mut rng));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| generate_rand_ex(entries_arr, wait, until_next, skip_until_exit, &mut rng));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1523,10 +1519,9 @@ pub fn generate_rand_ex_by_prob_rs<'py>(
     let (nrows, ncols) = entries_arr.dim();
     let prob_flex = FlexArray::from_pyarray("prob", &prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
-    let result = py.allow_threads(|| {
-        generate_rand_ex_by_prob(entries_arr, &prob_flex, wait, until_next, skip_until_exit, &mut rng)
-    });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result =
+        py.detach(|| generate_rand_ex_by_prob(entries_arr, &prob_flex, wait, until_next, skip_until_exit, &mut rng));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1546,11 +1541,10 @@ pub fn generate_rand_enex_rs<'py>(
         return Err(PyValueError::new_err("n must have length equal to ncols"));
     }
     let mut rng = make_rng(seed);
-    let (entries, exits) =
-        py.allow_threads(|| generate_rand_enex(nrows, ncols, n_slice, entry_wait, exit_wait, &mut rng))?;
+    let (entries, exits) = py.detach(|| generate_rand_enex(nrows, ncols, n_slice, entry_wait, exit_wait, &mut rng))?;
     Ok((
-        PyArray2::from_owned_array_bound(py, entries),
-        PyArray2::from_owned_array_bound(py, exits),
+        PyArray2::from_owned_array(py, entries),
+        PyArray2::from_owned_array(py, exits),
     ))
 }
 
@@ -1586,7 +1580,7 @@ pub fn generate_rand_enex_by_prob_rs<'py>(
     let entry_prob_flex = FlexArray::from_pyarray("entry_prob", &entry_prob, nrows, ncols, flex_2d)?;
     let exit_prob_flex = FlexArray::from_pyarray("exit_prob", &exit_prob, nrows, ncols, flex_2d)?;
     let mut rng = make_rng(seed);
-    let (entries, exits) = py.allow_threads(|| {
+    let (entries, exits) = py.detach(|| {
         generate_rand_enex_by_prob(
             nrows,
             ncols,
@@ -1600,8 +1594,8 @@ pub fn generate_rand_enex_by_prob_rs<'py>(
         )
     })?;
     Ok((
-        PyArray2::from_owned_array_bound(py, entries),
-        PyArray2::from_owned_array_bound(py, exits),
+        PyArray2::from_owned_array(py, entries),
+        PyArray2::from_owned_array(py, exits),
     ))
 }
 
@@ -1627,7 +1621,7 @@ pub fn generate_stop_ex_rs<'py>(
     }
     let stop_flex = FlexArray::from_pyarray("stop", &stop, shape.0, shape.1, flex_2d)?;
     let trailing_flex = FlexArray::from_pyarray("trailing", &trailing, shape.0, shape.1, flex_2d)?;
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         generate_stop_ex(
             entries_arr,
             ts_arr,
@@ -1639,7 +1633,7 @@ pub fn generate_stop_ex_rs<'py>(
             pick_first,
         )
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1663,7 +1657,7 @@ pub fn generate_stop_enex_rs<'py>(
     }
     let stop_flex = FlexArray::from_pyarray("stop", &stop, shape.0, shape.1, flex_2d)?;
     let trailing_flex = FlexArray::from_pyarray("trailing", &trailing, shape.0, shape.1, flex_2d)?;
-    let (new_entries, exits) = py.allow_threads(|| {
+    let (new_entries, exits) = py.detach(|| {
         generate_stop_enex(
             entries_arr,
             ts_arr,
@@ -1675,8 +1669,8 @@ pub fn generate_stop_enex_rs<'py>(
         )
     })?;
     Ok((
-        PyArray2::from_owned_array_bound(py, new_entries),
-        PyArray2::from_owned_array_bound(py, exits),
+        PyArray2::from_owned_array(py, new_entries),
+        PyArray2::from_owned_array(py, exits),
     ))
 }
 
@@ -1739,7 +1733,7 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
         return Err(PyValueError::new_err("Output arrays must match entries shape"));
     }
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         generate_ohlc_stop_ex(
             entries_arr,
             open_arr,
@@ -1759,7 +1753,7 @@ pub fn generate_ohlc_stop_ex_rs<'py>(
             pick_first,
         )
     })?;
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1819,7 +1813,7 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
     if stop_price_view.dim() != shape || stop_type_view.dim() != shape {
         return Err(PyValueError::new_err("Output arrays must match entries shape"));
     }
-    let (new_entries, exits) = py.allow_threads(|| {
+    let (new_entries, exits) = py.detach(|| {
         generate_ohlc_stop_enex(
             entries_arr,
             open_arr,
@@ -1839,8 +1833,8 @@ pub fn generate_ohlc_stop_enex_rs<'py>(
         )
     })?;
     Ok((
-        PyArray2::from_owned_array_bound(py, new_entries),
-        PyArray2::from_owned_array_bound(py, exits),
+        PyArray2::from_owned_array(py, new_entries),
+        PyArray2::from_owned_array(py, exits),
     ))
 }
 
@@ -1850,8 +1844,8 @@ pub fn between_ranges_rs<'py>(
     a: PyReadonlyArray2<'py, bool>,
 ) -> PyResult<Bound<'py, PyArray1<RangeRecord>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| between_ranges(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| between_ranges(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -1864,8 +1858,8 @@ pub fn between_two_ranges_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<RangeRecord>>> {
     let a_arr = a.as_array();
     let b_arr = b.as_array();
-    let result = py.allow_threads(|| between_two_ranges(a_arr, b_arr, from_other));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| between_two_ranges(a_arr, b_arr, from_other));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -1874,8 +1868,8 @@ pub fn partition_ranges_rs<'py>(
     a: PyReadonlyArray2<'py, bool>,
 ) -> PyResult<Bound<'py, PyArray1<RangeRecord>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| partition_ranges(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| partition_ranges(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -1884,8 +1878,8 @@ pub fn between_partition_ranges_rs<'py>(
     a: PyReadonlyArray2<'py, bool>,
 ) -> PyResult<Bound<'py, PyArray1<RangeRecord>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| between_partition_ranges(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| between_partition_ranges(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -1899,8 +1893,8 @@ pub fn sig_pos_rank_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<i64>>> {
     let a_arr = a.as_array();
     let reset_arr = reset_by.as_ref().map(|x| x.as_array());
-    let result = py.allow_threads(|| sig_pos_rank(a_arr, reset_arr, after_false, allow_gaps));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| sig_pos_rank(a_arr, reset_arr, after_false, allow_gaps));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1913,8 +1907,8 @@ pub fn part_pos_rank_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<i64>>> {
     let a_arr = a.as_array();
     let reset_arr = reset_by.as_ref().map(|x| x.as_array());
-    let result = py.allow_threads(|| part_pos_rank(a_arr, reset_arr, after_false));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| part_pos_rank(a_arr, reset_arr, after_false));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -1930,8 +1924,8 @@ pub fn nth_index_rs<'py>(
     n: i64,
 ) -> PyResult<Bound<'py, PyArray1<i64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| nth_index(a_arr, n));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| nth_index(a_arr, n));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -1944,8 +1938,8 @@ pub fn norm_avg_index_1d_rs(a: PyReadonlyArray1<'_, bool>) -> PyResult<f64> {
 #[pyfunction]
 pub fn norm_avg_index_rs<'py>(py: Python<'py>, a: PyReadonlyArray2<'py, bool>) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| norm_avg_index(a_arr));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| norm_avg_index(a_arr));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

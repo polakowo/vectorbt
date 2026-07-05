@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=83.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,15 +11,15 @@ license-files = ["LICENSE.md"]
 authors = [
     {name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro"}
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.15"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Topic :: Software Development",
@@ -27,14 +27,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "numpy>=1.23",
-    "pandas>=2.0,<3.0",
+    "numpy>=2.4.6",
+    "pandas>=3.0.3,<4.0",
     "scipy",
     "matplotlib",
     "plotly>=4.12.0",
     "ipywidgets>=7.0.0",
     "anywidget",
-    "numba>=0.60",
+    "numba>=0.66",
     "dill",
     "tqdm",
     "dateparser",
@@ -70,7 +70,7 @@ test = [
 ]
 test-rust = [
     "vectorbt[test]",
-    "maturin>=1.7,<2.0",
+    "maturin>=1.14,<2.0",
 ]
 docs = [
     "mkdocs-material",

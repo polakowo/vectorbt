@@ -10,9 +10,10 @@ use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
+use pyo3::IntoPyObject;
 
 pub(crate) fn tuple_hash(py: Python<'_>, window: usize, ewm: bool) -> PyResult<isize> {
-    let key = PyTuple::new_bound(py, [window.into_py(py), ewm.into_py(py)]);
+    let key = (window, ewm).into_pyobject(py)?;
     key.hash()
 }
 
@@ -55,12 +56,12 @@ pub(crate) fn build_ma_cache<'py>(
     adjust: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     validate_param_lengths("windows and ewms", windows.len(), ewms.len())?;
-    let cache_dict = PyDict::new_bound(py);
+    let cache_dict = PyDict::new(py);
     for i in 0..windows.len() {
         let h = tuple_hash(py, windows[i], ewms[i])?;
         if !cache_dict.contains(h)? {
-            let result = py.allow_threads(|| ma_2d(close, windows[i], ewms[i], adjust));
-            cache_dict.set_item(h, PyArray2::from_owned_array_bound(py, result))?;
+            let result = py.detach(|| ma_2d(close, windows[i], ewms[i], adjust));
+            cache_dict.set_item(h, PyArray2::from_owned_array(py, result))?;
         }
     }
     Ok(cache_dict)
@@ -75,12 +76,12 @@ pub(crate) fn build_mstd_cache<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyDict>> {
     validate_param_lengths("windows and ewms", windows.len(), ewms.len())?;
-    let cache_dict = PyDict::new_bound(py);
+    let cache_dict = PyDict::new(py);
     for i in 0..windows.len() {
         let h = tuple_hash(py, windows[i], ewms[i])?;
         if !cache_dict.contains(h)? {
-            let result = py.allow_threads(|| mstd_2d(close, windows[i], ewms[i], adjust, ddof));
-            cache_dict.set_item(h, PyArray2::from_owned_array_bound(py, result))?;
+            let result = py.detach(|| mstd_2d(close, windows[i], ewms[i], adjust, ddof));
+            cache_dict.set_item(h, PyArray2::from_owned_array(py, result))?;
         }
     }
     Ok(cache_dict)
@@ -96,8 +97,8 @@ pub fn ma_rs<'py>(
     adjust: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| ma_2d(a_arr, window, ewm, adjust));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| ma_2d(a_arr, window, ewm, adjust));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -111,8 +112,8 @@ pub fn mstd_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let a_arr = a.as_array();
-    let result = py.allow_threads(|| mstd_2d(a_arr, window, ewm, adjust, ddof));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| mstd_2d(a_arr, window, ewm, adjust, ddof));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -134,9 +135,9 @@ pub fn ma_apply_rs<'py>(
     ewm: bool,
     _adjust: bool,
     cache_dict: &Bound<'py, PyAny>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let h = tuple_hash(py, window, ewm)?;
-    Ok(cache_dict.get_item(h)?.into_py(py))
+    Ok(cache_dict.get_item(h)?.unbind())
 }
 
 #[pyfunction]
@@ -160,9 +161,9 @@ pub fn mstd_apply_rs<'py>(
     _adjust: bool,
     _ddof: usize,
     cache_dict: &Bound<'py, PyAny>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let h = tuple_hash(py, window, ewm)?;
-    Ok(cache_dict.get_item(h)?.into_py(py))
+    Ok(cache_dict.get_item(h)?.unbind())
 }
 
 #[pyfunction]
@@ -219,9 +220,9 @@ pub fn bb_apply_rs<'py>(
             *lower_out = ma_v - alpha * mstd_v;
         });
     Ok((
-        PyArray2::from_owned_array_bound(py, ma),
-        PyArray2::from_owned_array_bound(py, upper),
-        PyArray2::from_owned_array_bound(py, lower),
+        PyArray2::from_owned_array(py, ma),
+        PyArray2::from_owned_array(py, upper),
+        PyArray2::from_owned_array(py, lower),
     ))
 }
 
@@ -235,23 +236,23 @@ pub fn rsi_cache_rs<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     validate_param_lengths("windows and ewms", windows.len(), ewms.len())?;
     let close_arr = close.as_array();
-    let delta = py.allow_threads(|| diff_2d(close_arr));
+    let delta = py.detach(|| diff_2d(close_arr));
     let mut up = delta.clone();
     let mut down = delta;
     up.mapv_inplace(|v| if v < 0.0 { 0.0 } else { v });
     down.mapv_inplace(|v| if v > 0.0 { 0.0 } else { v.abs() });
 
-    let cache_dict = PyDict::new_bound(py);
+    let cache_dict = PyDict::new(py);
     for i in 0..windows.len() {
         let h = tuple_hash(py, windows[i], ewms[i])?;
         if !cache_dict.contains(h)? {
-            let roll_up = py.allow_threads(|| ma_2d(up.view(), windows[i], ewms[i], adjust));
-            let roll_down = py.allow_threads(|| ma_2d(down.view(), windows[i], ewms[i], adjust));
+            let roll_up = py.detach(|| ma_2d(up.view(), windows[i], ewms[i], adjust));
+            let roll_down = py.detach(|| ma_2d(down.view(), windows[i], ewms[i], adjust));
             cache_dict.set_item(
                 h,
                 (
-                    PyArray2::from_owned_array_bound(py, roll_up),
-                    PyArray2::from_owned_array_bound(py, roll_down),
+                    PyArray2::from_owned_array(py, roll_up),
+                    PyArray2::from_owned_array(py, roll_down),
                 ),
             )?;
         }
@@ -270,7 +271,7 @@ pub fn rsi_apply_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let h = tuple_hash(py, window, ewm)?;
     let item = cache_dict.get_item(h)?;
-    let tuple = item.downcast::<PyTuple>()?;
+    let tuple = item.cast::<PyTuple>()?;
     let roll_up_arr = tuple.get_item(0)?.extract::<PyReadonlyArray2<'py, f64>>()?;
     let roll_down_arr = tuple.get_item(1)?.extract::<PyReadonlyArray2<'py, f64>>()?;
     let roll_up = roll_up_arr.as_array();
@@ -283,7 +284,7 @@ pub fn rsi_apply_rs<'py>(
             let rs = up / down;
             *out_v = 100.0 - 100.0 / (1.0 + rs);
         });
-    Ok(PyArray2::from_owned_array_bound(py, out))
+    Ok(PyArray2::from_owned_array(py, out))
 }
 
 #[pyfunction]
@@ -302,18 +303,17 @@ pub fn stoch_cache_rs<'py>(
     if high_arr.dim() != low_arr.dim() {
         return Err(PyValueError::new_err("high and low must have the same shape"));
     }
-    let cache_dict = PyDict::new_bound(py);
+    let cache_dict = PyDict::new(py);
     for &k_window in &k_windows {
         let h = k_window as isize;
         if !cache_dict.contains(h)? {
-            let roll_min = py.allow_threads(|| apply_2d_by_col(low_arr, |col| rolling_min_1d(col, k_window, k_window)));
-            let roll_max =
-                py.allow_threads(|| apply_2d_by_col(high_arr, |col| rolling_max_1d(col, k_window, k_window)));
+            let roll_min = py.detach(|| apply_2d_by_col(low_arr, |col| rolling_min_1d(col, k_window, k_window)));
+            let roll_max = py.detach(|| apply_2d_by_col(high_arr, |col| rolling_max_1d(col, k_window, k_window)));
             cache_dict.set_item(
                 h,
                 (
-                    PyArray2::from_owned_array_bound(py, roll_min),
-                    PyArray2::from_owned_array_bound(py, roll_max),
+                    PyArray2::from_owned_array(py, roll_min),
+                    PyArray2::from_owned_array(py, roll_max),
                 ),
             )?;
         }
@@ -334,7 +334,7 @@ pub fn stoch_apply_rs<'py>(
     cache_dict: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray2<f64>>)> {
     let item = cache_dict.get_item(k_window as isize)?;
-    let tuple = item.downcast::<PyTuple>()?;
+    let tuple = item.cast::<PyTuple>()?;
     let roll_min_arr = tuple.get_item(0)?.extract::<PyReadonlyArray2<'py, f64>>()?;
     let roll_max_arr = tuple.get_item(1)?.extract::<PyReadonlyArray2<'py, f64>>()?;
     let roll_min = roll_min_arr.as_array();
@@ -353,10 +353,10 @@ pub fn stoch_apply_rs<'py>(
         .for_each(|out_v, &close_v, &min_v, &max_v| {
             *out_v = 100.0 * (close_v - min_v) / (max_v - min_v);
         });
-    let percent_d = py.allow_threads(|| ma_2d(percent_k.view(), d_window, d_ewm, adjust));
+    let percent_d = py.detach(|| ma_2d(percent_k.view(), d_window, d_ewm, adjust));
     Ok((
-        PyArray2::from_owned_array_bound(py, percent_k),
-        PyArray2::from_owned_array_bound(py, percent_d),
+        PyArray2::from_owned_array(py, percent_k),
+        PyArray2::from_owned_array(py, percent_d),
     ))
 }
 
@@ -407,10 +407,10 @@ pub fn macd_apply_rs<'py>(
         .for_each(|out_v, &fast_v, &slow_v| {
             *out_v = fast_v - slow_v;
         });
-    let signal_ts = py.allow_threads(|| ma_2d(macd_ts.view(), signal_window, signal_ewm, adjust));
+    let signal_ts = py.detach(|| ma_2d(macd_ts.view(), signal_window, signal_ewm, adjust));
     Ok((
-        PyArray2::from_owned_array_bound(py, macd_ts),
-        PyArray2::from_owned_array_bound(py, signal_ts),
+        PyArray2::from_owned_array(py, macd_ts),
+        PyArray2::from_owned_array(py, signal_ts),
     ))
 }
 
@@ -515,8 +515,8 @@ pub fn true_range_1d_rs<'py>(
     if h.len() != l.len() || h.len() != c.len() {
         return Err(PyValueError::new_err("high, low, and close must have the same length"));
     }
-    let result = py.allow_threads(|| true_range_1d(h, l, c));
-    Ok(PyArray1::from_vec_bound(py, result))
+    let result = py.detach(|| true_range_1d(h, l, c));
+    Ok(PyArray1::from_vec(py, result))
 }
 
 #[pyfunction]
@@ -532,8 +532,8 @@ pub fn true_range_rs<'py>(
     if h_arr.dim() != l_arr.dim() || h_arr.dim() != c_arr.dim() {
         return Err(PyValueError::new_err("high, low, and close must have the same shape"));
     }
-    let result = py.allow_threads(|| true_range_2d(h_arr, l_arr, c_arr));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| true_range_2d(h_arr, l_arr, c_arr));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -553,16 +553,16 @@ pub fn atr_cache_rs<'py>(
     if h_arr.dim() != l_arr.dim() || h_arr.dim() != c_arr.dim() {
         return Err(PyValueError::new_err("high, low, and close must have the same shape"));
     }
-    let tr = py.allow_threads(|| true_range_2d(h_arr, l_arr, c_arr));
-    let cache_dict = PyDict::new_bound(py);
+    let tr = py.detach(|| true_range_2d(h_arr, l_arr, c_arr));
+    let cache_dict = PyDict::new(py);
     for i in 0..windows.len() {
         let h = tuple_hash(py, windows[i], ewms[i])?;
         if !cache_dict.contains(h)? {
-            let result = py.allow_threads(|| ma_2d(tr.view(), windows[i], ewms[i], adjust));
-            cache_dict.set_item(h, PyArray2::from_owned_array_bound(py, result))?;
+            let result = py.detach(|| ma_2d(tr.view(), windows[i], ewms[i], adjust));
+            cache_dict.set_item(h, PyArray2::from_owned_array(py, result))?;
         }
     }
-    Ok((PyArray2::from_owned_array_bound(py, tr), cache_dict))
+    Ok((PyArray2::from_owned_array(py, tr), cache_dict))
 }
 
 #[pyfunction]
@@ -576,9 +576,9 @@ pub fn atr_apply_rs<'py>(
     _adjust: bool,
     tr: &Bound<'py, PyAny>,
     cache_dict: &Bound<'py, PyAny>,
-) -> PyResult<(PyObject, PyObject)> {
+) -> PyResult<(Py<PyAny>, Py<PyAny>)> {
     let h = tuple_hash(py, window, ewm)?;
-    Ok((tr.clone().into_py(py), cache_dict.get_item(h)?.into_py(py)))
+    Ok((tr.clone().unbind(), cache_dict.get_item(h)?.unbind()))
 }
 
 pub(crate) fn obv_custom_1d_into(close: &[f64], volume: &[f64], out: &mut [f64]) {
@@ -609,7 +609,7 @@ pub fn obv_custom_rs<'py>(
         return Err(PyValueError::new_err("close and volume_ts must have the same shape"));
     }
     let (nrows, ncols) = c_arr.dim();
-    let result = py.allow_threads(|| {
+    let result = py.detach(|| {
         if let (Some(close_src), Some(volume_src)) = (c_arr.as_slice(), v_arr.as_slice()) {
             let mut out = Array2::<f64>::zeros((nrows, ncols));
             let dst = out.as_slice_mut().expect("owned array must be sliceable");
@@ -651,7 +651,7 @@ pub fn obv_custom_rs<'py>(
         }
         out
     });
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -784,8 +784,8 @@ pub fn future_mean_apply_rs<'py>(
     adjust: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| future_mean_apply(close_arr, window, ewm, wait, adjust));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| future_mean_apply(close_arr, window, ewm, wait, adjust));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -800,8 +800,8 @@ pub fn future_std_apply_rs<'py>(
     ddof: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| future_std_apply(close_arr, window, ewm, wait, adjust, ddof));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| future_std_apply(close_arr, window, ewm, wait, adjust, ddof));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -813,8 +813,8 @@ pub fn future_min_apply_rs<'py>(
     wait: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| future_min_apply(close_arr, window, wait));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| future_min_apply(close_arr, window, wait));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -826,8 +826,8 @@ pub fn future_max_apply_rs<'py>(
     wait: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| future_max_apply(close_arr, window, wait));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| future_max_apply(close_arr, window, wait));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -837,8 +837,8 @@ pub fn fixed_labels_apply_rs<'py>(
     n: usize,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| fixed_labels_apply(close_arr, n));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| fixed_labels_apply(close_arr, n));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -852,8 +852,8 @@ pub fn mean_labels_apply_rs<'py>(
     adjust: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let close_arr = close.as_array();
-    let result = py.allow_threads(|| mean_labels_apply(close_arr, window, ewm, wait, adjust));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| mean_labels_apply(close_arr, window, ewm, wait, adjust));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -869,8 +869,8 @@ pub fn local_extrema_apply_rs<'py>(
     let (nrows, ncols) = close_arr.dim();
     let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
     let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
-    let result = py.allow_threads(|| local_extrema_apply(close_arr, &pos_flex, &neg_flex));
-    Ok(PyArray2::from_owned_array_bound(py, result?))
+    let result = py.detach(|| local_extrema_apply(close_arr, &pos_flex, &neg_flex));
+    Ok(PyArray2::from_owned_array(py, result?))
 }
 
 #[pyfunction]
@@ -882,8 +882,8 @@ pub fn bn_trend_labels_rs<'py>(
     let close_arr = close.as_array();
     let le_arr = local_extrema.as_array();
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
-    let result = py.allow_threads(|| bn_trend_labels(close_arr, le_arr));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| bn_trend_labels(close_arr, le_arr));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -895,8 +895,8 @@ pub fn bn_cont_trend_labels_rs<'py>(
     let close_arr = close.as_array();
     let le_arr = local_extrema.as_array();
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
-    let result = py.allow_threads(|| bn_cont_trend_labels(close_arr, le_arr));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| bn_cont_trend_labels(close_arr, le_arr));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -915,8 +915,8 @@ pub fn bn_cont_sat_trend_labels_rs<'py>(
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
     let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
     let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
-    let result = py.allow_threads(|| bn_cont_sat_trend_labels(close_arr, le_arr, &pos_flex, &neg_flex));
-    Ok(PyArray2::from_owned_array_bound(py, result?))
+    let result = py.detach(|| bn_cont_sat_trend_labels(close_arr, le_arr, &pos_flex, &neg_flex));
+    Ok(PyArray2::from_owned_array(py, result?))
 }
 
 #[pyfunction]
@@ -929,8 +929,8 @@ pub fn pct_trend_labels_rs<'py>(
     let close_arr = close.as_array();
     let le_arr = local_extrema.as_array();
     validate_matching_shape("local_extrema", close_arr.dim(), le_arr.dim())?;
-    let result = py.allow_threads(|| pct_trend_labels(close_arr, le_arr, normalize));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| pct_trend_labels(close_arr, le_arr, normalize));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 #[pyfunction]
@@ -947,8 +947,8 @@ pub fn trend_labels_apply_rs<'py>(
     let (nrows, ncols) = close_arr.dim();
     let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
     let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
-    let result = py.allow_threads(|| trend_labels_apply(close_arr, &pos_flex, &neg_flex, mode));
-    Ok(PyArray2::from_owned_array_bound(py, result?))
+    let result = py.detach(|| trend_labels_apply(close_arr, &pos_flex, &neg_flex, mode));
+    Ok(PyArray2::from_owned_array(py, result?))
 }
 
 #[pyfunction]
@@ -966,8 +966,8 @@ pub fn breakout_labels_rs<'py>(
     let (nrows, ncols) = close_arr.dim();
     let pos_flex = FlexArray::from_pyarray("pos_th", &pos_th, nrows, ncols, flex_2d)?;
     let neg_flex = FlexArray::from_pyarray("neg_th", &neg_th, nrows, ncols, flex_2d)?;
-    let result = py.allow_threads(|| breakout_labels(close_arr, window, &pos_flex, &neg_flex, wait));
-    Ok(PyArray2::from_owned_array_bound(py, result))
+    let result = py.detach(|| breakout_labels(close_arr, window, &pos_flex, &neg_flex, wait));
+    Ok(PyArray2::from_owned_array(py, result))
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

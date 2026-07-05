@@ -473,8 +473,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                     stacklevel=2,
                 )
             return a
-        if to_pd:
-            return pd.to_timedelta(a * self.freq)
+        if to_pd or isinstance(a, (pd.Series, pd.DataFrame)):
+            out = a * self.freq.value
+            if isinstance(out, pd.DataFrame):
+                return out.apply(lambda col: pd.to_timedelta(col, unit="ns"))
+            return pd.to_timedelta(out, unit="ns")
         return a * self.freq
 
     @property
@@ -597,7 +600,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             if checks.is_series(out):
                 out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
             else:
-                out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
+                out = (out.map if hasattr(out, "map") else out.applymap)(
+                    lambda x: self.index[x] if x != -1 else np.nan
+                )
         if to_timedelta:
             # Convert to timedelta
             out = self.to_timedelta(out, silence_warnings=silence_warnings)
@@ -688,7 +693,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             if checks.is_series(out):
                 out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
             elif checks.is_frame(out):
-                out = out.map(lambda x: self.index[x] if x != -1 else np.nan)
+                out = (out.map if hasattr(out, "map") else out.applymap)(
+                    lambda x: self.index[x] if x != -1 else np.nan
+                )
             else:
                 out = self.index[out] if out != -1 else np.nan
         if to_timedelta:

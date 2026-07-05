@@ -618,7 +618,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
                     if isinstance(dct["mapping"], str) and dct["mapping"] == "index":
                         df[title] = self.get_map_field_to_index(col_name)
                     else:
-                        df[title] = self.get_apply_mapping_arr(col_name)
+                        df[title] = pd.Series(self.get_apply_mapping_arr(col_name), index=df.index, dtype=object)
         return df
 
     def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
