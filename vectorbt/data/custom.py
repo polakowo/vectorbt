@@ -5,10 +5,12 @@
 
 import time
 import warnings
+import os
 from functools import wraps
 
 import numpy as np
 import pandas as pd
+import requests
 from tqdm.auto import tqdm
 
 from vectorbt import _typing as tp
@@ -289,6 +291,136 @@ class YFData(Data):
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `YFData.download_symbol`."""
+        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        kwargs = merge_dicts(download_kwargs, kwargs)
+        return self.download_symbol(symbol, **kwargs)
+
+
+class FXMacroData(Data):
+    """`Data` for daily FX reference rates coming from FXMacroData.
+
+    FXMacroData returns one daily spot/reference value per currency pair. This
+    class exposes those values as close-only OHLCV data by setting Open, High,
+    Low, and Close to the same value and Volume to 0.
+
+    Usage:
+        ```pycon
+        >>> import vectorbt as vbt
+
+        >>> fx_data = vbt.FXMacroData.download(
+        ...     "EURUSD",
+        ...     start="2024-01-01 UTC",
+        ...     end="2024-03-01 UTC",
+        ...     api_key="..."
+        ... )
+        >>> fx_data.get()
+                              Open    High     Low   Close  Volume
+        Datetime
+        2024-01-01 00:00:00+00:00  1.1038  1.1038  1.1038  1.1038     0.0
+        ```
+    """
+
+    @classmethod
+    def download_symbol(
+        cls,
+        symbol: str,
+        start: tp.DatetimeLike = "365 days ago UTC",
+        end: tp.DatetimeLike = "now UTC",
+        api_key: tp.Optional[str] = None,
+        base_url: str = "https://fxmacrodata.com/api/v1",
+        timeout: float = 30,
+        **kwargs,
+    ) -> tp.Frame:
+        """Download daily FX spot/reference rates from FXMacroData.
+
+        Args:
+            symbol (str): Six-letter FX pair such as "EURUSD", or separated
+                pair such as "EUR/USD".
+            start (any): Start datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): End datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            api_key (str): Optional FXMacroData API key. If omitted,
+                `FXMACRODATA_API_KEY` or `FXMD_API_KEY` will be used.
+            base_url (str): FXMacroData API base URL.
+            timeout (float): Request timeout in seconds.
+            **kwargs: Keyword arguments passed to `requests.get`.
+        """
+        base_currency, quote_currency = cls._split_pair(symbol)
+        start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).date().isoformat()
+        end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).date().isoformat()
+
+        params = {
+            "start_date": start_ts,
+            "end_date": end_ts,
+        }
+        api_key = api_key or os.getenv("FXMACRODATA_API_KEY") or os.getenv("FXMD_API_KEY")
+        if api_key:
+            params["api_key"] = api_key
+
+        url = "{}/forex/{}/{}".format(
+            base_url.rstrip("/"),
+            base_currency.lower(),
+            quote_currency.lower(),
+        )
+        response = requests.get(
+            url,
+            params=params,
+            timeout=timeout,
+            headers={"Accept": "application/json"},
+            **kwargs,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            raise ValueError("FXMacroData response did not include a data list")
+
+        records = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            date_value = row.get("date")
+            value = row.get("val")
+            if date_value is None or value is None:
+                continue
+            try:
+                dt = pd.Timestamp(date_value, tz=get_utc_tz())
+                price = float(value)
+            except (TypeError, ValueError):
+                continue
+            records.append(
+                {
+                    "Datetime": dt,
+                    "Open": price,
+                    "High": price,
+                    "Low": price,
+                    "Close": price,
+                    "Volume": 0.0,
+                }
+            )
+
+        if len(records) == 0:
+            raise ValueError(f"FXMacroData response did not include dated values for {symbol}")
+
+        df = pd.DataFrame.from_records(records)
+        df = df.sort_values("Datetime").set_index("Datetime")
+        return df[["Open", "High", "Low", "Close", "Volume"]]
+
+    @classmethod
+    def _split_pair(cls, symbol: str) -> tp.Tuple[str, str]:
+        normalized = "".join(char for char in str(symbol).upper() if char.isalpha())
+        if len(normalized) != 6:
+            raise ValueError("FXMacroData symbols must look like 'EURUSD' or 'EUR/USD'")
+        return normalized[:3], normalized[3:]
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        """Update the symbol.
+
+        `**kwargs` will override keyword arguments passed to `FXMacroData.download_symbol`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs["start"] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
