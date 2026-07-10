@@ -277,7 +277,13 @@ Installing optional dependencies may be subject to a more restrictive license.
 
 ## Star history
 
-[![Star History Chart](https://api.star-history.com/svg?repos=polakowo/vectorbt&type=Timeline)](https://star-history.com/#polakowo/vectorbt&Timeline)
+<a href="https://www.star-history.com/?repos=polakowo%2Fvectorbt&type=timeline&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=polakowo/vectorbt&type=timeline&theme=dark&legend=top-left&sealed_token=KlOVtbOm3HjH84bY3hmz2J3mCAIuIo25-YWRtFRduUgrPKKvY_57s9_VBT6mVPCK2yn_2lT8HTUUtin98D6TMMW17aKv-cydUxd1Du1Tf1ssKC-JgTB0jxbYu-6OUz9D_O94uHS12_AaS3JYAJKzzapwwzEeHicDIqJN9XE3_Rl6RB6gk03qvQA5b6mn" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=polakowo/vectorbt&type=timeline&legend=top-left&sealed_token=KlOVtbOm3HjH84bY3hmz2J3mCAIuIo25-YWRtFRduUgrPKKvY_57s9_VBT6mVPCK2yn_2lT8HTUUtin98D6TMMW17aKv-cydUxd1Du1Tf1ssKC-JgTB0jxbYu-6OUz9D_O94uHS12_AaS3JYAJKzzapwwzEeHicDIqJN9XE3_Rl6RB6gk03qvQA5b6mn" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=polakowo/vectorbt&type=timeline&legend=top-left&sealed_token=KlOVtbOm3HjH84bY3hmz2J3mCAIuIo25-YWRtFRduUgrPKKvY_57s9_VBT6mVPCK2yn_2lT8HTUUtin98D6TMMW17aKv-cydUxd1Du1Tf1ssKC-JgTB0jxbYu-6OUz9D_O94uHS12_AaS3JYAJKzzapwwzEeHicDIqJN9XE3_Rl6RB6gk03qvQA5b6mn" />
+ </picture>
+</a>
 
 ## Disclaimer
 
