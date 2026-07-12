@@ -759,42 +759,53 @@ def rolling_mean_nb(a: tp.Array2d, window: int, minp: tp.Optional[int] = None) -
 def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
     """Return rolling standard deviation.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`.
+
+    Uses Welford's online algorithm (with a matching remove-point update for values leaving
+    the window) to accumulate the mean and sum of squared deviations (M2). Unlike the naive
+    two-pass `sum(x**2) - 2*mean*sum(x) + n*mean**2` formula, this does not subtract two large,
+    nearly equal numbers, so it stays numerically stable even when the data has a large
+    offset relative to its variance (e.g. large price levels with small fluctuations)."""
     if minp is None:
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float64)
-    cumsum_arr = np.zeros_like(a)
-    cumsum = 0
-    cumsum_sq_arr = np.zeros_like(a)
-    cumsum_sq = 0
-    nancnt_arr = np.zeros_like(a)
-    nancnt = 0
+    mean = 0.0
+    m2 = 0.0
+    cnt = 0
     for i in range(a.shape[0]):
-        if np.isnan(a[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + a[i]
-            cumsum_sq = cumsum_sq + a[i] ** 2
-        nancnt_arr[i] = nancnt
-        cumsum_arr[i] = cumsum
-        cumsum_sq_arr[i] = cumsum_sq
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-            window_cumsum_sq = cumsum_sq
-        else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum = cumsum - cumsum_arr[i - window]
-            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
+        add_val = a[i]
+        if not np.isnan(add_val):
+            cnt = cnt + 1
+            delta = add_val - mean
+            mean = mean + delta / cnt
+            delta2 = add_val - mean
+            m2 = m2 + delta * delta2
+        if i >= window:
+            rem_val = a[i - window]
+            if not np.isnan(rem_val):
+                if cnt == 1:
+                    cnt = 0
+                    mean = 0.0
+                    m2 = 0.0
+                else:
+                    new_cnt = cnt - 1
+                    delta = rem_val - mean
+                    mean = mean - delta / new_cnt
+                    delta2 = rem_val - mean
+                    m2 = m2 - delta * delta2
+                    cnt = new_cnt
+        window_len = cnt
         if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
-            mean = window_cumsum / window_len
-            out[i] = np.sqrt(
-                np.abs(window_cumsum_sq - 2 * window_cumsum * mean + window_len * mean**2) / (window_len - ddof)
-            )
+            var = m2 / (window_len - ddof)
+            if var < 0.0:
+                # Guard against tiny negative values caused by floating-point round-off
+                # in the remove-point update; mathematically var >= 0 always.
+                var = 0.0
+            out[i] = np.sqrt(var)
     return out
 
 

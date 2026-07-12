@@ -276,6 +276,26 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_std(test_window), df.rolling(test_window).std())
 
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_rolling_std_numerical_stability(self, test_ddof):
+        # Regression test for https://github.com/polakowo/vectorbt/issues/714:
+        # a naive two-pass (sum-of-squares minus mean-squared) rolling std formula loses
+        # precision through catastrophic cancellation when values have a large offset
+        # relative to their variance (e.g. large price levels with tiny fluctuations).
+        rng = np.random.default_rng(42)
+        window = 4000
+        large_offset_series = pd.Series(1e8 + rng.normal(0, 0.01, 5000))
+        got = large_offset_series.vbt.rolling_std(window, minp=window, ddof=test_ddof)
+        expected = large_offset_series.rolling(window, min_periods=window).std(ddof=test_ddof)
+        pd.testing.assert_series_equal(got, expected, atol=1e-6, rtol=0)
+
+        # Same check with NaNs sprinkled in, exercising the min-periods/NaN-count bookkeeping.
+        large_offset_nan_series = large_offset_series.copy()
+        large_offset_nan_series.iloc[::37] = np.nan
+        got_nan = large_offset_nan_series.vbt.rolling_std(window, minp=10, ddof=test_ddof)
+        expected_nan = large_offset_nan_series.rolling(window, min_periods=10).std(ddof=test_ddof)
+        pd.testing.assert_series_equal(got_nan, expected_nan, atol=1e-6, rtol=0)
+
     @pytest.mark.parametrize(
         "test_window,test_minp,test_adjust", list(product([1, 2, 3, 4, 5], [1, None], [False, True]))
     )
