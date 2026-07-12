@@ -15,20 +15,20 @@ title: Getting started
     </a>
 </div>
 
-VectorBT® is a Python package for quantitative analysis that takes a novel approach to backtesting: 
-it operates entirely on pandas and NumPy objects, accelerated by [Numba](https://github.com/numba/numba) 
-and [Rust](https://www.rust-lang.org/) to analyze any data at speed and scale. This makes it possible 
+VectorBT® is a Python package for quantitative analysis that takes a novel approach to backtesting:
+it operates entirely on pandas and NumPy objects, accelerated by [Numba](https://github.com/numba/numba)
+and [Rust](https://www.rust-lang.org/) to analyze any data at speed and scale. This makes it possible
 to test many thousands of strategies in *seconds*.
 
 Unlike other backtesters, VectorBT represents complex data as structured NumPy arrays.
-This enables ultra-fast computation through vectorized operations with NumPy, dynamically 
+This enables ultra-fast computation through vectorized operations with NumPy, dynamically
 compiled operations with Numba, and optional precompiled Rust kernels with Python bindings via
 [PyO3](https://pyo3.rs/) for the most performance-critical paths.
 
-It also integrates [Plotly](https://github.com/plotly/plotly.py) and 
-[Jupyter Widgets](https://github.com/jupyter-widgets/ipywidgets) to display rich charts and dashboards 
-— akin to Tableau — right in the Jupyter notebook. Thanks to its high performance, VectorBT can process 
-large amounts of data even without a GPU or parallelization, enabling users to interact with 
+It also integrates [Plotly](https://github.com/plotly/plotly.py) and
+[Jupyter Widgets](https://github.com/jupyter-widgets/ipywidgets) to display rich charts and dashboards
+— akin to Tableau — right in the Jupyter notebook. Thanks to its high performance, VectorBT can process
+large amounts of data even without a GPU or parallelization, enabling users to interact with
 data-hungry widgets without noticeable delays.
 
 With VectorBT, you can
@@ -93,7 +93,7 @@ With VectorBT, you can
 
     ---
 
-    [__Support us__](https://vectorbt.pro/) to get access to parallelization, portfolio optimization, 
+    [__Support us__](https://vectorbt.pro/) to get access to parallelization, portfolio optimization,
     pattern recognition, event projections, limit orders, leverage, and 100+ other hot features!
 
 </div>
@@ -135,43 +135,43 @@ With VectorBT, you can
 17089.25554191831
 ```
 
-See [Installation](getting-started/installation.md) for Docker and other options, 
+See [Installation](getting-started/installation.md) for Docker and other options,
 or [Usage](getting-started/usage.md) for more examples.
 
 ## Why VectorBT?
 
-While there are many great backtesting packages for Python, VectorBT uniquely combines an extremely 
-fast backtester with a data science toolkit: it excels at raw processing performance while offering 
-interactive tools to explore complex phenomena in trading. With it, you can sweep a huge number of 
-strategy configurations, time periods, and instruments in seconds, discover where your strategy 
-performs best, and uncover hidden patterns in data. Having this kind of analytical power at your 
+While there are many great backtesting packages for Python, VectorBT uniquely combines an extremely
+fast backtester with a data science toolkit: it excels at raw processing performance while offering
+interactive tools to explore complex phenomena in trading. With it, you can sweep a huge number of
+strategy configurations, time periods, and instruments in seconds, discover where your strategy
+performs best, and uncover hidden patterns in data. Having this kind of analytical power at your
 fingertips can give you a real information advantage in your own trading.
 
 ## How it works
 
-VectorBT was designed to address common performance shortcomings of backtesting libraries. 
-It builds on the idea that each strategy instance can be represented in a vectorized form, 
-so multiple instances can be packed into a single multi-dimensional array, processed highly 
-efficiently, and compared with ease. This overhauls the traditional OOP approach, where 
-strategies are represented as classes and other data structures that are easier to write and extend, 
+VectorBT was designed to address common performance shortcomings of backtesting libraries.
+It builds on the idea that each strategy instance can be represented in a vectorized form,
+so multiple instances can be packed into a single multi-dimensional array, processed highly
+efficiently, and compared with ease. This overhauls the traditional OOP approach, where
+strategies are represented as classes and other data structures that are easier to write and extend,
 but harder to analyze at scale and much slower without additional optimization effort.
 
-Thanks to the time-series nature of trading data, most aspects of backtesting can be 
-translated into vectors. Instead of processing one element at a time, vectorization lets you 
-avoid naive looping and apply the same operation to all elements at once. The path-dependency 
+Thanks to the time-series nature of trading data, most aspects of backtesting can be
+translated into vectors. Instead of processing one element at a time, vectorization lets you
+avoid naive looping and apply the same operation to all elements at once. The path-dependency
 problem inherent to vectorization is solved by using compiled backends:
 
 - **Numba** compiles Python code on the fly, allowing you to write complex logic
 in pure Python while still achieving C-like performance.
-- **Rust** provides precompiled kernels for the most performance-critical paths, which can be 
+- **Rust** provides precompiled kernels for the most performance-critical paths, which can be
 enabled with a single argument.
 
 ## Example
 
-Imagine a complex strategy with many hyperparameters that need to be tuned. Brute-forcing every 
-combination might seem infeasible, but we can still interpolate — and VectorBT makes exactly this 
-possible. It doesn't care whether you have one strategy instance or millions. As long as their 
-vectors can be concatenated into a matrix and you have enough memory, you can analyze them all in 
+Imagine a complex strategy with many hyperparameters that need to be tuned. Brute-forcing every
+combination might seem infeasible, but we can still interpolate — and VectorBT makes exactly this
+possible. It doesn't care whether you have one strategy instance or millions. As long as their
+vectors can be concatenated into a matrix and you have enough memory, you can analyze them all in
 one go.
 
 Let's start with fetching the daily price of Bitcoin:
@@ -200,7 +200,7 @@ Date
 Freq: D, Name: Close, Length: 366, dtype: float64
 ```
 
-We are going to test a simple Dual Moving Average Crossover (DMAC) strategy using the 
+We are going to test a simple Dual Moving Average Crossover (DMAC) strategy using the
 `MA` class to calculate moving averages and generate signals.
 
 Our first test is straightforward: buy when the 10-day moving average crosses above the 20-day moving
@@ -288,7 +288,7 @@ fast_window  slow_window
 Name: total_return, dtype: float64
 ```
 
-For convenience, VectorBT automatically creates the column levels `fast_window` and `slow_window`, 
+For convenience, VectorBT automatically creates the column levels `fast_window` and `slow_window`,
 making it easy to tell which window size corresponds to which column.
 
 Notice how the signal generation code stays the same across examples — most functions in VectorBT work on
@@ -367,10 +367,10 @@ Name: total_return, dtype: float64
 
 ![](/assets/images/index_by_symbol.svg)
 
-Strategies and instruments aren't the only things that can act as separate features — time can too. 
-If we want to find out when our strategy performs best, we can backtest over multiple time periods. 
-VectorBT can split one time period into many segments of the same length and frequency and represent 
-them as distinct columns. For example, let's split the entire time period into two equal halves 
+Strategies and instruments aren't the only things that can act as separate features — time can too.
+If we want to find out when our strategy performs best, we can backtest over multiple time periods.
+VectorBT can split one time period into many segments of the same length and frequency and represent
+them as distinct columns. For example, let's split the entire time period into two equal halves
 and backtest them at once.
 
 ```pycon

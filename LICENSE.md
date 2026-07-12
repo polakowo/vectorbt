@@ -11,7 +11,7 @@ Software: vectorbt
 License: Apache 2.0 with Commons Clause
 
 Licensor: Oleg Polakow
-                                 
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
