@@ -761,11 +761,7 @@ def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None,
 
     Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`.
 
-    Uses Welford's online algorithm (with a matching remove-point update for values leaving
-    the window) to accumulate the mean and sum of squared deviations (M2). Unlike the naive
-    two-pass `sum(x**2) - 2*mean*sum(x) + n*mean**2` formula, this does not subtract two large,
-    nearly equal numbers, so it stays numerically stable even when the data has a large
-    offset relative to its variance (e.g. large price levels with small fluctuations)."""
+    Uses Welford's algorithm for numerical stability."""
     if minp is None:
         minp = window
     if minp > window:
@@ -774,6 +770,11 @@ def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None,
     mean = 0.0
     m2 = 0.0
     cnt = 0
+    # Decayed estimate of the per-point squared residual (~ local variance), used below
+    # to judge whether a negative M2 is tiny round-off or material drift. This tracks the
+    # data's actual spread, unlike `mean`, which is dominated by any large offset and so
+    # is useless as a drift-tolerance scale.
+    resid_scale2 = 0.0
     for i in range(a.shape[0]):
         add_val = a[i]
         if not np.isnan(add_val):
@@ -782,6 +783,7 @@ def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None,
             mean = mean + delta / cnt
             delta2 = add_val - mean
             m2 = m2 + delta * delta2
+            resid_scale2 = 0.9 * resid_scale2 + 0.1 * delta * delta2
         if i >= window:
             rem_val = a[i - window]
             if not np.isnan(rem_val):
@@ -797,15 +799,37 @@ def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None,
                     m2 = m2 - delta * delta2
                     cnt = new_cnt
         window_len = cnt
-        if window_len < minp or window_len == ddof:
+        if window_len < minp or window_len <= ddof:
             out[i] = np.nan
         else:
-            var = m2 / (window_len - ddof)
-            if var < 0.0:
-                # Guard against tiny negative values caused by floating-point round-off
-                # in the remove-point update; mathematically var >= 0 always.
-                var = 0.0
-            out[i] = np.sqrt(var)
+            if m2 < 0.0:
+                # Reverse Welford (the remove-point update) can drift M2 negative. Tiny
+                # drift is round-off and safe to clamp; larger drift means the running
+                # state has become unstable, so recompute it from scratch over the
+                # current window instead of reporting a wrong variance as zero. The
+                # tolerance is scaled by the residual (spread) magnitude, not by `mean`
+                # itself, since a large offset in `mean` is unrelated to how negative
+                # round-off can push M2.
+                tol = 1e-6 * window_len * (abs(resid_scale2) + 1e-300)
+                if m2 < -tol:
+                    lo = i - window + 1
+                    if lo < 0:
+                        lo = 0
+                    mean = 0.0
+                    m2 = 0.0
+                    cnt = 0
+                    for j in range(lo, i + 1):
+                        v = a[j]
+                        if not np.isnan(v):
+                            cnt = cnt + 1
+                            delta = v - mean
+                            mean = mean + delta / cnt
+                            delta2 = v - mean
+                            m2 = m2 + delta * delta2
+                    window_len = cnt
+                else:
+                    m2 = 0.0
+            out[i] = np.sqrt(m2 / (window_len - ddof))
     return out
 
 
