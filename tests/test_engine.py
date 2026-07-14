@@ -540,6 +540,16 @@ class TestGenericRustParity:
             equal_nan=True,
         )
         np.testing.assert_allclose(
+            dispatch.rolling_std_1d(a_1d, 0, 0, 0, engine="rust"),
+            np.full(a_1d.shape, np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
+            dispatch.rolling_std(a, 0, 0, 0, engine="rust"),
+            np.full(a.shape, np.nan),
+            equal_nan=True,
+        )
+        np.testing.assert_allclose(
             dispatch.expanding_std_1d(a_1d, 1, 5, engine="rust"),
             np.full(a_1d.shape, np.nan),
             equal_nan=True,
@@ -548,6 +558,41 @@ class TestGenericRustParity:
             dispatch.expanding_std(a, 1, 5, engine="rust"),
             np.full(a.shape, np.nan),
             equal_nan=True,
+        )
+
+    def test_rust_rolling_std_stability(self):
+        rng = np.random.default_rng(42)
+        window = 4000
+        a_1d = 1e8 + rng.normal(0, 0.01, 5000)
+        a_1d[::37] = np.nan
+        expected_1d = pd.Series(a_1d).rolling(window, min_periods=10).std(ddof=1).to_numpy()
+        np.testing.assert_allclose(
+            dispatch.rolling_std_1d(a_1d, window, 10, 1, engine="rust"),
+            expected_1d,
+            atol=1e-12,
+            rtol=0,
+            equal_nan=True,
+        )
+
+        base = np.column_stack((a_1d, a_1d[::-1]))
+        expected = pd.DataFrame(base).rolling(window, min_periods=10).std(ddof=1).to_numpy()
+        for a in (np.ascontiguousarray(base), np.asfortranarray(base)):
+            np.testing.assert_allclose(
+                dispatch.rolling_std(a, window, 10, 1, engine="rust"),
+                expected,
+                atol=1e-12,
+                rtol=0,
+                equal_nan=True,
+            )
+
+        rng = np.random.default_rng(7)
+        window = 30
+        unstable = 1e14 + rng.normal(0, 1.0, 7000)
+        base = np.ascontiguousarray(np.column_stack((unstable, unstable[::-1])))
+        expected = pd.DataFrame(base).rolling(window, min_periods=window).std(ddof=1).to_numpy()
+        np.testing.assert_array_equal(
+            dispatch.rolling_std(base, window, window, 1, engine="rust"),
+            expected,
         )
 
     def test_dispatch_drawdown_helpers_broadcast(self):

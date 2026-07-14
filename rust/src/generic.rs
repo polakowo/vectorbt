@@ -18,6 +18,7 @@ pub(crate) const RANGE_OPEN: i64 = 0;
 pub(crate) const RANGE_CLOSED: i64 = 1;
 const DRAWDOWN_ACTIVE: i64 = 0;
 const DRAWDOWN_RECOVERED: i64 = 1;
+const INV_COND_TOL: f64 = f64::EPSILON * 1e3;
 
 #[pyfunction]
 #[pyo3(signature = (a, seed=None))]
@@ -703,37 +704,97 @@ pub(crate) fn rolling_mean_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usi
     out
 }
 
+#[derive(Clone, Copy, Default)]
+struct RollingVarState {
+    count: usize,
+    mean: f64,
+    m2: f64,
+    compensation_add: f64,
+    compensation_remove: f64,
+    numerically_unstable: bool,
+}
+
+impl RollingVarState {
+    fn add(&mut self, val: f64) {
+        if val.is_nan() {
+            return;
+        }
+        let prev_m2 = self.m2;
+        self.count += 1;
+        let prev_mean = self.mean - self.compensation_add;
+        let y = val - self.compensation_add;
+        let delta = y - self.mean;
+        self.compensation_add = delta + self.mean - y;
+        self.mean += delta / self.count as f64;
+        self.m2 += (val - prev_mean) * (val - self.mean);
+        if prev_m2 * INV_COND_TOL > self.m2 {
+            self.numerically_unstable = true;
+        }
+    }
+
+    fn remove(&mut self, val: f64) {
+        if val.is_nan() {
+            return;
+        }
+        let prev_m2 = self.m2;
+        self.count -= 1;
+        if self.count > 0 {
+            let prev_mean = self.mean - self.compensation_remove;
+            let y = val - self.compensation_remove;
+            let delta = y - self.mean;
+            self.compensation_remove = delta + self.mean - y;
+            self.mean -= delta / self.count as f64;
+            self.m2 -= (val - prev_mean) * (val - self.mean);
+            if prev_m2 * INV_COND_TOL > self.m2 {
+                self.numerically_unstable = true;
+            }
+        } else {
+            self.mean = 0.0;
+            self.m2 = 0.0;
+            self.numerically_unstable = false;
+        }
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    fn std(&self, minp: usize, ddof: usize) -> f64 {
+        if self.count >= minp && self.count > ddof {
+            (self.m2 / (self.count - ddof) as f64).sqrt()
+        } else {
+            f64::NAN
+        }
+    }
+}
+
 pub(crate) fn rolling_std_2d_c(a: ArrayView2<'_, f64>, window: usize, minp: usize, ddof: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
     let dst = out.as_slice_mut().expect("owned array must be sliceable");
-    let mut sums = vec![0.0f64; ncols];
-    let mut sums_sq = vec![0.0f64; ncols];
-    let mut counts = vec![0usize; ncols];
+    let minp = minp.max(1);
+    let mut states = vec![RollingVarState::default(); ncols];
     for row in 0..nrows {
         let row_start = row * ncols;
         for col in 0..ncols {
-            let cur = src[row_start + col];
-            if !cur.is_nan() {
-                sums[col] += cur;
-                sums_sq[col] += cur * cur;
-                counts[col] += 1;
+            let state = &mut states[col];
+            let requires_recompute = row == 0 || window == 0;
+            if !requires_recompute && row >= window {
+                state.remove(src[(row - window) * ncols + col]);
             }
-            if row >= window {
-                let old = src[(row - window) * ncols + col];
-                if !old.is_nan() {
-                    sums[col] -= old;
-                    sums_sq[col] -= old * old;
-                    counts[col] -= 1;
+            if !requires_recompute {
+                state.add(src[row_start + col]);
+            }
+            if requires_recompute || state.numerically_unstable {
+                state.reset();
+                let start = (row + 1).saturating_sub(window);
+                for j in start..=row {
+                    state.add(src[j * ncols + col]);
                 }
+                state.numerically_unstable = false;
             }
-            let cnt = counts[col];
-            if cnt >= minp && cnt > ddof {
-                let mean = sums[col] / cnt as f64;
-                let variance = (sums_sq[col] - 2.0 * sums[col] * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
-                dst[row_start + col] = variance.abs().sqrt();
-            }
+            dst[row_start + col] = state.std(minp, ddof);
         }
     }
     out
@@ -1129,29 +1190,25 @@ pub(crate) fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64>
 pub(crate) fn rolling_std_1d(a: &[f64], window: usize, minp: usize, ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
-    let mut sum = 0.0f64;
-    let mut sum_sq = 0.0f64;
-    let mut cnt = 0usize;
+    let minp = minp.max(1);
+    let mut state = RollingVarState::default();
     for i in 0..n {
-        let cur = a[i];
-        if !cur.is_nan() {
-            sum += cur;
-            sum_sq += cur * cur;
-            cnt += 1;
+        let requires_recompute = i == 0 || window == 0;
+        if !requires_recompute && i >= window {
+            state.remove(a[i - window]);
         }
-        if i >= window {
-            let old = a[i - window];
-            if !old.is_nan() {
-                sum -= old;
-                sum_sq -= old * old;
-                cnt -= 1;
+        if !requires_recompute {
+            state.add(a[i]);
+        }
+        if requires_recompute || state.numerically_unstable {
+            state.reset();
+            let start = (i + 1).saturating_sub(window);
+            for j in start..=i {
+                state.add(a[j]);
             }
+            state.numerically_unstable = false;
         }
-        if cnt >= minp && cnt > ddof {
-            let mean = sum / cnt as f64;
-            let variance = (sum_sq - 2.0 * sum * mean + cnt as f64 * mean * mean) / (cnt - ddof) as f64;
-            out[i] = variance.abs().sqrt();
-        }
+        out[i] = state.std(minp, ddof);
     }
     out
 }
