@@ -276,6 +276,55 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_std(test_window), df.rolling(test_window).std())
 
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_rolling_std_numerical_stability(self, test_ddof):
+        # Regression test for https://github.com/polakowo/vectorbt/issues/714:
+        # a naive two-pass (sum-of-squares minus mean-squared) rolling std formula loses
+        # precision through catastrophic cancellation when values have a large offset
+        # relative to their variance (e.g. large price levels with tiny fluctuations).
+        rng = np.random.default_rng(42)
+        window = 4000
+        large_offset_series = pd.Series(1e8 + rng.normal(0, 0.01, 5000))
+        got = large_offset_series.vbt.rolling_std(window, minp=window, ddof=test_ddof)
+        expected = large_offset_series.rolling(window, min_periods=window).std(ddof=test_ddof)
+        pd.testing.assert_series_equal(got, expected, atol=1e-6, rtol=0)
+
+        # Same check with NaNs sprinkled in, exercising the min-periods/NaN-count bookkeeping.
+        large_offset_nan_series = large_offset_series.copy()
+        large_offset_nan_series.iloc[::37] = np.nan
+        got_nan = large_offset_nan_series.vbt.rolling_std(window, minp=10, ddof=test_ddof)
+        expected_nan = large_offset_nan_series.rolling(window, min_periods=10).std(ddof=test_ddof)
+        pd.testing.assert_series_equal(got_nan, expected_nan, atol=1e-6, rtol=0)
+
+    def test_rolling_std_ddof_exceeds_window(self):
+        # window_len <= ddof must return NaN (not zero from a negative divisor).
+        a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        out = nb.rolling_std_1d_nb(a, window=2, minp=1, ddof=5)
+        assert np.isnan(out).all()
+
+    def test_rolling_std_material_m2_drift_not_blind_clamped(self):
+        # At an offset extreme enough to make the remove-point update's M2 drift materially
+        # negative (verified: offset=1e14, window=30 pushes M2 as low as -40, far beyond
+        # round-off noise), blindly clamping every negative M2 to zero silently reports
+        # zero volatility for windows that clearly have some (1181/49971 points wrongly
+        # exactly zero, measured against a freshly-computed per-window std.stat as ground
+        # truth). The recompute-on-material-drift path must not do that.
+        rng = np.random.default_rng(7)
+        window = 30
+        a = 1e14 + rng.normal(0, 1.0, 50000)
+        got = nb.rolling_std_1d_nb(a, window=window, minp=window, ddof=1)
+        fresh = np.array(
+            [np.std(a[i - window + 1 : i + 1], ddof=1) for i in range(window - 1, len(a))]
+        )
+        has_real_std = fresh > 0.3
+        is_zero = got[window - 1 :] == 0.0
+        assert not np.any(is_zero & has_real_std)
+        assert not np.any(np.isnan(got[window - 1 :]))
+        # recompute should also land reasonably close to the fresh per-window ground truth,
+        # not merely "not exactly zero"
+        rel_err = np.abs(got[window - 1 :] - fresh) / fresh
+        assert np.median(rel_err) < 0.2
+
     @pytest.mark.parametrize(
         "test_window,test_minp,test_adjust", list(product([1, 2, 3, 4, 5], [1, None], [False, True]))
     )

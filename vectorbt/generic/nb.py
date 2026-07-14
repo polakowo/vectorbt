@@ -759,42 +759,77 @@ def rolling_mean_nb(a: tp.Array2d, window: int, minp: tp.Optional[int] = None) -
 def rolling_std_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
     """Return rolling standard deviation.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`.
+
+    Uses Welford's algorithm for numerical stability."""
     if minp is None:
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float64)
-    cumsum_arr = np.zeros_like(a)
-    cumsum = 0
-    cumsum_sq_arr = np.zeros_like(a)
-    cumsum_sq = 0
-    nancnt_arr = np.zeros_like(a)
-    nancnt = 0
+    mean = 0.0
+    m2 = 0.0
+    cnt = 0
+    # Decayed estimate of the per-point squared residual (~ local variance), used below
+    # to judge whether a negative M2 is tiny round-off or material drift. This tracks the
+    # data's actual spread, unlike `mean`, which is dominated by any large offset and so
+    # is useless as a drift-tolerance scale.
+    resid_scale2 = 0.0
     for i in range(a.shape[0]):
-        if np.isnan(a[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + a[i]
-            cumsum_sq = cumsum_sq + a[i] ** 2
-        nancnt_arr[i] = nancnt
-        cumsum_arr[i] = cumsum
-        cumsum_sq_arr[i] = cumsum_sq
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-            window_cumsum_sq = cumsum_sq
-        else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum = cumsum - cumsum_arr[i - window]
-            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
-        if window_len < minp or window_len == ddof:
+        add_val = a[i]
+        if not np.isnan(add_val):
+            cnt = cnt + 1
+            delta = add_val - mean
+            mean = mean + delta / cnt
+            delta2 = add_val - mean
+            m2 = m2 + delta * delta2
+            resid_scale2 = 0.9 * resid_scale2 + 0.1 * delta * delta2
+        if i >= window:
+            rem_val = a[i - window]
+            if not np.isnan(rem_val):
+                if cnt == 1:
+                    cnt = 0
+                    mean = 0.0
+                    m2 = 0.0
+                else:
+                    new_cnt = cnt - 1
+                    delta = rem_val - mean
+                    mean = mean - delta / new_cnt
+                    delta2 = rem_val - mean
+                    m2 = m2 - delta * delta2
+                    cnt = new_cnt
+        window_len = cnt
+        if window_len < minp or window_len <= ddof:
             out[i] = np.nan
         else:
-            mean = window_cumsum / window_len
-            out[i] = np.sqrt(
-                np.abs(window_cumsum_sq - 2 * window_cumsum * mean + window_len * mean**2) / (window_len - ddof)
-            )
+            if m2 < 0.0:
+                # Reverse Welford (the remove-point update) can drift M2 negative. Tiny
+                # drift is round-off and safe to clamp; larger drift means the running
+                # state has become unstable, so recompute it from scratch over the
+                # current window instead of reporting a wrong variance as zero. The
+                # tolerance is scaled by the residual (spread) magnitude, not by `mean`
+                # itself, since a large offset in `mean` is unrelated to how negative
+                # round-off can push M2.
+                tol = 1e-6 * window_len * (abs(resid_scale2) + 1e-300)
+                if m2 < -tol:
+                    lo = i - window + 1
+                    if lo < 0:
+                        lo = 0
+                    mean = 0.0
+                    m2 = 0.0
+                    cnt = 0
+                    for j in range(lo, i + 1):
+                        v = a[j]
+                        if not np.isnan(v):
+                            cnt = cnt + 1
+                            delta = v - mean
+                            mean = mean + delta / cnt
+                            delta2 = v - mean
+                            m2 = m2 + delta * delta2
+                    window_len = cnt
+                else:
+                    m2 = 0.0
+            out[i] = np.sqrt(m2 / (window_len - ddof))
     return out
 
 
