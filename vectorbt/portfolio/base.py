@@ -1610,7 +1610,61 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             init_cash=new_init_cash,
             call_seq=new_call_seq,
         )
+    def walk_forward(
+        self,
+        train_size: int,
+        test_size: int,
+        step_size: int = 1,
+        metric: str = "total_return",
+        agg_func=None,
+    ) -> pd.DataFrame:
+        """Run simple walk-forward analysis on this portfolio.
 
+        Splits the portfolio time index into rolling train/test windows.
+        Train windows always come before test windows to avoid lookahead leakage.
+        """
+
+        if train_size <= 0:
+            raise ValueError("train_size must be greater than 0")
+        if test_size <= 0:
+            raise ValueError("test_size must be greater than 0")
+        if step_size <= 0:
+            raise ValueError("step_size must be greater than 0")
+
+        index = self.wrapper.index
+        n = len(index)
+
+        results = []
+
+        for start in range(0, n - train_size - test_size + 1, step_size):
+            train_start = start
+            train_end = start + train_size
+            test_start = train_end
+            test_end = test_start + test_size
+
+            returns = self.returns()
+            train_returns = returns.iloc[train_start:train_end]
+            test_returns = returns.iloc[test_start:test_end]
+            train_metric = train_returns.mean()
+            test_metric = test_returns.mean()
+            if agg_func is not None:
+                train_metric = agg_func(train_metric)
+                test_metric = agg_func(test_metric)
+                
+            results.append(
+                dict(
+                    split=len(results),
+                    train_start=index[train_start],
+                    train_end=index[train_end - 1],
+                    test_start=index[test_start],
+                    test_end=index[test_end - 1],
+                    train_metric=train_metric,
+                    test_metric=test_metric,
+                )
+            )
+
+        return pd.DataFrame(results)
+    
     # ############# Class methods ############# #
 
     @classmethod
