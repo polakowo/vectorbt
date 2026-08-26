@@ -56,7 +56,7 @@ def test_fxmacrodata_download_symbol_fetches_close_only_ohlcv():
     )
     pd.testing.assert_frame_equal(actual, expected)
     assert captured == {
-        "url": "https://fxmacrodata.com/api/v1/forex/eur/usd",
+        "url": "https://api.fxmacrodata.com/v1/forex/eur/usd",
         "params": {
             "start_date": "2024-01-01",
             "end_date": "2024-01-31",
