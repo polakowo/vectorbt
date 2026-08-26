@@ -328,7 +328,7 @@ class FXMacroData(Data):
         start: tp.DatetimeLike = "365 days ago UTC",
         end: tp.DatetimeLike = "now UTC",
         api_key: tp.Optional[str] = None,
-        base_url: str = "https://fxmacrodata.com/api/v1",
+        base_url: str = "https://api.fxmacrodata.com/v1",
         timeout: float = 30,
         **kwargs,
     ) -> tp.Frame:
