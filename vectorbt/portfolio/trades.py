@@ -910,8 +910,17 @@ class Trades(Ranges):
             profit_mask = pnl > 0
             loss_mask = pnl < 0
 
-            marker_size = min_rel_rescale(np.abs(returns), marker_size_range)
-            opacity = max_rel_rescale(np.abs(returns), opacity_range)
+            # Exclude NaN and infinity so they cannot contaminate scaling for every trade marker.
+            abs_returns = np.abs(returns)
+            finite_mask = np.isfinite(abs_returns)
+
+            # Start unknown returns at the lower bounds, which are valid Plotly marker values.
+            marker_size = np.full(abs_returns.shape, marker_size_range[0], dtype=float)
+            opacity = np.full(abs_returns.shape, opacity_range[0], dtype=float)
+            if np.any(finite_mask):
+                # Preserve the existing relative scale for finite trades only.
+                marker_size[finite_mask] = min_rel_rescale(abs_returns[finite_mask], marker_size_range)
+                opacity[finite_mask] = max_rel_rescale(abs_returns[finite_mask], opacity_range)
 
             open_mask = status == TradeStatus.Open
             closed_profit_mask = (~open_mask) & profit_mask
