@@ -1615,13 +1615,53 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         train_size: int,
         test_size: int,
         step_size: int = 1,
+        expanding: bool = False,
+        purging: int = 0,
         metric: str = "total_return",
         agg_func=None,
     ) -> pd.DataFrame:
-        """Run simple walk-forward analysis on this portfolio.
+        """Run walk-forward analysis on this portfolio.
 
         Splits the portfolio time index into rolling train/test windows.
         Train windows always come before test windows to avoid lookahead leakage.
+
+        Args:
+            train_size: Number of periods in each training window.
+            test_size: Number of periods in each test (out-of-sample) window.
+            step_size: Number of periods to advance between folds (default 1).
+            expanding: If True, each fold uses an expanding window
+                (train_start=0, train_end grows by step_size each fold).
+                If False (default), uses a fixed-length rolling window.
+            purging: Number of periods to exclude between training and test
+                windows to prevent data leakage from overlapping observations
+                (also known as purge gap, Lopez de Prado 2018). Default 0.
+            metric: Name of the metric to compute. Supports:
+                - "total_return": cumulative return (mean of returns * n_periods)
+                - "sharpe_ratio": Sharpe ratio (requires freq set on wrapper)
+                - "max_drawdown": maximum drawdown
+                - "sortino_ratio": Sortino ratio (requires freq)
+                Or any pandas accessor method on returns Series.
+            agg_func: Optional aggregation function applied to the returns series
+                before computing the metric (e.g., np.sum, np.mean).
+
+        Returns:
+            pd.DataFrame with one row per fold and columns:
+            - split: fold index
+            - train_start, train_end: training window date range
+            - test_start, test_end: test window date range
+            - train_metric, test_metric: metric values for each window
+            - n_train, n_test: number of periods in each window
+
+        Note on purging:
+            The purge gap excludes `purging` periods from the end of the training
+            window and the beginning of the test window. This removes observations
+            that would appear in both windows under pure rolling splits, eliminating
+            the "information leakage" that overfits parameters to test data.
+
+        Example:
+            >>> pf = vbt.Portfolio.from_holding(close)
+            >>> result = pf.walk_forward(train_size=60, test_size=20, purging=5)
+            >>> print(result[["train_metric", "test_metric"]].mean())
         """
 
         if train_size <= 0:
@@ -1630,40 +1670,134 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             raise ValueError("test_size must be greater than 0")
         if step_size <= 0:
             raise ValueError("step_size must be greater than 0")
+        if purging < 0:
+            raise ValueError("purging must be >= 0")
 
         index = self.wrapper.index
         n = len(index)
 
+        # All supported single-metric names and their accessor paths
+        METRIC_METHODS = {
+            "total_return": None,          # use returns.mean() * n
+            "sharpe_ratio": "sharpe_ratio",
+            "max_drawdown": "max_drawdown",
+            "sortino_ratio": "sortino_ratio",
+            "calmar_ratio": "calmar_ratio",
+        }
+
+        def compute_metric(returns_series: pd.Series, metric_name: str):
+            """Compute a named metric from a returns Series."""
+            if metric_name == "total_return":
+                if agg_func is not None:
+                    return agg_func(returns_series) * len(returns_series)
+                return returns_series.mean() * len(returns_series)
+            accessor_path = METRIC_METHODS.get(metric_name)
+            if accessor_path is None:
+                # Fallback: treat metric as a pandas accessor method name
+                accessor = returns_series.vbt.returns()
+                if hasattr(accessor, metric_name):
+                    return getattr(accessor, metric_name)()
+                # Fallback to mean
+                return returns_series.mean()
+            accessor = returns_series.vbt.returns()
+            return getattr(accessor, accessor_path)()
+
         results = []
+        max_fold_start = n - test_size - (0 if expanding else train_size)
 
-        for start in range(0, n - train_size - test_size + 1, step_size):
-            train_start = start
-            train_end = start + train_size
-            test_start = train_end
-            test_end = test_start + test_size
+        if expanding:
+            # Expanding window: train_start=0 always, train_end grows each fold
+            for test_start in range(train_size, max_fold_start + 1, step_size):
+                train_start = 0
+                train_end = test_start  # train window = [0, test_start)
+                gap_end = train_end
+                gap_start = gap_end - purging if purging > 0 else train_end
+                test_end_local = min(test_start + test_size, n)
 
-            returns = self.returns()
-            train_returns = returns.iloc[train_start:train_end]
-            test_returns = returns.iloc[test_start:test_end]
-            train_metric = train_returns.mean()
-            test_metric = test_returns.mean()
-            if agg_func is not None:
-                train_metric = agg_func(train_metric)
-                test_metric = agg_func(test_metric)
-                
-            results.append(
-                dict(
-                    split=len(results),
-                    train_start=index[train_start],
-                    train_end=index[train_end - 1],
-                    test_start=index[test_start],
-                    test_end=index[test_end - 1],
-                    train_metric=train_metric,
-                    test_metric=test_metric,
+                returns = self.returns()
+                # Purge: exclude purged periods from train and beginning of test
+                train_returns = returns.iloc[train_start:gap_start]
+                test_returns = returns.iloc[test_start:test_end_local]
+
+                if len(train_returns) == 0 or len(test_returns) == 0:
+                    continue
+
+                train_val = compute_metric(train_returns, metric)
+                test_val = compute_metric(test_returns, metric)
+
+                results.append(
+                    dict(
+                        split=len(results),
+                        train_start=index[train_start],
+                        train_end=index[gap_start - 1] if gap_start > train_start else index[train_start],
+                        test_start=index[test_start],
+                        test_end=index[test_end_local - 1],
+                        train_metric=train_val,
+                        test_metric=test_val,
+                        n_train=len(train_returns),
+                        n_test=len(test_returns),
+                        window_type="expanding",
+                    )
                 )
-            )
+        else:
+            # Rolling window: fixed train_size, slides by step_size
+            for start in range(0, max_fold_start + 1, step_size):
+                train_start = start
+                train_end = start + train_size
+                gap_end = train_end
+                gap_start = gap_end - purging if purging > 0 else train_end
+                test_start = gap_end
+                test_end_local = min(test_start + test_size, n)
 
-        return pd.DataFrame(results)
+                returns = self.returns()
+                train_returns = returns.iloc[train_start:gap_start]
+                test_returns = returns.iloc[test_start:test_end_local]
+
+                if len(train_returns) == 0 or len(test_returns) == 0:
+                    continue
+
+                train_val = compute_metric(train_returns, metric)
+                test_val = compute_metric(test_returns, metric)
+
+                results.append(
+                    dict(
+                        split=len(results),
+                        train_start=index[train_start],
+                        train_end=index[gap_start - 1] if gap_start > train_start else index[train_start],
+                        test_start=index[test_start],
+                        test_end=index[test_end_local - 1],
+                        train_metric=train_val,
+                        test_metric=test_val,
+                        n_train=len(train_returns) + (purging if purging > 0 else 0),
+                        n_test=len(test_returns),
+                        window_type="rolling",
+                    )
+                )
+
+        df = pd.DataFrame(results)
+        if len(df) == 0:
+            return df
+
+        # Add summary statistics row
+        summary = dict(
+            split="summary",
+            train_start=df["train_start"].iloc[0],
+            train_end=df["train_end"].iloc[0],
+            test_start=df["test_start"].iloc[0],
+            test_end=df["test_end"].iloc[-1],
+            train_metric=df["train_metric"].mean(),
+            test_metric=df["test_metric"].mean(),
+            test_metric_std=df["test_metric"].std(),
+            test_metric_min=df["test_metric"].min(),
+            test_metric_max=df["test_metric"].max(),
+            n_train=df["n_train"].iloc[0],
+            n_test=df["n_test"].iloc[0],
+            window_type=df["window_type"].iloc[0],
+        )
+        # Append summary as last row
+        df_summary = pd.concat([df, pd.DataFrame([summary])], ignore_index=True)
+
+        return df_summary
     
     # ############# Class methods ############# #
 
