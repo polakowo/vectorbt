@@ -271,9 +271,6 @@
     },
     "title": {
       "x": 0.05
-    },
-    "mapbox": {
-      "style": "light"
     }
   }
 }

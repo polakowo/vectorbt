@@ -391,17 +391,6 @@
         }
       }
     ],
-    "scattermapbox": [
-      {
-        "type": "scattermapbox",
-        "marker": {
-          "colorbar": {
-            "outlinewidth": 0,
-            "ticks": ""
-          }
-        }
-      }
-    ],
     "scatterternary": [
       {
         "type": "scatterternary",
@@ -754,9 +743,6 @@
       "borderwidth": 1,
       "bordercolor": "#1f2536",
       "tickwidth": 0
-    },
-    "mapbox": {
-      "style": "dark"
     }
   }
 }
