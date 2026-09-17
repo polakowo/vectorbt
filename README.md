@@ -52,7 +52,13 @@
 
 Explore thousands of trading ideas across assets and timeframes, analyze portfolio performance down to individual trades, and visualize results interactively, all in a few lines of code. Built for both human researchers and AI agents, VectorBT combines large-scale experimentation with a mature, battle-tested backtesting stack refined through years of community use.
 
-VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt.pro/), a state-of-the-art hybrid backtesting library.
+VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt.pro/).
+PRO extends the library with parallelization, additional data integrations, portfolio optimization,
+pattern recognition, event projections, limit orders, leverage, and over 100 other features,
+with new features added weekly.
+
+See [VectorBT vs PRO](https://vectorbt.dev/getting-started/upgrade/) or browse
+[PRO feature examples](https://vectorbt.pro/features/).
 
 ## Features
 
@@ -127,6 +133,13 @@ print(pf.total_profit())
 34417.80960086067
 ```
 
+> [!TIP]
+> **VectorBT PRO**
+>
+> Simulate [limit orders](https://vectorbt.pro/features/portfolio/#limit-orders),
+> use [leverage](https://vectorbt.pro/features/portfolio/#leverage), and model futures with
+> [contract multipliers](https://vectorbt.pro/features/portfolio/#contract-multiplier).
+
 ### Generate 1,000 random strategies
 
 ```python
@@ -167,6 +180,15 @@ fig.show()
 ```
 
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
+
+> [!TIP]
+> **VectorBT PRO**
+>
+> Use [random search](https://vectorbt.pro/features/optimization/#random-search) to sample a large
+> parameter grid, or [conditional parameters](https://vectorbt.pro/features/optimization/#conditional-parameters)
+> to exclude combinations such as a fast MA window longer than the slow MA window. The
+> [cross-validation tutorial](https://vectorbt.pro/tutorials/cross-validation/)
+> shows how to select parameters on training data and evaluate them on later periods.
 
 ### Inspect any strategy configuration
 

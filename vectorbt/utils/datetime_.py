@@ -1,7 +1,15 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Utilities for working with dates and time."""
+"""Utilities for working with dates and time.
+
+!!! tip "VectorBT PRO"
+
+    [Numba datetime functions](https://vectorbt.pro/features/productivity/#numba-datetime)
+    extract time and weekday information from timestamps inside compiled code, for example
+    to restrict calculations to trading hours.
+
+"""
 
 from datetime import datetime, timezone, timedelta, tzinfo, time
 

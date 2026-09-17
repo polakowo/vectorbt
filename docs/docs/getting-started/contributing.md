@@ -1,4 +1,5 @@
 ---
+icon: lucide/heart-handshake
 title: Contributing
 ---
 
@@ -55,7 +56,13 @@ To preview the documentation locally:
 
 ```bash
 cd docs
-mkdocs serve
+zensical serve
 ```
 
 Then open `http://127.0.0.1:8000` in your browser.
+
+## Supporting development
+
+[VectorBT PRO membership](https://vectorbt.pro/become-a-member/) funds ongoing development
+through crowdfunding. Members can influence development by requesting features and discussing
+their requirements directly with the author. See [VectorBT vs PRO](upgrade.md#getting-access) for details.

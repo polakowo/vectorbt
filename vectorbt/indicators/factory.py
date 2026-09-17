@@ -31,6 +31,13 @@ Each generated class includes the following features:
 * Supports pandas and parameter indexing
 * Offers helper methods for all inputs, outputs, and properties
 
+!!! tip "VectorBT PRO"
+
+    Wrap functions that accept [one-dimensional inputs](https://vectorbt.pro/features/indicators/#1d-native-indicators),
+    [run parameter combinations in parallel](https://vectorbt.pro/features/indicators/#parallelizable-indicators),
+    or [run all indicators from a package](https://vectorbt.pro/features/indicators/#indicators-for-ml)
+    to generate features for a machine-learning model.
+
 Consider the following price DataFrame composed of two columns, one per asset:
 
 ```pycon

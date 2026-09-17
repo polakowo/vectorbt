@@ -3,7 +3,15 @@
 
 """Splitters for cross-validation.
 
-Defines splitter classes similar (but may not compatible) to `sklearn.model_selection.BaseCrossValidator`."""
+Defines splitter classes similar (but may not compatible) to `sklearn.model_selection.BaseCrossValidator`.
+
+!!! tip "VectorBT PRO"
+
+    Apply [purging and embargoing](https://vectorbt.pro/features/optimization/#purged-cv)
+    to cross-validation splits, [run a function on each split](https://vectorbt.pro/features/optimization/#split-decorator),
+    and inspect [rolling, expanding, and time-anchored splits](https://vectorbt.pro/features/optimization/#splitter).
+
+"""
 
 import math
 

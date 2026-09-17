@@ -15,6 +15,7 @@ nav = [
     { "Features" = "getting-started/features.md" },
     { "Installation" = "getting-started/installation.md" },
     { "Usage" = "getting-started/usage.md" },
+    { "Upgrade" = "getting-started/upgrade.md" },
     { "Resources" = "getting-started/resources.md" },
     { "Contributing" = "getting-started/contributing.md" },
   ] },

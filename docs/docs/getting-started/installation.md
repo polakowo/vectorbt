@@ -1,4 +1,5 @@
 ---
+icon: lucide/download
 title: Installation
 ---
 
@@ -29,6 +30,10 @@ To install all optional integrations together with the Rust engine:
 ```sh
 pip install -U "vectorbt[full,rust]"
 ```
+
+For VectorBT PRO access and installation requirements, see the
+[setup FAQ](https://vectorbt.pro/faq/#setup-and-compatibility). For native Rust applications,
+see the [PRO Rust setup guide](https://vectorbt.pro/documentation/rust/).
 
 ## With Docker
 

@@ -49,6 +49,11 @@ The accessors extend `vectorbt.generic.accessors`.
 0.09090909090909083
 ```
 
+!!! tip "VectorBT PRO"
+
+    See the [rolling metrics examples](https://vectorbt.pro/features/performance/#hyperfast-rolling-metrics)
+    for optimized calculations of rolling Sharpe ratios and other return statistics.
+
 ## Defaults
 
 `vectorbt.returns.accessors.ReturnsAccessor` accepts `defaults` dictionary where you can pass

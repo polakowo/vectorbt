@@ -5,6 +5,13 @@
 
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 
+!!! tip "VectorBT PRO"
+
+    Additional indicators include the [Hurst exponent](https://vectorbt.pro/features/indicators/#hurst-exponent)
+    and [Smart Money Concepts](https://vectorbt.pro/features/indicators/#smart-money-concepts).
+    [Streaming indicators](https://vectorbt.pro/features/indicators/#streaming-indicators)
+    update their values one observation at a time.
+
 ```pycon
 >>> import pandas as pd
 >>> import vectorbt as vbt

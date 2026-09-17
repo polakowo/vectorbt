@@ -1,4 +1,5 @@
 ---
+icon: lucide/library
 title: Resources
 ---
 
@@ -30,7 +31,7 @@ Learning material, examples, articles, videos, and help channels for VectorBT. O
     <a class="resource-card" href="https://vectorbt.pro/">
         <span class="resource-kicker">VectorBT PRO</span>
         <strong>VectorBT PRO</strong>
-        <p>Learn more about the advanced edition and how to access features beyond open-source VectorBT.</p>
+        <p>Browse PRO features, code examples, and membership information.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Advanced features</span></span>
     </a>
 </div>
@@ -132,7 +133,7 @@ Run the notebooks locally to interact with widgets and dynamic charts.
     <a class="resource-card" href="https://vectorbt.pro/tutorials/mtf-analysis/">
         <span class="resource-kicker">VectorBT PRO</span>
         <strong>MTF analysis</strong>
-        <p>Work with multiple timeframes in a single research pipeline.</p>
+        <p>Calculate indicators on different timeframes and align them for backtesting.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">MTF</span></span>
     </a>
     <a class="resource-card" href="https://vectorbt.pro/tutorials/portfolio-optimization/">
@@ -144,14 +145,20 @@ Run the notebooks locally to interact with widgets and dynamic charts.
     <a class="resource-card" href="https://vectorbt.pro/tutorials/pairs-trading/">
         <span class="resource-kicker">VectorBT PRO</span>
         <strong>Pairs trading</strong>
-        <p>Research pairs-trading workflows with VectorBT PRO.</p>
+        <p>Implement a pairs-trading strategy in four ways and compare parameter combinations.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Stat arb</span></span>
     </a>
     <a class="resource-card" href="https://vectorbt.pro/tutorials/patterns-and-projections/">
         <span class="resource-kicker">VectorBT PRO</span>
         <strong>Patterns and projections</strong>
-        <p>Detect historical patterns and project similar future segments.</p>
+        <p>Detect chart patterns and analyze price movements after historical matches.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Patterns</span></span>
+    </a>
+    <a class="resource-card" href="https://vectorbt.pro/tutorials/from-python-to-rust/">
+        <span class="resource-kicker">VectorBT PRO</span>
+        <strong>From Python to Rust</strong>
+        <p>Take a strategy from Python to a standalone Rust program and update its simulation as new bars arrive.</p>
+        <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags resource-tags--pro">PRO</span><span class="resource-tags">Rust</span></span>
     </a>
     <a class="resource-card" href="https://vectorbt.pro/tutorials/cross-validation/">
         <span class="resource-kicker">VectorBT PRO</span>
@@ -601,7 +608,7 @@ Run the notebooks locally to interact with widgets and dynamic charts.
         <p>Open an issue when you have found what appears to be a bug.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags">Bugs</span></span>
     </a>
-    <a class="resource-card" href="https://vectorbt.pro/">
+    <a class="resource-card" href="https://vectorbt.pro/faq/#support">
         <span class="resource-kicker">VectorBT PRO</span>
         <strong>Discord server</strong>
         <p>VectorBT PRO members can use the community server for discussion and support.</p>

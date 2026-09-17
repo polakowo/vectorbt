@@ -1,7 +1,15 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Class and function decorators."""
+"""Class and function decorators.
+
+!!! tip "VectorBT PRO"
+
+    The [caching registry](https://vectorbt.pro/features/performance/#caching) tracks cached results
+    and their memory use. The [iterated decorator](https://vectorbt.pro/features/productivity/#iterated-decorator)
+    runs loop iterations in parallel.
+
+"""
 
 import inspect
 from functools import wraps, lru_cache

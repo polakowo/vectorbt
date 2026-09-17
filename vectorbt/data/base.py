@@ -7,6 +7,11 @@ Class `Data` allows storing, downloading, updating, and managing data. It stores
 as a dictionary of Series/DataFrames keyed by symbol, and makes sure that
 all pandas objects have the same index and columns by aligning them.
 
+!!! tip "VectorBT PRO"
+
+    Read and write [Parquet files](https://vectorbt.pro/features/data/#pyarrow--fastparquet)
+    and [SQL databases](https://vectorbt.pro/features/data/#sqlalchemy).
+
 ## Downloading
 
 Data can be downloaded by overriding the `Data.download_symbol` class method. What `Data` does

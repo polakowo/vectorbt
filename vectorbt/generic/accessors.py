@@ -647,6 +647,11 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         For `freq`, see `pd.DataFrame.resample`.
 
+        !!! tip "VectorBT PRO"
+
+            For aligning bars by when their price information becomes available, see the
+            [resampling examples](https://vectorbt.pro/features/productivity/#safe-resampling).
+
         Usage:
             ```pycon
             >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))

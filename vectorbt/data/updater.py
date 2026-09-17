@@ -1,7 +1,15 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Class for scheduling data updates."""
+"""Class for scheduling data updates.
+
+!!! tip "VectorBT PRO"
+
+    [Data savers](https://vectorbt.pro/features/data/#data-saver) periodically fetch new data
+    and write it to CSV or HDF5. [Parallel data updates](https://vectorbt.pro/features/data/#parallel-data)
+    process multiple symbols concurrently.
+
+"""
 
 import logging
 

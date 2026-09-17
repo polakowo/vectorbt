@@ -1,7 +1,15 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Utilities for configuration."""
+"""Utilities for configuration.
+
+!!! tip "VectorBT PRO"
+
+    Save and load objects using readable [configuration files](https://vectorbt.pro/features/productivity/#configuration-files),
+    or [compress serialized objects](https://vectorbt.pro/features/productivity/#compression)
+    to reduce disk usage.
+
+"""
 
 import inspect
 import pickle

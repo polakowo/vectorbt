@@ -1,7 +1,16 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Custom data classes that subclass `vectorbt.data.base.Data`."""
+"""Custom data classes that subclass `vectorbt.data.base.Data`.
+
+!!! tip "VectorBT PRO"
+
+    Additional providers include [Databento](https://vectorbt.pro/features/data/#databento) and
+    [TradingView](https://vectorbt.pro/features/data/#trading-view).
+    [Symbol search](https://vectorbt.pro/features/data/#symbol-search) retrieves available symbols
+    and filters them by name.
+
+"""
 
 import time
 import warnings

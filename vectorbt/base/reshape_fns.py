@@ -4,7 +4,16 @@
 """Functions for reshaping arrays.
 
 Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,
-and unstacking."""
+and unstacking.
+
+!!! tip "VectorBT PRO"
+
+    [Array-like parameters](https://vectorbt.pro/features/optimization/#array-like-parameters)
+    automatically broadcast combinations of values, such as stop distances, alongside time series.
+    [Align arrays with different indexes](https://vectorbt.pro/features/productivity/#index-alignment)
+    before broadcasting.
+
+"""
 
 import functools
 from collections.abc import Sequence

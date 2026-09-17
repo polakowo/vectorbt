@@ -1,7 +1,16 @@
 # Copyright (c) 2017-2026 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Utilities for working with parameters."""
+"""Utilities for working with parameters.
+
+!!! tip "VectorBT PRO"
+
+    Sample parameter combinations without constructing the full grid with
+    [lazy parameter grids](https://vectorbt.pro/features/optimization/#lazy-parameter-grids).
+    The [parameterized decorator](https://vectorbt.pro/features/optimization/#parameterized-decorator)
+    runs your function across parameter combinations and combines its outputs.
+
+"""
 
 import itertools
 from collections.abc import Callable

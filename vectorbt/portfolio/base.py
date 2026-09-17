@@ -61,6 +61,14 @@ Run for the examples below:
 
 * Offers a broad range of risk & performance metrics based on order records
 
+!!! tip "VectorBT PRO"
+
+    [Create portfolios from execution records](https://vectorbt.pro/features/portfolio/#portfolio-from-fills),
+    model futures with [contract multipliers](https://vectorbt.pro/features/portfolio/#contract-multiplier), or
+    [continue simulations as new data arrives](https://vectorbt.pro/features/portfolio/#portfolio-continuation).
+    The [portfolio documentation preview](https://vectorbt.pro/documentation/portfolio/)
+    shows the available simulation methods and analysis topics.
+
 ## Simulation modes
 
 There are three main simulation modes.

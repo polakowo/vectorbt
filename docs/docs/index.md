@@ -1,4 +1,5 @@
 ---
+icon: lucide/house
 title: Getting started
 ---
 
@@ -89,12 +90,13 @@ With VectorBT, you can
 
     Fetch and process data periodically, send Telegram notifications, and more
 
-- :gem:{ .lg .middle } **VectorBT PRO**
+- :material-heart-outline:{ .lg .middle } **Support us**
 
     ---
 
-    [__Support us__](https://vectorbt.pro/) to get access to parallelization, portfolio optimization, 
-    pattern recognition, event projections, limit orders, leverage, and 100+ other hot features!
+    Support VectorBT development with a [VectorBT PRO membership](https://vectorbt.pro/).
+    PRO adds parallelization, portfolio optimization, pattern recognition, event projections,
+    limit orders, leverage, and over 100 other features, with new features added weekly.
 
 </div>
 

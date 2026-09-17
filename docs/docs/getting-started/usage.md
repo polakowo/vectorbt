@@ -1,4 +1,5 @@
 ---
+icon: lucide/code
 title: Usage
 ---
 
@@ -33,6 +34,12 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 >>> print(pf.total_profit())
 34417.80960086067
 ```
+
+!!! tip "VectorBT PRO"
+
+    Simulate [limit orders](https://vectorbt.pro/features/portfolio/#limit-orders),
+    use [leverage](https://vectorbt.pro/features/portfolio/#leverage), and model futures with
+    [contract multipliers](https://vectorbt.pro/features/portfolio/#contract-multiplier).
 
 ### Generate 1,000 random strategies
 
@@ -74,6 +81,14 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 ```
 
 ![](/assets/images/usage_dmac_heatmap.gif)
+
+!!! tip "VectorBT PRO"
+
+    Use [random search](https://vectorbt.pro/features/optimization/#random-search) to sample a large
+    parameter grid, or [conditional parameters](https://vectorbt.pro/features/optimization/#conditional-parameters)
+    to exclude combinations such as a fast MA window longer than the slow MA window. The
+    [cross-validation tutorial](https://vectorbt.pro/tutorials/cross-validation/)
+    shows how to select parameters on training data and evaluate them on later periods.
 
 ### Inspect any strategy configuration
 
@@ -162,4 +177,6 @@ Explore candlestick patterns interactively and backtest their signals with Vecto
 
 ## Learn more
 
-Check out [Resources](resources.md) to learn more.
+See [Resources](resources.md) for community examples and learning material.
+[VectorBT vs PRO](upgrade.md) compares the editions.
+Browse the [VectorBT PRO tutorials](https://vectorbt.pro/tutorials/).

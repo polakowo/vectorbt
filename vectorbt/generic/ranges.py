@@ -43,6 +43,12 @@ are 0 and 20 (not 19!) respectively.
 Timedelta('74 days 00:00:00')
 ```
 
+!!! tip "VectorBT PRO"
+
+    [Pattern ranges](https://vectorbt.pro/features/analysis/#patterns) locate windows that match
+    a price pattern. [Projections](https://vectorbt.pro/features/analysis/#projections) collect
+    price paths after events and calculate their distributions.
+
 ## From accessors
 
 Moreover, all generic accessors have a property `ranges` and a method `get_ranges`:

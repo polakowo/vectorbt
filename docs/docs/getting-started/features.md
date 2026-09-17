@@ -1,4 +1,5 @@
 ---
+icon: lucide/gem
 title: Features
 ---
 
@@ -79,6 +80,13 @@ z  7  8  9
 1  2.0  NaN  NaN
 2  3.0  NaN  NaN
 ```
+
+!!! tip "VectorBT PRO"
+
+    [Array expressions](https://vectorbt.pro/features/productivity/#array-expressions) align and
+    broadcast arrays before evaluating a formula. [Index dictionaries](https://vectorbt.pro/features/productivity/#index-dictionaries)
+    let you assign values by date and asset without constructing full arrays yourself.
+    Supported calculations can also [process columns in parallel](https://vectorbt.pro/features/performance/#parallel-numba).
 
 ## Data
 
@@ -186,6 +194,13 @@ Data updated with 5 data points
   </iframe>
 </div>
 
+!!! tip "VectorBT PRO"
+
+    Read market data from [Databento](https://vectorbt.pro/features/data/#databento),
+    load local [CSV and HDF5 files](https://vectorbt.pro/features/data/#local-data), or run
+    [SQL queries](https://vectorbt.pro/features/data/#sql-queries) on data objects.
+    [Data caching](https://vectorbt.pro/features/data/#data-caching) saves fetched data to disk for reuse.
+
 ## Indicators
 
 - [x] **Technical indicators**: Most popular technical indicators with full Numba support and optional Rust acceleration for built-in kernels, including Moving Average, Bollinger Bands, RSI, Stochastic, MACD, and more. Out-of-the-box support for 99% indicators in **[Technical Analysis Library](https://github.com/bukosabino/ta)**, **[Pandas TA](https://github.com/twopirllc/pandas-ta)**, and **[TA-Lib](https://github.com/mrjbq7/ta-lib)** thanks to built-in parsers. Each indicator is wrapped with the VectorBT's indicator engine and thus accepts arbitrary hyperparameter combinations - from arrays to Cartesian products.
@@ -258,6 +273,14 @@ custom_sigma       0.01        0.01
 4             97.314277  214.762117
 ```
 
+!!! tip "VectorBT PRO"
+
+    Build indicators from [expressions](https://vectorbt.pro/features/indicators/#indicator-expressions),
+    calculate [rolling regressions](https://vectorbt.pro/features/indicators/#rolling-ols), or use
+    [WorldQuant's 101 alphas](https://vectorbt.pro/features/indicators/#worldquant-alphas).
+    The [multiple-timeframe tutorial](https://vectorbt.pro/tutorials/mtf-analysis/)
+    shows how to combine indicators calculated at different frequencies.
+
 ## Signals
 
 - [x] **Signal analysis**: Generation, mapping and reducing, ranking, and distribution analysis of entry and exit signals.
@@ -328,6 +351,14 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 2   True   True   True
 ```
 
+!!! tip "VectorBT PRO"
+
+    Detect [confirmed price pivots](https://vectorbt.pro/features/indicators/#pivot-detection)
+    and [outliers](https://vectorbt.pro/features/indicators/#signal-detection), or
+    [backtest each signal individually](https://vectorbt.pro/features/indicators/#signal-unraveling).
+    See the [signal development tutorial](https://vectorbt.pro/tutorials/signal-development/)
+    for examples of building entry and exit signals.
+
 ## Modeling
 
 - [x] **Portfolio modeling**: The fastest backtesting engine in open source: fills 1,000,000 orders in 70-100ms on Apple M1. Flexible and powerful simulation functions for portfolio modeling, highly optimized for highest performance and lowest memory footprint. Supports two major simulation modes: 1) vectorized backtesting using user-provided arrays, such as orders, signals, and records, and 2) event-driven backtesting using user-defined callbacks. Supports optional Rust acceleration for supported vectorized simulation, order, trade, position, and portfolio metric paths. Supports shorting and individual as well as multi-asset mixed portfolios. Combines many features across VectorBT into a single behemoth class.
@@ -374,6 +405,15 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
     scrolling="no">
   </iframe>
 </div>
+
+!!! tip "VectorBT PRO"
+
+    Simulate [limit orders](https://vectorbt.pro/features/portfolio/#limit-orders),
+    [leverage](https://vectorbt.pro/features/portfolio/#leverage),
+    [stop ladders](https://vectorbt.pro/features/portfolio/#stop-laddering), and
+    [cash deposits and withdrawals](https://vectorbt.pro/features/portfolio/#cash-deposits).
+    The [portfolio optimization tutorial](https://vectorbt.pro/tutorials/portfolio-optimization/)
+    covers asset allocation and rebalancing.
 
 ## Analysis
 
@@ -473,6 +513,13 @@ dtype: float64
   </iframe>
 </div>
 
+!!! tip "VectorBT PRO"
+
+    Find [price patterns](https://vectorbt.pro/features/analysis/#patterns) and analyze subsequent
+    price movements with [event projections](https://vectorbt.pro/features/analysis/#projections).
+    Measure [maximum adverse and favorable excursion (MAE and MFE)](https://vectorbt.pro/features/analysis/#mae-and-mfe)
+    and [edge ratio](https://vectorbt.pro/features/analysis/#edge-ratio) to examine trade entries and exits.
+
 ## Plotting
 
 - [x] **Data visualization**: Numerous flexible data plotting functions distributed across VectorBT.
@@ -532,6 +579,13 @@ dtype: float64
     scrolling="no">
   </iframe>
 </div>
+
+!!! tip "VectorBT PRO"
+
+    Plot [TA-Lib indicator outputs](https://vectorbt.pro/features/indicators/#ta-lib-plotting)
+    or [long and short trade signals](https://vectorbt.pro/features/analysis/#trade-signals).
+    [Portfolio slicing](https://vectorbt.pro/features/productivity/#slicing) lets you select
+    and plot a date range without running the simulation again.
 
 ## Extra
 
@@ -621,3 +675,9 @@ dtype: float64
 >>> pf.total_return()
 5.96813681074424
 ```
+
+!!! tip "VectorBT PRO"
+
+    Run independent functions in parallel with [tasks](https://vectorbt.pro/features/productivity/#tasks),
+    inspect memory use with the [caching registry](https://vectorbt.pro/features/performance/#caching),
+    and save objects in readable [configuration files](https://vectorbt.pro/features/productivity/#configuration-files).

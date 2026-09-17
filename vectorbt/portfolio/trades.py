@@ -17,6 +17,13 @@ of the entire symbol.
     All classes return both closed AND open trades/positions, which may skew your performance results.
     To only consider closed trades/positions, you should explicitly query the `closed` attribute.
 
+!!! tip "VectorBT PRO"
+
+    Track [MAE and MFE throughout each trade](https://vectorbt.pro/features/analysis/#expanding-trade-metrics),
+    measure [edge ratio](https://vectorbt.pro/features/analysis/#edge-ratio), and inspect
+    [trade history](https://vectorbt.pro/features/analysis/#trade-history) with orders, entry trades,
+    exit trades, and positions in one table.
+
 ## Trade types
 
 There are three main types of trades.
