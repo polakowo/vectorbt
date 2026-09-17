@@ -42,15 +42,15 @@ jobs:
         run: |
           python generate_api.py
 
-      - name: Update mkdocs navigation for API
+      - name: Update API navigation
         working-directory: docs
         run: |
           python update_api_nav.py
 
-      - name: Build MkDocs site
+      - name: Build Zensical site
         working-directory: docs
         run: |
-          mkdocs build --strict
+          zensical build --strict
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block extrahead %}
+    {{ super() }}
     {% if page and page.meta and page.meta.og_title %}
         <meta property="og:title" content="{{ page.meta.og_title }}" />
     {% elif page and page.meta and page.meta.title %}
@@ -20,7 +21,7 @@
     {% elif page and page.meta and page.meta.og_image %}
         <meta property="og:image:url" content="{{ page.meta.og_image }}" />
     {% else %}
-        <meta property="og:image:url" content="/assets/logo/social-512x512.png" />
+        <meta property="og:image:url" content="{{ config.site_url }}assets/logo/web-app-manifest-512x512.png" />
     {% endif %}
 
     {% if page and page.meta and page.meta.og_image_type %}
@@ -51,10 +52,10 @@
 
 {% block content %}
   {{ super() }}
-  {% if config.theme.sponsor %}
+  {% if config.extra.sponsor %}
   <footer class="sponsorship">
     <hr>
-    <a href="{{config.theme.sponsor}}" title="Become a sponsor">
+    <a href="{{config.extra.sponsor}}" title="Become a sponsor" aria-label="Become a sponsor">
       <span class="twemoji heart-throb-hover">
         {% set icon = "octicons/heart-fill-16" %}
         {% include ".icons/" ~ icon ~ ".svg" %}

@@ -73,9 +73,8 @@ test-rust = [
     "maturin>=1.14,<2.0",
 ]
 docs = [
-    "mkdocs-material",
-    "mkdocs-minify-plugin",
-    "ruamel.yaml",
+    "zensical>=0.0.62",
+    "tomlkit>=0.13",
     "mako",
 ]
 all = [

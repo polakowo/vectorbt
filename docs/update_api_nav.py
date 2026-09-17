@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ruamel.yaml import YAML
+import tomlkit
 
 
 def generate_nav_from_api(nav, root_dir=".", curr_dir="api"):
@@ -18,28 +18,35 @@ def generate_nav_from_api(nav, root_dir=".", curr_dir="api"):
             nav.append({p.stem: str(curr_dir / p.name)})
 
 
+def nav_to_toml(nav):
+    """Represent nested navigation with inline tables inside TOML arrays."""
+    result = tomlkit.array().multiline(True)
+    for item in nav:
+        if isinstance(item, dict):
+            entry = tomlkit.inline_table()
+            for title, target in item.items():
+                entry[title] = nav_to_toml(target) if isinstance(target, list) else target
+            result.append(entry)
+        else:
+            result.append(item)
+    return result
+
+
 if __name__ == "__main__":
-    mkdocs_path = Path("mkdocs.yml")
-
-    yaml = YAML()
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    yaml.width = 9999
-    yaml.explicit_start = False
-    yaml.explicit_end = False
-    yaml.preserve_quotes = True
-
-    data = yaml.load(mkdocs_path.read_text(encoding="utf-8"))
-    if "nav" not in data or not isinstance(data["nav"], list):
-        raise ValueError("mkdocs.yml has no top-level 'nav' list")
+    config_path = Path(__file__).with_name("zensical.toml")
+    data = tomlkit.parse(config_path.read_text(encoding="utf-8"))
+    nav = data.get("project", {}).get("nav")
+    if not isinstance(nav, list):
+        raise ValueError("zensical.toml has no 'project.nav' list")
 
     api_nav = []
-    generate_nav_from_api(api_nav, root_dir="docs")
+    generate_nav_from_api(api_nav, root_dir=config_path.parent / "docs")
 
-    for item in data["nav"]:
+    for item in nav:
         if isinstance(item, dict) and "API" in item:
-            item["API"] = api_nav
+            item["API"] = nav_to_toml(api_nav)
             break
     else:
         raise ValueError("Couldn't find an 'API' section under nav")
 
-    yaml.dump(data, mkdocs_path.open("w", encoding="utf-8"))
+    config_path.write_text(tomlkit.dumps(data), encoding="utf-8")

@@ -1,7 +1,7 @@
-/* Normal colors */
+/* VectorBT-specific components; the surrounding theme uses Zensical defaults. */
 :root {
-  --md-heart: #{$clr-red-a200};
-  --md-heart-big: #{$clr-red-a400};
+  --md-heart: #ff5252;
+  --md-heart-big: #ff1744;
 }
 
 .dobjtype {
@@ -56,11 +56,6 @@ footer.sponsorship:not(:hover) .twemoji.heart-throb-hover svg {
     color: var(--md-default-fg-color--lighter) !important;
 }
 
-.grid.cards li:last-of-type {
-    border-color: transparent !important;
-    box-shadow: var(--md-shadow-z3) !important;
-}
-
 .highlight .gp, .highlight .go {
     -webkit-user-select: none;  /* Chrome all / Safari all */
     -moz-user-select: none;     /* Firefox all */
@@ -93,6 +88,10 @@ footer.sponsorship:not(:hover) .twemoji.heart-throb-hover svg {
 
 .resource-card:hover {
     box-shadow: var(--md-shadow-z2);
+}
+
+.md-typeset a.resource-card {
+    text-decoration: none;
 }
 
 .resource-card strong {

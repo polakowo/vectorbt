@@ -9,13 +9,13 @@ Learning material, examples, articles, videos, and help channels for VectorBT. O
 ## Start here
 
 <div class="resources-grid">
-    <a class="resource-card" href="../installation/">
+    <a class="resource-card" href="installation.md">
         <span class="resource-kicker">Docs</span>
         <strong>Installation</strong>
         <p>Install VectorBT with the core package, optional Rust kernels, Docker, and extra dependencies.</p>
         <span class="resource-tag-row"><span class="resource-tags resource-tags--official">Official</span><span class="resource-tags">Setup</span></span>
     </a>
-    <a class="resource-card" href="../usage/">
+    <a class="resource-card" href="usage.md">
         <span class="resource-kicker">Docs</span>
         <strong>Usage examples</strong>
         <p>Start with holding, signal backtesting, parameter grids, interactive plots, and example apps.</p>
