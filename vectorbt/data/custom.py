@@ -330,6 +330,7 @@ class FXMacroData(Data):
         api_key: tp.Optional[str] = None,
         base_url: str = "https://api.fxmacrodata.com/v1",
         timeout: float = 30,
+        max_pages: int = 1000,
         **kwargs,
     ) -> tp.Frame:
         """Download daily FX spot/reference rates from FXMacroData.
@@ -347,6 +348,7 @@ class FXMacroData(Data):
                 If omitted, `FXMACRODATA_API_KEY` or `FXMD_API_KEY` will be used.
             base_url (str): FXMacroData API base URL.
             timeout (float): Request timeout in seconds.
+            max_pages (int): Maximum number of 100-row pages to request.
             **kwargs: Keyword arguments passed to `requests.get`.
         """
         base_currency, quote_currency = cls._split_pair(symbol)
@@ -367,18 +369,28 @@ class FXMacroData(Data):
             base_currency.lower(),
             quote_currency.lower(),
         )
-        response = requests.get(
-            url,
-            params=params,
-            timeout=timeout,
-            headers=headers,
-            **kwargs,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        rows = payload.get("data") if isinstance(payload, dict) else None
-        if not isinstance(rows, list):
-            raise ValueError("FXMacroData response did not include a data list")
+        # The API returns at most 100 rows per request (newest first),
+        # so page through the window until pagination.has_more is false
+        rows = []
+        offset = 0
+        for _ in range(max_pages):
+            response = requests.get(
+                url,
+                params={**params, "limit": 100, "offset": offset},
+                timeout=timeout,
+                headers=headers,
+                **kwargs,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            page = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(page, list):
+                raise ValueError("FXMacroData response did not include a data list")
+            rows.extend(page)
+            pagination = payload.get("pagination")
+            if not page or not isinstance(pagination, dict) or not pagination.get("has_more"):
+                break
+            offset = pagination.get("next_offset") or offset + len(page)
 
         records = []
         for row in rows:

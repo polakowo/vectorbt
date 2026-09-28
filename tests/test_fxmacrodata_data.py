@@ -60,11 +60,38 @@ def test_fxmacrodata_download_symbol_fetches_close_only_ohlcv():
         "params": {
             "start_date": "2024-01-01",
             "end_date": "2024-01-31",
+            "limit": 100,
+            "offset": 0,
         },
         "timeout": 12,
         "headers": {"Accept": "application/json", "X-API-Key": "test-key"},
         "kwargs": {},
     }
+
+
+def test_fxmacrodata_download_symbol_follows_pagination():
+    pages = {
+        0: {
+            "data": [{"date": "2024-01-03", "val": 1.092}, {"date": "2024-01-02", "val": 1.0943}],
+            "pagination": {"has_more": True, "next_offset": 2},
+        },
+        2: {
+            "data": [{"date": "2024-01-01", "val": 1.1038}],
+            "pagination": {"has_more": False, "next_offset": None},
+        },
+    }
+    offsets = []
+
+    def fake_get(url, params, timeout, headers, **kwargs):
+        assert params["limit"] == 100
+        offsets.append(params["offset"])
+        return FakeResponse(pages[params["offset"]])
+
+    with mock.patch("vectorbt.data.custom.requests.get", side_effect=fake_get):
+        actual = vbt.FXMacroData.download_symbol("EURUSD", start="2024-01-01 UTC", end="2024-01-31 UTC")
+
+    assert offsets == [0, 2]
+    assert actual["Close"].tolist() == [1.1038, 1.0943, 1.092]
 
 
 def test_fxmacrodata_integrates_with_data_download(monkeypatch):
