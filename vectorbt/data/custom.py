@@ -343,8 +343,8 @@ class FXMacroData(Data):
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
-            api_key (str): Optional FXMacroData API key. If omitted,
-                `FXMACRODATA_API_KEY` or `FXMD_API_KEY` will be used.
+            api_key (str): Optional FXMacroData API key, sent in the `X-API-Key` header.
+                If omitted, `FXMACRODATA_API_KEY` or `FXMD_API_KEY` will be used.
             base_url (str): FXMacroData API base URL.
             timeout (float): Request timeout in seconds.
             **kwargs: Keyword arguments passed to `requests.get`.
@@ -357,9 +357,10 @@ class FXMacroData(Data):
             "start_date": start_ts,
             "end_date": end_ts,
         }
+        headers = {"Accept": "application/json"}
         api_key = api_key or os.getenv("FXMACRODATA_API_KEY") or os.getenv("FXMD_API_KEY")
         if api_key:
-            params["api_key"] = api_key
+            headers["X-API-Key"] = api_key
 
         url = "{}/forex/{}/{}".format(
             base_url.rstrip("/"),
@@ -370,7 +371,7 @@ class FXMacroData(Data):
             url,
             params=params,
             timeout=timeout,
-            headers={"Accept": "application/json"},
+            headers=headers,
             **kwargs,
         )
         response.raise_for_status()
