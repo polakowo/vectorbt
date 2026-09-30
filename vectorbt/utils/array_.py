@@ -4,6 +4,7 @@
 """Utilities for working with arrays."""
 
 import numpy as np
+import math
 from numba import njit
 
 from vectorbt import _typing as tp
@@ -16,9 +17,13 @@ def is_sorted(a: tp.Array1d) -> np.bool_:
 
 @njit(cache=True)
 def is_sorted_nb(a: tp.Array1d) -> bool:
-    """Numba-compiled version of `is_sorted`."""
+    """Numba-compiled version of `is_sorted`.
+
+    Rejects arrays with NaN values to match the non-Numba behavior."""
     for i in range(a.size - 1):
-        if a[i + 1] < a[i]:
+        ai = a[i]
+        aip1 = a[i + 1]
+        if math.isnan(ai) or math.isnan(aip1) or aip1 < ai:
             return False
     return True
 

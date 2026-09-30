@@ -2027,6 +2027,20 @@ class TestArray:
         assert array_.is_sorted_nb(np.array([0]))
         assert not array_.is_sorted_nb(np.array([1, 0]))
         assert not array_.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
+        # NaN handling regression: both should reject arrays with NaN
+        # (single NaN has no adjacent pair to compare, so it passes)
+        assert not array_.is_sorted(np.array([1.0, 2.0, np.nan, 3.0]))
+        assert not array_.is_sorted_nb(np.array([1.0, 2.0, np.nan, 3.0]))
+        assert not array_.is_sorted(np.array([1.0, np.nan, 2.0]))
+        assert not array_.is_sorted_nb(np.array([1.0, np.nan, 2.0]))
+        assert not array_.is_sorted(np.array([np.nan, 1.0, 2.0]))
+        assert not array_.is_sorted_nb(np.array([np.nan, 1.0, 2.0]))
+        assert not array_.is_sorted(np.array([1.0, 1.0, np.nan, 2.0]))
+        assert not array_.is_sorted_nb(np.array([1.0, 1.0, np.nan, 2.0]))
+        assert not array_.is_sorted(np.array([np.nan, np.nan]))
+        assert not array_.is_sorted_nb(np.array([np.nan, np.nan]))
+        assert array_.is_sorted(np.array([np.nan]))
+        assert array_.is_sorted_nb(np.array([np.nan]))
 
     def test_insert_argsort_nb(self):
         a = np.random.uniform(size=1000)
