@@ -2021,12 +2021,14 @@ class TestArray:
         assert array_.is_sorted(np.array([0]))
         assert not array_.is_sorted(np.array([1, 0]))
         assert not array_.is_sorted(np.array([0, 1, 2, 4, 3]))
+        assert not array_.is_sorted(np.array([0.0, np.nan, 1.0]))
         # nb
         assert array_.is_sorted_nb(np.array([0, 1, 2, 3, 4]))
         assert array_.is_sorted_nb(np.array([0, 1]))
         assert array_.is_sorted_nb(np.array([0]))
         assert not array_.is_sorted_nb(np.array([1, 0]))
         assert not array_.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
+        assert not array_.is_sorted_nb(np.array([0.0, np.nan, 1.0]))
 
     def test_insert_argsort_nb(self):
         a = np.random.uniform(size=1000)
