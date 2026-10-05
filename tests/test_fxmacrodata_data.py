@@ -7,8 +7,9 @@ import vectorbt as vbt
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self.payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self):
         pass
@@ -65,7 +66,7 @@ def test_fxmacrodata_download_symbol_fetches_close_only_ohlcv():
         },
         "timeout": 12,
         "headers": {"Accept": "application/json", "X-API-Key": "test-key"},
-        "kwargs": {},
+        "kwargs": {"allow_redirects": False},
     }
 
 
@@ -115,3 +116,21 @@ def test_fxmacrodata_integrates_with_data_download(monkeypatch):
 def test_fxmacrodata_rejects_invalid_pair_shape():
     with pytest.raises(ValueError, match="EURUSD"):
         vbt.FXMacroData.download_symbol("EUR", start="2024-01-01 UTC", end="2024-01-31 UTC")
+
+
+def test_fxmacrodata_does_not_follow_redirects():
+    def fake_get(url, params, timeout, headers, **kwargs):
+        assert kwargs["allow_redirects"] is False
+        return FakeResponse({}, status_code=302)
+
+    with mock.patch("vectorbt.data.custom.requests.get", side_effect=fake_get):
+        with pytest.raises(ValueError, match="redirected"):
+            vbt.FXMacroData.download_symbol("EURUSD", api_key="test-key")
+
+
+def test_fxmacrodata_rejects_key_with_control_characters_without_echoing_it():
+    with mock.patch("vectorbt.data.custom.requests.get") as fake_get:
+        with pytest.raises(ValueError) as excinfo:
+            vbt.FXMacroData.download_symbol("EURUSD", api_key="test\nkey")
+    assert "test" not in str(excinfo.value)
+    fake_get.assert_not_called()

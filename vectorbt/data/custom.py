@@ -360,9 +360,13 @@ class FXMacroData(Data):
             "end_date": end_ts,
         }
         headers = {"Accept": "application/json"}
-        api_key = api_key or os.getenv("FXMACRODATA_API_KEY") or os.getenv("FXMD_API_KEY")
+        api_key = (api_key or os.getenv("FXMACRODATA_API_KEY") or os.getenv("FXMD_API_KEY") or "").strip()
         if api_key:
+            if any(ord(char) < 33 or ord(char) == 127 for char in api_key):
+                raise ValueError("FXMacroData API key contains whitespace or control characters")
             headers["X-API-Key"] = api_key
+        # Redirects are not followed so the key is never sent to another host
+        request_kwargs = {**kwargs, "allow_redirects": False}
 
         url = "{}/forex/{}/{}".format(
             base_url.rstrip("/"),
@@ -379,8 +383,10 @@ class FXMacroData(Data):
                 params={**params, "limit": 100, "offset": offset},
                 timeout=timeout,
                 headers=headers,
-                **kwargs,
+                **request_kwargs,
             )
+            if 300 <= response.status_code < 400:
+                raise ValueError(f"FXMacroData request was redirected (HTTP {response.status_code})")
             response.raise_for_status()
             payload = response.json()
             page = payload.get("data") if isinstance(payload, dict) else None
