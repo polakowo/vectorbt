@@ -10829,3 +10829,58 @@ class TestPortfolio:
             _ = pf.plot(subplots="all")
         with pytest.raises(Exception):
             _ = pf_grouped.plot(subplots="all")
+
+
+# ############# Issue #810: Best Trade [%] definition ############# #
+
+
+def test_best_trade_pct_definition():
+    """Regression test for issue #810.
+
+    Best Trade [%] is the maximum individual trade return, where each trade's
+    return = trade PnL / trade entry value (NOT PnL / portfolio initial cash).
+    """
+    # Two short trades: B has larger PnL, A has higher return
+    # Trade A: entry=100, exit=90, size=10  -> PnL=100,  Return=10%
+    # Trade B: entry=200, exit=190, size=100 -> PnL=1000, Return=5%
+    price = pd.Series(
+        [100.0, 90.0, 200.0, 190.0],
+        index=pd.date_range("2020-01-01", periods=4, freq="D"),
+    )
+    # Entries at 0 and 2, exits at 1 and 3
+    entries = pd.Series([True, False, True, False], index=price.index)
+    exits = pd.Series([False, True, False, True], index=price.index)
+    size = pd.Series([10.0, np.nan, 100.0, np.nan], index=price.index)
+
+    pf = vbt.Portfolio.from_signals(
+        price, entries, exits, size=size, direction="shortonly", init_cash=1000000
+    )
+
+    # B has the larger PnL
+    assert pf.trades.pnl.max() == 1000.0
+    # But A has the higher return -> Best Trade [%] must be 10.0, not 5.0
+    np.testing.assert_allclose(pf.trades.returns.max(), 0.10)
+    np.testing.assert_allclose(pf.stats()["Best Trade [%]"], 10.0)
+
+    # Definition consistency: stats value == max trade return * 100
+    expected = pf.trades.closed.returns.max() * 100
+    np.testing.assert_allclose(pf.stats()["Best Trade [%]"], expected)
+
+
+def test_short_trade_return_math():
+    """Short trade return = PnL / entry value, with correct sign handling."""
+    price = pd.Series(
+        [100.0, 90.0],
+        index=pd.date_range("2020-01-01", periods=2, freq="D"),
+    )
+    entries = pd.Series([True, False], index=price.index)
+    exits = pd.Series([False, True], index=price.index)
+
+    pf = vbt.Portfolio.from_signals(
+        price, entries, exits, size=10.0, direction="shortonly", fees=0.0
+    )
+    trade = pf.trades.records_readable.iloc[0]
+    # Short: profit when price falls. entry=100, exit=90, size=10
+    # PnL = 10 * (100 - 90) = 100, Return = 100 / (10 * 100) = 10%
+    np.testing.assert_allclose(trade["PnL"], 100.0)
+    np.testing.assert_allclose(trade["Return"], 0.10)
