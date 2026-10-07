@@ -148,7 +148,7 @@ def to_tzaware_datetime(
     elif isinstance(dt_like, pd.Timestamp):
         dt = dt_like.to_pydatetime()
     elif isinstance(dt_like, np.datetime64):
-        dt = datetime.combine(dt_like.astype(datetime), time())
+        dt = dt_like.astype("datetime64[us]").astype(datetime)
     else:
         dt = dt_like
 

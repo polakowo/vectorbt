@@ -2362,6 +2362,24 @@ class TestDatetime:
         with pytest.raises(Exception):
             _ = datetime_.to_tzaware_datetime("2020-01-001")
 
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            (np.datetime64("2020-01-02", "D"), _datetime(2020, 1, 2)),
+            (np.datetime64("2020-01-02T13:14:15", "s"), _datetime(2020, 1, 2, 13, 14, 15)),
+            (np.datetime64("2020-01-02T13:14:15.123", "ms"), _datetime(2020, 1, 2, 13, 14, 15, 123000)),
+            (np.datetime64("2020-01-02T13:14:15.123456", "us"), _datetime(2020, 1, 2, 13, 14, 15, 123456)),
+            (np.datetime64("2020-01-02T13:14:15.123456789", "ns"), _datetime(2020, 1, 2, 13, 14, 15, 123456)),
+        ],
+    )
+    @pytest.mark.parametrize("tz", [None, "UTC"])
+    def test_to_tzaware_datetime_numpy(self, value, expected, tz):
+        source_tz = _timezone(_timedelta(hours=2))
+        expected = expected.replace(tzinfo=source_tz)
+        if tz is not None:
+            expected = expected.astimezone(_timezone.utc)
+        assert datetime_.to_tzaware_datetime(value, naive_tz=source_tz, tz=tz) == expected
+
     def test_datetime_to_ms(self):
         assert (
             datetime_.datetime_to_ms(_datetime(2020, 1, 1))
