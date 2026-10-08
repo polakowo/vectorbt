@@ -149,6 +149,8 @@ def to_tzaware_datetime(
         dt = dt_like.to_pydatetime()
     elif isinstance(dt_like, np.datetime64):
         dt = dt_like.astype("datetime64[us]").astype(datetime)
+        if not isinstance(dt, datetime):
+            raise ValueError("Couldn't parse the datetime")
     else:
         dt = dt_like
 
