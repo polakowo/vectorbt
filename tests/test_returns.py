@@ -517,6 +517,18 @@ class TestAccessors:
             ),
         )
 
+    def test_cond_value_at_risk_nan(self):
+        arr = np.array(
+            [-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0]
+            + [0.01, 0.02, -0.04, 0.01, 0.02, 0.03, -0.02, 0.01, 0.0, 0.02, 0.01]
+        ).reshape(-1, 1)
+        clean = arr[~np.isnan(arr[:, 0])]
+        result = vbt.returns.nb.cond_value_at_risk_nb(arr, 0.1)
+        np.testing.assert_allclose(result, vbt.returns.nb.cond_value_at_risk_nb(clean, 0.1))
+        np.testing.assert_allclose(result, [np.mean([-0.05, -0.04])])
+        assert np.isnan(vbt.returns.nb.cond_value_at_risk_nb(np.full((3, 1), np.nan), 0.1)[0])
+        np.testing.assert_allclose(vbt.returns.dispatch.cond_value_at_risk(arr, 0.1, engine="rust"), result)
+
     def test_capture(self):
         assert isclose(rets["a"].vbt.returns.capture(benchmark_rets["a"]), 0.0007435597416888084)
         pd.testing.assert_series_equal(
