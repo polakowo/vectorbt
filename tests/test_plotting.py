@@ -25,7 +25,6 @@ from vectorbt.generic.plotting import Scatter, Bar, Histogram, Heatmap, Gauge, B
 from vectorbt.portfolio.base import Portfolio
 from vectorbt.utils.figure import make_figure, make_subplots, Figure, FigureWidget
 
-
 # ############# Fixtures ############# #
 
 index_5 = pd.DatetimeIndex([datetime(2020, 1, d) for d in range(1, 6)])

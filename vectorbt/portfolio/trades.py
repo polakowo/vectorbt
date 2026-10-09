@@ -538,9 +538,7 @@ trades_field_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "trades_field_config"
-] = f"""Field config for `Trades`.
+__pdoc__["trades_field_config"] = f"""Field config for `Trades`.
 
 ```json
 {trades_field_config.to_doc()}
@@ -558,9 +556,7 @@ trades_attach_field_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "trades_attach_field_config"
-] = f"""Config of fields to be attached to `Trades`.
+__pdoc__["trades_attach_field_config"] = f"""Config of fields to be attached to `Trades`.
 
 ```json
 {trades_attach_field_config.to_doc()}
@@ -1389,9 +1385,7 @@ entry_trades_field_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "entry_trades_field_config"
-] = f"""Field config for `EntryTrades`.
+__pdoc__["entry_trades_field_config"] = f"""Field config for `EntryTrades`.
 
 ```json
 {entry_trades_field_config.to_doc()}
@@ -1428,9 +1422,7 @@ class EntryTrades(Trades):
 exit_trades_field_config = Config(dict(settings={"id": dict(title="Exit Trade Id")}), readonly=True, as_attrs=False)
 """_"""
 
-__pdoc__[
-    "exit_trades_field_config"
-] = f"""Field config for `ExitTrades`.
+__pdoc__["exit_trades_field_config"] = f"""Field config for `ExitTrades`.
 
 ```json
 {exit_trades_field_config.to_doc()}
@@ -1471,9 +1463,7 @@ positions_field_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "positions_field_config"
-] = f"""Field config for `Positions`.
+__pdoc__["positions_field_config"] = f"""Field config for `Positions`.
 
 ```json
 {positions_field_config.to_doc()}

@@ -531,9 +531,9 @@ class TestAccessors:
         assert np.isnan(vbt.returns.nb.cond_value_at_risk_nb(np.empty((0, 1)), 0.1)[0])
 
     def test_rolling_cond_value_at_risk_nan(self):
-        arr = np.array(
-            [-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0, 0.01, np.nan, -0.04]
-        ).reshape(-1, 1)
+        arr = np.array([-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0, 0.01, np.nan, -0.04]).reshape(
+            -1, 1
+        )
         window = 6
         result = vbt.returns.nb.rolling_cond_value_at_risk_nb(arr, window, 1, 0.2)
         expected = np.full(len(arr), np.nan)

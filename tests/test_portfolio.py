@@ -84,17 +84,51 @@ def test_order_func_init_records(test_row_wise, test_flexible):
     assert pf.orders.count() == 0
     record_arrays_close(
         seen["order_records"],
-        np.array([( -1, -1, -1, np.nan, np.nan, np.nan, -1)], dtype=order_dt),
+        np.array([(-1, -1, -1, np.nan, np.nan, np.nan, -1)], dtype=order_dt),
     )
     record_arrays_close(
         seen["log_records"],
         np.array(
             [
                 (
-                    -1, -1, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                    np.nan, np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                    np.nan, False, False, False, False, np.nan, np.nan, np.nan, np.nan, np.nan,
-                    np.nan, np.nan, np.nan, np.nan, -1, -1, -1, -1
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    -1,
+                    -1,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    False,
+                    False,
+                    False,
+                    False,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
                 )
             ],
             dtype=log_dt,
@@ -102,12 +136,16 @@ def test_order_func_init_records(test_row_wise, test_flexible):
     )
     record_arrays_close(
         seen["last_pos_record"],
-        np.array([(-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1)], dtype=trade_dt),
+        np.array(
+            [(-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1)], dtype=trade_dt
+        ),
     )
     if not test_flexible:
         record_arrays_close(
             seen["pos_record_now"],
-            np.array((-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1), dtype=trade_dt),
+            np.array(
+                (-1, -1, np.nan, -1, np.nan, np.nan, -1, np.nan, np.nan, np.nan, np.nan, -1, -1, -1), dtype=trade_dt
+            ),
         )
 
 
@@ -10853,9 +10891,7 @@ def test_best_trade_pct_definition():
     exits = pd.Series([False, True, False, True], index=price.index)
     size = pd.Series([10.0, np.nan, 100.0, np.nan], index=price.index)
 
-    pf = vbt.Portfolio.from_signals(
-        price, entries, exits, size=size, direction="shortonly", init_cash=1000000
-    )
+    pf = vbt.Portfolio.from_signals(price, entries, exits, size=size, direction="shortonly", init_cash=1000000)
 
     # B has the larger PnL
     assert pf.trades.pnl.max() == 1000.0
@@ -10878,17 +10914,13 @@ def test_short_trade_return_math(fees):
     entries = pd.Series([True, False], index=price.index)
     exits = pd.Series([False, True], index=price.index)
 
-    pf = vbt.Portfolio.from_signals(
-        price, entries, exits, size=10.0, direction="shortonly", fees=fees
-    )
+    pf = vbt.Portfolio.from_signals(price, entries, exits, size=10.0, direction="shortonly", fees=fees)
     trade = pf.trades.records_readable.iloc[0]
     # Short: profit when price falls. entry=100, exit=90, size=10
     # Both entry and exit fees reduce PnL; the denominator excludes fees.
     expected_pnl = 10.0 * (100.0 - 90.0) - fees * 10.0 * (100.0 + 90.0)
     np.testing.assert_allclose(trade["PnL"], expected_pnl)
-    np.testing.assert_allclose(
-        trade["Return"], trade["PnL"] / (trade["Size"] * trade["Avg Entry Price"])
-    )
+    np.testing.assert_allclose(trade["Return"], trade["PnL"] / (trade["Size"] * trade["Avg Entry Price"]))
     np.testing.assert_allclose(trade["Return"], expected_pnl / 1000.0)
 
 
@@ -10896,8 +10928,7 @@ def test_short_trade_return_math(fees):
 def test_best_worst_trade_pct_incl_open(incl_open):
     """Best/Worst Trade [%] use closed trades unless incl_open=True."""
     price = pd.DataFrame(
-        {"best": [100.0, 90.0, 100.0, 80.0, 80.0, 80.0],
-         "worst": [100.0, 90.0, 100.0, 80.0, 100.0, 110.0]},
+        {"best": [100.0, 90.0, 100.0, 80.0, 80.0, 80.0], "worst": [100.0, 90.0, 100.0, 80.0, 100.0, 110.0]},
         index=pd.date_range("2020-01-01", periods=6, freq="D"),
     )
     entries = pd.DataFrame(
@@ -10908,9 +10939,7 @@ def test_best_worst_trade_pct_incl_open(incl_open):
         index=price.index,
     )
     exits = pd.Series([False, True, False, False, False, False], index=price.index)
-    pf = vbt.Portfolio.from_signals(
-        price, entries, exits, size=10.0, direction="shortonly", fees=0.001
-    )
+    pf = vbt.Portfolio.from_signals(price, entries, exits, size=10.0, direction="shortonly", fees=0.001)
     for column, metric, reducer in [
         ("best", "Best Trade [%]", "max"),
         ("worst", "Worst Trade [%]", "min"),

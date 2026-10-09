@@ -1418,6 +1418,7 @@ You can also replace templates across all subplots by using the global template 
 
 ![](/assets/images/portfolio_plot_path.svg)
 """
+
 import warnings
 
 import numpy as np
@@ -1486,9 +1487,7 @@ returns_acc_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "returns_acc_config"
-] = f"""Config of returns accessor methods to be added to `Portfolio`.
+__pdoc__["returns_acc_config"] = f"""Config of returns accessor methods to be added to `Portfolio`.
 
 ```json
 {returns_acc_config.to_doc()}
