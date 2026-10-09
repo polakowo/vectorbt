@@ -7,13 +7,11 @@ hash = lambda s: int(hashlib.sha512(s.encode("utf-8")).hexdigest()[:16], 16)
 
 
 def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):
-    if np.isnan(a) == np.isnan(b):
-        return True
-    if np.isinf(a) == np.isinf(b):
-        return True
-    if a == b:
-        return True
-    return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+    if np.isnan(a) or np.isnan(b):
+        return bool(np.isnan(a) and np.isnan(b))
+    if np.isinf(a) or np.isinf(b):
+        return bool(a == b)
+    return bool(abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol))
 
 
 def record_arrays_close(x, y):
