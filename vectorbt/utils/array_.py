@@ -18,7 +18,7 @@ def is_sorted(a: tp.Array1d) -> np.bool_:
 def is_sorted_nb(a: tp.Array1d) -> bool:
     """Numba-compiled version of `is_sorted`."""
     for i in range(a.size - 1):
-        if a[i + 1] < a[i]:
+        if not a[i] <= a[i + 1]:
             return False
     return True
 
