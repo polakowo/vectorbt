@@ -6,7 +6,6 @@ use ndarray::{Array2, ArrayView2};
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use std::cmp::Ordering;
 
 fn validate_same_shape_2d(a: ArrayView2<'_, f64>, b: ArrayView2<'_, f64>, name: &str) -> PyResult<()> {
     if a.dim() != b.dim() {
@@ -762,17 +761,12 @@ pub(crate) fn value_at_risk_1d(returns: &[f64], cutoff: f64) -> f64 {
 }
 
 pub(crate) fn cond_value_at_risk_1d(returns: &[f64], cutoff: f64) -> f64 {
-    if returns.is_empty() {
+    let mut vals: Vec<f64> = returns.iter().copied().filter(|value| !value.is_nan()).collect();
+    if vals.is_empty() {
         return f64::NAN;
     }
-    let mut vals = returns.to_vec();
     let cutoff_index = ((vals.len() - 1) as f64 * cutoff) as usize;
-    vals.select_nth_unstable_by(cutoff_index, |left, right| match (left.is_nan(), right.is_nan()) {
-        (true, true) => Ordering::Equal,
-        (true, false) => Ordering::Greater,
-        (false, true) => Ordering::Less,
-        (false, false) => left.partial_cmp(right).unwrap(),
-    });
+    vals.select_nth_unstable_by(cutoff_index, |left, right| left.partial_cmp(right).unwrap());
     mean_strict(&vals[..cutoff_index + 1])
 }
 

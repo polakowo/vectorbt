@@ -632,7 +632,10 @@ def rolling_value_at_risk_nb(
 
 @njit(cache=True)
 def cond_value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
-    """Conditional value at risk (CVaR) of a returns stream."""
+    """Conditional value at risk (CVaR) of a returns stream.
+
+    NaN returns are ignored, same as in `value_at_risk_1d_nb`."""
+    returns = returns[~np.isnan(returns)]
     if len(returns) == 0:
         return np.nan
     cutoff_index = int((len(returns) - 1) * cutoff)

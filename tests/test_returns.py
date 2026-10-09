@@ -6,6 +6,7 @@ import pytest
 from scipy.stats import kurtosis, norm, skew
 
 import vectorbt as vbt
+from vectorbt import _engine
 from tests.utils import isclose
 from vectorbt.returns.metrics import approx_exp_max_sharpe
 
@@ -515,6 +516,51 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+
+    def test_cond_value_at_risk_nan(self):
+        arr = np.array(
+            [-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0]
+            + [0.01, 0.02, -0.04, 0.01, 0.02, 0.03, -0.02, 0.01, 0.0, 0.02, 0.01]
+        ).reshape(-1, 1)
+        clean = arr[~np.isnan(arr[:, 0])]
+        result = vbt.returns.nb.cond_value_at_risk_nb(arr, 0.1)
+        np.testing.assert_allclose(result, vbt.returns.nb.cond_value_at_risk_nb(clean, 0.1))
+        np.testing.assert_allclose(result, [np.mean([-0.05, -0.04])])
+        assert np.isnan(vbt.returns.nb.cond_value_at_risk_nb(np.full((3, 1), np.nan), 0.1)[0])
+        assert np.isnan(vbt.returns.nb.cond_value_at_risk_nb(np.empty((0, 1)), 0.1)[0])
+
+    def test_rolling_cond_value_at_risk_nan(self):
+        arr = np.array(
+            [-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0, 0.01, np.nan, -0.04]
+        ).reshape(-1, 1)
+        window = 6
+        result = vbt.returns.nb.rolling_cond_value_at_risk_nb(arr, window, 1, 0.2)
+        expected = np.full(len(arr), np.nan)
+        for i in range(len(arr)):
+            chunk = arr[max(0, i - window + 1) : i + 1, 0]
+            chunk = chunk[~np.isnan(chunk)]
+            if len(chunk) > 0:
+                k = int((len(chunk) - 1) * 0.2)
+                expected[i] = np.sort(chunk)[: k + 1].mean()
+        np.testing.assert_allclose(result[:, 0], expected)
+
+    @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+    def test_cond_value_at_risk_nan_rust(self):
+        arr = np.array(
+            [-0.05, 0.01, np.nan, -0.02, 0.03, 0.02, -0.01, 0.04, -0.03, 0.0]
+            + [0.01, 0.02, -0.04, 0.01, 0.02, 0.03, -0.02, 0.01, 0.0, 0.02, 0.01]
+        ).reshape(-1, 1)
+        np.testing.assert_allclose(
+            vbt.returns.dispatch.cond_value_at_risk(arr, 0.1, engine="rust"),
+            vbt.returns.nb.cond_value_at_risk_nb(arr, 0.1),
+        )
+        all_nan = np.full((3, 1), np.nan)
+        assert np.isnan(vbt.returns.dispatch.cond_value_at_risk(all_nan, 0.1, engine="rust")[0])
+        np.testing.assert_allclose(
+            vbt.returns.dispatch.rolling_cond_value_at_risk(arr, 6, 1, 0.2, engine="rust"),
+            vbt.returns.nb.rolling_cond_value_at_risk_nb(arr, 6, 1, 0.2),
+            equal_nan=True,
         )
 
     def test_capture(self):
