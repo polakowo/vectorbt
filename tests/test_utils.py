@@ -2364,6 +2364,76 @@ class TestDatetime:
         with pytest.raises(Exception):
             _ = datetime_.to_tzaware_datetime("2020-01-001")
 
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            (np.datetime64("2020", "Y"), _datetime(2020, 1, 1)),
+            (np.datetime64("2020-02", "M"), _datetime(2020, 2, 1)),
+            (np.datetime64("2020-01-02", "W"), _datetime(2020, 1, 2)),
+            (np.datetime64("2020-01-02", "D"), _datetime(2020, 1, 2)),
+            (np.datetime64("2020-01-02T13", "h"), _datetime(2020, 1, 2, 13)),
+            (np.datetime64("2020-01-02T13:14", "m"), _datetime(2020, 1, 2, 13, 14)),
+            (np.datetime64("2020-01-02T13:14:15", "s"), _datetime(2020, 1, 2, 13, 14, 15)),
+            (np.datetime64("2020-01-02T13:14:15.123", "ms"), _datetime(2020, 1, 2, 13, 14, 15, 123000)),
+            (np.datetime64("2020-01-02T13:14:15.123456", "us"), _datetime(2020, 1, 2, 13, 14, 15, 123456)),
+            (np.datetime64("2020-01-02T13:14:15.123456789", "ns"), _datetime(2020, 1, 2, 13, 14, 15, 123456)),
+            (np.datetime64("1969-12-31T23:59:59.999999999", "ns"), _datetime(1969, 12, 31, 23, 59, 59, 999999)),
+            (np.datetime64("1970-01-01T00:00:00.123456789012", "ps"), _datetime(1970, 1, 1, 0, 0, 0, 123456)),
+            (np.datetime64("1970-01-01T00:00:00.123456789012345", "fs"), _datetime(1970, 1, 1, 0, 0, 0, 123456)),
+            (np.datetime64("1970-01-01T00:00:00.123456789012345678", "as"), _datetime(1970, 1, 1, 0, 0, 0, 123456)),
+            (np.datetime64(2**63 - 1, "2ns"), _datetime(2554, 7, 21, 23, 34, 33, 709551)),
+            (np.datetime64(-(2**63) + 1, "ns"), _datetime(1677, 9, 21, 0, 12, 43, 145224)),
+            (np.datetime64(-(2**63) + 1, "ps"), _datetime(1969, 9, 16, 5, 57, 7, 963145)),
+            (np.datetime64(-(2**63) + 1, "fs"), _datetime(1969, 12, 31, 21, 26, 16, 627963)),
+            (np.datetime64(-(2**63) + 1, "as"), _datetime(1969, 12, 31, 23, 59, 50, 776627)),
+            (np.datetime64(-(2**63) + 1, "2ns"), _datetime(1385, 6, 12, 0, 25, 26, 290448)),
+        ],
+    )
+    @pytest.mark.parametrize("tz", [None, "UTC"])
+    def test_to_tzaware_datetime_numpy(self, value, expected, tz):
+        source_tz = _timezone(_timedelta(hours=2))
+        expected = expected.replace(tzinfo=source_tz)
+        if tz is not None:
+            expected = expected.astimezone(_timezone.utc)
+        assert datetime_.to_tzaware_datetime(value, naive_tz=source_tz, tz=tz) == expected
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            (np.datetime64("0001-01-01", "us"), _datetime.min),
+            (np.datetime64("9999-12-31T23:59:59.999999", "us"), _datetime.max),
+            (np.datetime64(-6213559680000000, "10000ns"), _datetime.min),
+            (np.datetime64(25340230079999999, "10000ns"), _datetime(9999, 12, 31, 23, 59, 59, 999990)),
+        ],
+    )
+    def test_to_tzaware_datetime_numpy_boundaries(self, value, expected):
+        assert datetime_.to_tzaware_datetime(value, naive_tz="UTC") == expected.replace(tzinfo=_timezone.utc)
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            np.datetime64("NaT"),
+            np.datetime64("NaT", "us"),
+            np.datetime64("NaT", "ns"),
+            np.datetime64("0000-12-31", "D"),
+            np.datetime64("10000-01-01", "D"),
+            np.datetime64("12000-01-01", "us"),
+            np.datetime64("586554-01-18", "D"),
+            np.datetime64("-582556-12-14", "D"),
+            np.datetime64("586554", "Y"),
+            np.datetime64("-582556", "Y"),
+            np.datetime64("586554-01", "M"),
+            np.datetime64("-582556-12", "M"),
+            np.datetime64(2**63 - 1, "2Y"),
+            np.datetime64(-(2**63) + 1, "2Y"),
+            np.datetime64(2**63 - 1, "10000ns"),
+            np.datetime64(-(2**63) + 1, "10000ns"),
+        ],
+    )
+    def test_to_tzaware_datetime_numpy_invalid(self, value):
+        with pytest.raises(ValueError, match="Couldn't parse the datetime"):
+            datetime_.to_tzaware_datetime(value, naive_tz="UTC")
+
     def test_datetime_to_ms(self):
         assert (
             datetime_.datetime_to_ms(_datetime(2020, 1, 1))
