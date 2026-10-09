@@ -1643,4 +1643,4 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(down_capture_rs, m)?)?;
     m.add_function(wrap_pyfunction!(rolling_down_capture_rs, m)?)?;
     Ok(())
-                }
+}
