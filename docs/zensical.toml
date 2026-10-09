@@ -140,6 +140,7 @@ nav = [
     "terms/index.md",
     { "License" = "terms/license.md" },
   ] },
+  { "PRO" = "https://vectorbt.pro/" },
 ]
 
 [project.theme]
@@ -149,6 +150,7 @@ language = "en"
 logo = "assets/logo/logo.svg"
 favicon = "assets/logo/favicon.svg"
 features = [
+  "announce.dismiss",
   "navigation.tracking",
   "navigation.indexes",
   "navigation.tabs",
