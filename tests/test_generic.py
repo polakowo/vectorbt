@@ -263,6 +263,146 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_mean(test_window), df.rolling(test_window).mean())
 
+    @pytest.mark.parametrize(
+        "dtype,value",
+        [
+            (np.int8, 100),
+            (np.int8, -100),
+            (np.int16, 30000),
+            (np.int16, -30000),
+            (np.int32, 2**30),
+            (np.int64, 2**62),
+            (np.uint8, 200),
+            (np.uint16, 60000),
+            (np.uint32, 2**31),
+            (np.uint64, 2**63),
+        ],
+    )
+    def test_rolling_mean_integer_overflow(self, dtype, value):
+        a = np.full(5, value, dtype=dtype)
+        # A constant window has the same mean even when its prefix sum exceeds the input dtype.
+        # The full-length window also catches overflow in the scalar before any prefix is evicted.
+        for window in (2, len(a)):
+            expected = np.full(a.shape, float(value))
+            expected[: window - 1] = np.nan
+            np.testing.assert_array_equal(nb.rolling_mean_1d_nb(a, window), expected)
+            np.testing.assert_array_equal(nb.rolling_mean_nb(a[:, None], window), expected[:, None])
+
+    @pytest.mark.parametrize("window", [1, 2])
+    def test_rolling_mean_integer_precision_after_large_prefix(self, window):
+        a = np.array([2**53, 1, 1, 1], dtype=np.int64)
+        # Unbounded sums of each actual window avoid rounding a large, already retired prefix.
+        # Once that prefix leaves the window, the mean of the remaining ones must still be one.
+        expected = np.full(a.shape, np.nan)
+        for i in range(window - 1, len(a)):
+            expected[i] = sum(int(value) for value in a[i - window + 1 : i + 1]) / window
+        np.testing.assert_array_equal(nb.rolling_mean_1d_nb(a, window), expected)
+        np.testing.assert_array_equal(nb.rolling_mean_nb(a[:, None], window), expected[:, None])
+
+    @pytest.mark.parametrize(
+        "values", [[2**53 + 1, -(2**53)], [2**62 + 1, -(2**62)], [-(2**53) - 1, 2**53], [-(2**62) - 1, 2**62]]
+    )
+    def test_rolling_mean_integer_value_precision(self, values):
+        a = np.array(values, dtype=np.int64)
+        # Converting either large input to float before summing discards the unit difference.
+        expected = np.array([np.nan, sum(values) / 2])
+        np.testing.assert_array_equal(nb.rolling_mean_1d_nb(a, 2), expected)
+        np.testing.assert_array_equal(nb.rolling_mean_nb(a[:, None], 2), expected[:, None])
+        pd.testing.assert_series_equal(pd.Series(a).vbt.rolling_mean(2, engine="numba"), pd.Series(expected))
+
+    @pytest.mark.parametrize(
+        "dtype", [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.bool_]
+    )
+    def test_rolling_mean_integer_extrema(self, dtype):
+        low, high = (0, 1) if dtype == np.bool_ else (int(np.iinfo(dtype).min), int(np.iinfo(dtype).max))
+        a = np.array([high, high, low, low, 1, 0, high, 1, low, 0], dtype=dtype)
+        base = np.column_stack((a, a[::-1]))
+        strided = np.empty((2 * len(a), 4), dtype=dtype)
+        strided[::2, ::2] = base
+        # Extremal runs and sign changes force carries, borrows and cancellation as values leave.
+        # Sum each actual slice with Python integers; pandas first casts these values to float.
+        for window in (1, 2, 5, len(a) + 3):
+            for minp in (1, None):
+                expected = np.full(base.shape, np.nan)
+                for i in range(len(a)):
+                    sample = base[max(0, i - window + 1) : i + 1]
+                    if len(sample) >= (window if minp is None else minp):
+                        for col in range(base.shape[1]):
+                            expected[i, col] = sum(int(value) for value in sample[:, col]) / len(sample)
+                # Float64 conversion/division can round; zero means must still be exactly zero.
+                np.testing.assert_allclose(nb.rolling_mean_1d_nb(a, window, minp), expected[:, 0], rtol=3e-16, atol=0)
+                for arr in (np.ascontiguousarray(base), np.asfortranarray(base), strided[::2, ::2]):
+                    np.testing.assert_allclose(nb.rolling_mean_nb(arr, window, minp), expected, rtol=3e-16, atol=0)
+
+    @pytest.mark.parametrize(
+        "dtype",
+        [
+            np.int8,
+            np.int16,
+            np.int32,
+            np.int64,
+            np.uint8,
+            np.uint16,
+            np.uint32,
+            np.uint64,
+            np.bool_,
+            np.float32,
+            np.float64,
+        ],
+    )
+    def test_rolling_mean_boundaries(self, dtype):
+        a = np.array([1, 1, 0, 1], dtype=dtype)
+        # Dtype specialization must preserve validation and the existing nonpositive-window path.
+        for func, arr in ((nb.rolling_mean_1d_nb, a), (nb.rolling_mean_nb, a[:, None])):
+            for window, minp in ((0, 1), (-1, 1), (2, 3)):
+                with pytest.raises(ValueError, match="minp must be <= window"):
+                    func(arr, window, minp)
+            with pytest.raises(ZeroDivisionError):
+                func(arr, 0)
+            np.testing.assert_array_equal(func(arr, 8), np.full(arr.shape, np.nan))
+            expected = np.array([1.0, 1.0, 2 / 3, 3 / 4]).reshape(arr.shape)
+            np.testing.assert_array_equal(func(arr, 2**60, 1), expected)
+        # No observations or no columns must retain their shape and float64 output dtype.
+        for func, arr in (
+            (nb.rolling_mean_1d_nb, np.empty(0, dtype=dtype)),
+            (nb.rolling_mean_nb, np.empty((0, 2), dtype=dtype)),
+            (nb.rolling_mean_nb, np.empty((4, 0), dtype=dtype)),
+        ):
+            out = func(arr, 2)
+            assert out.shape == arr.shape
+            assert out.dtype == np.float64
+
+    def test_rolling_mean_integer_eviction(self):
+        a = np.array([100, 100, -100, -100, 100, 100], dtype=np.int8)
+        # Adjacent pairs give 100, 0, -100, 0, 100; the two columns must remain independent.
+        expected = np.array([np.nan, 100.0, 0.0, -100.0, 0.0, 100.0])
+        frame = pd.DataFrame(
+            np.column_stack((a, -a)),
+            index=pd.date_range("2020-01-01", periods=len(a), tz="UTC", name="time"),
+            columns=pd.MultiIndex.from_tuples([("price", "a"), ("price", "b")], names=["kind", "asset"]),
+        )
+        expected_frame = pd.DataFrame(np.column_stack((expected, -expected)), index=frame.index, columns=frame.columns)
+        np.testing.assert_array_equal(nb.rolling_mean_1d_nb(a, 2), expected)
+        # Both pandas containers must retain their labels when wrapping the corrected kernel result.
+        pd.testing.assert_frame_equal(frame.vbt.rolling_mean(2, engine="numba"), expected_frame)
+        pd.testing.assert_series_equal(frame.iloc[:, 0].vbt.rolling_mean(2, engine="numba"), expected_frame.iloc[:, 0])
+
+    def test_rolling_mean_boolean_prefix(self):
+        # Boolean prefixes must retain counts larger than one before window subtraction.
+        a = np.array([True, True, True, False])
+        np.testing.assert_array_equal(nb.rolling_mean_1d_nb(a, 2), np.array([np.nan, 1.0, 1.0, 0.5]))
+
+    def test_rolling_mean_integer_downstream(self):
+        close = pd.Series(np.full(5, 100, dtype=np.int8))
+        # MA uses chronological windows, while FMEAN reverses them and shifts by one bar.
+        np.testing.assert_array_equal(
+            vbt.MA.run(close, 2, engine="numba").ma.to_numpy(), np.array([np.nan, 100.0, 100.0, 100.0, 100.0])
+        )
+        np.testing.assert_array_equal(
+            vbt.FMEAN.run(close, 2, wait=1, engine="numba").fmean.to_numpy(),
+            np.array([100.0, 100.0, 100.0, np.nan, np.nan]),
+        )
+
     @pytest.mark.parametrize("test_window,test_minp,test_ddof", list(product([1, 2, 3, 4, 5], [1, None], [0, 1])))
     def test_rolling_std(self, test_window, test_minp, test_ddof):
         if test_minp is None:
