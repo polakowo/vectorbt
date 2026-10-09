@@ -4924,6 +4924,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
+            # NOTE: Best/Worst Trade [%] is the maximum/minimum individual trade return,
+            # net of fees, relative to gross entry notional: PnL / (size * entry_price)
+            # (NOT PnL / portfolio initial cash). See issue #810.
+            # Closed trades are used by default; incl_open=True also includes open trades.
             best_trade=dict(
                 title="Best Trade [%]",
                 calc_func="trades.returns.max",
