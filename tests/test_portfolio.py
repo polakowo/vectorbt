@@ -10837,8 +10837,9 @@ class TestPortfolio:
 def test_best_trade_pct_definition():
     """Regression test for issue #810.
 
-    Best Trade [%] is the maximum individual trade return, where each trade's
-    return = trade PnL / trade entry value (NOT PnL / portfolio initial cash).
+    Best Trade [%] is the maximum individual trade return, net of fees, relative
+    to gross entry notional (NOT portfolio initial cash). By default, only closed
+    trades are included; incl_open=True also includes open trades.
     """
     # Two short trades: B has larger PnL, A has higher return
     # Trade A: entry=100, exit=90, size=10  -> PnL=100,  Return=10%
@@ -10867,8 +10868,9 @@ def test_best_trade_pct_definition():
     np.testing.assert_allclose(pf.stats()["Best Trade [%]"], expected)
 
 
-def test_short_trade_return_math():
-    """Short trade return = PnL / entry value, with correct sign handling."""
+@pytest.mark.parametrize("fees", [0.0, 0.001])
+def test_short_trade_return_math(fees):
+    """Short trade return is net of fees, relative to gross entry notional."""
     price = pd.Series(
         [100.0, 90.0],
         index=pd.date_range("2020-01-01", periods=2, freq="D"),
@@ -10877,10 +10879,48 @@ def test_short_trade_return_math():
     exits = pd.Series([False, True], index=price.index)
 
     pf = vbt.Portfolio.from_signals(
-        price, entries, exits, size=10.0, direction="shortonly", fees=0.0
+        price, entries, exits, size=10.0, direction="shortonly", fees=fees
     )
     trade = pf.trades.records_readable.iloc[0]
     # Short: profit when price falls. entry=100, exit=90, size=10
-    # PnL = 10 * (100 - 90) = 100, Return = 100 / (10 * 100) = 10%
-    np.testing.assert_allclose(trade["PnL"], 100.0)
-    np.testing.assert_allclose(trade["Return"], 0.10)
+    # Both entry and exit fees reduce PnL; the denominator excludes fees.
+    expected_pnl = 10.0 * (100.0 - 90.0) - fees * 10.0 * (100.0 + 90.0)
+    np.testing.assert_allclose(trade["PnL"], expected_pnl)
+    np.testing.assert_allclose(
+        trade["Return"], trade["PnL"] / (trade["Size"] * trade["Avg Entry Price"])
+    )
+    np.testing.assert_allclose(trade["Return"], expected_pnl / 1000.0)
+
+
+@pytest.mark.parametrize("incl_open", [False, True])
+def test_best_worst_trade_pct_incl_open(incl_open):
+    """Best/Worst Trade [%] use closed trades unless incl_open=True."""
+    price = pd.DataFrame(
+        {"best": [100.0, 90.0, 100.0, 80.0, 80.0, 80.0],
+         "worst": [100.0, 90.0, 100.0, 80.0, 100.0, 110.0]},
+        index=pd.date_range("2020-01-01", periods=6, freq="D"),
+    )
+    entries = pd.DataFrame(
+        {
+            "best": [True, False, True, False, False, False],
+            "worst": [True, False, False, False, True, False],
+        },
+        index=price.index,
+    )
+    exits = pd.Series([False, True, False, False, False, False], index=price.index)
+    pf = vbt.Portfolio.from_signals(
+        price, entries, exits, size=10.0, direction="shortonly", fees=0.001
+    )
+    for column, metric, reducer in [
+        ("best", "Best Trade [%]", "max"),
+        ("worst", "Worst Trade [%]", "min"),
+    ]:
+        trades = pf[column].trades
+        assert trades.closed.count() == 1
+        assert trades.open.count() == 1
+        selected = trades if incl_open else trades.closed
+        expected = getattr(selected.returns, reducer)() * 100
+        actual = pf.stats(column=column, settings=dict(incl_open=incl_open))[metric]
+        np.testing.assert_allclose(actual, expected)
+        if incl_open:
+            assert not np.isclose(actual, getattr(trades.closed.returns, reducer)() * 100)
