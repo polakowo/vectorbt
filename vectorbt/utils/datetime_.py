@@ -148,7 +148,27 @@ def to_tzaware_datetime(
     elif isinstance(dt_like, pd.Timestamp):
         dt = dt_like.to_pydatetime()
     elif isinstance(dt_like, np.datetime64):
-        dt = dt_like.astype("datetime64[us]").astype(datetime)
+        if np.isnat(dt_like):
+            raise ValueError("Couldn't parse the datetime")
+        # Check bounds with Python integers before changing units can overflow.
+        unit, step = np.datetime_data(dt_like.dtype)
+        ticks = int(dt_like.astype(np.int64)) * step
+        if unit in ("Y", "M"):
+            lower = int(np.datetime64("0001", unit).astype(np.int64))
+            upper = int(np.datetime64("10000", unit).astype(np.int64))
+        else:
+            us_per_unit = int(np.timedelta64(1, unit).astype("timedelta64[us]").astype(np.int64))
+            if us_per_unit:
+                ticks *= us_per_unit
+            else:
+                units_per_us = int(np.timedelta64(1, "us").astype(f"timedelta64[{unit}]").astype(np.int64))
+                ticks //= units_per_us
+            lower = int(np.datetime64("0001", "us").astype(np.int64))
+            upper = int(np.datetime64("10000", "us").astype(np.int64))
+        if not lower <= ticks < upper:
+            raise ValueError("Couldn't parse the datetime")
+        # Rebuild from normalized ticks to avoid overflow in NumPy's unit conversion.
+        dt = np.datetime64(ticks, unit if unit in ("Y", "M") else "us").astype("datetime64[us]").astype(datetime)
         if not isinstance(dt, datetime):
             raise ValueError("Couldn't parse the datetime")
     else:
