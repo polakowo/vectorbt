@@ -61,6 +61,7 @@ full = [
     "pandas-ta-classic",
     "python-telegram-bot>=13.4",
     "quantstats>=0.0.37",
+    "kaleido>=1",
 ]
 test = [
     "pytest",
