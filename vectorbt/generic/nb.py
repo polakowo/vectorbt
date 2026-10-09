@@ -714,38 +714,112 @@ def rolling_max_nb(a: tp.Array2d, window: int, minp: tp.Optional[int] = None) ->
     return out
 
 
+@njit(cache=True, inline="always")
+def _integer_sum_to_float_nb(sum_lo, sum_hi):
+    """Convert a two-word integer sum to float64 without cancelling its signed words."""
+    # Common windows fit in one word and retain the usual integer-to-float conversion.
+    if sum_hi == 0:
+        return np.float64(sum_lo)
+    if sum_hi == -1 and sum_lo >= np.uint64(2**63):
+        return np.float64(np.int64(sum_lo))
+    # Convert wider negative sums through their magnitude, not opposing rounded terms.
+    if sum_hi < 0:
+        if sum_lo == 0:
+            return -np.float64(-sum_hi) * 18446744073709551616.0
+        magnitude_hi = -(sum_hi + 1)
+        magnitude_lo = np.uint64(0) - sum_lo
+        return -(np.float64(magnitude_hi) * 18446744073709551616.0 + np.float64(magnitude_lo))
+    return np.float64(sum_hi) * 18446744073709551616.0 + np.float64(sum_lo)
+
+
+@njit(cache=True)
+def _rolling_mean_integer_1d_nb(a: tp.Array1d, window: int, minp: int) -> tp.Array1d:
+    """Keep integer/bool window sums exact until the final float64 conversion."""
+    out = np.empty_like(a, dtype=np.float64)
+    # S = sum_hi * 2**64 + sum_lo. Only the unsigned low word wraps; carry/borrow
+    # corrects the signed high word. An addressable array has at most 2**63 - 1 values,
+    # so even uint64 sums are below 2**127 and the high word stays within int64.
+    sum_lo = np.uint64(0)
+    sum_hi = np.int64(0)
+    for i in range(a.shape[0]):
+        # Evict first to bound the state by the current window and discard retired prefixes.
+        if i >= window:
+            value = a[i - window]
+            value_lo = np.uint64(value)
+            value_hi = np.int64(-1) if value < 0 else np.int64(0)
+            borrow = np.int64(1) if sum_lo < value_lo else np.int64(0)
+            sum_lo = sum_lo - value_lo
+            sum_hi = sum_hi - value_hi - borrow
+        value = a[i]
+        value_lo = np.uint64(value)
+        value_hi = np.int64(-1) if value < 0 else np.int64(0)
+        new_lo = sum_lo + value_lo
+        carry = np.int64(1) if new_lo < sum_lo else np.int64(0)
+        sum_lo = new_lo
+        sum_hi = sum_hi + value_hi + carry
+        window_len = min(i + 1, window)
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            out[i] = _integer_sum_to_float_nb(sum_lo, sum_hi) / window_len
+    return out
+
+
+def _rolling_mean_1d_nb(a, window, minp=None):
+    nb_enabled = isinstance(a, Type)
+    a_dtype = as_dtype(a.dtype) if nb_enabled else a.dtype
+    integer = a_dtype.kind in "biu"
+    # Specialize before arithmetic: float conversion can discard valid integer input bits.
+    prefix_dtype = np.dtype(np.float64) if a_dtype.kind == "f" else a_dtype
+    initial_sum = np.float64(0.0) if a_dtype.kind == "f" else 0
+
+    def impl(a, window, minp=None):
+        if minp is None:
+            minp = window
+        if minp > window:
+            raise ValueError("minp must be <= window")
+        if integer and window > 0:
+            return _rolling_mean_integer_1d_nb(a, window, minp)
+        # Preserve floating NaN/window behavior and the existing nonpositive-window path.
+        # Float32 prefixes must not narrow a sum that is accumulated in float64.
+        out = np.empty_like(a, dtype=np.float64)
+        cumsum_arr = np.zeros_like(a, dtype=prefix_dtype)
+        cumsum = initial_sum
+        nancnt_arr = np.zeros_like(a)
+        nancnt = 0
+        for i in range(a.shape[0]):
+            if np.isnan(a[i]):
+                nancnt = nancnt + 1
+            else:
+                cumsum = cumsum + a[i]
+            nancnt_arr[i] = nancnt
+            cumsum_arr[i] = cumsum
+            if i < window:
+                window_len = i + 1 - nancnt
+                window_cumsum = cumsum
+            else:
+                window_len = window - (nancnt - nancnt_arr[i - window])
+                window_cumsum = cumsum - cumsum_arr[i - window]
+            if window_len < minp:
+                out[i] = np.nan
+            else:
+                out[i] = window_cumsum / window_len
+        return out
+
+    if not nb_enabled:
+        return impl(a, window, minp)
+    return impl
+
+
+ol_rolling_mean_1d_nb = overload(_rolling_mean_1d_nb)(_rolling_mean_1d_nb)
+
+
 @njit(cache=True)
 def rolling_mean_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling mean.
 
     Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).mean()`."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(a, dtype=np.float64)
-    cumsum_arr = np.zeros_like(a)
-    cumsum = 0
-    nancnt_arr = np.zeros_like(a)
-    nancnt = 0
-    for i in range(a.shape[0]):
-        if np.isnan(a[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + a[i]
-        nancnt_arr[i] = nancnt
-        cumsum_arr[i] = cumsum
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-        else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum = cumsum - cumsum_arr[i - window]
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            out[i] = window_cumsum / window_len
-    return out
+    return _rolling_mean_1d_nb(a, window, minp)
 
 
 @njit(cache=True)

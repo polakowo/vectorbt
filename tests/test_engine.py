@@ -241,6 +241,66 @@ class TestEngineResolution:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestGenericRustParity:
+    @pytest.mark.parametrize("dtype,value", [(np.int8, 100), (np.uint64, 2**63)])
+    def test_rolling_mean_integer_engine_boundary(self, dtype, value):
+        a = np.full(5, value, dtype=dtype)
+        expected = np.array([np.nan, float(value), float(value), float(value), float(value)])
+        # Integer input deliberately falls back to Numba; explicit Rust still rejects that dtype.
+        for func, arr, target in (
+            (dispatch.rolling_mean_1d, a, expected),
+            (dispatch.rolling_mean, a[:, None], expected[:, None]),
+        ):
+            np.testing.assert_array_equal(func(arr, 2, engine="auto"), target)
+            with pytest.raises(ValueError, match="cannot be safely cast"):
+                func(arr, 2, engine="rust")
+            # Explicitly converted equivalents can use Rust without widening dispatch support.
+            np.testing.assert_array_equal(func(arr.astype(np.float64), 2, engine="rust"), target)
+
+    def test_rolling_mean_integer_precision_engine_boundary(self):
+        a = np.array([2**53 + 1, -(2**53)], dtype=np.int64)
+        expected = np.array([np.nan, 0.5])
+        # Auto must retain integer bits through Numba, while explicit Rust rejects this dtype.
+        for func, arr, target in (
+            (dispatch.rolling_mean_1d, a, expected),
+            (dispatch.rolling_mean, a[:, None], expected[:, None]),
+        ):
+            for engine in ("numba", "auto"):
+                np.testing.assert_array_equal(func(arr, 2, engine=engine), target)
+            with pytest.raises(ValueError, match="cannot be safely cast"):
+                func(arr, 2, engine="rust")
+            # An explicit caller cast discards the unit difference before the float-only Rust sum.
+            np.testing.assert_array_equal(
+                func(arr.astype(np.float64), 2, engine="rust"), np.array([np.nan, 0.0]).reshape(arr.shape)
+            )
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    @pytest.mark.parametrize("minp", [1, None])
+    def test_rolling_mean_float_prefix(self, dtype, minp):
+        base = np.array(
+            [[0.1, 0.25], [0.2, np.nan], [np.nan, np.nan], [0.4, 0.5], [0.5, 0.75], [0.6, 1.0]], dtype=dtype
+        )
+        strided = np.empty((2 * len(base), 4), dtype=dtype)
+        strided[::2, ::2] = base
+        # Float32 dispatch converts to float64 for Rust. Numba must not narrow stored prefixes
+        # back to float32, including when NaN counts change as an old window is evicted.
+        for a in (np.ascontiguousarray(base), np.asfortranarray(base), strided[::2, ::2]):
+            expected = pd.DataFrame(a).rolling(2, min_periods=minp).mean().to_numpy()
+            for engine in ("numba", "rust"):
+                np.testing.assert_allclose(
+                    dispatch.rolling_mean(a, 2, minp=minp, engine=engine),
+                    expected,
+                    rtol=1e-12,
+                    atol=1e-12,
+                    equal_nan=True,
+                )
+                np.testing.assert_allclose(
+                    dispatch.rolling_mean_1d(a[:, 0], 2, minp=minp, engine=engine),
+                    expected[:, 0],
+                    rtol=1e-12,
+                    atol=1e-12,
+                    equal_nan=True,
+                )
+
     def test_dispatch_matches_numba(self):
         a_1d = np.array([1.0, np.nan, 3.0, 4.0, np.nan], dtype=np.float64)
         a = np.array(
