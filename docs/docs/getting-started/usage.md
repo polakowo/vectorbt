@@ -38,8 +38,8 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 !!! tip "VectorBT PRO"
 
     Simulate [limit orders](https://vectorbt.pro/features/backtesting/orders-and-execution/#limit-orders),
-    use [leverage](https://vectorbt.pro/features/backtesting/orders-and-execution/#leverage), and model futures with
-    [contract multipliers](https://vectorbt.pro/features/backtesting/orders-and-execution/#contract-multiplier).
+    use [leverage](https://vectorbt.pro/features/backtesting/fees-slippage-and-leverage/#leverage), and model futures with
+    [contract multipliers](https://vectorbt.pro/features/backtesting/fees-slippage-and-leverage/#contract-multiplier).
 
 ### Generate 1,000 random strategies
 

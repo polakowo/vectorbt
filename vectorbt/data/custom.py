@@ -6,7 +6,7 @@
 !!! tip "VectorBT PRO"
 
     Additional providers include [Databento](https://vectorbt.pro/features/data/market-data-sources/#databento) and
-    [TradingView](https://vectorbt.pro/features/data/market-data-sources/#trading-view).
+    [TradingView](https://vectorbt.pro/features/data/tradingview-data/#trading-view).
     [Symbol search](https://vectorbt.pro/features/data/market-data-sources/#symbol-search) retrieves available symbols
     and filters them by name.
 

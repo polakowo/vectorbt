@@ -650,7 +650,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         !!! tip "VectorBT PRO"
 
             For aligning bars by when their price information becomes available, see the
-            [resampling examples](https://vectorbt.pro/features/tooling/time-series-operations/#safe-resampling).
+            [resampling examples](https://vectorbt.pro/features/data/multi-timeframe-analysis/#safe-resampling).
 
         Usage:
             ```pycon

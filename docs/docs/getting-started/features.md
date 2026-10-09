@@ -84,7 +84,7 @@ z  7  8  9
 !!! tip "VectorBT PRO"
 
     [Array expressions](https://vectorbt.pro/features/tooling/time-series-operations/#array-expressions) align and
-    broadcast arrays before evaluating a formula. [Index dictionaries](https://vectorbt.pro/features/tooling/time-series-operations/#index-dictionaries)
+    broadcast arrays before evaluating a formula. [Index dictionaries](https://vectorbt.pro/features/tooling/multidimensional-research/#index-dictionaries)
     let you assign values by date and asset without constructing full arrays yourself.
     Supported calculations can also [process columns in parallel](https://vectorbt.pro/features/performance/compute-backends/#parallel-numba).
 
@@ -409,8 +409,8 @@ rprobnx_exit_prob     0.5    1.0    0.5    1.0
 !!! tip "VectorBT PRO"
 
     Simulate [limit orders](https://vectorbt.pro/features/backtesting/orders-and-execution/#limit-orders),
-    [leverage](https://vectorbt.pro/features/backtesting/orders-and-execution/#leverage),
-    [stop ladders](https://vectorbt.pro/features/backtesting/signals-and-stops/#stop-laddering), and
+    [leverage](https://vectorbt.pro/features/backtesting/fees-slippage-and-leverage/#leverage),
+    [stop ladders](https://vectorbt.pro/features/backtesting/stop-loss-and-take-profit/#stop-laddering), and
     [cash deposits and withdrawals](https://vectorbt.pro/features/backtesting/portfolio-accounting/#cash-deposits).
     The [portfolio optimization tutorial](https://vectorbt.pro/tutorials/portfolio-optimization/)
     covers asset allocation and rebalancing.
@@ -584,7 +584,7 @@ dtype: float64
 
     Plot [TA-Lib indicator outputs](https://vectorbt.pro/features/indicators/technical-indicators/#ta-lib-plotting)
     or [long and short trade signals](https://vectorbt.pro/features/analytics/trade-analytics/#trade-signals).
-    [Portfolio slicing](https://vectorbt.pro/features/tooling/time-series-operations/#slicing) lets you select
+    [Portfolio slicing](https://vectorbt.pro/features/tooling/multidimensional-research/#slicing) lets you select
     and plot a date range without running the simulation again.
 
 ## Extra
@@ -680,4 +680,4 @@ dtype: float64
 
     Run independent functions in parallel with [tasks](https://vectorbt.pro/features/tooling/workflow-automation/#tasks),
     inspect memory use with the [caching registry](https://vectorbt.pro/features/performance/parallel-execution-and-caching/#caching),
-    and save objects in readable [configuration files](https://vectorbt.pro/features/tooling/workflow-automation/#configuration-files).
+    and save objects in readable [configuration files](https://vectorbt.pro/features/tooling/configuration-and-persistence/#configuration-files).

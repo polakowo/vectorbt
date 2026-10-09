@@ -10,7 +10,7 @@ and unstacking.
 
     [Array-like parameters](https://vectorbt.pro/features/optimization/strategy-optimization/#array-like-parameters)
     automatically broadcast combinations of values, such as stop distances, alongside time series.
-    [Align arrays with different indexes](https://vectorbt.pro/features/tooling/time-series-operations/#index-alignment)
+    [Align arrays with different indexes](https://vectorbt.pro/features/tooling/multidimensional-research/#index-alignment)
     before broadcasting.
 
 """
