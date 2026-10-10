@@ -150,7 +150,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.returns import dispatch, metrics
+from vectorbt.returns import dispatch, metrics, nb
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
@@ -478,6 +478,52 @@ class ReturnsAccessor(GenericAccessor):
         if minp is None:
             minp = self.defaults["minp"]
         result = dispatch.rolling_calmar_ratio(self.to_2d_array(), window, minp, self.ann_factor, engine=engine)
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
+    def ulcer_index(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Ulcer index: the root mean square of the drawdowns.
+
+        See `vectorbt.returns.nb.ulcer_index_1d_nb`."""
+        result = nb.ulcer_index_nb(self.to_2d_array())
+        wrap_kwargs = merge_dicts(dict(name_or_index="ulcer_index"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_ulcer_index(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.ulcer_index`."""
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        result = nb.rolling_ulcer_index_nb(self.to_2d_array(), window, minp)
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
+    def martin_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Martin ratio (ulcer performance index): annualized return divided by the ulcer index.
+
+        See `vectorbt.returns.nb.martin_ratio_1d_nb`."""
+        result = nb.martin_ratio_nb(self.to_2d_array(), self.ann_factor)
+        wrap_kwargs = merge_dicts(dict(name_or_index="martin_ratio"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_martin_ratio(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.martin_ratio`."""
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        result = nb.rolling_martin_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
@@ -1479,4 +1525,4 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
             year_freq=year_freq,
             defaults=defaults,
             **kwargs,
-        )
+    )
