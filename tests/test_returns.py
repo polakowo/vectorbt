@@ -249,7 +249,12 @@ class TestAccessors:
         r = rets["b"].vbt.returns
         expected = r.annualized() / r.ulcer_index()
         assert isclose(r.martin_ratio(), expected)
+        assert isclose(r.martin_ratio(risk_free=0.02), (r.annualized() - 0.02) / r.ulcer_index())
+        assert not isclose(r.martin_ratio(risk_free=0.02), r.martin_ratio())
         assert rets.vbt.returns.martin_ratio().name == "martin_ratio"
+        assert not rets.vbt.returns.rolling_martin_ratio(window=3, risk_free=0.5).equals(
+            rets.vbt.returns.rolling_martin_ratio(window=3)
+        )
         assert rets.vbt.returns.rolling_martin_ratio(window=3).shape == rets.shape
         flat = pd.Series([0.01, 0.01, 0.01], index=pd.date_range("2020", periods=3))
         assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").martin_ratio())
