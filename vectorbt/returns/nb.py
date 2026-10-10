@@ -313,31 +313,38 @@ def rolling_ulcer_index_nb(returns: tp.Array2d, window: int, minp: tp.Optional[i
 
 
 @njit(cache=True)
-def martin_ratio_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
-    """Martin ratio, or ulcer performance index: annualized return divided by the ulcer index."""
+def martin_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0.0) -> float:
+    """Martin ratio, or ulcer performance index: annualized return minus the annualized
+    risk-free rate, divided by the ulcer index."""
     ulcer_index = ulcer_index_1d_nb(returns)
     if np.isnan(ulcer_index) or ulcer_index == 0.0:
         return np.nan
-    return annualized_return_1d_nb(returns, ann_factor) / ulcer_index
+    return (annualized_return_1d_nb(returns, ann_factor) - risk_free) / ulcer_index
 
 
 @njit(cache=True)
-def martin_ratio_nb(returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
+def martin_ratio_nb(returns: tp.Array2d, ann_factor: float, risk_free: float = 0.0) -> tp.Array1d:
     """2-dim version of `martin_ratio_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float64)
     for col in range(returns.shape[1]):
-        out[col] = martin_ratio_1d_nb(returns[:, col], ann_factor)
+        out[col] = martin_ratio_1d_nb(returns[:, col], ann_factor, risk_free)
     return out
 
 
 @njit
-def rolling_martin_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int], ann_factor: float) -> tp.Array2d:
+def rolling_martin_ratio_nb(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    ann_factor: float,
+    risk_free: float = 0.0,
+) -> tp.Array2d:
     """Rolling version of `martin_ratio_nb`."""
 
-    def _apply_func_nb(i, col, _returns, _ann_factor):
-        return martin_ratio_1d_nb(_returns, _ann_factor)
+    def _apply_func_nb(i, col, _returns, _ann_factor, _risk_free):
+        return martin_ratio_1d_nb(_returns, _ann_factor, _risk_free)
 
-    return generic_nb.rolling_apply_nb(returns, window, minp, _apply_func_nb, ann_factor)
+    return generic_nb.rolling_apply_nb(returns, window, minp, _apply_func_nb, ann_factor, risk_free)
 
 
 @njit(cache=True)
