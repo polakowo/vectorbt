@@ -504,11 +504,15 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def martin_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Martin ratio (ulcer performance index): annualized return divided by the ulcer index.
+    def martin_ratio(self, risk_free: float = 0.0, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Martin ratio (ulcer performance index): annualized return minus `risk_free`,
+        divided by the ulcer index.
+
+        `risk_free` is an annualized rate and defaults to 0, in which case the numerator
+        is just the annualized return (as in `ReturnsAccessor.calmar_ratio`).
 
         See `vectorbt.returns.nb.martin_ratio_1d_nb`."""
-        result = nb.martin_ratio_nb(self.to_2d_array(), self.ann_factor)
+        result = nb.martin_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free)
         wrap_kwargs = merge_dicts(dict(name_or_index="martin_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
@@ -516,6 +520,7 @@ class ReturnsAccessor(GenericAccessor):
         self,
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
+        risk_free: float = 0.0,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.martin_ratio`."""
@@ -523,7 +528,7 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        result = nb.rolling_martin_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor)
+        result = nb.rolling_martin_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor, risk_free)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
