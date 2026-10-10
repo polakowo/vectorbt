@@ -1525,4 +1525,4 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
             year_freq=year_freq,
             defaults=defaults,
             **kwargs,
-    )
+        )
