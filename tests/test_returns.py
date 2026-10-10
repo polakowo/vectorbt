@@ -228,6 +228,32 @@ class TestAccessors:
             ),
         )
 
+    def test_ulcer_index(self):
+        def ref(x):
+            x = x.dropna()
+            cum = (1 + x).cumprod()
+            peak = np.maximum(cum.cummax(), 1.0)
+            return np.sqrt(((cum / peak - 1) ** 2).mean())
+
+        for col in rets.columns:
+            assert isclose(rets[col].vbt.returns.ulcer_index(), ref(rets[col].fillna(0)))
+        res = rets.vbt.returns.ulcer_index()
+        assert res.name == "ulcer_index"
+        assert list(res.index) == list(rets.columns)
+        assert rets.vbt.returns.rolling_ulcer_index(window=3).shape == rets.shape
+        assert isclose(rets["a"].vbt.returns.rolling_ulcer_index(window=3).iloc[-1], ref(rets["a"].iloc[-3:].fillna(0)))
+        flat = pd.Series([0.0, 0.0, 0.0])
+        assert flat.vbt.returns(freq="1D").ulcer_index() == 0.0
+
+    def test_martin_ratio(self):
+        r = rets["b"].vbt.returns
+        expected = r.annualized() / r.ulcer_index()
+        assert isclose(r.martin_ratio(), expected)
+        assert rets.vbt.returns.martin_ratio().name == "martin_ratio"
+        assert rets.vbt.returns.rolling_martin_ratio(window=3).shape == rets.shape
+        flat = pd.Series([0.01, 0.01, 0.01], index=pd.date_range("2020", periods=3))
+        assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").martin_ratio())
+
     def test_calmar_ratio(self):
         assert isclose(rets["a"].vbt.returns.calmar_ratio(), np.nan)
         pd.testing.assert_series_equal(
