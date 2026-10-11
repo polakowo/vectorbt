@@ -69,7 +69,7 @@ app = Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP],
 )
 CACHE_CONFIG = {
-    "CACHE_TYPE": "filesystem" if USE_CACHING else "null",
+    "CACHE_TYPE": "FileSystemCache" if USE_CACHING else "NullCache",
     "CACHE_DIR": "data",
     "CACHE_DEFAULT_TIMEOUT": 0,
     "CACHE_THRESHOLD": 50,
