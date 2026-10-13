@@ -3214,3 +3214,30 @@ class TestBasic:
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
         )
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.int64, np.uint64])
+    def test_OBV_flat_close(self, dtype):
+        # First volume, then zero/up/zero/down contributions: 100, 0, 300, 0, -500.
+        close = pd.Series([10, 10, 11, 11, 10], dtype=dtype, index=close_ts.index[:5], name="price")
+        volume = pd.Series([100, 200, 300, 400, 500], index=close.index, name=close.name)
+        expected = pd.Series([100, 100, 400, 400, -100], index=close.index, name=close.name)
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.obv_custom_nb(close.to_numpy()[:, None], volume.to_numpy()[:, None]),
+            expected.to_numpy()[:, None],
+        )
+        obv = vbt.OBV.run(close, volume, engine="numba")
+        pd.testing.assert_series_equal(obv.obv, expected)
+        # The incorrect added flat-bar volume previously hid this downstream zero crossing.
+        pd.testing.assert_series_equal(
+            obv.obv_crossed_below(0.0),
+            pd.Series([False, False, False, False, True], index=close.index, name=close.name),
+        )
+
+    def test_OBV_flat_close_large_integer(self):
+        # Float conversion would make the one-unit rise indistinguishable from equality.
+        close = np.array([2**63, 2**63, 2**63 + 1, 2**63 + 1], dtype=np.uint64)[:, None]
+        volume = np.array([100, 200, 300, 400])[:, None]
+        expected = np.array([100, 100, 400, 400])[:, None]
+        np.testing.assert_array_equal(vbt.indicators.nb.obv_custom_nb(close, volume), expected)
+        # Integers remain on Numba's precision-preserving path under automatic engine selection.
+        np.testing.assert_array_equal(vbt.indicators.dispatch.obv_custom(close, volume, engine="auto"), expected)

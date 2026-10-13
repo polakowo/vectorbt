@@ -305,5 +305,11 @@ def atr_apply_nb(
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
     obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
+    # Flat finite closes contribute no volume. Compare original prices to retain integer precision;
+    # leave first-bar and non-finite behavior to the existing signed-volume/cumulative-sum rules.
+    for col in range(close.shape[1]):
+        for i in range(1, close.shape[0]):
+            if np.isfinite(close[i, col]) and close[i, col] == close[i - 1, col]:
+                obv[i, col] = 0
     obv = generic_nb.nancumsum_nb(obv)
     return obv
