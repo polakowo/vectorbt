@@ -245,6 +245,16 @@ class TestAccessors:
         assert flat.vbt.returns(freq="1D").ulcer_index() == 0.0
         assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").ulcer_index())
 
+    def test_ulcer_index_nan_returns(self):
+        # NaN returns count as zero-return observations, like in `max_drawdown`
+        x = pd.Series([0.01, np.nan, -0.02, 0.015], index=pd.date_range("2020", periods=4))
+        acc = x.vbt.returns(freq="1D")
+        assert isclose(acc.ulcer_index(), x.fillna(0).vbt.returns(freq="1D").ulcer_index())
+        assert isclose(acc.max_drawdown(), x.fillna(0).vbt.returns(freq="1D").max_drawdown())
+        all_nan = pd.Series([np.nan] * 3, index=pd.date_range("2020", periods=3)).vbt.returns(freq="1D")
+        assert all_nan.ulcer_index() == 0.0
+        assert np.isnan(all_nan.martin_ratio())
+
     def test_rolling_ulcer_index(self):
         def ref(x):
             x = x.dropna()
@@ -271,8 +281,8 @@ class TestAccessors:
     def test_martin_ratio(self):
         r = rets["b"].vbt.returns
         expected = r.annualized() / r.ulcer_index()
-        assert isclose(r.martin_ratio(), expected)
-        assert isclose(r.martin_ratio(engine="numba"), expected)
+        assert isclose(r.martin_ratio(risk_free=0.0), expected)
+        assert isclose(r.martin_ratio(risk_free=0.0, engine="numba"), expected)
         assert rets.vbt.returns.martin_ratio().name == "martin_ratio"
 
         # risk_free is a constant per-period return, as in sharpe_ratio and omega_ratio
@@ -281,7 +291,8 @@ class TestAccessors:
         rf = 0.001
         excess_ann = np.prod(1 + x.values - rf) ** (365 / len(x)) - 1
         assert isclose(acc.martin_ratio(risk_free=rf), excess_ann / acc.ulcer_index())
-        assert not isclose(acc.martin_ratio(risk_free=rf), acc.martin_ratio())
+        assert not isclose(acc.martin_ratio(risk_free=rf), acc.martin_ratio(risk_free=0.0))
+        assert isclose(acc.martin_ratio(), acc.martin_ratio(risk_free=0.01))  # test module default
         acc_rf = x.vbt.returns(freq="1D", year_freq="365D", defaults=dict(risk_free=rf))
         assert isclose(acc_rf.martin_ratio(), acc.martin_ratio(risk_free=rf))
 
@@ -292,7 +303,7 @@ class TestAccessors:
     def test_rolling_martin_ratio(self):
         window = 3
         freq = rets.vbt.returns.wrapper.freq
-        res = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window)
+        res = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.0)
         assert res.shape == rets.shape
         for col in rets.columns:
             for i in range(len(rets)):
@@ -300,9 +311,9 @@ class TestAccessors:
                 if sub.notna().sum() < window:
                     assert np.isnan(res[col].iloc[i])
                 else:
-                    assert isclose(res[col].iloc[i], sub.vbt.returns(freq=freq).martin_ratio())
+                    assert isclose(res[col].iloc[i], sub.vbt.returns(freq=freq).martin_ratio(risk_free=0.0))
         pd.testing.assert_frame_equal(
-            rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, engine="numba"), res
+            rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.0, engine="numba"), res
         )
         res_rf = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.001)
         assert not res_rf.equals(res)
