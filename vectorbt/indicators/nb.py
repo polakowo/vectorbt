@@ -303,7 +303,10 @@ def atr_apply_nb(
 
 @njit(cache=True)
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
-    """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
+    """Custom calculation function for `vectorbt.indicators.basic.OBV`.
+
+    Compare each close with the immediately previous bar. A NaN close breaks
+    the comparison chain, so the next finite close adds its full volume."""
     obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
     # Flat finite closes contribute no volume. Compare original prices to retain integer precision;
     # leave first-bar and non-finite behavior to the existing signed-volume/cumulative-sum rules.
