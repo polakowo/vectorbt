@@ -43,7 +43,10 @@ def future_std_apply_nb(
     adjust: bool = False,
     ddof: int = 0,
 ) -> tp.Array2d:
-    """Get the standard deviation of the next period."""
+    """Get the standard deviation of the next period.
+
+    With `ewm=True`, `ddof=0` uses population variance, while `ddof=1`
+    applies the unbiased weighted correction."""
     if ewm:
         out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust, ddof=ddof)[::-1]
     else:

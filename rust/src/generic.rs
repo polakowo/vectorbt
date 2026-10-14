@@ -1352,7 +1352,7 @@ pub(crate) fn ewm_mean_2d_c(a: ArrayView2<'_, f64>, span: usize, minp: usize, ad
     out
 }
 
-pub(crate) fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddof: usize) -> Vec<f64> {
+pub(crate) fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, ddof: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
     if n == 0 {
@@ -1366,6 +1366,9 @@ pub(crate) fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddo
     let mut mean_y = a[0];
     let is_observation = !mean_x.is_nan() && !mean_y.is_nan();
     let mut nobs = if is_observation { 1usize } else { 0usize };
+    if a[0].is_finite() && nobs >= minp && ddof == 0 {
+        out[0] = 0.0;
+    }
     if !is_observation {
         mean_x = f64::NAN;
         mean_y = f64::NAN;
@@ -1410,24 +1413,22 @@ pub(crate) fn ewm_std_1d(a: &[f64], span: usize, minp: usize, adjust: bool, _ddo
             mean_x = cur_x;
             mean_y = cur_y;
         }
-        if nobs >= minp {
-            let numerator = sum_wt * sum_wt;
-            let denominator = numerator - sum_wt2;
-            if denominator > 0.0 {
-                out[i] = ((numerator / denominator) * cov).sqrt();
+        if nobs > 0 && nobs >= minp && mean_x.is_finite() {
+            if ddof == 0 {
+                out[i] = cov.sqrt();
+            } else {
+                let numerator = sum_wt * sum_wt;
+                let denominator = numerator - ddof as f64 * sum_wt2;
+                if denominator > 0.0 {
+                    out[i] = ((numerator / denominator) * cov).sqrt();
+                }
             }
         }
     }
     out
 }
 
-pub(crate) fn ewm_std_2d_c(
-    a: ArrayView2<'_, f64>,
-    span: usize,
-    minp: usize,
-    adjust: bool,
-    _ddof: usize,
-) -> Array2<f64> {
+pub(crate) fn ewm_std_2d_c(a: ArrayView2<'_, f64>, span: usize, minp: usize, adjust: bool, ddof: usize) -> Array2<f64> {
     let (nrows, ncols) = a.dim();
     let src = a.as_slice().expect("standard-layout array must be sliceable");
     let mut out = Array2::<f64>::from_elem((nrows, ncols), f64::NAN);
@@ -1446,6 +1447,9 @@ pub(crate) fn ewm_std_2d_c(
         let is_observation = !mean_x[col].is_nan() && !mean_y[col].is_nan();
         if is_observation {
             nobs[col] = 1;
+            if mean_x[col].is_finite() && nobs[col] >= minp && ddof == 0 {
+                dst[col] = 0.0;
+            }
         } else {
             mean_x[col] = f64::NAN;
             mean_y[col] = f64::NAN;
@@ -1493,11 +1497,15 @@ pub(crate) fn ewm_std_2d_c(
                 mean_x[col] = cur_x;
                 mean_y[col] = cur_y;
             }
-            if nobs[col] >= minp {
-                let numerator = sum_wt[col] * sum_wt[col];
-                let denominator = numerator - sum_wt2[col];
-                if denominator > 0.0 {
-                    dst[row_start + col] = ((numerator / denominator) * cov[col]).sqrt();
+            if nobs[col] > 0 && nobs[col] >= minp && mean_x[col].is_finite() {
+                if ddof == 0 {
+                    dst[row_start + col] = cov[col].sqrt();
+                } else {
+                    let numerator = sum_wt[col] * sum_wt[col];
+                    let denominator = numerator - ddof as f64 * sum_wt2[col];
+                    if denominator > 0.0 {
+                        dst[row_start + col] = ((numerator / denominator) * cov[col]).sqrt();
+                    }
                 }
             }
         }

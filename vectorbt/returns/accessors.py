@@ -150,7 +150,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.returns import dispatch, metrics
+from vectorbt.returns import dispatch, metrics, nb
 from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
@@ -478,6 +478,68 @@ class ReturnsAccessor(GenericAccessor):
         if minp is None:
             minp = self.defaults["minp"]
         result = dispatch.rolling_calmar_ratio(self.to_2d_array(), window, minp, self.ann_factor, engine=engine)
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
+    def ulcer_index(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """See `vectorbt.returns.dispatch.ulcer_index`."""
+        engine = engine if engine is not None else self.engine
+        result = dispatch.ulcer_index(self.to_2d_array(), engine=engine)
+        wrap_kwargs = merge_dicts(dict(name_or_index="ulcer_index"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_ulcer_index(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.ulcer_index`."""
+        engine = engine if engine is not None else self.engine
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        result = dispatch.rolling_ulcer_index(self.to_2d_array(), window, minp, engine=engine)
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
+    def martin_ratio(
+        self,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Martin ratio (ulcer performance index).
+
+        See `vectorbt.returns.dispatch.martin_ratio`."""
+        engine = engine if engine is not None else self.engine
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.martin_ratio(self.to_2d_array(), self.ann_factor, risk_free, engine=engine)
+        wrap_kwargs = merge_dicts(dict(name_or_index="martin_ratio"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_martin_ratio(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.martin_ratio`."""
+        engine = engine if engine is not None else self.engine
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.rolling_martin_ratio(
+            self.to_2d_array(), window, minp, self.ann_factor, risk_free, engine=engine
+        )
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
