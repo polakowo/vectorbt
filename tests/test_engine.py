@@ -1275,6 +1275,56 @@ class TestSignalsRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestIndicatorRustParity:
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    def test_obv_flat_close(self, dtype, layout):
+        # Each column has its own flat bars; the second also changes direction independently.
+        close = np.array([[10, 20], [10, 19], [11, 19], [11, 20], [10, 20]], dtype=dtype)
+        volume = np.array([[100, 10], [200, 20], [300, 30], [400, 40], [500, 50]], dtype=dtype)
+        expected = np.array([[100, 10], [100, -10], [400, -10], [400, 30], [-100, 30]], dtype=float)
+        if layout == "F":
+            close, volume = np.asfortranarray(close), np.asfortranarray(volume)
+        elif layout == "strided":
+            close = np.repeat(close, 2, axis=0)[::2]
+            volume = np.repeat(volume, 2, axis=0)[::2]
+        index = pd.date_range("2020-01-01", periods=5, tz="UTC")
+        columns = pd.Index(["asset_a", "asset_b"], name="asset")
+        close_df = pd.DataFrame(close, index=index, columns=columns)
+        volume_df = pd.DataFrame(volume, index=index, columns=columns)
+        # Exercise the contiguous Rust loop, column-buffer fallback and float32 conversion.
+        for engine in ("numba", "rust", "auto"):
+            actual = indicator_dispatch.obv_custom(close, volume, engine=engine)
+            np.testing.assert_array_equal(actual, expected)
+            assert actual.dtype == np.dtype(np.float64)
+            obv = vbt.OBV.run(close_df, volume_df, engine=engine)
+            pd.testing.assert_frame_equal(obv.obv, pd.DataFrame(expected, index=index, columns=columns))
+            pd.testing.assert_frame_equal(
+                obv.obv_crossed_below(0.0),
+                pd.DataFrame(
+                    [[False, False], [False, True], [False, False], [False, False], [True, False]],
+                    index=index,
+                    columns=columns,
+                ),
+            )
+
+    @pytest.mark.parametrize(
+        "close,volume,expected",
+        [
+            ([], [], []),
+            ([10], [100], [100]),
+            ([10, 11, 10], [100, 200, 300], [100, 300, 0]),
+            ([10, 10, np.nan, 10, 10], [100, np.nan, 300, 400, 500], [100, 100, 400, 800, 800]),
+            ([np.inf, np.inf, -np.inf, -np.inf], [100, 200, 300, 400], [100, 300, 0, 400]),
+        ],
+    )
+    def test_obv_flat_close_boundaries(self, close, volume, expected):
+        # Retain initialization, directional and non-finite-close conventions around flat bars.
+        close = np.array(close, dtype=float)[:, None]
+        volume = np.array(volume, dtype=float)[:, None]
+        expected = np.array(expected, dtype=float)[:, None]
+        for engine in ("numba", "rust", "auto"):
+            np.testing.assert_array_equal(indicator_dispatch.obv_custom(close, volume, engine=engine), expected)
+
     def test_dispatch_matches_numba(self):
         close = np.array(
             [
