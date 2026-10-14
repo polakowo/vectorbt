@@ -251,6 +251,39 @@ class TestEngineResolution:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestGenericRustParity:
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    @pytest.mark.parametrize("span", [1, 3])
+    @pytest.mark.parametrize("minp", [0, None])
+    @pytest.mark.parametrize("adjust", [False, True])
+    @pytest.mark.parametrize("ddof", [0, 1])
+    def test_ewm_std_ddof(self, layout, span, minp, adjust, ddof):
+        a = np.array([[np.nan, 1, np.nan], [1, 1, np.nan], [2, np.nan, np.nan], [4, 1, np.nan]], dtype=float)
+        if layout == "F":
+            a = np.asfortranarray(a)
+        elif layout == "strided":
+            a = np.repeat(a, 2, axis=0)[::2]
+        expected = (
+            pd.DataFrame(a)
+            .ewm(span=span, min_periods=span if minp is None else minp, adjust=adjust)
+            .std(bias=ddof == 0)
+            .to_numpy()
+        )
+        for engine in ("numba", "rust"):
+            np.testing.assert_allclose(dispatch.ewm_std(a, span, minp, adjust, ddof, engine=engine), expected)
+            np.testing.assert_allclose(
+                dispatch.ewm_std_1d(a[:, 0], span, minp, adjust, ddof, engine=engine), expected[:, 0]
+            )
+
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    def test_ewm_std_effective_ddof(self, layout):
+        a = np.array([[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]])
+        if layout == "F":
+            a = np.asfortranarray(a)
+        elif layout == "strided":
+            a = np.repeat(a, 2, axis=0)[::2]
+        expected = np.array([[np.nan, np.nan], [np.nan, np.nan], [np.sqrt(10), 2 * np.sqrt(10)]])
+        np.testing.assert_allclose(dispatch.ewm_std(a, 3, 0, True, 2, engine="rust"), expected)
+
     def test_dispatch_matches_numba(self):
         a_1d = np.array([1.0, np.nan, 3.0, 4.0, np.nan], dtype=np.float64)
         a = np.array(
@@ -1550,6 +1583,17 @@ class TestIndicatorRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestLabelsRustParity:
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    def test_future_std_ddof(self, ddof, adjust):
+        a = np.array([[1, np.nan], [2, 4], [4, 3], [3, np.nan], [5, 1], [2, 2]], dtype=float)
+        frame = pd.DataFrame(a)
+        expected = frame.iloc[::-1].ewm(span=3, min_periods=3, adjust=adjust).std(bias=ddof == 0)
+        expected = expected.iloc[::-1].shift(-1).to_numpy()
+        np.testing.assert_allclose(
+            labels_dispatch.future_std_apply(a, 3, True, 1, adjust, ddof, engine="rust"), expected
+        )
+
     def test_dispatch_matches_numba(self):
         close_c = np.array(
             [

@@ -2,6 +2,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import pytest
 
 import vectorbt as vbt
 
@@ -93,57 +94,23 @@ class TestGenerators:
             ),
         )
 
-    def test_FSTD(self):
-        pd.testing.assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), ewm=False).fstd,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [0.5, 0.5, 0.4714045207910384, 0.4714045207910183],
-                        [0.5, 0.5, 0.816496580927726, 0.816496580927726],
-                        [0.5, 0.5, 0.4714045207910183, 0.4714045207910384],
-                        [0.5, 0.5, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (2, False, "a"),
-                        (2, False, "b"),
-                        (3, False, "a"),
-                        (3, False, "b"),
-                    ],
-                    names=["fstd_window", "fstd_ewm", None],
-                ),
-            ),
-        )
-        pd.testing.assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), ewm=True).fstd,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [0.64486716348143, 0.6448671634814303, 0.6462561866810479, 0.6462561866810479],
-                        [0.8833005039168617, 0.8833005039168604, 0.8591246929842246, 0.8591246929842246],
-                        [0.5916079783099623, 0.5916079783099623, 0.5477225575051662, 0.5477225575051662],
-                        [0.7071067811865476, 0.7071067811865476, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (2, True, "a"),
-                        (2, True, "b"),
-                        (3, True, "a"),
-                        (3, True, "b"),
-                    ],
-                    names=["fstd_window", "fstd_ewm", None],
-                ),
-            ),
-        )
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    @pytest.mark.parametrize("ewm", [False, True])
+    def test_FSTD(self, ddof, adjust, ewm):
+        expected = {}
+        for window in (2, 3):
+            reversed_close = close_ts.iloc[::-1]
+            if ewm:
+                values = reversed_close.ewm(span=window, min_periods=window, adjust=adjust).std(bias=ddof == 0)
+            else:
+                values = reversed_close.rolling(window).std(ddof=ddof)
+            expected[(window, ewm)] = values.iloc[::-1].shift(-1)
+        expected = pd.concat(expected, axis=1)
+        expected.columns.names = ["fstd_window", "fstd_ewm", None]
+        kwargs = {} if ddof == 0 else dict(ddof=ddof)
+        actual = vbt.FSTD.run(close_ts, window=(2, 3), ewm=ewm, adjust=adjust, engine="numba", **kwargs).fstd
+        pd.testing.assert_frame_equal(actual, expected)
 
     def test_FMIN(self):
         pd.testing.assert_frame_equal(

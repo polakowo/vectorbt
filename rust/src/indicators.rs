@@ -624,10 +624,7 @@ pub fn obv_custom_rs<'py>(
                     let idx = row_start + col;
                     let volume = if row > 0 && close_src[idx] < close_src[prev_start + col] {
                         -volume_src[idx]
-                    } else if row > 0
-                        && close_src[idx].is_finite()
-                        && close_src[idx] == close_src[prev_start + col]
-                    {
+                    } else if row > 0 && close_src[idx].is_finite() && close_src[idx] == close_src[prev_start + col] {
                         // Match the column-buffer path: no volume contribution on finite equality.
                         0.0
                     } else {

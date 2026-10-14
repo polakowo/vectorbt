@@ -20,11 +20,11 @@ array([nan, 1.5, 2.5, 3.5])
 
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
-    2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
+    2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     Data is processed along index (axis 0).
-    
+
     Rolling functions with `minp=None` have `min_periods` set to the window size.
-    
+
     All functions passed as argument should be Numba-compiled."""
 
 import numpy as np
@@ -927,7 +927,9 @@ def ewm_mean_nb(a: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) -
 def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False, ddof: int = 0) -> tp.Array1d:
     """Return exponential weighted standard deviation.
 
-    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std(ddof=ddof)`.
+    For `ddof=0`, matches pandas EWM standard deviation with `bias=True`;
+    for `ddof=1`, matches `bias=False`. Other values adjust the effective
+    weighted sample size by `ddof`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
     if minp is None:
@@ -949,7 +951,7 @@ def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False,
     if not is_observation:
         mean_x = np.nan
         mean_y = np.nan
-    out[0] = np.nan
+    out[0] = 0.0 if np.isfinite(a[0]) and nobs >= minp and ddof < 1 else np.nan
     cov = 0.0
     sum_wt = 1.0
     sum_wt2 = 1.0
@@ -990,13 +992,16 @@ def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False,
             mean_x = cur_x
             mean_y = cur_y
 
-        if nobs >= minp:
-            numerator = sum_wt * sum_wt
-            denominator = numerator - sum_wt2
-            if denominator > 0.0:
-                out[i] = (numerator / denominator) * cov
+        if nobs > 0 and nobs >= minp and np.isfinite(mean_x):
+            if ddof == 0:
+                out[i] = cov
             else:
-                out[i] = np.nan
+                numerator = sum_wt * sum_wt
+                denominator = numerator - ddof * sum_wt2
+                if denominator > 0.0:
+                    out[i] = (numerator / denominator) * cov
+                else:
+                    out[i] = np.nan
         else:
             out[i] = np.nan
     return np.sqrt(out)
