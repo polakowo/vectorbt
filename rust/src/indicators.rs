@@ -590,6 +590,9 @@ pub(crate) fn obv_custom_1d_into(close: &[f64], volume: &[f64], out: &mut [f64])
     for i in 0..len {
         signed_volume[i] = if i > 0 && close[i] < close[i - 1] {
             -volume[i]
+        } else if i > 0 && close[i].is_finite() && close[i] == close[i - 1] {
+            // Flat finite closes leave OBV unchanged; retain first-bar and non-finite conventions.
+            0.0
         } else {
             volume[i]
         };
@@ -621,6 +624,9 @@ pub fn obv_custom_rs<'py>(
                     let idx = row_start + col;
                     let volume = if row > 0 && close_src[idx] < close_src[prev_start + col] {
                         -volume_src[idx]
+                    } else if row > 0 && close_src[idx].is_finite() && close_src[idx] == close_src[prev_start + col] {
+                        // Match the column-buffer path: no volume contribution on finite equality.
+                        0.0
                     } else {
                         volume_src[idx]
                     };

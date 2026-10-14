@@ -210,6 +210,16 @@ class TestEngineResolution:
         with pytest.raises(ValueError, match="callback-accepting"):
             dispatch.apply(np.ones((2, 2)), lambda col, a: a, engine="rust")
 
+    def test_ulcer_martin_reject_explicit_rust(self, monkeypatch):
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
+        arr = np.array([[0.01], [-0.02], [0.03]])
+
+        with pytest.raises(ValueError, match="not implemented for `ulcer_index`"):
+            returns_dispatch.ulcer_index(arr, engine="rust")
+        with pytest.raises(ValueError, match="not implemented for `rolling_martin_ratio`"):
+            returns_dispatch.rolling_martin_ratio(arr, 2, None, 365.0, 0.0, engine="rust")
+        assert returns_dispatch.martin_ratio(arr, 365.0, 0.0, engine="auto").shape == (1,)
+
     @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
     def test_rust_accepts_safe_cast_arrays(self):
         f32_arr = np.array([[1.0, np.nan], [3.0, 4.0]], dtype=np.float32)
@@ -241,6 +251,39 @@ class TestEngineResolution:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestGenericRustParity:
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    @pytest.mark.parametrize("span", [1, 3])
+    @pytest.mark.parametrize("minp", [0, None])
+    @pytest.mark.parametrize("adjust", [False, True])
+    @pytest.mark.parametrize("ddof", [0, 1])
+    def test_ewm_std_ddof(self, layout, span, minp, adjust, ddof):
+        a = np.array([[np.nan, 1, np.nan], [1, 1, np.nan], [2, np.nan, np.nan], [4, 1, np.nan]], dtype=float)
+        if layout == "F":
+            a = np.asfortranarray(a)
+        elif layout == "strided":
+            a = np.repeat(a, 2, axis=0)[::2]
+        expected = (
+            pd.DataFrame(a)
+            .ewm(span=span, min_periods=span if minp is None else minp, adjust=adjust)
+            .std(bias=ddof == 0)
+            .to_numpy()
+        )
+        for engine in ("numba", "rust"):
+            np.testing.assert_allclose(dispatch.ewm_std(a, span, minp, adjust, ddof, engine=engine), expected)
+            np.testing.assert_allclose(
+                dispatch.ewm_std_1d(a[:, 0], span, minp, adjust, ddof, engine=engine), expected[:, 0]
+            )
+
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    def test_ewm_std_effective_ddof(self, layout):
+        a = np.array([[1.0, 2.0], [2.0, 4.0], [4.0, 8.0]])
+        if layout == "F":
+            a = np.asfortranarray(a)
+        elif layout == "strided":
+            a = np.repeat(a, 2, axis=0)[::2]
+        expected = np.array([[np.nan, np.nan], [np.nan, np.nan], [np.sqrt(10), 2 * np.sqrt(10)]])
+        np.testing.assert_allclose(dispatch.ewm_std(a, 3, 0, True, 2, engine="rust"), expected)
+
     def test_dispatch_matches_numba(self):
         a_1d = np.array([1.0, np.nan, 3.0, 4.0, np.nan], dtype=np.float64)
         a = np.array(
@@ -1275,6 +1318,56 @@ class TestSignalsRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestIndicatorRustParity:
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    @pytest.mark.parametrize("layout", ["C", "F", "strided"])
+    def test_obv_flat_close(self, dtype, layout):
+        # Each column has its own flat bars; the second also changes direction independently.
+        close = np.array([[10, 20], [10, 19], [11, 19], [11, 20], [10, 20]], dtype=dtype)
+        volume = np.array([[100, 10], [200, 20], [300, 30], [400, 40], [500, 50]], dtype=dtype)
+        expected = np.array([[100, 10], [100, -10], [400, -10], [400, 30], [-100, 30]], dtype=float)
+        if layout == "F":
+            close, volume = np.asfortranarray(close), np.asfortranarray(volume)
+        elif layout == "strided":
+            close = np.repeat(close, 2, axis=0)[::2]
+            volume = np.repeat(volume, 2, axis=0)[::2]
+        index = pd.date_range("2020-01-01", periods=5, tz="UTC")
+        columns = pd.Index(["asset_a", "asset_b"], name="asset")
+        close_df = pd.DataFrame(close, index=index, columns=columns)
+        volume_df = pd.DataFrame(volume, index=index, columns=columns)
+        # Exercise the contiguous Rust loop, column-buffer fallback and float32 conversion.
+        for engine in ("numba", "rust", "auto"):
+            actual = indicator_dispatch.obv_custom(close, volume, engine=engine)
+            np.testing.assert_array_equal(actual, expected)
+            assert actual.dtype == np.dtype(np.float64)
+            obv = vbt.OBV.run(close_df, volume_df, engine=engine)
+            pd.testing.assert_frame_equal(obv.obv, pd.DataFrame(expected, index=index, columns=columns))
+            pd.testing.assert_frame_equal(
+                obv.obv_crossed_below(0.0),
+                pd.DataFrame(
+                    [[False, False], [False, True], [False, False], [False, False], [True, False]],
+                    index=index,
+                    columns=columns,
+                ),
+            )
+
+    @pytest.mark.parametrize(
+        "close,volume,expected",
+        [
+            ([], [], []),
+            ([10], [100], [100]),
+            ([10, 11, 10], [100, 200, 300], [100, 300, 0]),
+            ([10, 10, np.nan, 10, 10], [100, np.nan, 300, 400, 500], [100, 100, 400, 800, 800]),
+            ([np.inf, np.inf, -np.inf, -np.inf], [100, 200, 300, 400], [100, 300, 0, 400]),
+        ],
+    )
+    def test_obv_flat_close_boundaries(self, close, volume, expected):
+        # Retain initialization, directional and non-finite-close conventions around flat bars.
+        close = np.array(close, dtype=float)[:, None]
+        volume = np.array(volume, dtype=float)[:, None]
+        expected = np.array(expected, dtype=float)[:, None]
+        for engine in ("numba", "rust", "auto"):
+            np.testing.assert_array_equal(indicator_dispatch.obv_custom(close, volume, engine=engine), expected)
+
     def test_dispatch_matches_numba(self):
         close = np.array(
             [
@@ -1490,6 +1583,17 @@ class TestIndicatorRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestLabelsRustParity:
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    def test_future_std_ddof(self, ddof, adjust):
+        a = np.array([[1, np.nan], [2, 4], [4, 3], [3, np.nan], [5, 1], [2, 2]], dtype=float)
+        frame = pd.DataFrame(a)
+        expected = frame.iloc[::-1].ewm(span=3, min_periods=3, adjust=adjust).std(bias=ddof == 0)
+        expected = expected.iloc[::-1].shift(-1).to_numpy()
+        np.testing.assert_allclose(
+            labels_dispatch.future_std_apply(a, 3, True, 1, adjust, ddof, engine="rust"), expected
+        )
+
     def test_dispatch_matches_numba(self):
         close_c = np.array(
             [

@@ -44,7 +44,7 @@
     </a>
 </p>
 
-<h3 align="center"><b>Thinks in matrices, backtests at scale.</b></h3>
+<h3 align="center"><b>Think in matrices. Backtest at scale.</b></h3>
 
 <p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, accelerates the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
 
@@ -62,18 +62,18 @@ See [VectorBT vs PRO](https://vectorbt.dev/getting-started/upgrade/) or browse
 
 ## Features
 
-- **Fast, vectorized backtesting** and strategy research built on pandas, NumPy, and Numba
-- **Optional Rust engine** for precompiled speed without JIT overhead
-- **Pandas-native API** with custom accessors and high-performance operations
-- **Flexible broadcasting** for multi-asset analysis and large-scale parameter sweeps
-- **Rich indicator ecosystem** with custom indicators and integrations for TA-Lib, Pandas TA, and more
-- **Portfolio backtesting** with trade, drawdown, and performance analytics, including QuantStats integration
-- **Signal tooling** for generation, ranking, mapping, and distribution analysis
-- **Built-in data access** with preprocessing and synthetic data generation
-- **Robustness testing** with walk-forward optimization and label generation for ML workflows
-- **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
-- **Automation tools** for scheduled updates and Telegram notifications
-- **Composable Python API** for rapid experimentation and AI agent-driven workflows
+- 🧮 **Fast, vectorized backtesting** and strategy research built on pandas, NumPy, and Numba
+- 🦾 **Optional Rust engine** for precompiled speed without JIT overhead
+- 🐼 **Pandas-native API** with custom accessors and high-performance operations
+- 🪗 **Flexible broadcasting** for multi-asset analysis and large-scale parameter sweeps
+- 🎛️ **Rich indicator ecosystem** with custom indicators and integrations for TA-Lib, Pandas TA, and more
+- 🧾 **Portfolio backtesting** with trade, drawdown, and performance analytics, including QuantStats integration
+- 🚦 **Signal tooling** for generation, ranking, mapping, and distribution analysis
+- 🚰 **Built-in data access** with preprocessing and synthetic data generation
+- 🪨 **Robustness testing** with walk-forward optimization and label generation for ML workflows
+- 🪞 **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
+- 🕰️ **Automation tools** for scheduled updates and Telegram notifications
+- 🧱 **Composable Python API** for rapid experimentation and AI agent-driven workflows
 
 ## Installation
 

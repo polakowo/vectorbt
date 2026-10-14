@@ -30,7 +30,10 @@ def ma_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False) -> tp.Arr
 
 @njit(cache=True)
 def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
-    """Compute simple or exponential moving STD (`ewm=True`)."""
+    """Compute simple or exponential moving STD (`ewm=True`).
+
+    With `ewm=True`, `ddof=0` uses population variance, while `ddof=1`
+    applies the unbiased weighted correction."""
     if ewm:
         return generic_nb.ewm_std_nb(a, window, minp=window, adjust=adjust, ddof=ddof)
     return generic_nb.rolling_std_nb(a, window, minp=window, ddof=ddof)
@@ -303,7 +306,16 @@ def atr_apply_nb(
 
 @njit(cache=True)
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
-    """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
+    """Custom calculation function for `vectorbt.indicators.basic.OBV`.
+
+    Compare each close with the immediately previous bar. A NaN close breaks
+    the comparison chain, so the next finite close adds its full volume."""
     obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
+    # Flat finite closes contribute no volume. Compare original prices to retain integer precision;
+    # leave first-bar and non-finite behavior to the existing signed-volume/cumulative-sum rules.
+    for col in range(close.shape[1]):
+        for i in range(1, close.shape[0]):
+            if np.isfinite(close[i, col]) and close[i, col] == close[i - 1, col]:
+                obv[i, col] = 0
     obv = generic_nb.nancumsum_nb(obv)
     return obv

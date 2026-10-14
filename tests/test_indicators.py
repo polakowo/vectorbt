@@ -2081,141 +2081,54 @@ class TestBasic:
             ),
         )
 
-    def test_MSTD(self):
-        pd.testing.assert_frame_equal(
-            vbt.MSTD.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).mstd,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [0.5, 0.70710678, np.nan, np.nan],
-                        [0.5, 0.97467943, 0.81649658, 1.04880885],
-                        [0.5, 1.11434207, 0.81649658, 1.30018314],
-                        [0.5, 0.73001838, 0.47140452, 0.91715673],
-                        [0.5, 0.88824841, 0.81649658, 0.9182094],
-                        [0.5, 1.05965735, 0.81649658, 1.14049665],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(2, False), (2, True), (3, False), (3, True)], names=["mstd_window", "mstd_ewm"]
-                ),
-            ),
-        )
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    def test_MSTD(self, ddof, adjust):
+        expected = {}
+        for window, ewm in product((2, 3), (False, True)):
+            if ewm:
+                expected[(window, ewm)] = close_ts.ewm(span=window, min_periods=window, adjust=adjust).std(
+                    bias=ddof == 0
+                )
+            else:
+                expected[(window, ewm)] = close_ts.rolling(window).std(ddof=ddof)
+        expected = pd.DataFrame(expected)
+        expected.columns.names = ["mstd_window", "mstd_ewm"]
+        kwargs = {} if ddof == 0 else dict(ddof=ddof)
+        actual = vbt.MSTD.run(
+            close_ts, window=(2, 3), ewm=(False, True), param_product=True, adjust=adjust, **kwargs
+        ).mstd
+        pd.testing.assert_frame_equal(actual, expected)
 
-    def test_BBANDS(self):
-        columns = pd.MultiIndex.from_tuples(
-            [
-                (2, False, 2.0),
-                (2, False, 3.0),
-                (2, True, 2.0),
-                (2, True, 3.0),
-                (3, False, 2.0),
-                (3, False, 3.0),
-                (3, True, 2.0),
-                (3, True, 3.0),
-            ],
-            names=["bb_window", "bb_ewm", "bb_alpha"],
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    def test_BBANDS(self, ddof, adjust):
+        expected = {name: {} for name in ("middle", "upper", "lower", "percent_b", "bandwidth")}
+        for window, ewm, alpha in product((2, 3), (False, True), (2.0, 3.0)):
+            if ewm:
+                rolling = close_ts.ewm(span=window, min_periods=window, adjust=adjust)
+                middle = rolling.mean()
+                std = rolling.std(bias=ddof == 0)
+            else:
+                rolling = close_ts.rolling(window)
+                middle = rolling.mean()
+                std = rolling.std(ddof=ddof)
+            upper = middle + alpha * std
+            lower = middle - alpha * std
+            key = (window, ewm, alpha)
+            expected["middle"][key] = middle
+            expected["upper"][key] = upper
+            expected["lower"][key] = lower
+            expected["percent_b"][key] = (close_ts - lower) / (upper - lower)
+            expected["bandwidth"][key] = (upper - lower) / middle
+        kwargs = {} if ddof == 0 else dict(ddof=ddof)
+        bands = vbt.BBANDS.run(
+            close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True, adjust=adjust, **kwargs
         )
-        pd.testing.assert_frame_equal(
-            vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True).middle,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [1.5, 1.5, 1.66666667, 1.66666667, np.nan, np.nan, np.nan, np.nan],
-                        [2.5, 2.5, 2.55555556, 2.55555556, 2.0, 2.0, 2.25, 2.25],
-                        [3.5, 3.5, 3.51851852, 3.51851852, 3.0, 3.0, 3.125, 3.125],
-                        [3.5, 3.5, 3.17283951, 3.17283951, 3.33333333, 3.33333333, 3.0625, 3.0625],
-                        [2.5, 2.5, 2.3909465, 2.3909465, 3.0, 3.0, 2.53125, 2.53125],
-                        [1.5, 1.5, 1.46364883, 1.46364883, 2.0, 2.0, 1.765625, 1.765625],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
-        pd.testing.assert_frame_equal(
-            vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True).upper,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [2.5, 3.0, 3.08088023, 3.78798701, np.nan, np.nan, np.nan, np.nan],
-                        [3.5, 4.0, 4.50491442, 5.47959386, 3.63299316, 4.44948974, 4.3476177, 5.39642654],
-                        [4.5, 5.0, 5.74720265, 6.86154472, 4.63299316, 5.44948974, 5.72536627, 7.02554941],
-                        [4.5, 5.0, 4.63287626, 5.36289463, 4.27614237, 4.7475469, 4.89681346, 5.8139702],
-                        [3.5, 4.0, 4.16744332, 5.05569172, 4.63299316, 5.44948974, 4.3676688, 5.2858782],
-                        [2.5, 3.0, 3.58296354, 4.64262089, 3.63299316, 4.44948974, 4.04661829, 5.18711494],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
-        pd.testing.assert_frame_equal(
-            vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True).lower,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [0.5, 0.0, 0.2524531, -0.45465368, np.nan, np.nan, np.nan, np.nan],
-                        [1.5, 1.0, 0.60619669, -0.36848275, 0.36700684, -0.44948974, 0.1523823, -0.89642654],
-                        [2.5, 2.0, 1.28983438, 0.17549232, 1.36700684, 0.55051026, 0.52463373, -0.77554941],
-                        [2.5, 2.0, 1.71280275, 0.98278438, 2.39052429, 1.91911977, 1.22818654, 0.3110298],
-                        [1.5, 1.0, 0.61444969, -0.27379872, 1.36700684, 0.55051026, 0.6948312, -0.2233782],
-                        [0.5, 0.0, -0.65566587, -1.71532322, 0.36700684, -0.44948974, -0.51536829, -1.65586494],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
-        pd.testing.assert_frame_equal(
-            vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True).percent_b,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [0.75, 0.66666667, 0.61785113, 0.57856742, np.nan, np.nan, np.nan, np.nan],
-                        [0.75, 0.66666667, 0.61399759, 0.5759984, 0.80618622, 0.70412415, 0.67877424, 0.61918282],
-                        [0.75, 0.66666667, 0.60801923, 0.57201282, 0.80618622, 0.70412415, 0.66824553, 0.61216369],
-                        [0.25, 0.33333333, 0.44080988, 0.46053992, 0.3232233, 0.38214887, 0.48296365, 0.48864244],
-                        [0.25, 0.33333333, 0.38996701, 0.42664468, 0.19381378, 0.29587585, 0.35535707, 0.40357138],
-                        [0.25, 0.33333333, 0.3906135, 0.42707567, 0.19381378, 0.29587585, 0.3321729, 0.38811526],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
-        pd.testing.assert_frame_equal(
-            vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True).bandwidth,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [1.33333333, 2.0, 1.69705627, 2.54558441, np.nan, np.nan, np.nan, np.nan],
-                        [0.8, 1.2, 1.5255852, 2.2883778, 1.63299316, 2.44948974, 1.86454906, 2.7968236],
-                        [
-                            0.57142857,
-                            0.85714286,
-                            1.26683098,
-                            1.90024647,
-                            1.08866211,
-                            1.63299316,
-                            1.66423442,
-                            2.49635162,
-                        ],
-                        [0.57142857, 0.85714286, 0.92033445, 1.38050168, 0.56568542, 0.84852814, 1.197919, 1.79687849],
-                        [0.8, 1.2, 1.48601971, 2.22902956, 1.08866211, 1.63299316, 1.45099757, 2.17649636],
-                        [1.33333333, 2.0, 2.8959333, 4.34389996, 1.63299316, 2.44948974, 2.58378001, 3.87567002],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
+        for name, values in expected.items():
+            frame = pd.DataFrame(values)
+            frame.columns.names = ["bb_window", "bb_ewm", "bb_alpha"]
+            pd.testing.assert_frame_equal(getattr(bands, name), frame)
 
     def test_RSI(self):
         pd.testing.assert_frame_equal(
@@ -3214,3 +3127,30 @@ class TestBasic:
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
         )
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.int64, np.uint64])
+    def test_OBV_flat_close(self, dtype):
+        # First volume, then zero/up/zero/down contributions: 100, 0, 300, 0, -500.
+        close = pd.Series([10, 10, 11, 11, 10], dtype=dtype, index=close_ts.index[:5], name="price")
+        volume = pd.Series([100, 200, 300, 400, 500], index=close.index, name=close.name)
+        expected = pd.Series([100, 100, 400, 400, -100], index=close.index, name=close.name)
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.obv_custom_nb(close.to_numpy()[:, None], volume.to_numpy()[:, None]),
+            expected.to_numpy()[:, None],
+        )
+        obv = vbt.OBV.run(close, volume, engine="numba")
+        pd.testing.assert_series_equal(obv.obv, expected)
+        # The incorrect added flat-bar volume previously hid this downstream zero crossing.
+        pd.testing.assert_series_equal(
+            obv.obv_crossed_below(0.0),
+            pd.Series([False, False, False, False, True], index=close.index, name=close.name),
+        )
+
+    def test_OBV_flat_close_large_integer(self):
+        # Float conversion would make the one-unit rise indistinguishable from equality.
+        close = np.array([2**63, 2**63, 2**63 + 1, 2**63 + 1], dtype=np.uint64)[:, None]
+        volume = np.array([100, 200, 300, 400])[:, None]
+        expected = np.array([100, 100, 400, 400])[:, None]
+        np.testing.assert_array_equal(vbt.indicators.nb.obv_custom_nb(close, volume), expected)
+        # Integers remain on Numba's precision-preserving path under automatic engine selection.
+        np.testing.assert_array_equal(vbt.indicators.dispatch.obv_custom(close, volume, engine="auto"), expected)
