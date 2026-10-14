@@ -481,11 +481,10 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def ulcer_index(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Ulcer index: the root mean square of the drawdowns.
-
-        See `vectorbt.returns.nb.ulcer_index_1d_nb`."""
-        result = nb.ulcer_index_nb(self.to_2d_array())
+    def ulcer_index(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """See `vectorbt.returns.dispatch.ulcer_index`."""
+        engine = engine if engine is not None else self.engine
+        result = dispatch.ulcer_index(self.to_2d_array(), engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="ulcer_index"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
@@ -493,26 +492,32 @@ class ReturnsAccessor(GenericAccessor):
         self,
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.ulcer_index`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        result = nb.rolling_ulcer_index_nb(self.to_2d_array(), window, minp)
+        result = dispatch.rolling_ulcer_index(self.to_2d_array(), window, minp, engine=engine)
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
-    def martin_ratio(self, risk_free: float = 0.0, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Martin ratio (ulcer performance index): annualized return minus `risk_free`,
-        divided by the ulcer index.
+    def martin_ratio(
+        self,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Martin ratio (ulcer performance index).
 
-        `risk_free` is an annualized rate and defaults to 0, in which case the numerator
-        is just the annualized return (as in `ReturnsAccessor.calmar_ratio`).
-
-        See `vectorbt.returns.nb.martin_ratio_1d_nb`."""
-        result = nb.martin_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free)
+        See `vectorbt.returns.dispatch.martin_ratio`."""
+        engine = engine if engine is not None else self.engine
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.martin_ratio(self.to_2d_array(), self.ann_factor, risk_free, engine=engine)
         wrap_kwargs = merge_dicts(dict(name_or_index="martin_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
 
@@ -520,15 +525,21 @@ class ReturnsAccessor(GenericAccessor):
         self,
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
-        risk_free: float = 0.0,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.martin_ratio`."""
+        engine = engine if engine is not None else self.engine
         if window is None:
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        result = nb.rolling_martin_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor, risk_free)
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.rolling_martin_ratio(
+            self.to_2d_array(), window, minp, self.ann_factor, risk_free, engine=engine
+        )
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
