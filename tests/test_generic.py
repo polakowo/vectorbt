@@ -329,20 +329,37 @@ class TestAccessors:
         pd.testing.assert_frame_equal(df.vbt.ewm_mean(test_window), df.ewm(span=test_window).mean())
 
     @pytest.mark.parametrize(
-        "test_window,test_minp,test_adjust", list(product([1, 2, 3, 4, 5], [1, None], [False, True]))
+        "test_window,test_minp,test_adjust,test_ddof", list(product([1, 2, 3, 4, 5], [1, None], [False, True], [0, 1]))
     )
-    def test_ewm_std(self, test_window, test_minp, test_adjust):
+    def test_ewm_std(self, test_window, test_minp, test_adjust, test_ddof):
         if test_minp is None:
             test_minp = test_window
         pd.testing.assert_series_equal(
-            df["a"].vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
-            df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
+            df["a"].vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, ddof=test_ddof),
+            df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(bias=test_ddof == 0),
         )
         pd.testing.assert_frame_equal(
-            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
-            df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
+            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, ddof=test_ddof),
+            df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(bias=test_ddof == 0),
         )
         pd.testing.assert_frame_equal(df.vbt.ewm_std(test_window), df.ewm(span=test_window).std())
+
+    @pytest.mark.parametrize(
+        "values", [[], [np.nan], [2.0], [np.nan, np.nan], [np.nan, 2.0, np.nan, 2.0], [np.inf], [np.nan, np.inf]]
+    )
+    @pytest.mark.parametrize("ddof", [0, 1])
+    @pytest.mark.parametrize("adjust", [False, True])
+    def test_ewm_std_edges(self, values, ddof, adjust):
+        values = np.array(values, dtype=float)
+        expected = pd.Series(values).ewm(span=3, min_periods=0, adjust=adjust).std(bias=ddof == 0).to_numpy()
+        np.testing.assert_allclose(nb.ewm_std_1d_nb(values, 3, 0, adjust, ddof), expected, equal_nan=True)
+
+    def test_ewm_std_effective_ddof(self):
+        # Weights [1/4, 1/2, 1] give weighted squared deviations 5/2;
+        # dividing by sum(w) - 2 * sum(w**2) / sum(w) = 1/4 gives variance 10.
+        values = np.array([1.0, 2.0, 4.0])
+        np.testing.assert_allclose(nb.ewm_std_1d_nb(values, 3, 0, True, 2), [np.nan, np.nan, np.sqrt(10)])
+        assert np.all(np.isnan(nb.ewm_std_1d_nb(values, 3, 0, True, 3)))
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_min(self, test_minp):

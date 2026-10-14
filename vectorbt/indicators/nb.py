@@ -30,7 +30,10 @@ def ma_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False) -> tp.Arr
 
 @njit(cache=True)
 def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
-    """Compute simple or exponential moving STD (`ewm=True`)."""
+    """Compute simple or exponential moving STD (`ewm=True`).
+
+    With `ewm=True`, `ddof=0` uses population variance, while `ddof=1`
+    applies the unbiased weighted correction."""
     if ewm:
         return generic_nb.ewm_std_nb(a, window, minp=window, adjust=adjust, ddof=ddof)
     return generic_nb.rolling_std_nb(a, window, minp=window, ddof=ddof)
