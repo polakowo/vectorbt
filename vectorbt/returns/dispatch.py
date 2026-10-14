@@ -435,7 +435,10 @@ def rolling_martin_ratio(
     resolve_engine(engine, supports_rust=_no_rust("rolling_martin_ratio"))
     from vectorbt.returns.nb import rolling_martin_ratio_nb
 
-    return rolling_martin_ratio_nb(returns, window, minp, ann_factor, risk_freeomega_ratio(
+    return rolling_martin_ratio_nb(returns, window, minp, ann_factor, risk_free)
+
+
+def omega_ratio(
     returns: tp.Array2d,
     ann_factor: float,
     risk_free: float = 0.0,
