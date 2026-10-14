@@ -385,7 +385,57 @@ def rolling_calmar_ratio(
     return rolling_calmar_ratio_nb(returns, window, minp, ann_factor)
 
 
-def omega_ratio(
+def _no_rust(name: str) -> RustSupport:
+    return RustSupport(False, f"Rust engine is not implemented for `{name}`.")
+
+
+def ulcer_index(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.ulcer_index_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("ulcer_index"))
+    from vectorbt.returns.nb import ulcer_index_nb
+
+    return ulcer_index_nb(returns)
+
+
+def rolling_ulcer_index(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.rolling_ulcer_index_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("rolling_ulcer_index"))
+    from vectorbt.returns.nb import rolling_ulcer_index_nb
+
+    return rolling_ulcer_index_nb(returns, window, minp)
+
+
+def martin_ratio(
+    returns: tp.Array2d,
+    ann_factor: float,
+    risk_free: float = 0.0,
+    engine: tp.Optional[str] = None,
+) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.martin_ratio_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("martin_ratio"))
+    from vectorbt.returns.nb import martin_ratio_nb
+
+    return martin_ratio_nb(returns, ann_factor, risk_free)
+
+
+def rolling_martin_ratio(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    ann_factor: float,
+    risk_free: float = 0.0,
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.rolling_martin_ratio_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("rolling_martin_ratio"))
+    from vectorbt.returns.nb import rolling_martin_ratio_nb
+
+    return rolling_martin_ratio_nb(returns, window, minp, ann_factor, risk_freeomega_ratio(
     returns: tp.Array2d,
     ann_factor: float,
     risk_free: float = 0.0,
