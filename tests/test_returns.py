@@ -65,6 +65,20 @@ def teardown_module():
 # ############# accessors.py ############# #
 
 
+def ref_ulcer_index(values):
+    cum = np.cumprod(1 + np.nan_to_num(np.asarray(values, dtype=float)))
+    return np.sqrt(np.mean((cum / np.maximum.accumulate(cum) - 1) ** 2))
+
+
+def ref_martin_ratio(values, ann_factor, risk_free):
+    values = np.nan_to_num(np.asarray(values, dtype=float))
+    ulcer = ref_ulcer_index(values)
+    if ulcer == 0:
+        return np.nan
+    strategy_ann = np.prod(1 + values) ** (ann_factor / len(values)) - 1
+    return (strategy_ann - ((1 + risk_free) ** ann_factor - 1)) / ulcer
+
+
 class TestAccessors:
     def test_indexing(self):
         assert rets.vbt.returns["a"].total() == rets["a"].vbt.returns.total()
@@ -285,13 +299,20 @@ class TestAccessors:
         assert isclose(r.martin_ratio(risk_free=0.0, engine="numba"), expected)
         assert rets.vbt.returns.martin_ratio().name == "martin_ratio"
 
-        # risk_free is a constant per-period return, as in sharpe_ratio and omega_ratio
+        # risk_free is a constant per-period return, as in sharpe_ratio and omega_ratio. Martin's
+        # definition annualizes the strategy and the risk-free returns separately, then subtracts.
         x = pd.Series([0.01, -0.02, 0.015, -0.01, 0.02, -0.005], index=pd.date_range("2020", periods=6))
         acc = x.vbt.returns(freq="1D", year_freq="365D")
         rf = 0.001
-        excess_ann = np.prod(1 + x.values - rf) ** (365 / len(x)) - 1
-        assert isclose(acc.martin_ratio(risk_free=rf), excess_ann / acc.ulcer_index())
+        strategy_ann = np.prod(1 + x.values) ** (365 / len(x)) - 1
+        rf_ann = (1 + rf) ** 365 - 1
+        ulcer = ref_ulcer_index(x.values)
+        assert isclose(acc.ulcer_index(), ulcer)
+        assert isclose(acc.martin_ratio(risk_free=rf), (strategy_ann - rf_ann) / ulcer)
         assert not isclose(acc.martin_ratio(risk_free=rf), acc.martin_ratio(risk_free=0.0))
+        # compounding the excess per-period returns instead gives a different number
+        assert not isclose(acc.martin_ratio(risk_free=rf), (np.prod(1 + x.values - rf) ** (365 / len(x)) - 1) / ulcer)
+        assert isclose(acc.martin_ratio(risk_free=0.0), strategy_ann / ulcer)
         assert isclose(acc.martin_ratio(), acc.martin_ratio(risk_free=0.01))  # test module default
         acc_rf = x.vbt.returns(freq="1D", year_freq="365D", defaults=dict(risk_free=rf))
         assert isclose(acc_rf.martin_ratio(), acc.martin_ratio(risk_free=rf))
@@ -300,9 +321,47 @@ class TestAccessors:
         assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").martin_ratio())
         assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").martin_ratio())
 
+    def test_martin_ratio_references(self):
+        rng = np.random.default_rng(7)
+        x = pd.Series(rng.normal(0.0005, 0.01, 20), index=pd.date_range("2020", periods=20))
+        window = 5
+
+        for freq, year_freq, ann_factor in [("1D", "365D", 365.0), ("2D", "365D", 182.5), ("1D", "1D", 1.0)]:
+            acc = x.vbt.returns(freq=freq, year_freq=year_freq)
+            assert acc.ann_factor == ann_factor
+            for rf in [0.0, 0.0005, -0.0003]:
+                assert isclose(acc.martin_ratio(risk_free=rf), ref_martin_ratio(x.values, ann_factor, rf))
+                assert isclose(
+                    acc.martin_ratio(risk_free=rf, engine="numba"), ref_martin_ratio(x.values, ann_factor, rf)
+                )
+                res = acc.rolling_martin_ratio(window=window, minp=window, risk_free=rf)
+                res_numba = acc.rolling_martin_ratio(window=window, minp=window, risk_free=rf, engine="numba")
+                pd.testing.assert_series_equal(res, res_numba)
+                assert res.iloc[: window - 1].isna().all()
+                for i in range(window - 1, len(x)):
+                    assert isclose(res.iloc[i], ref_martin_ratio(x.values[i - window + 1 : i + 1], ann_factor, rf))
+
+    def test_rolling_martin_ratio_interior_nan(self):
+        x = pd.Series(
+            [0.01, -0.02, np.nan, 0.015, -0.01, 0.02, np.nan, -0.005, 0.004, 0.01],
+            index=pd.date_range("2020", periods=10),
+        )
+        acc = x.vbt.returns(freq="1D", year_freq="365D")
+        window, rf = 4, 0.0004
+        res = acc.rolling_martin_ratio(window=window, minp=2, risk_free=rf)
+        for i in range(len(x)):
+            sub = x.values[max(0, i - window + 1) : i + 1]
+            if np.isfinite(sub).sum() < 2:
+                assert np.isnan(res.iloc[i])
+            else:
+                assert isclose(res.iloc[i], ref_martin_ratio(sub, 365.0, rf))
+        # at least one window really contains an interior NaN
+        assert any(np.isnan(x.values[max(0, i - window + 1) : i + 1]).any() and i >= window for i in range(len(x)))
+
     def test_rolling_martin_ratio(self):
         window = 3
         freq = rets.vbt.returns.wrapper.freq
+        # consistency check against the 1-dim path; the independent references are below
         res = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.0)
         assert res.shape == rets.shape
         for col in rets.columns:
@@ -315,7 +374,24 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.0, engine="numba"), res
         )
-        res_rf = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.001)
+        rf = 0.001
+        ann_factor = 365
+        assert rets.vbt.returns.ann_factor == ann_factor
+        res_rf = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=rf)
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < window:
+                    assert np.isnan(res_rf[col].iloc[i])
+                    continue
+                vals = sub.fillna(0).values
+                cum = np.cumprod(1 + vals)
+                ulcer = np.sqrt(np.mean((cum / np.maximum.accumulate(cum) - 1) ** 2))
+                if ulcer == 0:
+                    assert np.isnan(res_rf[col].iloc[i])
+                    continue
+                expected = (cum[-1] ** (ann_factor / len(vals)) - 1 - ((1 + rf) ** ann_factor - 1)) / ulcer
+                assert isclose(res_rf[col].iloc[i], expected)
         assert not res_rf.equals(res)
         pd.testing.assert_frame_equal(
             rets.vbt.returns(defaults=dict(risk_free=0.001)).rolling_martin_ratio(window=window, minp=window), res_rf
