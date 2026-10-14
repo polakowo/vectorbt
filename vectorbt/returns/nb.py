@@ -314,12 +314,12 @@ def rolling_ulcer_index_nb(returns: tp.Array2d, window: int, minp: tp.Optional[i
 
 @njit(cache=True)
 def martin_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0.0) -> float:
-    """Martin ratio, or ulcer performance index: annualized return minus the annualized
-    risk-free rate, divided by the ulcer index."""
+    """Martin ratio, or ulcer performance index: annualized return of the returns in excess of
+    the constant per-period `risk_free` return, divided by the ulcer index of the returns."""
     ulcer_index = ulcer_index_1d_nb(returns)
     if np.isnan(ulcer_index) or ulcer_index == 0.0:
         return np.nan
-    return (annualized_return_1d_nb(returns, ann_factor) - risk_free) / ulcer_index
+    return annualized_return_1d_nb(returns - risk_free, ann_factor) / ulcer_index
 
 
 @njit(cache=True)
