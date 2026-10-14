@@ -654,7 +654,9 @@ class Trades(Ranges):
     def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability.
 
-        Breakeven trades are counted but contribute no profit or loss."""
+        Breakeven trades are counted but contribute no profit or loss.
+        Missing-PnL trades remain in the total count and residual loss weight,
+        preserving existing behavior."""
         win_rate = to_1d_array(self.win_rate(group_by=group_by))
         avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by)).copy()
         avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by)).copy()
