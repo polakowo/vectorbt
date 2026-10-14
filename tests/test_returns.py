@@ -232,32 +232,83 @@ class TestAccessors:
         def ref(x):
             x = x.dropna()
             cum = (1 + x).cumprod()
-            peak = np.maximum(cum.cummax(), 1.0)
+            peak = cum.cummax()
             return np.sqrt(((cum / peak - 1) ** 2).mean())
 
         for col in rets.columns:
             assert isclose(rets[col].vbt.returns.ulcer_index(), ref(rets[col].fillna(0)))
+            assert isclose(rets[col].vbt.returns.ulcer_index(engine="numba"), ref(rets[col].fillna(0)))
         res = rets.vbt.returns.ulcer_index()
         assert res.name == "ulcer_index"
         assert list(res.index) == list(rets.columns)
-        assert rets.vbt.returns.rolling_ulcer_index(window=3).shape == rets.shape
-        assert isclose(rets["a"].vbt.returns.rolling_ulcer_index(window=3).iloc[-1], ref(rets["a"].iloc[-3:].fillna(0)))
         flat = pd.Series([0.0, 0.0, 0.0])
         assert flat.vbt.returns(freq="1D").ulcer_index() == 0.0
+        assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").ulcer_index())
+
+    def test_rolling_ulcer_index(self):
+        def ref(x):
+            x = x.dropna()
+            cum = (1 + x).cumprod()
+            peak = cum.cummax()
+            return np.sqrt(((cum / peak - 1) ** 2).mean())
+
+        window = 3
+        res = rets.vbt.returns.rolling_ulcer_index(window=window, minp=window)
+        assert res.shape == rets.shape
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < window:
+                    assert np.isnan(res[col].iloc[i])
+                else:
+                    assert isclose(res[col].iloc[i], ref(sub))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_ulcer_index(window=window, minp=window, engine="numba"), res
+        )
+        res_minp = rets.vbt.returns.rolling_ulcer_index(window=window, minp=1)
+        assert res_minp.iloc[1:].notna().all().all()
 
     def test_martin_ratio(self):
         r = rets["b"].vbt.returns
         expected = r.annualized() / r.ulcer_index()
         assert isclose(r.martin_ratio(), expected)
-        assert isclose(r.martin_ratio(risk_free=0.02), (r.annualized() - 0.02) / r.ulcer_index())
-        assert not isclose(r.martin_ratio(risk_free=0.02), r.martin_ratio())
+        assert isclose(r.martin_ratio(engine="numba"), expected)
         assert rets.vbt.returns.martin_ratio().name == "martin_ratio"
-        assert not rets.vbt.returns.rolling_martin_ratio(window=3, risk_free=0.5).equals(
-            rets.vbt.returns.rolling_martin_ratio(window=3)
-        )
-        assert rets.vbt.returns.rolling_martin_ratio(window=3).shape == rets.shape
+
+        # risk_free is a constant per-period return, as in sharpe_ratio and omega_ratio
+        x = pd.Series([0.01, -0.02, 0.015, -0.01, 0.02, -0.005], index=pd.date_range("2020", periods=6))
+        acc = x.vbt.returns(freq="1D", year_freq="365D")
+        rf = 0.001
+        excess_ann = np.prod(1 + x.values - rf) ** (365 / len(x)) - 1
+        assert isclose(acc.martin_ratio(risk_free=rf), excess_ann / acc.ulcer_index())
+        assert not isclose(acc.martin_ratio(risk_free=rf), acc.martin_ratio())
+        acc_rf = x.vbt.returns(freq="1D", year_freq="365D", defaults=dict(risk_free=rf))
+        assert isclose(acc_rf.martin_ratio(), acc.martin_ratio(risk_free=rf))
+
         flat = pd.Series([0.01, 0.01, 0.01], index=pd.date_range("2020", periods=3))
         assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").martin_ratio())
+        assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").martin_ratio())
+
+    def test_rolling_martin_ratio(self):
+        window = 3
+        freq = rets.vbt.returns.wrapper.freq
+        res = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window)
+        assert res.shape == rets.shape
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < window:
+                    assert np.isnan(res[col].iloc[i])
+                else:
+                    assert isclose(res[col].iloc[i], sub.vbt.returns(freq=freq).martin_ratio())
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, engine="numba"), res
+        )
+        res_rf = rets.vbt.returns.rolling_martin_ratio(window=window, minp=window, risk_free=0.001)
+        assert not res_rf.equals(res)
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns(defaults=dict(risk_free=0.001)).rolling_martin_ratio(window=window, minp=window), res_rf
+        )
 
     def test_calmar_ratio(self):
         assert isclose(rets["a"].vbt.returns.calmar_ratio(), np.nan)
