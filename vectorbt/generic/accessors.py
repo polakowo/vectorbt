@@ -30,7 +30,7 @@ specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.return
     Accessors do not utilize caching.
 
 Run for the examples below:
-    
+
 ```pycon
 >>> import vectorbt as vbt
 >>> import numpy as np
@@ -315,9 +315,7 @@ nb_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "nb_config"
-] = f"""Config of Numba methods to be added to `GenericAccessor`.
+__pdoc__["nb_config"] = f"""Config of Numba methods to be added to `GenericAccessor`.
 
 ```json
 {nb_config.to_doc()}
@@ -358,9 +356,7 @@ transform_config = Config(
 )
 """_"""
 
-__pdoc__[
-    "transform_config"
-] = f"""Config of transform methods to be added to `GenericAccessor`.
+__pdoc__["transform_config"] = f"""Config of transform methods to be added to `GenericAccessor`.
 
 ```json
 {transform_config.to_doc()}
@@ -469,7 +465,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         engine: tp.Optional[str] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbt.generic.dispatch.ewm_std`."""
+        """Exponentially weighted standard deviation.
+
+        Defaults to the unbiased weighted correction (`ddof=1`), matching pandas
+        EWM standard deviation with `bias=False`. Use `ddof=0` for population
+        variance (`bias=True`).
+
+        See `vectorbt.generic.dispatch.ewm_std`."""
         engine = engine if engine is not None else self.engine
         out = dispatch.ewm_std(
             self.to_2d_array(),

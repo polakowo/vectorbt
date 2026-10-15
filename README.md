@@ -297,6 +297,14 @@ If you have questions or want to request a license exception, please [contact th
 
 Installing optional dependencies may be subject to a more restrictive license.
 
+## Contributors
+
+Thanks to everyone who has contributed to VectorBT!
+
+<a href="https://github.com/polakowo/vectorbt/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=polakowo/vectorbt" alt="VectorBT contributors" />
+</a>
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=polakowo%2Fvectorbt&type=timeline&legend=top-left">

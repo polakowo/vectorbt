@@ -286,7 +286,10 @@ def ulcer_index_1d_nb(returns: tp.Array1d) -> float:
     """Ulcer index: the root mean square of the drawdowns.
 
     Unlike the maximum drawdown, it accounts for both the depth and the duration of drawdowns.
-    The result is a fraction, for example 0.05 means 5%."""
+    The result is a fraction, for example 0.05 means 5%.
+
+    Uses `drawdown_1d_nb`, treating NaN returns as zero-return observations.
+    Empty input returns NaN; a series without drawdowns returns zero."""
     if returns.shape[0] == 0:
         return np.nan
     drawdown = drawdown_1d_nb(returns)
@@ -317,7 +320,8 @@ def martin_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float 
     """Martin ratio, or ulcer performance index: the annualized return minus the annualized
     risk-free return, divided by the ulcer index.
 
-    `risk_free` is a constant per-period return and is compounded over `ann_factor` periods."""
+    `risk_free` is a constant per-period return and is compounded over `ann_factor` periods.
+    Return NaN when the ulcer index is zero or NaN."""
     ulcer_index = ulcer_index_1d_nb(returns)
     if np.isnan(ulcer_index) or ulcer_index == 0.0:
         return np.nan

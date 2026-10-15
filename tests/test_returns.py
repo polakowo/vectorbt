@@ -243,15 +243,9 @@ class TestAccessors:
         )
 
     def test_ulcer_index(self):
-        def ref(x):
-            x = x.dropna()
-            cum = (1 + x).cumprod()
-            peak = cum.cummax()
-            return np.sqrt(((cum / peak - 1) ** 2).mean())
-
         for col in rets.columns:
-            assert isclose(rets[col].vbt.returns.ulcer_index(), ref(rets[col].fillna(0)))
-            assert isclose(rets[col].vbt.returns.ulcer_index(engine="numba"), ref(rets[col].fillna(0)))
+            assert isclose(rets[col].vbt.returns.ulcer_index(), ref_ulcer_index(rets[col]))
+            assert isclose(rets[col].vbt.returns.ulcer_index(engine="numba"), ref_ulcer_index(rets[col]))
         res = rets.vbt.returns.ulcer_index()
         assert res.name == "ulcer_index"
         assert list(res.index) == list(rets.columns)
@@ -270,12 +264,6 @@ class TestAccessors:
         assert np.isnan(all_nan.martin_ratio())
 
     def test_rolling_ulcer_index(self):
-        def ref(x):
-            x = x.dropna()
-            cum = (1 + x).cumprod()
-            peak = cum.cummax()
-            return np.sqrt(((cum / peak - 1) ** 2).mean())
-
         window = 3
         res = rets.vbt.returns.rolling_ulcer_index(window=window, minp=window)
         assert res.shape == rets.shape
@@ -285,12 +273,18 @@ class TestAccessors:
                 if sub.notna().sum() < window:
                     assert np.isnan(res[col].iloc[i])
                 else:
-                    assert isclose(res[col].iloc[i], ref(sub))
+                    assert isclose(res[col].iloc[i], ref_ulcer_index(sub))
         pd.testing.assert_frame_equal(
             rets.vbt.returns.rolling_ulcer_index(window=window, minp=window, engine="numba"), res
         )
         res_minp = rets.vbt.returns.rolling_ulcer_index(window=window, minp=1)
-        assert res_minp.iloc[1:].notna().all().all()
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < 1:
+                    assert np.isnan(res_minp[col].iloc[i])
+                else:
+                    assert isclose(res_minp[col].iloc[i], ref_ulcer_index(sub))
 
     def test_martin_ratio(self):
         r = rets["b"].vbt.returns
@@ -1042,4 +1036,7 @@ class TestAccessors:
                 rets.vbt.returns(freq="h", year_freq="252d").qs.sharpe(periods=252, periods_per_year=252, rf=0),
                 qs.stats.sharpe(rets.dropna()),
             )
-            assert rets["a"].vbt.returns(benchmark_rets=benchmark_rets["a"]).qs.r_squared() == 0.6321016849785153
+            # Verify delegation against the installed QuantStats version's preparation rules.
+            valid_mask = rets["a"].notna() & benchmark_rets["a"].notna()
+            expected = qs.stats.r_squared(rets["a"][valid_mask], benchmark=benchmark_rets["a"][valid_mask])
+            assert isclose(rets["a"].vbt.returns(benchmark_rets=benchmark_rets["a"]).qs.r_squared(), expected)

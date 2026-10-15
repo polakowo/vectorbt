@@ -38,7 +38,10 @@ FSTD = IndicatorFactory(
     ddof=0,
 )
 
-FSTD.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_std_apply_nb`."""
+FSTD.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_std_apply_nb`.
+
+Defaults to `ddof=0` (population variance). With `ewm=True`, use `ddof=1`
+for the unbiased weighted correction, matching pandas EWM `bias=False`."""
 
 FMIN = IndicatorFactory(
     class_name="FMIN",

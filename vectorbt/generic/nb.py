@@ -925,11 +925,13 @@ def ewm_mean_nb(a: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) -
 
 @njit(cache=True)
 def ewm_std_1d_nb(a: tp.Array1d, span: int, minp: int = 0, adjust: bool = False, ddof: int = 0) -> tp.Array1d:
-    """Return exponential weighted standard deviation.
+    """Return exponentially weighted standard deviation.
 
     For `ddof=0`, matches pandas EWM standard deviation with `bias=True`;
-    for `ddof=1`, matches `bias=False`. Other values adjust the effective
-    weighted sample size by `ddof`.
+    for `ddof=1`, matches `bias=False`, with the same `span`, `minp`, and `adjust`.
+    For other values, multiply the weighted population variance by
+    `n_eff / (n_eff - ddof)`, where `n_eff` is the effective weighted sample size.
+    Return NaN when `n_eff <= ddof`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
     if minp is None:

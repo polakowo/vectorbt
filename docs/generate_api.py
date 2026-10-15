@@ -152,13 +152,14 @@ def pep224_docstrings(doc_obj, *, _init_tree=None):
         if not (
             isinstance(assign_node, (ast.Assign, ast.AnnAssign))
             and isinstance(str_node, ast.Expr)
-            and isinstance(str_node.value, ast.Str)
+            and isinstance(str_node.value, ast.Constant)
+            and isinstance(str_node.value.value, str)
         ):
             continue
         name = get_name(assign_node)
         if not name:
             continue
-        docstring = inspect.cleandoc(str_node.value.s).strip()
+        docstring = inspect.cleandoc(str_node.value.value).strip()
         if docstring:
             vars[name] = docstring
 
@@ -1175,9 +1176,9 @@ def git_project_root():
 
 @lru_cache()
 def project_relative_path(absolute_path):
-    from distutils.sysconfig import get_python_lib
+    from sysconfig import get_path
 
-    for prefix_path in (git_project_root() or os.getcwd(), get_python_lib()):
+    for prefix_path in (git_project_root() or os.getcwd(), get_path("purelib")):
         common_path = os.path.commonpath([prefix_path, absolute_path])
         if os.path.samefile(common_path, prefix_path):
             return os.path.relpath(absolute_path, prefix_path)

@@ -179,8 +179,10 @@ MSTD = IndicatorFactory(
 class _MSTD(MSTD):
     """Moving Standard Deviation (MSTD).
 
-    Standard deviation is an indicator that measures the size of an assets recent price moves
-    in order to predict how volatile the price may be in the future."""
+    Standard deviation measures the size of an asset's recent price moves.
+
+    Defaults to `ddof=0` (population variance). With `ewm=True`, use `ddof=1`
+    for the unbiased weighted correction, matching pandas EWM `bias=False`."""
 
     def plot(
         self,
@@ -258,6 +260,9 @@ class _BBANDS(BBANDS):
     A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
     deviations (positively and negatively) away from a simple moving average (SMA) of the security's
     price, but can be adjusted to user preferences.
+
+    Standard deviation defaults to `ddof=0` (population variance). With `ewm=True`,
+    use `ddof=1` for the unbiased weighted correction, matching pandas EWM `bias=False`.
 
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp)."""
 

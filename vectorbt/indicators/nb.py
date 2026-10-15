@@ -29,7 +29,7 @@ def ma_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False) -> tp.Arr
 
 
 @njit(cache=True)
-def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
+def mstd_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
     """Compute simple or exponential moving STD (`ewm=True`).
 
     With `ewm=True`, `ddof=0` uses population variance, while `ddof=1`
@@ -307,6 +307,9 @@ def atr_apply_nb(
 @njit(cache=True)
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbt.indicators.basic.OBV`.
+
+    Start with the first bar's volume. Add volume when the close rises, subtract
+    it when the close falls, and leave OBV unchanged for equal finite closes.
 
     Compare each close with the immediately previous bar. A NaN close breaks
     the comparison chain, so the next finite close adds its full volume."""
