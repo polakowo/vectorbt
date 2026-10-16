@@ -2700,6 +2700,88 @@ class TestExitTrades:
             pd.Series(np.array([-0.084, 0.3588]), index=pd.Index(["g1", "g2"], dtype="object")).rename("expectancy"),
         )
 
+    @pytest.mark.parametrize("trade_cls", [vbt.Trades, vbt.EntryTrades, vbt.ExitTrades, vbt.Positions])
+    def test_expectancy_breakeven(self, trade_cls):
+        # Three independent round trips earn +10, -10 and zero with no fees: average PnL is zero.
+        pf = vbt.Portfolio.from_orders([100, 110, 100, 90, 100, 100], [1, -1, 1, -1, 1, -1], fees=0)
+        np.testing.assert_array_equal(pf.trades.values["pnl"], [10, -10, 0])
+        trades = trade_cls(pf.wrapper, pf.trades.values, close=pf.close)
+        assert trades.expectancy() == pytest.approx(0.0)
+
+    @pytest.mark.parametrize(
+        "pnl,expected",
+        [
+            ([10, -4, 0], 2.0),
+            ([10, -4, 0, 0], 1.5),
+            # Equal count weights must cancel equal large PnLs even with a breakeven trade.
+            ([2**53, -(2**53), 0], 0.0),
+            ([0.0, -0.0], 0.0),
+            ([10], 10.0),
+            ([-10], -10.0),
+            ([], np.nan),
+            ([np.nan], 0.0),
+            ([10, -10, np.nan], -10 / 3),
+            ([np.nan, 0], 0.0),
+            ([10, -10, 0, np.nan], -2.5),
+        ],
+    )
+    def test_expectancy_breakeven_boundaries(self, pnl, expected):
+        # Explicit PnL fields are the statistic's input. Preserve native missing-PnL conventions:
+        # NaNs remain in the total/residual counts; only true zeros lose their loss weight.
+        template = exit_trades["a"]
+        records = np.repeat(template.values[:1], len(pnl))
+        records["id"] = np.arange(len(pnl))
+        records["pnl"] = pnl
+        trades = template.replace(records_arr=records)
+        before = records.tobytes()
+        actual = trades.expectancy()
+        if np.isnan(expected):
+            assert np.isnan(actual)
+        else:
+            assert actual == pytest.approx(expected)
+        assert records.tobytes() == before
+
+    def test_expectancy_breakeven_grouped(self):
+        # Three trades in a, one in b, none in c. Group all earns 15 over four trades: 3.75.
+        columns = pd.Index(["a", "b", "c"], name="asset")
+        close = pd.DataFrame(
+            {"a": [100, 110, 100, 90, 100, 100], "b": [100, 115, 115, 115, 115, 115], "c": [100] * 6},
+            columns=columns,
+        )
+        size = pd.DataFrame(
+            {"a": [1, -1, 1, -1, 1, -1], "b": [1, -1, 0, 0, 0, 0], "c": [0] * 6}, columns=columns
+        )
+        trades = vbt.Portfolio.from_orders(close, size, fees=0).trades
+        np.testing.assert_array_equal(trades.values["pnl"], [10, -10, 0, 15])
+        pd.testing.assert_series_equal(
+            trades.expectancy(group_by=False), pd.Series([0.0, 15.0, np.nan], index=columns, name="expectancy")
+        )
+        group_by = pd.Index(["all", "all", "empty"], name="group")
+        expected = pd.Series([3.75, np.nan], index=pd.Index(["all", "empty"], name="group"), name="expectancy")
+        pd.testing.assert_series_equal(trades.expectancy(group_by=group_by), expected)
+        # Regrouping and caller wrap overrides must preserve the same counts, order and values.
+        pd.testing.assert_series_equal(
+            trades.regroup(group_by).expectancy(wrap_kwargs=dict(name_or_index="custom")), expected.rename("custom")
+        )
+
+    @pytest.mark.parametrize("incl_open,expected", [(False, 0.0), (True, 1.25)])
+    def test_expectancy_breakeven_stats(self, incl_open, expected):
+        # Closed round trips earn 10,-10,0; the last open trade is marked at +5.
+        pf = vbt.Portfolio.from_orders(
+            [100, 110, 100, 90, 100, 100, 100, 105], [1, -1, 1, -1, 1, -1, 1, 0], init_cash=1000, fees=0
+        )
+        np.testing.assert_array_equal(pf.trades.values["pnl"], [10, -10, 0, 5])
+        # Reconcile the independent cash/value path so the metric cannot hide a simulation error.
+        np.testing.assert_array_equal(pf.cash(), [900, 1010, 910, 1000, 900, 1000, 900, 900])
+        np.testing.assert_array_equal(pf.asset_value(), [100, 0, 100, 0, 100, 0, 100, 105])
+        np.testing.assert_array_equal(pf.value(), [1000, 1010, 1010, 1000, 1000, 1000, 1000, 1005])
+        assert pf.stats(metrics=["expectancy"], settings=dict(incl_open=incl_open))["Expectancy"] == pytest.approx(
+            expected
+        )
+        assert pf.trades.stats(metrics=["expectancy"], settings=dict(incl_open=incl_open))["Expectancy"] == pytest.approx(
+            expected
+        )
+
     def test_sqn(self):
         assert exit_trades["a"].sqn() == 1.634155521947584
         pd.testing.assert_series_equal(
