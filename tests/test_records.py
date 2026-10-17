@@ -1448,6 +1448,19 @@ class TestDrawdowns:
         assert drawdowns.wrapper.freq == day_dt
         pd.testing.assert_index_equal(drawdowns_grouped.wrapper.grouper.group_by, group_by)
 
+    def test_from_ts_trailing_nan(self):
+        ts = pd.DataFrame({"a": [3.0, 2.0, 1.0, 1.5], "b": [3.0, 2.0, 1.0, np.nan]})
+        record_arrays_close(
+            vbt.Drawdowns.from_ts(ts).values,
+            np.array(
+                [
+                    (0, 0, 0, 1, 2, 3, 3.0, 1.0, 1.5, 0),
+                    (1, 1, 0, 1, 2, 2, 3.0, 1.0, 1.0, 0),
+                ],
+                dtype=drawdown_dt,
+            ),
+        )
+
     def test_records_readable(self):
         records_readable = drawdowns.records_readable
 
