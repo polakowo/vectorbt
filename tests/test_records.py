@@ -1448,6 +1448,46 @@ class TestDrawdowns:
         assert drawdowns.wrapper.freq == day_dt
         pd.testing.assert_index_equal(drawdowns_grouped.wrapper.grouper.group_by, group_by)
 
+    def test_from_ts_trailing_nan(self):
+        ts = pd.DataFrame({"a": [3.0, 2.0, 1.0, 1.5], "b": [3.0, 2.0, 1.0, np.nan]})
+        record_arrays_close(
+            vbt.Drawdowns.from_ts(ts).values,
+            np.array(
+                [
+                    (0, 0, 0, 1, 2, 3, 3.0, 1.0, 1.5, 0),
+                    (1, 1, 0, 1, 2, 2, 3.0, 1.0, 1.0, 0),
+                ],
+                dtype=drawdown_dt,
+            ),
+        )
+        pd.testing.assert_series_equal(
+            vbt.Drawdowns.from_ts(ts).max_drawdown(),
+            pd.Series([-2 / 3, -2 / 3], index=ts.columns, name="max_drawdown"),
+        )
+        pd.testing.assert_series_equal(
+            vbt.Drawdowns.from_ts(ts).coverage(),
+            pd.Series([0.75, 0.5], index=ts.columns, name="coverage"),
+        )
+
+    def test_from_ts_trailing_nan_edge_cases(self):
+        ts = pd.DataFrame(
+            {
+                "recovered": [3.0, 2.0, 1.0, 3.5, np.nan, np.nan],
+                "gaps": [3.0, np.nan, 2.0, 1.0, np.nan, np.nan],
+                "all_nan": [np.nan] * 6,
+            }
+        )
+        record_arrays_close(
+            vbt.Drawdowns.from_ts(ts).values,
+            np.array(
+                [
+                    (0, 0, 0, 1, 2, 3, 3.0, 1.0, 3.5, 1),
+                    (1, 1, 0, 1, 3, 3, 3.0, 1.0, 1.0, 0),
+                ],
+                dtype=drawdown_dt,
+            ),
+        )
+
     def test_records_readable(self):
         records_readable = drawdowns.records_readable
 
