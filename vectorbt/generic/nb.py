@@ -1864,6 +1864,11 @@ def get_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
         store_record = False
         status = -1
 
+        # Trailing NaNs must not stop a running drawdown from being saved
+        last_i = ts.shape[0] - 1
+        while last_i >= 0 and np.isnan(ts[last_i, col]):
+            last_i -= 1
+
         for i in range(ts.shape[0]):
             cur_val = ts[i, col]
 
@@ -1893,7 +1898,7 @@ def get_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                             valley_val = cur_val
                             valley_idx = i
 
-                if i == ts.shape[0] - 1 and drawdown_started:
+                if i == last_i and drawdown_started:
                     # If still running, mark for save
                     drawdown_started = False
                     store_record = True

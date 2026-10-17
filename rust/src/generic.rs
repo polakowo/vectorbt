@@ -1944,6 +1944,10 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
             let mut valley_idx = -1i64;
             let mut peak_val = unsafe { *src.get_unchecked(col) };
             let mut valley_val = peak_val;
+            // Trailing NaNs must not stop a running drawdown from being saved
+            let last_i = (0..nrows)
+                .rev()
+                .find(|&i| unsafe { !src.get_unchecked(i * ncols + col).is_nan() });
             for i in 0..nrows {
                 let cur_val = unsafe { *src.get_unchecked(i * ncols + col) };
                 if !cur_val.is_nan() {
@@ -1979,7 +1983,7 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
                         valley_val = cur_val;
                         valley_idx = i as i64;
                     }
-                    if i == nrows - 1 && drawdown_started {
+                    if Some(i) == last_i && drawdown_started {
                         out.push(DrawdownRecord {
                             id: ddidx,
                             col: col as i64,
@@ -2008,6 +2012,8 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
         let mut valley_val = col_view[0];
         let mut store_record = false;
         let mut status = -1i64;
+        // Trailing NaNs must not stop a running drawdown from being saved
+        let last_i = (0..nrows).rev().find(|&i| !col_view[i].is_nan());
         for i in 0..nrows {
             let cur_val = col_view[i];
             if !cur_val.is_nan() {
@@ -2028,7 +2034,7 @@ pub(crate) fn get_drawdowns(a: ArrayView2<'_, f64>) -> Vec<DrawdownRecord> {
                     valley_val = cur_val;
                     valley_idx = i as i64;
                 }
-                if i == nrows - 1 && drawdown_started {
+                if Some(i) == last_i && drawdown_started {
                     drawdown_started = false;
                     store_record = true;
                     status = DRAWDOWN_ACTIVE;

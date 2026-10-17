@@ -559,6 +559,15 @@ class TestGenericRustParity:
         assert drawdowns.dtype.itemsize == drawdown_dt.itemsize
         np.testing.assert_array_equal(drawdowns, expected_drawdowns)
 
+    def test_dispatch_get_drawdowns_trailing_nan(self):
+        ts = np.array([[3.0, 3.0], [2.0, 2.0], [1.0, 1.0], [1.5, np.nan]])
+
+        for arr in (ts, np.asfortranarray(ts)):
+            drawdowns = dispatch.get_drawdowns(arr, engine="rust")
+            expected_drawdowns = nb.get_drawdowns_nb(arr)
+            assert len(expected_drawdowns) == 2
+            np.testing.assert_array_equal(drawdowns, expected_drawdowns)
+
     def test_dispatch_get_drawdowns_empty_rows(self):
         ts = np.empty((0, 3), dtype=np.float64)
 
