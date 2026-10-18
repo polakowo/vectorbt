@@ -8479,6 +8479,69 @@ class TestPortfolio:
         pd.testing.assert_series_equal(pf_shared[["second"]].init_cash, pf_shared.init_cash[["second"]])
         pd.testing.assert_frame_equal(pf_shared[["second"]].call_seq, pf_shared.call_seq[["c"]])
 
+    @pytest.mark.parametrize("cash_sharing", [False, True])
+    @pytest.mark.parametrize(
+        "groups,col_idxs,asset_values,unshared_init_cash",
+        [
+            (
+                ["G1", "G1", "G2", "G2", "G3", "G3"],
+                [4, 5, 0, 1, 2, 3],
+                [[60.0, 20.0, 40.0], [66.0, 22.0, 36.0], [68.0, 24.0, 38.0]],
+                [200.0, 200.0, 200.0],
+            ),
+            (
+                ["G1", "G2", "G2", "G3", "G3", "G3"],
+                [3, 4, 5, 0, 1, 2],
+                [[80.0, 10.0, 30.0], [84.0, 11.0, 29.0], [87.0, 12.0, 31.0]],
+                [300.0, 100.0, 200.0],
+            ),
+        ],
+    )
+    def test_group_selection_membership(self, cash_sharing, groups, col_idxs, asset_values, unshared_init_cash):
+        # Buy one unit of each asset at row zero, then hold. Prices independently determine group assets.
+        close = pd.DataFrame(
+            [
+                [10.0, 10.0, 20.0, 20.0, 30.0, 30.0],
+                [11.0, 11.0, 18.0, 18.0, 33.0, 33.0],
+                [12.0, 12.0, 19.0, 19.0, 34.0, 34.0],
+            ],
+            columns=pd.Index(list("abcdef"), name="asset"),
+        )
+        size = np.zeros((3, 6))
+        size[0] = 1.0
+        pf = vbt.Portfolio.from_orders(
+            close,
+            size,
+            init_cash=[150.0, 250.0, 400.0] if cash_sharing else 100.0,
+            fees=0.0,
+            group_by=pd.Index(groups, name="strategy"),
+            cash_sharing=cash_sharing,
+            call_seq="reversed",
+            attach_call_seq=True,
+        )
+        before = pf.orders.values.tobytes()
+        selected = pf.iloc[[2, 0, 1]]
+        columns = pd.Index(["G3", "G1", "G2"], name="strategy")
+        initial = np.array([400.0, 150.0, 250.0] if cash_sharing else unshared_init_cash)
+        assets = np.array(asset_values)
+        # Cash is initial capital less row-zero purchase costs; no later order changes those holdings.
+        cash = np.broadcast_to(initial - assets[0], (3, 3))
+        pd.testing.assert_frame_equal(selected.cash(), pd.DataFrame(cash, columns=columns))
+        pd.testing.assert_frame_equal(selected.asset_value(), pd.DataFrame(assets, columns=columns))
+        expected_value = pd.DataFrame(cash + assets, columns=columns)
+        pd.testing.assert_frame_equal(selected.value(), expected_value)
+        pd.testing.assert_frame_equal(pf.iloc[:].value(), expected_value[["G1", "G2", "G3"]])
+        pd.testing.assert_series_equal(selected.init_cash, pd.Series(initial, index=columns, name="init_cash"))
+        pd.testing.assert_frame_equal(selected.close, close.iloc[:, col_idxs])
+        pd.testing.assert_frame_equal(selected.call_seq, pf.call_seq.iloc[:, col_idxs])
+        # Selection must preserve record identity and row/column association, including reversed execution.
+        source = pf.orders.values
+        expected_records = np.concatenate([source[source["col"] == col] for col in col_idxs])
+        expected_records["col"] = np.arange(6)
+        record_arrays_close(selected.orders.values, expected_records)
+        assert pf.orders.values.tobytes() == before
+        pd.testing.assert_index_equal(pf.wrapper.grouper.group_by, pd.Index(groups, name="strategy"))
+
     def test_regroup(self):
         assert pf.regroup(None) == pf
         assert pf.regroup(False) == pf

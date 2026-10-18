@@ -421,6 +421,71 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1, 2]))
 
+    @pytest.mark.parametrize("column_only", [False, True])
+    @pytest.mark.parametrize(
+        "groups,selection,col_idxs,expected_groups",
+        [
+            (["a", "a", "b", "b", "c", "c"], [0, 1, 2], [0, 1, 2, 3, 4, 5], ["a", "a", "b", "b", "c", "c"]),
+            (["a", "a", "b", "b", "c", "c"], [2, 0, 1], [4, 5, 0, 1, 2, 3], ["c", "c", "a", "a", "b", "b"]),
+            (["a", "b", "b", "c", "c", "c"], [0, 1, 2], [0, 1, 2, 3, 4, 5], ["a", "b", "b", "c", "c", "c"]),
+            (["a", "b", "b", "c", "c", "c"], [2, 0, 1], [3, 4, 5, 0, 1, 2], ["c", "c", "c", "a", "b", "b"]),
+            (["a", "a", "b", "b", "c", "c"], [1, 1, 0], [2, 3, 2, 3, 0, 1], ["b", "b", "b", "b", "a", "a"]),
+        ],
+    )
+    def test_group_selection_membership(self, column_only, groups, selection, col_idxs, expected_groups):
+        # Each selected physical block must keep its own label, including repeated adjacent selections.
+        wrapper = array_wrapper.ArrayWrapper(
+            index=pd.Index(["x", "y", "z"], name="row"),
+            columns=pd.Index(list("abcdef"), name="asset"),
+            ndim=2,
+            group_by=pd.Index(groups, name="strategy"),
+            group_select=True,
+            column_only_select=column_only,
+        )
+        selected, row_idxs, group_idxs, physical_idxs = wrapper.indexing_func_meta(
+            lambda obj: obj.iloc[selection] if column_only else obj.iloc[[2, 0], selection]
+        )
+        pd.testing.assert_index_equal(selected.grouper.group_by, pd.Index(expected_groups, name="strategy"))
+        pd.testing.assert_index_equal(selected.columns, wrapper.columns[col_idxs])
+        pd.testing.assert_index_equal(selected.index, wrapper.index if column_only else wrapper.index[[2, 0]])
+        np.testing.assert_array_equal(row_idxs, [0, 1, 2] if column_only else [2, 0])
+        np.testing.assert_array_equal(group_idxs, selection)
+        np.testing.assert_array_equal(physical_idxs, col_idxs)
+        assert selected.ndim == selected.grouped_ndim == 2
+        pd.testing.assert_index_equal(wrapper.grouper.group_by, pd.Index(groups, name="strategy"))
+
+    @pytest.mark.parametrize("column_only", [False, True])
+    def test_group_selection_renamed_labels(self, column_only):
+        groups = pd.MultiIndex.from_tuples(
+            [("s", 1), ("s", 2), ("s", 2), ("t", 3), ("t", 3), ("t", 3)], names=["strategy", "number"]
+        )
+        wrapper = array_wrapper.ArrayWrapper(
+            index=[0, 1],
+            columns=list("abcdef"),
+            ndim=2,
+            group_by=groups,
+            group_select=True,
+            column_only_select=column_only,
+        )
+        renamed = pd.MultiIndex.from_tuples([("new", 30), ("new", 10), ("new", 20)], names=["model", "bucket"])
+
+        def select(obj):
+            # Indexing callbacks may rename groups; copying labels from the source would lose that change.
+            selected = (
+                obj.loc[[("t", 3), ("s", 1), ("s", 2)]] if column_only else obj.loc[:, [("t", 3), ("s", 1), ("s", 2)]]
+            )
+            return selected.set_axis(renamed, axis=0 if column_only else 1)
+
+        selected = wrapper.indexing_func(select)
+        expected = pd.MultiIndex.from_tuples(
+            [("new", 30), ("new", 30), ("new", 30), ("new", 10), ("new", 20), ("new", 20)],
+            names=["model", "bucket"],
+        )
+        pd.testing.assert_index_equal(selected.grouper.group_by, expected)
+        pd.testing.assert_index_equal(selected.grouper.get_columns(), renamed)
+        pd.testing.assert_index_equal(selected.columns, pd.Index(list("defabc")))
+        pd.testing.assert_index_equal(wrapper.grouper.group_by, groups)
+
     def test_indexing(self):
         # not grouped
         pd.testing.assert_index_equal(sr2_wrapper.iloc[:2].index, pd.Index(["x2", "y2"], dtype="object", name="i2"))
