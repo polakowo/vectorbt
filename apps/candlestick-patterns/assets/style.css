@@ -97,10 +97,10 @@ body {
 
 .app-shell .app-banner h6 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text);
 }
 
@@ -139,12 +139,12 @@ body {
    ========================= */
 
 .app-shell .pretty-container {
-  margin: 14px 0;
+  margin: 16px 0;
   padding: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-shell .card-header {
@@ -152,18 +152,19 @@ body {
   align-items: center;
   justify-content: space-between;
 
-  margin: -2px 0 10px;
-  padding: 8px 0;
+  margin: 0 0 16px;
+  padding: 0 0 12px;
+  background: transparent;
 
   border-bottom: 1px solid var(--border);
 }
 
 .app-shell .card-header h6 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text);
 }
 
@@ -451,3 +452,6 @@ body {
 }
 
 .app-shell .dash-spreadsheet-inner .row { margin: 0; }
+
+.app-shell .dash-spreadsheet-inner,
+.app-shell .dash-spreadsheet-inner table { font-family: inherit; font-variant-numeric: tabular-nums; }

@@ -15,6 +15,7 @@ import dash_bootstrap_components as dbc
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.io as pio
 import talib
 import yfinance as yf
 from dash import Dash, dcc, html, dash_table, Input, Output, State, no_update, callback_context
@@ -69,7 +70,7 @@ app = Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP],
 )
 CACHE_CONFIG = {
-    "CACHE_TYPE": "filesystem" if USE_CACHING else "null",
+    "CACHE_TYPE": "FileSystemCache" if USE_CACHING else "NullCache",
     "CACHE_DIR": "data",
     "CACHE_DEFAULT_TIMEOUT": 0,
     "CACHE_THRESHOLD": 50,
@@ -168,12 +169,9 @@ default_sim_options = ["allow_accumulate"]
 default_n_random_strat = 50
 default_stats_options = ["incl_open"]
 default_layout = dict(
-    template="plotly_white",
+    template=pio.templates["plotly"].to_plotly_json(),
     autosize=True,
     margin=dict(b=40, t=20),
-    font=dict(color=fontcolor),
-    plot_bgcolor=bgcolor,
-    paper_bgcolor=bgcolor,
     legend=dict(font=dict(size=10), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
 )
 default_subplots = ["orders", "trade_pnl", "cum_returns"]
@@ -310,16 +308,20 @@ app.layout = html.Div(
                                                     children=[
                                                         dash_table.DataTable(
                                                             id="stats_table",
+                                                            style_cell=dict(
+                                                                fontFamily="inherit", fontSize=13, padding="8px 10px",
+                                                                whiteSpace="normal", height="auto", minWidth="75px", maxWidth="180px",
+                                                            ),
                                                             columns=[{"name": c, "id": c} for c in stats_table_columns],
                                                             style_data_conditional=[
                                                                 {
                                                                     "if": {"column_id": stats_table_columns[1]},
-                                                                    "fontWeight": "bold",
+                                                                    "fontWeight": 400,
                                                                     "borderLeft": "1px solid " + bordercolor,
                                                                 },
                                                                 {
                                                                     "if": {"column_id": stats_table_columns[2]},
-                                                                    "fontWeight": "bold",
+                                                                    "fontWeight": 400,
                                                                 },
                                                                 {
                                                                     "if": {"column_id": stats_table_columns[3]},
@@ -327,7 +329,7 @@ app.layout = html.Div(
                                                                 },
                                                                 {
                                                                     "if": {"column_id": stats_table_columns[4]},
-                                                                    "fontWeight": "bold",
+                                                                    "fontWeight": 400,
                                                                 },
                                                                 {
                                                                     "if": {"state": "selected"},
@@ -346,7 +348,7 @@ app.layout = html.Div(
                                                                 "border": "none",
                                                                 "backgroundColor": bgcolor,
                                                                 "fontWeight": "bold",
-                                                                "padding": "0px 5px",
+                                                                "padding": "9px 10px",
                                                             },
                                                             style_data={
                                                                 "border": "none",
@@ -626,6 +628,10 @@ app.layout = html.Div(
                                         section_summary("Candle settings"),
                                         dash_table.DataTable(
                                             id="candle_settings_table",
+                                            style_cell=dict(
+                                                fontFamily="inherit", fontSize=13, padding="8px 10px",
+                                                whiteSpace="normal", height="auto", minWidth="75px", maxWidth="180px",
+                                            ),
                                             columns=[
                                                 {
                                                     "name": c,
@@ -659,7 +665,7 @@ app.layout = html.Div(
                                                 "border": "none",
                                                 "backgroundColor": bgcolor,
                                                 "fontWeight": "bold",
-                                                "padding": "0px 5px",
+                                                "padding": "9px 10px",
                                             },
                                             style_data={
                                                 "border": "none",
@@ -1198,8 +1204,6 @@ def update_ohlcv(
         add_trace_kwargs=dict(row=1, col=1),
         fig=fig,
     )
-    fig.update_xaxes(gridcolor=gridcolor)
-    fig.update_yaxes(gridcolor=gridcolor, zerolinecolor=gridcolor)
     figure = dict(data=fig.data, layout=fig.layout)
 
     mimic_strategy = "mimic_strategy" in prob_options
@@ -1446,8 +1450,6 @@ def update_stats(
         ),
     )
     fig.update_traces(xaxis="x" if len(subplots) == 1 else "x" + str(len(subplots)))
-    fig.update_xaxes(gridcolor=gridcolor)
-    fig.update_yaxes(gridcolor=gridcolor, zerolinecolor=gridcolor)
 
     def _chop_microseconds(delta):
         return delta - pd.Timedelta(microseconds=delta.microseconds, nanoseconds=delta.nanoseconds)
@@ -1582,8 +1584,7 @@ def update_metric_stats(window_width, stats_json, metric):
                 showlegend=False,
                 margin=dict(l=60, r=20, t=40, b=20),
                 hovermode="closest",
-                xaxis=dict(gridcolor=gridcolor, title=metric, side="top"),
-                yaxis=dict(gridcolor=gridcolor),
+                xaxis=dict(title=metric, side="top"),
             ),
         ),
     )

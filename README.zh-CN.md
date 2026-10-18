@@ -12,14 +12,6 @@
 <br>
 
 <p align="center">
-    <b>简体中文</b> / <a href="README.md">English</a> |
-    <a href="#功能">功能</a> ·
-    <a href="#安装">安装</a> ·
-    <a href="#示例">示例</a> ·
-    <a href="#链接">链接</a>
-</p>
-
-<p align="center">
     <a href="https://pepy.tech/project/vectorbt" title="下载量">
         <img src="https://img.shields.io/pepy/dt/vectorbt?label=downloads&color=blue" />
     </a>
@@ -50,6 +42,14 @@
     <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" title="许可证">
         <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
     </a>
+</p>
+
+<p align="center">
+    <b>简体中文</b> / <a href="https://github.com/polakowo/vectorbt/blob/master/README.md">English</a> |
+    <a href="#功能">功能</a> ·
+    <a href="#安装">安装</a> ·
+    <a href="#示例">示例</a> ·
+    <a href="#链接">链接</a>
 </p>
 
 <h3 align="center"><b>用矩阵思考，让回测规模化。</b></h3>
@@ -164,7 +164,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title="randnx_n", yaxis_ti
 fig.show()
 ```
 
-![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg)
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-scatter.gif" alt="悬停查看随机策略结果并缩放图表" />
 
 ### 测试 10,000 种双 SMA 窗口组合
 
@@ -186,7 +186,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-heatmap.gif" alt="切换资产并查看双 SMA 参数组合的收益" />
 
 > [!TIP]
 > **VectorBT PRO**
@@ -241,7 +241,7 @@ Name: (10, 20, ETH-USD), dtype: object
 pf[(10, 20, "ETH-USD")].plot().show()
 ```
 
-![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_portfolio.svg)
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-portfolio.gif" alt="查看交易、缩放图表并切换投资组合基准曲线" />
 
 ### 为多个交易标的生成布林带动画
 
@@ -276,7 +276,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-bbands.gif" alt="查看布林带并播放滚动窗口动画" />
 
 访问[网站](https://vectorbt.dev/)，获取更多示例、文档和指南。
 
@@ -286,7 +286,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 
 以交互方式探索 K 线形态，并使用 VectorBT 回测其交易信号。
 
-[![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
+<img width="900" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-candlestick.gif" alt="在应用中探索 K 线形态、查看交易，并比较策略统计数据" />
 
 ## 链接
 

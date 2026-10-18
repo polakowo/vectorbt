@@ -12,14 +12,6 @@
 <br>
 
 <p align="center">
-    <a href="README.zh-CN.md">简体中文</a> / <b>English</b> |
-    <a href="#features">Features</a> ·
-    <a href="#installation">Installation</a> ·
-    <a href="#examples">Examples</a> ·
-    <a href="#links">Links</a>
-</p>
-
-<p align="center">
     <a href="https://pepy.tech/project/vectorbt" title="Downloads">
         <img src="https://img.shields.io/pepy/dt/vectorbt?label=downloads&color=blue" />
     </a>
@@ -50,6 +42,14 @@
     <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" title="License">
         <img src="https://img.shields.io/badge/license-Fair%20Code-yellow" />
     </a>
+</p>
+
+<p align="center">
+    <a href="https://github.com/polakowo/vectorbt/blob/master/README.zh-CN.md">简体中文</a> / <b>English</b> |
+    <a href="#features">Features</a> ·
+    <a href="#installation">Installation</a> ·
+    <a href="#examples">Examples</a> ·
+    <a href="#links">Links</a>
 </p>
 
 <h3 align="center"><b>Think in matrices. Backtest at scale.</b></h3>
@@ -165,7 +165,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title="randnx_n", yaxis_ti
 fig.show()
 ```
 
-![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg)
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-scatter.gif" alt="Hovering and zooming into random-strategy results" />
 
 ### Test 10,000 dual-SMA window combinations
 
@@ -187,7 +187,7 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-heatmap.gif" alt="Switching assets and inspecting dual-SMA parameter returns" />
 
 > [!TIP]
 > **VectorBT PRO**
@@ -242,7 +242,7 @@ Name: (10, 20, ETH-USD), dtype: object
 pf[(10, 20, "ETH-USD")].plot().show()
 ```
 
-![](https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_portfolio.svg)
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-portfolio.gif" alt="Inspecting trades, zooming, and toggling the portfolio benchmark" />
 
 ### Animate Bollinger Bands across multiple symbols
 
@@ -277,7 +277,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif">
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-bbands.gif" alt="Inspecting Bollinger Bands and playing the rolling-window animation" />
 
 Visit the [website](https://vectorbt.dev/) for more examples, documentation, and guides.
 
@@ -287,7 +287,7 @@ Visit the [website](https://vectorbt.dev/) for more examples, documentation, and
 
 Explore candlestick patterns interactively and backtest their signals with VectorBT.
 
-[![teaser.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
+<img width="900" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-candlestick.gif" alt="Exploring candlestick patterns, inspecting trades, and comparing strategy statistics in the app" />
 
 ## Links
 

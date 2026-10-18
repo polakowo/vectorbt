@@ -58,7 +58,7 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 >>> fig.show()
 ```
 
-![](/assets/images/usage_rand_scatter.svg)
+![Hovering and zooming into random-strategy results](../assets/images/readme-scatter.gif){ width="750" }
 
 ### Test 10,000 dual-SMA window combinations
 
@@ -80,7 +80,7 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 >>> fig.show()
 ```
 
-![](/assets/images/usage_dmac_heatmap.gif)
+![Switching assets and inspecting dual-SMA parameter returns](../assets/images/readme-heatmap.gif){ width="750" }
 
 !!! tip "VectorBT PRO"
 
@@ -133,7 +133,7 @@ Name: (10, 20, ETH-USD), dtype: object
 >>> pf[(10, 20, "ETH-USD")].plot().show()
 ```
 
-![](/assets/images/usage_dmac_portfolio.svg)
+![Inspecting trades, zooming, and toggling the portfolio benchmark](../assets/images/readme-portfolio.gif){ width="750" }
 
 ### Animate Bollinger Bands across multiple symbols
 
@@ -165,7 +165,7 @@ VectorBT goes beyond backtesting, with tools for financial data analysis and vis
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-![](/assets/images/usage_bbands.gif)
+![Inspecting Bollinger Bands and playing the rolling-window animation](../assets/images/readme-bbands.gif){ width="750" }
 
 ## Example apps
 
@@ -173,7 +173,7 @@ VectorBT goes beyond backtesting, with tools for financial data analysis and vis
 
 Explore candlestick patterns interactively and backtest their signals with VectorBT.
 
-[![Candlestick Patterns](https://raw.githubusercontent.com/polakowo/vectorbt/master/apps/candlestick-patterns/assets/teaser.png)](https://github.com/polakowo/vectorbt/blob/master/apps/candlestick-patterns/)
+![Exploring candlestick patterns, inspecting trades, and comparing strategy statistics in the app](../assets/images/readme-candlestick.gif){ width="900" }
 
 ## Learn more
 
