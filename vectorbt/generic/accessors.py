@@ -2457,10 +2457,6 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 symmetric=symmetric,
                 sort=sort,
             )
-            if x_labels is None:
-                x_labels = df.columns
-            if y_labels is None:
-                y_labels = df.index
             _kwargs = merge_dicts(
                 dict(
                     trace_kwargs=dict(name=str(name) if name is not None else None, visible=False),
@@ -2468,10 +2464,11 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 kwargs,
             )
             default_size = fig is None and "height" not in _kwargs
+            # Automatic axes must follow each frame's values, not the first frame's order.
             fig = plotting.Heatmap(
                 data=reshape_fns.to_2d_array(df),
-                x_labels=x_labels,
-                y_labels=y_labels,
+                x_labels=df.columns if x_labels is None else x_labels,
+                y_labels=df.index if y_labels is None else y_labels,
                 fig=fig,
                 **_kwargs,
             ).fig
