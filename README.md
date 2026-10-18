@@ -12,6 +12,14 @@
 <br>
 
 <p align="center">
+    <a href="README.zh-CN.md">简体中文</a> / <b>English</b> |
+    <a href="#features">Features</a> ·
+    <a href="#installation">Installation</a> ·
+    <a href="#examples">Examples</a> ·
+    <a href="#links">Links</a>
+</p>
+
+<p align="center">
     <a href="https://pepy.tech/project/vectorbt" title="Downloads">
         <img src="https://img.shields.io/pepy/dt/vectorbt?label=downloads&color=blue" />
     </a>
