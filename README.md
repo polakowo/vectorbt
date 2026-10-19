@@ -73,73 +73,73 @@ See [VectorBT vs PRO](https://vectorbt.dev/getting-started/upgrade/) or browse
 <table>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Fast, vectorized backtesting</strong><br>
-      Research strategies at scale with pandas, NumPy, and Numba.</p>
+      <h3>Fast, vectorized backtesting</h3>
+      <p>Research strategies at scale with pandas, NumPy, and Numba.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#fast-vectorized-backtesting">Backtesting examples →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Optional Rust engine</strong><br>
-      Use precompiled kernels for supported operations without JIT compilation.</p>
+      <h3>Optional Rust engine</h3>
+      <p>Use precompiled kernels for supported operations without JIT compilation.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#optional-rust-engine">Rust engine →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Pandas-native API</strong><br>
-      Work with custom accessors and high-performance operations directly on pandas objects.</p>
+      <h3>Pandas-native API</h3>
+      <p>Work with custom accessors and high-performance operations directly on pandas objects.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#pandas-native-api">Pandas integration →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Flexible broadcasting</strong><br>
-      Analyze multiple assets and sweep large parameter grids with flexible array broadcasting.</p>
+      <h3>Flexible broadcasting</h3>
+      <p>Analyze multiple assets and sweep large parameter grids with flexible array broadcasting.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#flexible-broadcasting">Broadcasting API →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Rich indicator ecosystem</strong><br>
-      Build custom indicators and use integrations for TA-Lib, Pandas TA, and more.</p>
+      <h3>Rich indicator ecosystem</h3>
+      <p>Build custom indicators and use integrations for TA-Lib, Pandas TA, and more.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#rich-indicator-ecosystem">Indicator features →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Portfolio backtesting</strong><br>
-      Analyze trades, drawdowns, and performance, with QuantStats integration.</p>
+      <h3>Portfolio backtesting</h3>
+      <p>Analyze trades, drawdowns, and performance, with QuantStats integration.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#portfolio-backtesting">Portfolio analysis →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Signal tooling</strong><br>
-      Generate, rank, map, and analyze the distribution of trading signals.</p>
+      <h3>Signal tooling</h3>
+      <p>Generate, rank, map, and analyze the distribution of trading signals.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#signal-tooling">Signal features →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Built-in data access</strong><br>
-      Fetch market data, preprocess it, and generate synthetic time series.</p>
+      <h3>Built-in data access</h3>
+      <p>Fetch market data, preprocess it, and generate synthetic time series.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#built-in-data-access">Data features →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Robustness testing</strong><br>
-      Run walk-forward optimization and generate labels for machine learning workflows.</p>
+      <h3>Robustness testing</h3>
+      <p>Run walk-forward optimization and generate labels for machine learning workflows.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#robustness-testing">Robustness testing →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Interactive visualization</strong><br>
-      Explore results with Plotly charts, Jupyter widgets, and browser dashboards.</p>
+      <h3>Interactive visualization</h3>
+      <p>Explore results with Plotly charts, Jupyter widgets, and browser dashboards.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#interactive-visualization">Plotting features →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>Automation tools</strong><br>
-      Schedule data updates and send Telegram notifications.</p>
+      <h3>Automation tools</h3>
+      <p>Schedule data updates and send Telegram notifications.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#automation-tools">Scheduling and notifications →</a></p>
     </td>
     <td width="50%" valign="top">
-      <p><strong>Composable Python API</strong><br>
-      Combine building blocks for rapid experimentation and AI agent-driven workflows.</p>
+      <h3>Composable Python API</h3>
+      <p>Combine building blocks for rapid experimentation and AI agent-driven workflows.</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#composable-python-api">Python workflows →</a></p>
     </td>
   </tr>
