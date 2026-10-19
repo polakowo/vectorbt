@@ -52,7 +52,7 @@
     <a href="#链接">链接</a>
 </p>
 
-<h3 align="center"><b>用矩阵思考，让研究规模化。</b></h3>
+<h3 align="center"><b>让交易研究规模化。</b></h3>
 
 <p align="center">VectorBT 是面向交易研究的 Python 工具库。探索市场数据，构建指标和信号，跨资产、跨时间周期比较数千种交易思路。借助 NumPy 数组、Numba 加速和可选的 Rust 引擎，只需几行 Python 代码即可开展大规模实验。</p>
 
