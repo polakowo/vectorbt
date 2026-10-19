@@ -75,60 +75,72 @@ See [VectorBT vs PRO](https://vectorbt.dev/getting-started/upgrade/) or browse
     <td width="50%" valign="top">
       <p><strong>Fast, vectorized backtesting</strong><br>
       Research strategies at scale with pandas, NumPy, and Numba.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#fast-vectorized-backtesting">Backtesting examples →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Optional Rust engine</strong><br>
       Use precompiled kernels for supported operations without JIT compilation.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#optional-rust-engine">Rust engine →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <p><strong>Pandas-native API</strong><br>
       Work with custom accessors and high-performance operations directly on pandas objects.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#pandas-native-api">Pandas integration →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Flexible broadcasting</strong><br>
       Analyze multiple assets and sweep large parameter grids with flexible array broadcasting.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#flexible-broadcasting">Broadcasting API →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <p><strong>Rich indicator ecosystem</strong><br>
       Build custom indicators and use integrations for TA-Lib, Pandas TA, and more.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#rich-indicator-ecosystem">Indicator features →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Portfolio backtesting</strong><br>
       Analyze trades, drawdowns, and performance, with QuantStats integration.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#portfolio-backtesting">Portfolio analysis →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <p><strong>Signal tooling</strong><br>
       Generate, rank, map, and analyze the distribution of trading signals.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#signal-tooling">Signal features →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Built-in data access</strong><br>
       Fetch market data, preprocess it, and generate synthetic time series.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#built-in-data-access">Data features →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <p><strong>Robustness testing</strong><br>
       Run walk-forward optimization and generate labels for machine learning workflows.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#robustness-testing">Robustness testing →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Interactive visualization</strong><br>
       Explore results with Plotly charts, Jupyter widgets, and browser dashboards.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#interactive-visualization">Plotting features →</a></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <p><strong>Automation tools</strong><br>
       Schedule data updates and send Telegram notifications.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#automation-tools">Scheduling and notifications →</a></p>
     </td>
     <td width="50%" valign="top">
       <p><strong>Composable Python API</strong><br>
       Combine building blocks for rapid experimentation and AI agent-driven workflows.</p>
+      <p><a href="https://vectorbt.dev/getting-started/features/#composable-python-api">Python workflows →</a></p>
     </td>
   </tr>
 </table>
@@ -171,7 +183,9 @@ pf = vbt.Portfolio.from_holding(price, init_cash=100)
 print(pf.total_profit())
 ```
 
-```plaintext
+Output:
+
+```text
 19501.10906763755
 ```
 
@@ -187,7 +201,9 @@ pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
 print(pf.total_profit())
 ```
 
-```plaintext
+Output:
+
+```text
 34417.80960086067
 ```
 
@@ -215,6 +231,8 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title="randnx_n", yaxis_ti
 fig.show()
 ```
 
+Output:
+
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-scatter.gif" alt="Hovering and zooming into random-strategy results" />
 
 ### Test 10,000 dual-SMA window combinations
@@ -237,6 +255,8 @@ fig = pf.total_return().vbt.heatmap(
 fig.show()
 ```
 
+Output:
+
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-heatmap.gif" alt="Switching assets and inspecting dual-SMA parameter returns" />
 
 > [!TIP]
@@ -254,7 +274,9 @@ fig.show()
 print(pf[(10, 20, "ETH-USD")].stats())
 ```
 
-```plaintext
+Output:
+
+```text
 Start                          2017-11-09 00:00:00+00:00
 End                            2026-01-03 00:00:00+00:00
 Period                                2978 days 00:00:00
@@ -292,6 +314,8 @@ Name: (10, 20, ETH-USD), dtype: object
 pf[(10, 20, "ETH-USD")].plot().show()
 ```
 
+Output:
+
 <img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-portfolio.gif" alt="Inspecting trades, zooming, and toggling the portfolio benchmark" />
 
 ### Animate Bollinger Bands across multiple symbols
@@ -323,7 +347,9 @@ def plot(index, bbands):
 vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
 ```
 
-```plaintext
+Output:
+
+```text
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 

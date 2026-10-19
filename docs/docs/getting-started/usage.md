@@ -9,29 +9,75 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 
 ## Examples
 
+### Run a backtest with local prices
+
+Start with a small price series to try the core package without downloading data
+or installing a market-data integration:
+
+```python
+import pandas as pd
+import vectorbt as vbt
+close = pd.Series(
+    [100.0, 102.0, 101.0, 104.0, 103.0, 107.0],
+    index=pd.date_range("2024-01-01", periods=6, freq="D"),
+    name="Close",
+)
+pf = vbt.Portfolio.from_holding(
+    close, init_cash=1000, fees=0.001, freq="1D"
+)
+print(round(float(pf.total_return()) * 100, 2))
+```
+
+Output:
+
+```text
+6.89
+```
+
+This invests the available cash at the first price, including a 0.1% entry fee.
+The position remains open: the final portfolio value uses the last price, without
+charging a hypothetical exit fee. `freq="1D"` tells the statistics engine that
+each observation represents one day; it does not resample the prices.
+
+Inspect `pf.orders.records_readable` for fills or `pf.stats()` for a summary.
+For multiple strategies and signal timing, continue with
+[vectorized backtesting](features.md#fast-vectorized-backtesting).
+
+The market-data examples below use the optional Yahoo Finance integration.
+Install it with `pip install yfinance` or install all integrations with
+`pip install "vectorbt[full]"`. Downloaded data and the resulting output can
+change as providers update their history.
+
 ### Invest $100 in Bitcoin since 2014
 
-```pycon
->>> import vectorbt as vbt
+```python
+import vectorbt as vbt
+data = vbt.YFData.download("BTC-USD")
+price = data.get("Close")
+pf = vbt.Portfolio.from_holding(price, init_cash=100)
+print(pf.total_profit())
+```
 
->>> data = vbt.YFData.download("BTC-USD")
->>> price = data.get("Close")
+Output:
 
->>> pf = vbt.Portfolio.from_holding(price, init_cash=100)
->>> print(pf.total_profit())
+```text
 19501.10906763755
 ```
 
 ### Trade a dual-SMA crossover strategy
 
-```pycon
->>> fast_ma = vbt.MA.run(price, 10)
->>> slow_ma = vbt.MA.run(price, 50)
->>> entries = fast_ma.ma_crossed_above(slow_ma)
->>> exits = fast_ma.ma_crossed_below(slow_ma)
+```python
+fast_ma = vbt.MA.run(price, 10)
+slow_ma = vbt.MA.run(price, 50)
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
+pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
+print(pf.total_profit())
+```
 
->>> pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
->>> print(pf.total_profit())
+Output:
+
+```text
 34417.80960086067
 ```
 
@@ -43,42 +89,40 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 
 ### Generate 1,000 random strategies
 
-```pycon
->>> import numpy as np
-
->>> symbols = ["BTC-USD", "ETH-USD"]
->>> data = vbt.YFData.download(symbols, missing_index="drop")
->>> price = data.get("Close")
-
->>> n = np.random.randint(10, 101, size=1000).tolist()
->>> pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
-
->>> mean_expectancy = pf.trades.expectancy().groupby(["randnx_n", "symbol"]).mean()
->>> fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title="randnx_n", yaxis_title="mean_expectancy")
->>> fig.show()
+```python
+import numpy as np
+symbols = ["BTC-USD", "ETH-USD"]
+data = vbt.YFData.download(symbols, missing_index="drop")
+price = data.get("Close")
+n = np.random.randint(10, 101, size=1000).tolist()
+pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
+mean_expectancy = pf.trades.expectancy().groupby(["randnx_n", "symbol"]).mean()
+fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title="randnx_n", yaxis_title="mean_expectancy")
+fig.show()
 ```
+
+Output:
 
 ![Hovering and zooming into random-strategy results](../assets/images/readme-scatter.gif){ width="750" }
 
 ### Test 10,000 dual-SMA window combinations
 
-```pycon
->>> symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
->>> data = vbt.YFData.download(symbols, missing_index="drop")
->>> price = data.get("Close")
-
->>> windows = np.arange(2, 101)
->>> fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=["fast", "slow"])
->>> entries = fast_ma.ma_crossed_above(slow_ma)
->>> exits = fast_ma.ma_crossed_below(slow_ma)
-
->>> pf = vbt.Portfolio.from_signals(price, entries, exits, size=np.inf, fees=0.001, freq="1D")
-
->>> fig = pf.total_return().vbt.heatmap(
-...     x_level="fast_window", y_level="slow_window", slider_level="symbol", symmetric=True,
-...     trace_kwargs=dict(colorbar=dict(title="Total return", tickformat="%")))
->>> fig.show()
+```python
+symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
+data = vbt.YFData.download(symbols, missing_index="drop")
+price = data.get("Close")
+windows = np.arange(2, 101)
+fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=["fast", "slow"])
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
+pf = vbt.Portfolio.from_signals(price, entries, exits, size=np.inf, fees=0.001, freq="1D")
+fig = pf.total_return().vbt.heatmap(
+    x_level="fast_window", y_level="slow_window", slider_level="symbol", symmetric=True,
+    trace_kwargs=dict(colorbar=dict(title="Total return", tickformat="%")))
+fig.show()
 ```
+
+Output:
 
 ![Switching assets and inspecting dual-SMA parameter returns](../assets/images/readme-heatmap.gif){ width="750" }
 
@@ -94,8 +138,13 @@ VectorBT allows you to easily backtest strategies with a couple of lines of Pyth
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
-```pycon
->>> print(pf[(10, 20, "ETH-USD")].stats())
+```python
+print(pf[(10, 20, "ETH-USD")].stats())
+```
+
+Output:
+
+```text
 Start                          2017-11-09 00:00:00+00:00
 End                            2026-01-03 00:00:00+00:00
 Period                                2978 days 00:00:00
@@ -129,9 +178,11 @@ Name: (10, 20, ETH-USD), dtype: object
 
 ### Plot any strategy configuration
 
-```pycon
->>> pf[(10, 20, "ETH-USD")].plot().show()
+```python
+pf[(10, 20, "ETH-USD")].plot().show()
 ```
+
+Output:
 
 ![Inspecting trades, zooming, and toggling the portfolio benchmark](../assets/images/readme-portfolio.gif){ width="750" }
 
@@ -139,29 +190,32 @@ Name: (10, 20, ETH-USD), dtype: object
 
 VectorBT goes beyond backtesting, with tools for financial data analysis and visualization:
 
-```pycon
->>> symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
->>> data = vbt.YFData.download(symbols, period="6mo", missing_index="drop")
->>> price = data.get("Close")
->>> bbands = vbt.BBANDS.run(price)
+```python
+symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
+data = vbt.YFData.download(symbols, period="6mo", missing_index="drop")
+price = data.get("Close")
+bbands = vbt.BBANDS.run(price)
+def plot(index, bbands):
+    bbands = bbands.loc[index]
+    fig = vbt.make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
+        subplot_titles=("%B", "Bandwidth"))
+    fig.update_layout(showlegend=False, width=750, height=400)
+    bbands.percent_b.vbt.ts_heatmap(
+        trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale="Spectral", colorbar=dict(
+            y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=1, col=1), fig=fig)
+    bbands.bandwidth.vbt.ts_heatmap(
+        trace_kwargs=dict(colorbar=dict(
+            y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
+        )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
+    return fig
+vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
+```
 
->>> def plot(index, bbands):
-...     bbands = bbands.loc[index]
-...     fig = vbt.make_subplots(
-...         rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
-...         subplot_titles=("%B", "Bandwidth"))
-...     fig.update_layout(showlegend=False, width=750, height=400)
-...     bbands.percent_b.vbt.ts_heatmap(
-...         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale="Spectral", colorbar=dict(
-...             y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5
-...         )), add_trace_kwargs=dict(row=1, col=1), fig=fig)
-...     bbands.bandwidth.vbt.ts_heatmap(
-...         trace_kwargs=dict(colorbar=dict(
-...             y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
-...         )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
-...     return fig
+Output:
 
->>> vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
+```text
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
@@ -176,6 +230,23 @@ Explore candlestick patterns interactively and backtest their signals with Vecto
 ![Exploring candlestick patterns, inspecting trades, and comparing strategy statistics in the app](../assets/images/readme-candlestick.gif){ width="900" }
 
 ## Learn more
+
+The [Features](features.md) page includes worked examples for each part of a
+research workflow:
+
+- [Pandas accessors](features.md#pandas-native-api) and
+  [broadcasting](features.md#flexible-broadcasting) for labeled arrays.
+- [The Rust engine](features.md#optional-rust-engine) and
+  [vectorized backtesting](features.md#fast-vectorized-backtesting) for execution.
+- [Indicators](features.md#rich-indicator-ecosystem) and
+  [signals](features.md#signal-tooling) for expressing a strategy.
+- [Portfolio analysis](features.md#portfolio-backtesting) and
+  [robustness testing](features.md#robustness-testing) for examining results.
+- [Data access](features.md#built-in-data-access) and
+  [automation](features.md#automation-tools) for maintaining inputs.
+- [Interactive visualization](features.md#interactive-visualization) and
+  [composable Python workflows](features.md#composable-python-api) for exploring
+  and reusing the results.
 
 See [Resources](resources.md) for community examples and learning material.
 [VectorBT vs PRO](upgrade.md) compares the editions.
