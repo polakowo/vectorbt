@@ -72,74 +72,98 @@ PRO 在此基础上提供并行计算、更多数据集成、投资组合优化�
 <table>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>高速向量化回测</strong><br>
-      基于 pandas、NumPy 和 Numba，开展大规模策略研究。</p>
+      <br>
+      <h3>高速向量化回测</h3>
+      <p>基于 pandas、NumPy 和 Numba，开展大规模策略研究。</p>
       <p><a href="https://vectorbt.dev/getting-started/usage/#examples">回测示例 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>可选的 Rust 引擎</strong><br>
-      为支持的运算提供预编译内核，无需承担 JIT 编译开销。</p>
+      <br>
+      <h3>可选的 Rust 引擎</h3>
+      <p>为支持的运算提供预编译内核，无需承担 JIT 编译开销。</p>
       <p><a href="https://vectorbt.dev/getting-started/installation/#with-pip">Rust 安装指南 →</a></p>
+      <br>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>原生集成 pandas 的 API</strong><br>
-      通过自定义访问器，直接对 pandas 对象执行高性能运算。</p>
+      <br>
+      <h3>原生集成 pandas 的 API</h3>
+      <p>通过自定义访问器，直接对 pandas 对象执行高性能运算。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#pandas">pandas 集成指南 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>灵活的广播机制</strong><br>
-      利用灵活的数组广播，开展多资产分析和大规模参数扫描。</p>
+      <br>
+      <h3>灵活的广播机制</h3>
+      <p>利用灵活的数组广播，开展多资产分析和大规模参数扫描。</p>
       <p><a href="https://vectorbt.dev/api/base/reshape_fns/#vectorbt.base.reshape_fns.broadcast">广播 API →</a></p>
+      <br>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>丰富的指标生态</strong><br>
-      构建自定义指标，并使用 TA-Lib、Pandas TA 等工具集成。</p>
+      <br>
+      <h3>丰富的指标生态</h3>
+      <p>构建自定义指标，并使用 TA-Lib、Pandas TA 等工具集成。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#indicators">指标功能 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>投资组合回测</strong><br>
-      分析交易、回撤和绩效，并集成 QuantStats。</p>
+      <br>
+      <h3>投资组合回测</h3>
+      <p>分析交易、回撤和绩效，并集成 QuantStats。</p>
       <p><a href="https://vectorbt.dev/api/portfolio/base/">投资组合参考 →</a></p>
+      <br>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>信号工具</strong><br>
-      生成、排序和映射交易信号，并分析其分布。</p>
+      <br>
+      <h3>信号工具</h3>
+      <p>生成、排序和映射交易信号，并分析其分布。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#signals">信号功能 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>内置数据获取功能</strong><br>
-      获取市场数据、执行预处理，并生成合成时间序列。</p>
+      <br>
+      <h3>内置数据获取功能</h3>
+      <p>获取市场数据、执行预处理，并生成合成时间序列。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#data">数据功能 →</a></p>
+      <br>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>稳健性测试</strong><br>
-      运行滚动优化，并为机器学习工作流生成标签。</p>
+      <br>
+      <h3>稳健性测试</h3>
+      <p>运行滚动优化，并为机器学习工作流生成标签。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#data">数据划分与标签生成 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>交互式可视化</strong><br>
-      通过 Plotly 图表、Jupyter 小部件和浏览器仪表板探索结果。</p>
+      <br>
+      <h3>交互式可视化</h3>
+      <p>通过 Plotly 图表、Jupyter 小部件和浏览器仪表板探索结果。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#plotting">绘图功能 →</a></p>
+      <br>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <p><strong>自动化工具</strong><br>
-      定时更新数据，并发送 Telegram 通知。</p>
+      <br>
+      <h3>自动化工具</h3>
+      <p>定时更新数据，并发送 Telegram 通知。</p>
       <p><a href="https://vectorbt.dev/getting-started/features/#extra">定时任务与通知 →</a></p>
+      <br>
     </td>
     <td width="50%" valign="top">
-      <p><strong>可组合的 Python API</strong><br>
-      组合功能模块，支持快速实验和由 AI 智能体驱动的工作流。</p>
+      <br>
+      <h3>可组合的 Python API</h3>
+      <p>组合功能模块，支持快速实验和由 AI 智能体驱动的工作流。</p>
       <p><a href="https://vectorbt.dev/getting-started/usage/">使用示例 →</a></p>
+      <br>
     </td>
   </tr>
 </table>
