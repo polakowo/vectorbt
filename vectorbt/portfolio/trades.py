@@ -652,17 +652,28 @@ class Trades(Ranges):
 
     @cached_method
     def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Average profitability."""
+        """Average profitability.
+
+        Breakeven trades are counted but contribute no profit or loss.
+        Missing-PnL trades remain in the total count and residual loss weight,
+        preserving existing behavior."""
         win_rate = to_1d_array(self.win_rate(group_by=group_by))
         avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by)).copy()
         avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by)).copy()
+        total_count = to_1d_array(self.count(group_by=group_by))
 
         # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d_array(self.count(group_by=group_by)) > 0
+        has_values = total_count > 0
         avg_win[np.isnan(avg_win) & has_values] = 0.0
         avg_loss[np.isnan(avg_loss) & has_values] = 0.0
 
-        expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
+        # Remove only true zero-PnL trades, preserving the remaining missing-PnL convention.
+        # Count before division so equal win/loss counts have identical weights at large PnL scales.
+        breakeven_count = to_1d_array(self.pnl.apply_mask(self.values["pnl"] == 0.0).count(group_by=group_by))
+        win_count = to_1d_array(self.winning.count(group_by=group_by))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            loss_rate = (total_count - win_count - breakeven_count) / total_count
+        expectancy = win_rate * avg_win - loss_rate * np.abs(avg_loss)
         wrap_kwargs = merge_dicts(dict(name_or_index="expectancy"), wrap_kwargs)
         return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **wrap_kwargs)
 
