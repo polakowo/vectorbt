@@ -52,13 +52,13 @@
     <a href="#links">Links</a>
 </p>
 
-<h3 align="center"><b>Think in matrices. Backtest at scale.</b></h3>
+<h3 align="center"><b>Research at scale.</b></h3>
 
-<p align="center">VectorBT takes a radically different approach to backtesting: instead of looping through bars one strategy at a time, it packs thousands of configurations into NumPy arrays, accelerates the hot path with Numba and Rust, and runs them all at once, turning hours of grid search into seconds.</p>
+<p align="center">VectorBT is a Python toolkit for trading research. Explore market data, build indicators and signals, and compare thousands of ideas across assets and timeframes. NumPy arrays, Numba acceleration, and an optional Rust engine let you run large experiments in a few lines of Python.</p>
 
 ---
 
-Explore thousands of trading ideas across assets and timeframes, analyze portfolio performance down to individual trades, and visualize results interactively, all in a few lines of code. Built for both human researchers and AI agents, VectorBT combines large-scale experimentation with a mature, battle-tested backtesting stack refined through years of community use.
+Move from exploring price patterns to evaluating strategies in one workflow. Inspect trades, fees, drawdowns, and portfolio performance, then explore the results with interactive charts. Built for traders, researchers, and AI agents, VectorBT brings data analysis, strategy simulation, and visualization together in a composable Python API.
 
 VectorBT is the open-source community edition of [VectorBT PRO](https://vectorbt.pro/).
 PRO extends the library with parallelization, additional data integrations, portfolio optimization,
