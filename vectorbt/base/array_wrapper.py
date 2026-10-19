@@ -311,7 +311,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 # We could do _self.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
                 group_lens = _self.grouper.get_group_lens()[group_idxs_arr]
                 ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
-                ungrouped_group_idxs[group_lens[:-1]] = 1
+                # Each boundary is the total width of preceding blocks, not an individual group length.
+                ungrouped_group_idxs[np.cumsum(group_lens[:-1])] = 1
                 ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
                 return (
