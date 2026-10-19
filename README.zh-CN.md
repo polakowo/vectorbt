@@ -69,18 +69,68 @@ PRO 在此基础上提供并行计算、更多数据集成、投资组合优化�
 
 ## 功能
 
-- 🧮 基于 pandas、NumPy 和 Numba 的**高速向量化回测**与策略研究
-- 🦾 **可选的 Rust 引擎**，提供预编译执行速度，无需承担 JIT 编译开销
-- 🐼 **原生集成 pandas 的 API**，提供自定义访问器和高性能运算
-- 🪗 **灵活的广播机制**，支持多资产分析和大规模参数扫描
-- 🎛️ **丰富的指标生态**，支持自定义指标，并集成 TA-Lib、Pandas TA 等工具
-- 🧾 **投资组合回测**，提供交易、回撤和绩效分析，并集成 QuantStats
-- 🚦 **信号工具**，支持信号生成、排序、映射和分布分析
-- 🚰 **内置数据获取功能**，支持预处理和合成数据生成
-- 🪨 **稳健性测试**，支持滚动优化，并为机器学习工作流生成标签
-- 🪞 **交互式可视化**，支持 Plotly、Jupyter 小部件和浏览器仪表板
-- 🕰️ **自动化工具**，支持定时更新和 Telegram 通知
-- 🧱 **可组合的 Python API**，支持快速实验和由 AI 智能体驱动的工作流
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>高速向量化回测</strong><br>
+      基于 pandas、NumPy 和 Numba，开展大规模策略研究。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>可选的 Rust 引擎</strong><br>
+      为支持的运算提供预编译内核，无需承担 JIT 编译开销。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>原生集成 pandas 的 API</strong><br>
+      通过自定义访问器，直接对 pandas 对象执行高性能运算。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>灵活的广播机制</strong><br>
+      利用灵活的数组广播，开展多资产分析和大规模参数扫描。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>丰富的指标生态</strong><br>
+      构建自定义指标，并使用 TA-Lib、Pandas TA 等工具集成。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>投资组合回测</strong><br>
+      分析交易、回撤和绩效，并集成 QuantStats。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>信号工具</strong><br>
+      生成、排序和映射交易信号，并分析其分布。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>内置数据获取功能</strong><br>
+      获取市场数据、执行预处理，并生成合成时间序列。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>稳健性测试</strong><br>
+      运行滚动优化，并为机器学习工作流生成标签。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>交互式可视化</strong><br>
+      通过 Plotly 图表、Jupyter 小部件和浏览器仪表板探索结果。</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>自动化工具</strong><br>
+      定时更新数据，并发送 Telegram 通知。</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>可组合的 Python API</strong><br>
+      组合功能模块，支持快速实验和由 AI 智能体驱动的工作流。</p>
+    </td>
+  </tr>
+</table>
 
 ## 安装
 

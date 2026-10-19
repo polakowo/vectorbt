@@ -70,18 +70,68 @@ See [VectorBT vs PRO](https://vectorbt.dev/getting-started/upgrade/) or browse
 
 ## Features
 
-- 🧮 **Fast, vectorized backtesting** and strategy research built on pandas, NumPy, and Numba
-- 🦾 **Optional Rust engine** for precompiled speed without JIT overhead
-- 🐼 **Pandas-native API** with custom accessors and high-performance operations
-- 🪗 **Flexible broadcasting** for multi-asset analysis and large-scale parameter sweeps
-- 🎛️ **Rich indicator ecosystem** with custom indicators and integrations for TA-Lib, Pandas TA, and more
-- 🧾 **Portfolio backtesting** with trade, drawdown, and performance analytics, including QuantStats integration
-- 🚦 **Signal tooling** for generation, ranking, mapping, and distribution analysis
-- 🚰 **Built-in data access** with preprocessing and synthetic data generation
-- 🪨 **Robustness testing** with walk-forward optimization and label generation for ML workflows
-- 🪞 **Interactive visualization** with Plotly, Jupyter widgets, and browser-friendly dashboards
-- 🕰️ **Automation tools** for scheduled updates and Telegram notifications
-- 🧱 **Composable Python API** for rapid experimentation and AI agent-driven workflows
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Fast, vectorized backtesting</strong><br>
+      Research strategies at scale with pandas, NumPy, and Numba.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Optional Rust engine</strong><br>
+      Use precompiled kernels for supported operations without JIT compilation.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Pandas-native API</strong><br>
+      Work with custom accessors and high-performance operations directly on pandas objects.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Flexible broadcasting</strong><br>
+      Analyze multiple assets and sweep large parameter grids with flexible array broadcasting.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Rich indicator ecosystem</strong><br>
+      Build custom indicators and use integrations for TA-Lib, Pandas TA, and more.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Portfolio backtesting</strong><br>
+      Analyze trades, drawdowns, and performance, with QuantStats integration.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Signal tooling</strong><br>
+      Generate, rank, map, and analyze the distribution of trading signals.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Built-in data access</strong><br>
+      Fetch market data, preprocess it, and generate synthetic time series.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Robustness testing</strong><br>
+      Run walk-forward optimization and generate labels for machine learning workflows.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Interactive visualization</strong><br>
+      Explore results with Plotly charts, Jupyter widgets, and browser dashboards.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p><strong>Automation tools</strong><br>
+      Schedule data updates and send Telegram notifications.</p>
+    </td>
+    <td width="50%" valign="top">
+      <p><strong>Composable Python API</strong><br>
+      Combine building blocks for rapid experimentation and AI agent-driven workflows.</p>
+    </td>
+  </tr>
+</table>
 
 ## Installation
 
