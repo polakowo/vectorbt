@@ -543,6 +543,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         # Create new instance
         symbols = list(data.keys())
         wrapper = ArrayWrapper.from_obj(data[symbols[0]], **wrapper_kwargs)
+        # In-memory data has no download parameters unless supplied explicitly.
+        kwargs.setdefault("download_kwargs", {})
         return cls(
             wrapper,
             data,
