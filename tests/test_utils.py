@@ -1,5 +1,6 @@
 import asyncio
 import os
+import pickle
 from collections import namedtuple
 from copy import copy, deepcopy
 from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
@@ -760,6 +761,56 @@ class TestConfig:
         cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
+
+    @pytest.mark.parametrize("failure", ["missing", "unreadable", "corrupt", "nonmapping", "nested", "constructor"])
+    def test_pickleable_dict_load_update_rejected(self, tmp_path, failure):
+        path = tmp_path / "replacement"
+        payloads = {
+            "corrupt": b"!",
+            "nonmapping": pickle.dumps([1, 2]),
+            "nested": pickle.dumps({"child": config.DumpTuple(config.Pickleable, b"!")}),
+            "constructor": pickle.dumps({0: "non-string key"}),
+        }
+        errors = {
+            "missing": FileNotFoundError,
+            "unreadable": OSError,
+            "corrupt": pickle.UnpicklingError,
+            "nonmapping": AttributeError,
+            "nested": pickle.UnpicklingError,
+            "constructor": TypeError,
+        }
+        if failure == "unreadable":
+            path.mkdir()
+        elif failure in payloads:
+            path.write_bytes(payloads[failure])
+
+        # Rejection at any load/reconstruction stage must retain the original values and references.
+        units = [2]
+        positions = {"A": units}
+        target = config.PickleableDict({"positions": positions, "cash": 100})
+        with pytest.raises(errors[failure]):
+            target.load_update(path)
+        assert target == {"positions": {"A": [2]}, "cash": 100}
+        assert target["positions"] is positions
+        assert target["positions"]["A"] is units
+
+    @pytest.mark.parametrize("empty", [False, True])
+    def test_pickleable_dict_load_update(self, tmp_path, empty):
+        replacement = config.PickleableDict()
+        if not empty:
+            replacement.update(positions={"A": [3]}, config=config.Config({"limit": 5}, readonly=True))
+        path = tmp_path / "replacement"
+        replacement.save(path)
+        target = config.PickleableDict({"obsolete": [1]})
+        alias = target
+
+        # Successful loading still replaces all keys in place, including with an empty mapping.
+        assert target.load_update(path, ignore=True) is None
+        assert target is alias
+        assert target == replacement
+        if not empty:
+            assert isinstance(target["config"], config.Config)
+            assert target["config"].readonly_
 
     def test_config_save_and_load(self, tmp_path):
         cfg = config.Config(
