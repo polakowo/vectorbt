@@ -230,10 +230,12 @@ class TestMappedArray:
     def test_top_n(self):
         np.testing.assert_array_equal(mapped_array.top_n(1).id_arr, np.array([2, 4, 6]))
         np.testing.assert_array_equal(mapped_array.top_n(0).id_arr, np.array([], dtype=np.int64))
+        np.testing.assert_array_equal(mapped_array.top_n(1, group_by=group_by).id_arr, np.array([4, 6]))
 
     def test_bottom_n(self):
         np.testing.assert_array_equal(mapped_array.bottom_n(1).id_arr, np.array([0, 3, 8]))
         np.testing.assert_array_equal(mapped_array.bottom_n(0).id_arr, np.array([], dtype=np.int64))
+        np.testing.assert_array_equal(mapped_array.bottom_n(1, group_by=group_by).id_arr, np.array([0, 8]))
 
     def test_to_pd(self):
         target = pd.DataFrame(
