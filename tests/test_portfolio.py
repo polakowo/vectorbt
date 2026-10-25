@@ -832,6 +832,27 @@ class TestFromOrders:
             np.array([(0, 0, 0, 90.0, 1.0, 9.1, 1), (1, 0, 1, 82.0, 2.0, 16.5, 0)], dtype=order_dt),
         )
 
+    def test_size_granularity_fractional(self):
+        close = pd.Series([10.0, 10.0])
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([1.0, -1.0]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0), (1, 0, 1, 1.0, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([0.9, -0.9]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 0.9, 10.0, 0.0, 0), (1, 0, 1, 0.9, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([np.inf, np.nan]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 10.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([1.0, np.nan]), size_granularity=0.001, allow_partial=False
+            ).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+
     def test_price(self):
         record_arrays_close(
             from_orders_both(price=price * 1.01).order_records,

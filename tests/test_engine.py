@@ -2089,6 +2089,15 @@ class TestPortfolioRustParity:
         record_arrays_close(pf_rust.log_records, pf_numba.log_records)
         pd.testing.assert_series_equal(pf_rust.init_cash, pf_numba.init_cash)
 
+    def test_from_orders_fractional_size_granularity_parity(self):
+        price = pd.Series([10.0, 10.0, 10.0, 10.0, 10.0])
+        size = pd.Series([1.0, -1.0, 0.9, -0.9, np.inf])
+        for size_granularity in (0.1, 0.01, 0.001):
+            kwargs = dict(close=price, size=size, direction="both", size_granularity=size_granularity)
+            pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+            pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+            record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+
     def test_from_orders_error_parity(self):
         price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
         size = pd.Series([1.0, -1.0, np.nan, 1.0, -1.0])
