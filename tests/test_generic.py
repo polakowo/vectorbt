@@ -786,8 +786,10 @@ class TestAccessors:
         bool_ts = df == df
         assert test_func(bool_ts["a"].vbt) == test_func(bool_ts["a"])
         pd.testing.assert_series_equal(test_func(bool_ts.vbt), test_func(bool_ts).rename(test_name))
+        # pandas 3.1 rejects bool * Timedelta; floats also preserve fractional reductions such as mean and std.
         pd.testing.assert_series_equal(
-            test_func(bool_ts.vbt, wrap_kwargs=dict(to_timedelta=True)), test_func(bool_ts).rename(test_name) * day_dt
+            test_func(bool_ts.vbt, wrap_kwargs=dict(to_timedelta=True)),
+            test_func(bool_ts).rename(test_name).astype(float) * day_dt,
         )
 
     @pytest.mark.parametrize(
