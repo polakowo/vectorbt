@@ -3779,8 +3779,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(
                     output = tuple([output.iloc[:, i] for i in range(len(output.columns))])
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
-                outputs = list(zip(*outputs))
-                return list(map(np.column_stack, outputs))
+                outputs = list(map(np.column_stack, zip(*outputs)))
+                return outputs[0] if len(outputs) == 1 else outputs
             return np.column_stack(outputs)
 
         defaults = config.pop("defaults")

@@ -2072,6 +2072,25 @@ class TestFactory:
                 ),
             )
 
+    @pytest.mark.skipif(not pandas_ta_available, reason="pandas-ta is not installed")
+    @pytest.mark.parametrize("multi_columns", [False, True])
+    def test_from_pandas_ta_single_output_frame(self, multi_columns):
+        close = ts if multi_columns else ts["a"]
+        result = vbt.pandas_ta("TTM_TREND").run(close, close, close, length=[2, 3]).ttm_trnd
+        columns = ts.columns if multi_columns else ["a"]
+        expected = np.column_stack(
+            [
+                pandas_ta.ttm_trend(ts[col], ts[col], ts[col], length=length).iloc[:, 0]
+                for length in [2, 3]
+                for col in columns
+            ]
+        )
+        if multi_columns:
+            expected_columns = pd.MultiIndex.from_product([[2, 3], columns], names=["ttm_trend_length", None])
+        else:
+            expected_columns = pd.Index([2, 3], name="ttm_trend_length")
+        pd.testing.assert_frame_equal(result, pd.DataFrame(expected, index=ts.index, columns=expected_columns))
+
     def test_get_ta_indicators(self):
         if ta_available:
             assert len(vbt.IndicatorFactory.get_ta_indicators()) > 0
