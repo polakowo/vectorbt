@@ -97,6 +97,14 @@ fn add(a: f64, b: f64) -> f64 {
 }
 
 #[inline(always)]
+fn floor_to_granularity(size: f64, size_granularity: f64) -> f64 {
+    let lots = size / size_granularity;
+    let nearest = (lots + 0.5).floor();
+    let lots = if is_close(lots, nearest) { nearest } else { lots.floor() };
+    (lots * size_granularity).min(size)
+}
+
+#[inline(always)]
 fn get_return(input_value: f64, output_value: f64) -> f64 {
     if input_value == 0.0 {
         if output_value == 0.0 {
@@ -847,7 +855,7 @@ fn buy(
 
     // Adjust granularity
     if !size_granularity.is_nan() {
-        adj_size = (adj_size / size_granularity).floor() * size_granularity;
+        adj_size = floor_to_granularity(adj_size, size_granularity);
     }
 
     // Get cash required
@@ -873,7 +881,7 @@ fn buy(
         let max_acq_size = max_req_cash / adj_price;
 
         if !size_granularity.is_nan() {
-            final_size = (max_acq_size / size_granularity).floor() * size_granularity;
+            final_size = floor_to_granularity(max_acq_size, size_granularity);
             let new_req_cash = final_size * adj_price;
             fees_paid = new_req_cash * fees + fixed_fees;
             final_req_cash = new_req_cash + fees_paid;
@@ -1039,7 +1047,7 @@ fn sell(
 
     // Adjust granularity
     if !size_granularity.is_nan() {
-        size_limit = (size_limit / size_granularity).floor() * size_granularity;
+        size_limit = floor_to_granularity(size_limit, size_granularity);
     }
 
     if is_close(size_limit, 0.0) {

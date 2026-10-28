@@ -63,6 +63,18 @@ from vectorbt.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, a
 
 
 @njit(cache=True)
+def floor_to_granularity_nb(size: float, size_granularity: float) -> float:
+    """Floor `size` to a multiple of `size_granularity`, counting a size within tolerance of one as that multiple."""
+    lots = size / size_granularity
+    nearest = np.floor(lots + 0.5)
+    if is_close_nb(lots, nearest):
+        lots = nearest
+    else:
+        lots = np.floor(lots)
+    return min(lots * size_granularity, size)
+
+
+@njit(cache=True)
 def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
     """Return `OrderResult` for order that hasn't been filled."""
     return OrderResult(np.nan, np.nan, np.nan, -1, status, status_info)
@@ -142,7 +154,7 @@ def buy_nb(
 
     # Adjust granularity
     if not np.isnan(size_granularity):
-        adj_size = np.floor(adj_size / size_granularity) * size_granularity
+        adj_size = floor_to_granularity_nb(adj_size, size_granularity)
 
     # Get cash required to complete this order
     req_cash = adj_size * adj_price
@@ -167,7 +179,7 @@ def buy_nb(
 
         if not np.isnan(size_granularity):
             # Adjust granularity
-            final_size = np.floor(max_acq_size / size_granularity) * size_granularity
+            final_size = floor_to_granularity_nb(max_acq_size, size_granularity)
             new_req_cash = final_size * adj_price
             fees_paid = new_req_cash * fees + fixed_fees
             final_req_cash = new_req_cash + fees_paid
@@ -291,7 +303,7 @@ def sell_nb(
 
     # Adjust granularity
     if not np.isnan(size_granularity):
-        size_limit = np.floor(size_limit / size_granularity) * size_granularity
+        size_limit = floor_to_granularity_nb(size_limit, size_granularity)
 
     if is_close_nb(size_limit, 0):
         return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)

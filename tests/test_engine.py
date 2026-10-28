@@ -2098,6 +2098,23 @@ class TestPortfolioRustParity:
             pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
             record_arrays_close(pf_rust.order_records, pf_numba.order_records)
 
+    def test_from_orders_size_granularity_lot_boundary_parity(self):
+        price = pd.Series([10.0, 10.0])
+        for size_granularity in (0.1, 0.01, 0.001):
+            lots = np.arange(1, 1001) * size_granularity
+            size = pd.DataFrame([lots, np.full(lots.shape, -np.inf)])
+            kwargs = dict(
+                close=price, size=size, direction="longonly", size_granularity=size_granularity, init_cash=1e6
+            )
+            pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+            pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+            record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+            for pf in (pf_numba, pf_rust):
+                records = pf.order_records
+                np.testing.assert_allclose(records["size"][records["side"] == 0], lots)
+                np.testing.assert_allclose(records["size"][records["side"] == 1], lots)
+                np.testing.assert_array_equal(pf.assets().iloc[-1].values, 0.0)
+
     def test_from_orders_error_parity(self):
         price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
         size = pd.Series([1.0, -1.0, np.nan, 1.0, -1.0])
