@@ -2169,7 +2169,13 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
             input_mapper = input_mapper[col_idxs_arr]
         input_list = []
         for input_name in self.input_names:
-            input_list.append(getattr(self, f"_{input_name}")[idx_idxs_arr])
+            input_array = getattr(self, f"_{input_name}")[idx_idxs_arr]
+            if input_mapper is None:
+                input_array = reshape_fns.to_2d_array(input_array)
+                # Select full-width inputs directly, but retain compact broadcast inputs from keep_raw.
+                if input_array.shape[1] == self.wrapper.shape_2d[1]:
+                    input_array = input_array[:, col_idxs_arr]
+            input_list.append(input_array)
         in_output_list = []
         for in_output_name in self.in_output_names:
             in_output_list.append(getattr(self, f"_{in_output_name}")[idx_idxs_arr, :][:, col_idxs_arr])

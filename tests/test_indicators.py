@@ -1517,6 +1517,87 @@ class TestFactory:
             ),
         )
 
+    @pytest.mark.parametrize("multiindex", [False, True])
+    @pytest.mark.parametrize("col_idxs", [1, [2, 0], [1, 1, 0], slice(None, None, -1)])
+    def test_indexing_no_params(self, multiindex, col_idxs):
+        # Unmapped inputs must follow the same mixed row/column selection as every output.
+        left = ts.copy()
+        left.index = left.index.tz_localize("UTC").rename("time")
+        left.columns = pd.Index(["a", "b", "c"], name="asset")
+        if multiindex:
+            left.columns = pd.MultiIndex.from_tuples(
+                [("prices", "a"), ("prices", "b"), ("prices", "c")], names=["kind", "asset"]
+            )
+        right = left * 2 + 10
+
+        def apply_func(left, right, in_out):
+            in_out[:] = left - right
+            return left + right
+
+        obj = (
+            vbt.IndicatorFactory(
+                input_names=["left", "right"],
+                in_output_names=["in_out"],
+                output_names=["out"],
+                custom_output_props={"derived": lambda self: self.left + self.right},
+            )
+            .from_apply_func(apply_func)
+            .run(left, right)
+        )
+        expected = dict(
+            left=left.copy(), right=right.copy(), in_out=left - right, out=left + right, derived=left + right
+        )
+        selected = obj.iloc[[3, 1], col_idxs]
+        for attr, original in expected.items():
+            target = original.iloc[[3, 1], col_idxs]
+            assert_equal = (
+                pd.testing.assert_series_equal if isinstance(target, pd.Series) else pd.testing.assert_frame_equal
+            )
+            assert_equal(getattr(selected, attr), target)
+            # A second selection must use the already selected inputs, including derived properties.
+            assert_equal(getattr(selected.iloc[::-1], attr), target.iloc[::-1])
+
+        # Selection must not mutate the original indicator or caller-owned input values.
+        pd.testing.assert_frame_equal(left, expected["left"])
+        pd.testing.assert_frame_equal(right, expected["right"])
+        pd.testing.assert_frame_equal(obj.left, expected["left"])
+        pd.testing.assert_frame_equal(obj.right, expected["right"])
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_indexing_no_params_one_column(self, as_frame):
+        # Series inputs are stored as 1D arrays; column selection must still preserve their public shape.
+        source = ts[["a"]] if as_frame else ts["a"]
+        obj = vbt.IndicatorFactory(input_names=["x"], output_names=["out"]).from_apply_func(lambda x: x * 2).run(source)
+        selected = obj.iloc[[3, 1]]
+        assert_equal = pd.testing.assert_frame_equal if as_frame else pd.testing.assert_series_equal
+        assert_equal(selected.x, source.iloc[[3, 1]])
+        assert_equal(selected.out, source.iloc[[3, 1]] * 2)
+        if as_frame:
+            # A materialized single column must still expand when selected more than once.
+            pd.testing.assert_frame_equal(obj.iloc[:, [0, 0]].x, pd.concat([source, source], axis=1))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize("keep_raw", [False, True])
+    def test_indexing_no_params_compact_input(self, as_frame, keep_raw):
+        # keep_raw may retain one input column while another input determines two output columns.
+        x = pd.Series([1.0, 2.0, 3.0], index=ts.index[:3])
+        y = pd.DataFrame({"A": [10.0, 11.0, 12.0], "B": [20.0, 21.0, 22.0]}, index=x.index)
+        obj = (
+            vbt.IndicatorFactory(input_names=["x", "y"], output_names=["out"])
+            .from_apply_func(lambda x, y: x + y)
+            .run(x.to_frame() if as_frame else x, y, broadcast_kwargs=dict(keep_raw=[keep_raw, False], columns_from=1))
+        )
+        expected_out = pd.DataFrame({"A": [11.0, 13.0, 15.0], "B": [21.0, 23.0, 25.0]}, index=x.index)
+        reordered = obj.iloc[[2, 0], [1, 0, 1]]
+        pd.testing.assert_frame_equal(reordered.out, expected_out.iloc[[2, 0], [1, 0, 1]])
+        assert reordered._x.shape[1] == (1 if keep_raw else 3)
+
+        # Both direct scalar selection and reselection from a reordered object must preserve B's values.
+        expected = dict(x=x.rename("B"), y=y["B"], out=expected_out["B"])
+        for selected, rows in [(obj.iloc[:, 1], slice(None)), (reordered.iloc[:, 0], [2, 0])]:
+            for attr, original in expected.items():
+                pd.testing.assert_series_equal(getattr(selected, attr), original.iloc[rows])
+
     def test_numeric_attr(self):
         obj = (
             vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -3146,6 +3227,17 @@ class TestBasic:
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
         )
+
+    def test_OBV_indexing_inputs(self):
+        close = pd.DataFrame({"A": [10.0, 11.0, 12.0], "B": [20.0, 19.0, 21.0]})
+        volume = pd.DataFrame({"A": [1.0, 2.0, 3.0], "B": [4.0, 5.0, 6.0]})
+        # Add volume on rises and subtract it on falls: A = 1,3,6; B = 4,-1,5.
+        expected_obv = pd.DataFrame({"A": [1.0, 3.0, 6.0], "B": [4.0, -1.0, 5.0]})
+        obj = vbt.OBV.run(close, volume, engine="numba")
+        for attr, expected in dict(close=close, volume=volume, obv=expected_obv).items():
+            # Reordering previously relabeled the inputs without moving their values; scalar access raised.
+            pd.testing.assert_frame_equal(getattr(obj.iloc[:, [1, 0]], attr), expected.iloc[:, [1, 0]])
+            pd.testing.assert_series_equal(getattr(obj["B"], attr), expected["B"])
 
     @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.int64, np.uint64])
     def test_OBV_flat_close(self, dtype):

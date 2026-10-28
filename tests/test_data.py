@@ -75,6 +75,68 @@ class MyData(vbt.Data):
 
 
 class TestData:
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_from_data(self, as_frame):
+        source = pd.Series([1.0, 2.0], index=pd.Index(["x", "y"], name="time"), name="close")
+        if as_frame:
+            source = source.to_frame()
+
+        # In-memory construction needs no provider request arguments and preserves the public data.
+        data = vbt.Data.from_data({"A": source})
+        assert data.download_kwargs == {}
+        assert data.config["download_kwargs"] == {}
+        assert data.symbols == ["A"]
+        assert data.wrapper.ndim == source.ndim
+        pd.testing.assert_index_equal(data.wrapper.index, source.index)
+        if as_frame:
+            pd.testing.assert_frame_equal(data.get(), source)
+            pd.testing.assert_index_equal(data.wrapper.columns, source.columns)
+        else:
+            pd.testing.assert_series_equal(data.get(), source)
+            pd.testing.assert_index_equal(data.wrapper.columns, pd.Index(["close"]))
+
+    def test_from_data_fresh_download_kwargs(self):
+        first = vbt.Data.from_data({"A": pd.Series([1.0])})
+        second = vbt.Data.from_data({"A": pd.Series([2.0])})
+        # A later edit to one object's request state must not affect another default-constructed object.
+        first.download_kwargs["period"] = "1d"
+        assert second.download_kwargs == {}
+
+    @pytest.mark.parametrize("download_kwargs", [{}, {"period": "1d"}, None])
+    def test_from_data_explicit_download_kwargs(self, download_kwargs):
+        source = pd.Series([1.0], name="close")
+        data = vbt.Data.from_data({"A": source}, download_kwargs=download_kwargs)
+        # Keep explicit values, including None, exactly as the existing constructor forwards them.
+        assert data.download_kwargs is download_kwargs
+        pd.testing.assert_series_equal(data.get(), source)
+
+    def test_from_data_configured_defaults(self, monkeypatch):
+        monkeypatch.setitem(vbt.settings.data, "tz_localize", "UTC")
+        monkeypatch.setitem(vbt.settings.data, "tz_convert", "Europe/Berlin")
+        monkeypatch.setitem(vbt.settings.data, "missing_index", "drop")
+        monkeypatch.setitem(vbt.settings.data, "missing_columns", "drop")
+        index = pd.date_range("2020-01-01", periods=3, name="time")
+        source = {
+            "A": pd.DataFrame({"open": [1.0, 2.0], "close": [10.0, 20.0]}, index=index[:2]),
+            "B": pd.DataFrame({"close": [21.0, 31.0], "volume": [200.0, 300.0]}, index=index[1:]),
+        }
+
+        # Both axes intersect at one timestamp/column; timezone conversion must still use settings.
+        with pytest.warns(UserWarning, match="mismatching"):
+            data = vbt.Data.from_data(source)
+        expected_index = pd.DatetimeIndex(["2020-01-02"], tz="UTC", name="time").tz_convert(
+            to_timezone("Europe/Berlin")
+        )
+        expected = pd.DataFrame(
+            {"A": [20.0], "B": [21.0]}, index=expected_index, columns=pd.Index(["A", "B"], name="symbol")
+        )
+        pd.testing.assert_frame_equal(data.get("close"), expected)
+        assert data.get("close").index.tz == expected_index.tz
+        assert data.missing_index == data.missing_columns == "drop"
+        assert data.tz_localize == "UTC"
+        assert data.tz_convert == "Europe/Berlin"
+        assert data.download_kwargs == {}
+
     def test_config(self, tmp_path):
         data = MyData.download([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert MyData.loads(data.dumps()) == data
