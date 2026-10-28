@@ -277,9 +277,12 @@ class PickleableDict(Pickleable, dict):
         return cls(**config)
 
     def load_update(self, fname: tp.FileName, **kwargs) -> None:
-        """Load dumps from a file and update this instance."""
+        """Load dumps from a file and update this instance.
+
+        The current contents are cleared only after loading succeeds."""
+        loaded = self.load(fname, **kwargs)
         self.clear()
-        self.update(self.load(fname, **kwargs))
+        self.update(loaded)
 
 
 ConfigT = tp.TypeVar("ConfigT", bound="Config")

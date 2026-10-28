@@ -52,7 +52,7 @@
     <a href="#links">Links</a>
 </p>
 
-<h3 align="center"><b>Trading research at scale.</b></h3>
+<h2 align="center">Trading research at scale.</h2>
 
 <p align="center">VectorBT is a Python toolkit for trading research. Explore market data, build indicators and signals, and compare thousands of ideas across assets and timeframes. NumPy arrays, Numba acceleration, and an optional Rust engine let you run large experiments in a few lines of Python.</p>
 
