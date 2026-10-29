@@ -1597,7 +1597,10 @@ For example, granularity of 1.0 makes the quantity to behave like an integer.
 Placing an order of 12.5 shares (in any direction) will order exactly 12.0 shares.
 
 !!! note
-    The filled size remains a floating number."""
+    The filled size remains a floating number. A size within the tolerance of
+    `vectorbt.utils.math_.is_close_nb` (relative 1e-9) of a multiple counts as that multiple,
+    and the filled size never exceeds the requested size, so fills are multiples of
+    the granularity up to that tolerance."""
 __pdoc__[
     "Order.reject_prob"
 ] = """Probability of rejecting this order to simulate a random rejection event.
