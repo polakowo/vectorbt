@@ -29,6 +29,25 @@ def teardown_module():
 
 
 class TestEngineResolution:
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    def test_true_range_unsigned_fallback(self, dtype):
+        high = np.array([105, 95, 109], dtype=dtype)[:, None]
+        low = np.array([95, 90, 100], dtype=dtype)[:, None]
+        close = np.array([100, 92, 105], dtype=dtype)[:, None]
+        # Unsigned inputs remain on Numba, including when the optional engine is installed.
+        assert not _engine.array_compatible_with_rust(high).supported
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(
+                indicator_dispatch.true_range(high, low, close, engine=engine)[:, 0], [10.0, 10.0, 17.0]
+            )
+
+    @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    def test_true_range_unsigned_rust_rejection(self, dtype):
+        prices = np.array([100, 99], dtype=dtype)[:, None]
+        with pytest.raises(ValueError, match="cannot be safely cast"):
+            indicator_dispatch.true_range(prices, prices, prices, engine="rust")
+
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
         assert _engine.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported

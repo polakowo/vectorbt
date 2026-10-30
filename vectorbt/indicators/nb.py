@@ -253,6 +253,18 @@ def macd_apply_nb(
 
 
 @njit(cache=True)
+def _true_range_distance_nb(a, b):
+    """Calculate a price distance without overflowing integer subtraction."""
+    integer_types = (np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32)
+    if isinstance(a, integer_types) and isinstance(b, integer_types):
+        # Flipping the sign bit maps signed order to uint64 order without losing unit differences.
+        unsigned_a = np.uint64(a) ^ np.uint64(1 << 63)
+        unsigned_b = np.uint64(b) ^ np.uint64(1 << 63)
+        return float(unsigned_a - unsigned_b) if unsigned_a >= unsigned_b else float(unsigned_b - unsigned_a)
+    return abs(a - b) if a >= b else abs(b - a)
+
+
+@njit(cache=True)
 def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
     """Calculate true range."""
     tr = np.empty(high.shape, dtype=np.float64)
@@ -262,8 +274,10 @@ def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Ar
             if i == 0:
                 tr[i, col] = tr1
             else:
-                tr2 = abs(high[i, col] - close[i - 1, col])
-                tr3 = abs(low[i, col] - close[i - 1, col])
+                # Keep integer distances exact until the existing floating output conversion.
+                prev_close = close[i - 1, col]
+                tr2 = _true_range_distance_nb(high[i, col], prev_close)
+                tr3 = _true_range_distance_nb(low[i, col], prev_close)
                 tr[i, col] = max(tr1, tr2, tr3)
     return tr
 
