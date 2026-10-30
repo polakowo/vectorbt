@@ -622,7 +622,10 @@ pub(crate) fn sortino_ratio_1d(returns: &[f64], ann_factor: f64, required_return
     let average_annualized_return = nanmean_shifted(returns, required_return) * ann_factor;
     let downside_risk = downside_risk_1d(returns, ann_factor, required_return);
     if downside_risk == 0.0 {
-        return zero_std_ratio(average_annualized_return);
+        if average_annualized_return == 0.0 {
+            return f64::NAN;
+        }
+        return f64::INFINITY;
     }
     average_annualized_return / downside_risk
 }
