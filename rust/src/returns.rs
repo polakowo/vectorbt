@@ -534,6 +534,14 @@ pub(crate) fn omega_ratio_1d(returns: &[f64], ann_factor: f64, risk_free: f64, r
     numer / denom
 }
 
+fn zero_std_ratio(mean: f64) -> f64 {
+    if mean == 0.0 {
+        f64::NAN
+    } else {
+        f64::INFINITY.copysign(mean)
+    }
+}
+
 pub(crate) fn sharpe_ratio_1d(returns: &[f64], ann_factor: f64, risk_free: f64, ddof: usize) -> f64 {
     if returns.len() < 2 {
         return f64::NAN;
@@ -541,7 +549,7 @@ pub(crate) fn sharpe_ratio_1d(returns: &[f64], ann_factor: f64, risk_free: f64, 
     let mean = nanmean_shifted(returns, risk_free);
     let std = nanstd_shifted(returns, risk_free, ddof);
     if std == 0.0 {
-        return f64::INFINITY;
+        return zero_std_ratio(mean);
     }
     mean / std * ann_factor.sqrt()
 }
@@ -577,7 +585,7 @@ pub(crate) fn sharpe_ratio_2d(returns: ArrayView2<'_, f64>, ann_factor: f64, ris
                 let mean = sums[col] / counts[col] as f64;
                 let std = (sq[col] / (counts[col] - ddof) as f64).sqrt();
                 out[col] = if std == 0.0 {
-                    f64::INFINITY
+                    zero_std_ratio(mean)
                 } else {
                     mean / std * ann_sqrt
                 };
@@ -614,6 +622,9 @@ pub(crate) fn sortino_ratio_1d(returns: &[f64], ann_factor: f64, required_return
     let average_annualized_return = nanmean_shifted(returns, required_return) * ann_factor;
     let downside_risk = downside_risk_1d(returns, ann_factor, required_return);
     if downside_risk == 0.0 {
+        if average_annualized_return == 0.0 {
+            return f64::NAN;
+        }
         return f64::INFINITY;
     }
     average_annualized_return / downside_risk

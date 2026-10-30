@@ -455,6 +455,21 @@ class TestAccessors:
             ),
         )
 
+    def test_sharpe_ratio_zero_std(self):
+        zero_std_rets = pd.DataFrame(
+            {"zero": [0.0, 0.0, 0.0], "pos": [0.25, 0.25, 0.25], "neg": [-0.25, -0.25, -0.25]},
+            index=rets.index[:3],
+        )
+        for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
+            pd.testing.assert_series_equal(
+                zero_std_rets.vbt.returns.sharpe_ratio(risk_free=0.0, engine=engine),
+                pd.Series([np.nan, np.inf, -np.inf], index=zero_std_rets.columns, name="sharpe_ratio"),
+            )
+            pd.testing.assert_series_equal(
+                zero_std_rets.vbt.returns.sortino_ratio(required_return=0.0, engine=engine),
+                pd.Series([np.nan, np.inf, -np.sqrt(365)], index=zero_std_rets.columns, name="sortino_ratio"),
+            )
+
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
             rets.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),

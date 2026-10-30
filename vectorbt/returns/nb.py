@@ -417,7 +417,9 @@ def sharpe_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float 
     mean = np.nanmean(returns_risk_adj)
     std = generic_nb.nanstd_1d_nb(returns_risk_adj, ddof)
     if std == 0.0:
-        return np.inf
+        if mean == 0.0:
+            return np.nan
+        return np.inf * np.sign(mean)
     return mean / std * np.sqrt(ann_factor)
 
 
@@ -490,6 +492,8 @@ def sortino_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, required_return:
     average_annualized_return = np.nanmean(adj_returns) * ann_factor
     downside_risk = downside_risk_1d_nb(returns, ann_factor, required_return)
     if downside_risk == 0.0:
+        if average_annualized_return == 0.0:
+            return np.nan
         return np.inf
     return average_annualized_return / downside_risk
 
