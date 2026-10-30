@@ -29,6 +29,22 @@ def teardown_module():
 
 
 class TestEngineResolution:
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16])
+    @pytest.mark.parametrize("n", [1, 2])
+    def test_diff_narrow_integer_fallback(self, dtype, n):
+        limits = np.iinfo(dtype)
+        values = np.array([[limits.max, limits.min], [0, 1], [limits.min, limits.max]], dtype=dtype)
+        expected = np.full(values.shape, np.nan)
+        for row in range(n, len(values)):
+            for col in range(values.shape[1]):
+                expected[row, col] = int(values[row, col]) - int(values[row - n, col])
+
+        # Integers remain unsupported by Rust: auto must reach the corrected Numba path.
+        assert not _engine.array_compatible_with_rust(values).supported
+        for engine in ("auto", "numba"):
+            np.testing.assert_array_equal(dispatch.diff(values, n=n, engine=engine), expected)
+            np.testing.assert_array_equal(dispatch.diff_1d(values[:, 0], n=n, engine=engine), expected[:, 0])
+
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
         assert _engine.array_compatible_with_rust(np.asfortranarray(np.ones((2, 3), dtype=np.float64))).supported

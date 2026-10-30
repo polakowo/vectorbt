@@ -199,6 +199,62 @@ class TestAccessors:
         np.testing.assert_array_equal(df["a"].vbt.diff().values, nb.diff_1d_nb(df["a"].values))
         pd.testing.assert_frame_equal(df.vbt.diff(), df.diff())
 
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16])
+    @pytest.mark.parametrize("n", [1, 2, 5, 6])
+    def test_diff_narrow_integer(self, dtype, n):
+        limits = np.iinfo(dtype)
+        # Opposite column directions expose overflow of both signs and accidental column mixing.
+        frame = pd.DataFrame(
+            np.array(
+                [
+                    [limits.max, limits.min],
+                    [limits.min, limits.max],
+                    [0, 1],
+                    [limits.max, limits.min],
+                    [limits.min, limits.max],
+                ],
+                dtype=dtype,
+            ),
+            index=pd.date_range("2024-01-01", periods=5, tz="UTC", name="date"),
+            columns=pd.MultiIndex.from_tuples([("a", "x"), ("b", "y")], names=["asset", "field"]),
+        )
+        before = frame.copy(deep=True)
+        values = frame.to_numpy()
+        expected_values = np.full(values.shape, np.nan)
+        # Python integers determine the result independently of fixed-width NumPy subtraction.
+        for row in range(n, len(frame)):
+            for col in range(values.shape[1]):
+                expected_values[row, col] = int(values[row, col]) - int(values[row - n, col])
+        expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
+
+        np.testing.assert_array_equal(nb.diff_nb(values, n), expected_values)
+        np.testing.assert_array_equal(nb.diff_1d_nb(values[:, 0], n), expected_values[:, 0])
+        pd.testing.assert_frame_equal(frame.vbt.diff(n=n, engine="numba"), expected)
+        pd.testing.assert_series_equal(frame.iloc[:, 0].vbt.diff(n=n, engine="numba"), expected.iloc[:, 0])
+        pd.testing.assert_frame_equal(frame.diff(n).astype(np.float64), expected)
+        pd.testing.assert_frame_equal(frame, before)
+
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16])
+    @pytest.mark.parametrize("length", [0, 1])
+    def test_diff_narrow_integer_short(self, dtype, length):
+        values = np.zeros((length, 2), dtype=dtype)
+        np.testing.assert_array_equal(nb.diff_nb(values), np.full(values.shape, np.nan))
+        np.testing.assert_array_equal(nb.diff_1d_nb(values[:, 0]), np.full(length, np.nan))
+
+    @pytest.mark.parametrize(
+        "values,expected",
+        [
+            (np.array([2**31 - 1, -(2**31), 2**31 - 1], dtype=np.int32), [np.nan, 1.0, -1.0]),
+            (np.array([2**63 - 2, 2**63 - 1, -(2**63)], dtype=np.int64), [np.nan, 1.0, 1.0]),
+            (np.array([255, 0, 255], dtype=np.uint8), [np.nan, 1.0, 255.0]),
+            (np.array([1e8, 1], dtype=np.float32), [np.nan, -1e8]),
+            (np.array([np.nan, 1, np.inf, 3], dtype=np.float64), [np.nan, np.nan, np.inf, -np.inf]),
+        ],
+    )
+    def test_diff_other_dtypes(self, values, expected):
+        # Narrow-integer promotion must preserve wider-integer precision and other arithmetic rules.
+        np.testing.assert_array_equal(nb.diff_1d_nb(values), expected)
+
     def test_pct_change(self):
         pd.testing.assert_series_equal(df["a"].vbt.pct_change(), df["a"].pct_change(fill_method=None))
         np.testing.assert_array_equal(df["a"].vbt.pct_change().values, nb.pct_change_1d_nb(df["a"].values))
