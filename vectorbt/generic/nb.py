@@ -38,6 +38,7 @@ from vectorbt import _typing as tp
 from vectorbt.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
 
 _INV_COND_TOL = np.finfo(np.float64).eps * 1e3
+_ROLLING_EXTREMUM_SCAN_WINDOW = 10
 
 
 @njit(cache=True)
@@ -645,6 +646,62 @@ def nanstd_nb(a: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 
 
 @njit(cache=True)
+def _rolling_extremum_1d_nb(a: tp.Array1d, window: int, minp: int, is_max: bool) -> tp.Array1d:
+    """Return rolling min or max.
+
+    Uses a monotonic deque, which runs in O(n) regardless of `window`; small windows use
+    a direct scan instead, which is faster there. Ties are resolved like a naive scan seeded
+    with the current element: the current element if it is extremal, else the earliest one."""
+    n = a.shape[0]
+    out = np.empty_like(a, dtype=np.float64)
+    if window <= _ROLLING_EXTREMUM_SCAN_WINDOW:
+        # A direct scan is faster than the deque for small windows
+        for i in range(n):
+            best = a[i]
+            cnt = 0
+            for j in range(max(i - window + 1, 0), i + 1):
+                if np.isnan(a[j]):
+                    continue
+                if np.isnan(best) or (a[j] > best if is_max else a[j] < best):
+                    best = a[j]
+                cnt += 1
+            if cnt < minp:
+                out[i] = np.nan
+            else:
+                out[i] = best
+        return out
+    # Indices are pushed in increasing order and never revisited, so a flat buffer suffices
+    deque = np.empty(n, dtype=np.int64)
+    head = 0
+    tail = 0
+    cnt = 0
+    for i in range(n):
+        if i >= window:
+            if not np.isnan(a[i - window]):
+                cnt -= 1
+            if head < tail and deque[head] == i - window:
+                head += 1
+        if not np.isnan(a[i]):
+            cnt += 1
+            if is_max:
+                while head < tail and a[deque[tail - 1]] < a[i]:
+                    tail -= 1
+            else:
+                while head < tail and a[deque[tail - 1]] > a[i]:
+                    tail -= 1
+            deque[tail] = i
+            tail += 1
+        if cnt < minp or head == tail:
+            out[i] = np.nan
+        elif a[i] == a[deque[head]]:
+            # Prefer the current element on ties (matters for signed zeros)
+            out[i] = a[i]
+        else:
+            out[i] = a[deque[head]]
+    return out
+
+
+@njit(cache=True)
 def rolling_min_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling min.
 
@@ -653,21 +710,7 @@ def rolling_min_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None)
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
-    out = np.empty_like(a, dtype=np.float64)
-    for i in range(a.shape[0]):
-        minv = a[i]
-        cnt = 0
-        for j in range(max(i - window + 1, 0), i + 1):
-            if np.isnan(a[j]):
-                continue
-            if np.isnan(minv) or a[j] < minv:
-                minv = a[j]
-            cnt += 1
-        if cnt < minp:
-            out[i] = np.nan
-        else:
-            out[i] = minv
-    return out
+    return _rolling_extremum_1d_nb(a, window, minp, False)
 
 
 @njit(cache=True)
@@ -688,21 +731,7 @@ def rolling_max_1d_nb(a: tp.Array1d, window: int, minp: tp.Optional[int] = None)
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
-    out = np.empty_like(a, dtype=np.float64)
-    for i in range(a.shape[0]):
-        maxv = a[i]
-        cnt = 0
-        for j in range(max(i - window + 1, 0), i + 1):
-            if np.isnan(a[j]):
-                continue
-            if np.isnan(maxv) or a[j] > maxv:
-                maxv = a[j]
-            cnt += 1
-        if cnt < minp:
-            out[i] = np.nan
-        else:
-            out[i] = maxv
-    return out
+    return _rolling_extremum_1d_nb(a, window, minp, True)
 
 
 @njit(cache=True)

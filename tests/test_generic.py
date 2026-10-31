@@ -250,6 +250,31 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_max(test_window), df.rolling(test_window).max())
 
+    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
+    @pytest.mark.parametrize("test_window", [3, 10, 11, 25, 120, 250])
+    @pytest.mark.parametrize("test_minp", [None, 0, 1, 2])
+    def test_rolling_min_max_long(self, test_engine, test_window, test_minp):
+        if test_engine == "rust" and not _engine.is_rust_available():
+            pytest.skip("vectorbt-rust is not installed or version-compatible")
+        # Long input covering both the direct-scan (small window) and deque (large window) paths,
+        # with NaN gaps longer than the window, repeated values, and monotonic runs
+        rng = np.random.default_rng(42)
+        values = rng.integers(-5, 5, size=(200, 3)).astype(np.float64)
+        values[rng.random(values.shape) < 0.2] = np.nan
+        values[50:80, 0] = np.nan
+        values[100:150, 1] = np.arange(50)
+        values[100:150, 2] = -np.arange(50)
+        long_df = pd.DataFrame(values, columns=["a", "b", "c"])
+        pd_minp = test_window if test_minp is None else test_minp
+        pd.testing.assert_frame_equal(
+            long_df.vbt.rolling_min(test_window, minp=test_minp, engine=test_engine),
+            long_df.rolling(test_window, min_periods=pd_minp).min(),
+        )
+        pd.testing.assert_frame_equal(
+            long_df.vbt.rolling_max(test_window, minp=test_minp, engine=test_engine),
+            long_df.rolling(test_window, min_periods=pd_minp).max(),
+        )
+
     @pytest.mark.parametrize("test_window,test_minp", list(product([1, 2, 3, 4, 5], [1, None])))
     def test_rolling_mean(self, test_window, test_minp):
         if test_minp is None:
