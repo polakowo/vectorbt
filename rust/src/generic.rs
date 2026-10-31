@@ -1116,50 +1116,82 @@ pub(crate) fn nanstd_1d(a: &[f64], ddof: usize) -> f64 {
     }
 }
 
-pub(crate) fn rolling_min_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
+const ROLLING_EXTREMUM_SCAN_WINDOW: usize = 10;
+
+/// Rolling min or max using a monotonic deque, O(n) regardless of `window`;
+/// small windows use a direct scan instead, which is faster there.
+///
+/// Ties are resolved like a naive scan seeded with the current element:
+/// the current element if it is extremal, else the earliest one.
+fn rolling_extremum_1d<const IS_MAX: bool>(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
     let n = a.len();
     let mut out = vec![f64::NAN; n];
-    for i in 0..n {
-        let mut minv = a[i];
-        let mut cnt = 0usize;
-        let start = if i + 1 >= window { i + 1 - window } else { 0 };
-        for j in start..=i {
-            if a[j].is_nan() {
-                continue;
+    if window <= ROLLING_EXTREMUM_SCAN_WINDOW {
+        // A direct scan is faster than the deque for small windows
+        for i in 0..n {
+            let mut best = a[i];
+            let mut cnt = 0usize;
+            let start = if i + 1 >= window { i + 1 - window } else { 0 };
+            for &v in &a[start..=i] {
+                if v.is_nan() {
+                    continue;
+                }
+                if best.is_nan() || (if IS_MAX { v > best } else { v < best }) {
+                    best = v;
+                }
+                cnt += 1;
             }
-            if minv.is_nan() || a[j] < minv {
-                minv = a[j];
+            if cnt >= minp {
+                out[i] = best;
             }
-            cnt += 1;
         }
-        if cnt >= minp {
-            out[i] = minv;
+        return out;
+    }
+    // Indices are pushed in increasing order and never revisited, so a flat buffer suffices
+    let mut deque = vec![0usize; n];
+    let mut head = 0usize;
+    let mut tail = 0usize;
+    let mut cnt = 0usize;
+    for i in 0..n {
+        if i >= window {
+            let old = i - window;
+            if !a[old].is_nan() {
+                cnt -= 1;
+            }
+            if head < tail && deque[head] == old {
+                head += 1;
+            }
+        }
+        let x = a[i];
+        if !x.is_nan() {
+            cnt += 1;
+            if IS_MAX {
+                while head < tail && a[deque[tail - 1]] < x {
+                    tail -= 1;
+                }
+            } else {
+                while head < tail && a[deque[tail - 1]] > x {
+                    tail -= 1;
+                }
+            }
+            deque[tail] = i;
+            tail += 1;
+        }
+        if cnt >= minp && head < tail {
+            let best = a[deque[head]];
+            // Prefer the current element on ties (matters for signed zeros)
+            out[i] = if x == best { x } else { best };
         }
     }
     out
 }
 
+pub(crate) fn rolling_min_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
+    rolling_extremum_1d::<false>(a, window, minp)
+}
+
 pub(crate) fn rolling_max_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
-    let n = a.len();
-    let mut out = vec![f64::NAN; n];
-    for i in 0..n {
-        let mut maxv = a[i];
-        let mut cnt = 0usize;
-        let start = if i + 1 >= window { i + 1 - window } else { 0 };
-        for j in start..=i {
-            if a[j].is_nan() {
-                continue;
-            }
-            if maxv.is_nan() || a[j] > maxv {
-                maxv = a[j];
-            }
-            cnt += 1;
-        }
-        if cnt >= minp {
-            out[i] = maxv;
-        }
-    }
-    out
+    rolling_extremum_1d::<true>(a, window, minp)
 }
 
 pub(crate) fn rolling_mean_1d(a: &[f64], window: usize, minp: usize) -> Vec<f64> {
