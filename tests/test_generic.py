@@ -275,6 +275,28 @@ class TestAccessors:
             long_df.rolling(test_window, min_periods=pd_minp).max(),
         )
 
+    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
+    def test_rolling_min_max_ties(self, test_engine):
+        if test_engine == "rust" and not _engine.is_rust_available():
+            pytest.skip("vectorbt-rust is not installed or version-compatible")
+        # Expected values are from the previous naive scan. Not compared against pandas,
+        # which resolves signed-zero ties differently and mishandles windows of -inf.
+        sr = pd.Series([0.0, -0.0, 0.0, 1.0, -0.0, np.nan, 0.0, -np.inf, -np.inf, 2.0, np.inf, 0.0, -0.0, 0.0])
+        inf = np.inf
+        expected = {
+            # window 3 takes the direct-scan path, window 12 the deque path
+            (3, "min"): [0.0, -0.0, 0.0, -0.0, -0.0, -0.0, 0.0, -inf, -inf, -inf, -inf, 0.0, -0.0, 0.0],
+            (3, "max"): [0.0, -0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 2.0, inf, inf, inf, 0.0],
+            (12, "min"): [0.0, -0.0, 0.0, 0.0, -0.0, 0.0, 0.0, -inf, -inf, -inf, -inf, -inf, -inf, -inf],
+            (12, "max"): [0.0, -0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, inf, inf, inf, inf],
+        }
+        for (window, func), exp in expected.items():
+            out = getattr(sr.vbt, "rolling_" + func)(window, minp=1, engine=test_engine).values
+            exp = np.array(exp)
+            np.testing.assert_array_equal(out, exp)
+            # assert_array_equal treats 0.0 == -0.0, so check the sign separately
+            np.testing.assert_array_equal(np.signbit(out), np.signbit(exp))
+
     @pytest.mark.parametrize("test_window,test_minp", list(product([1, 2, 3, 4, 5], [1, None])))
     def test_rolling_mean(self, test_window, test_minp):
         if test_minp is None:
