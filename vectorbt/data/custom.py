@@ -951,3 +951,321 @@ class AlpacaData(Data):
         download_kwargs["show_progress"] = False
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
+
+
+class RealMarketAPIError(ValueError):
+    """Error returned by RealMarketAPI.
+
+    Attributes:
+        status_code (int): HTTP status code.
+        error_codes (list of str): Error codes returned by the API, such as `ERR_0005_INVALID_API_KEY`."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: tp.Optional[int] = None,
+        error_codes: tp.Optional[tp.List[str]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_codes = list(error_codes) if error_codes is not None else []
+
+
+class RealMarketAPIData(Data):
+    """`Data` for data coming from [RealMarketAPI](https://realmarketapi.com).
+
+    Covers forex, metals and crypto symbols such as `EURUSD`, `XAUUSD` and `BTCUSD`
+    (no equities). Requires an API key, which can be passed as `api_key` or set under
+    `data.realmarketapi` in `vectorbt._settings.settings`.
+
+    Timeframes '1h', '4h' and '1d' with `start` are served from the history endpoint, which returns
+    1-hour candles page by page; '4h' and '1d' are resampled from them in UTC. Timeframes '1m', '5m'
+    and '15m' (and any timeframe without `start`) are served from the candle endpoint, which returns
+    only a recent window of candles, so `start` must fall within that window.
+
+    !!! note
+        Daily candles from the candle endpoint (`timeframe='1d'` without `start`) may open at the
+        broker's server midnight (for example, 21:00 or 22:00 UTC) rather than at 00:00 UTC,
+        while daily candles resampled from history are aligned to 00:00 UTC.
+
+    Usage:
+        * Fetch the 1-hour data of a fixed range and update it later:
+
+        ```pycon
+        >>> import os
+        >>> import vectorbt as vbt
+
+        >>> vbt.settings.data["realmarketapi"]["api_key"] = os.environ["REALMARKETAPI_API_KEY"]
+        >>> rma_data = vbt.RealMarketAPIData.download(
+        ...     "XAUUSD",
+        ...     start="2024-01-02 00:00:00 UTC",
+        ...     end="2024-01-03 00:00:00 UTC",
+        ...     timeframe="1h"
+        ... )
+        >>> rma_data.get()
+                                      Open      High       Low     Close    Volume
+        Open time
+        2024-01-02 00:00:00+00:00  <price>   <price>   <price>   <price>  <volume>
+        2024-01-02 01:00:00+00:00  <price>   <price>   <price>   <price>  <volume>
+        ...                            ...       ...       ...       ...       ...
+
+        >>> rma_data = rma_data.update(end="now UTC")
+        ```
+
+        * Fetch the most recent window of 15-minute candles:
+
+        ```pycon
+        >>> rma_data = vbt.RealMarketAPIData.download("EURUSD", timeframe="15m")
+        ```
+    """
+
+    _timeframe_map: tp.ClassVar[tp.Dict[str, tp.Tuple[str, str]]] = {
+        "1m": ("M1", "1min"),
+        "5m": ("M5", "5min"),
+        "15m": ("M15", "15min"),
+        "1h": ("H1", "1h"),
+        "4h": ("H4", "4h"),
+        "1d": ("D1", "1D"),
+    }
+
+    @classmethod
+    def _resolve_timeframe(cls, timeframe: str) -> tp.Tuple[str, str]:
+        """Resolve a timeframe such as '1h' (or the native code 'H1') into the API code and a pandas frequency."""
+        if isinstance(timeframe, str):
+            key = timeframe.strip()
+            if key.lower() in cls._timeframe_map:
+                return cls._timeframe_map[key.lower()]
+            for api_tf, freq in cls._timeframe_map.values():
+                if key.upper() == api_tf:
+                    return api_tf, freq
+        raise ValueError(
+            "Invalid timeframe {!r}. Supported: {}".format(timeframe, ", ".join(cls._timeframe_map.keys()))
+        )
+
+    @classmethod
+    def _request_json(
+        cls,
+        session: tp.Any,
+        url: str,
+        params: dict,
+        timeout: tp.Optional[float] = None,
+    ) -> dict:
+        """Send a GET request and return the decoded JSON.
+
+        Raises `RealMarketAPIError` with the API error codes on failure. Since the API key is
+        a query parameter, the request URL is never included in the error message."""
+        import requests
+
+        try:
+            response = session.get(url, params=params, timeout=timeout)
+        except requests.RequestException as e:
+            raise RealMarketAPIError("Request to RealMarketAPI failed ({})".format(type(e).__name__)) from None
+
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+        if response.status_code >= 400:
+            error_codes = []
+            details = []
+            if isinstance(payload, dict):
+                for err in payload.get("errors") or []:
+                    if isinstance(err, dict):
+                        if err.get("errorCode"):
+                            error_codes.append(str(err["errorCode"]))
+                        if err.get("message") or err.get("reason"):
+                            details.append(str(err.get("message") or err.get("reason")))
+                if not details and payload.get("detail"):
+                    details.append(str(payload["detail"]))
+                if not details and payload.get("title"):
+                    details.append(str(payload["title"]))
+            message = "RealMarketAPI request failed with HTTP {}".format(response.status_code)
+            if error_codes:
+                message += ": " + ", ".join(error_codes)
+            if details:
+                message += " ({})".format("; ".join(details))
+            raise RealMarketAPIError(message, status_code=response.status_code, error_codes=error_codes)
+
+        if not isinstance(payload, dict):
+            raise RealMarketAPIError(
+                "RealMarketAPI returned an unexpected response (HTTP {})".format(response.status_code),
+                status_code=response.status_code,
+            )
+        return payload
+
+    @classmethod
+    def _rows_to_frame(cls, rows: tp.List[dict]) -> tp.Frame:
+        """Convert candle rows into an OHLCV DataFrame with a unique, ascending UTC index."""
+        columns = ["Open", "High", "Low", "Close", "Volume"]
+        if len(rows) == 0:
+            index = pd.DatetimeIndex([], tz="UTC", name="Open time")
+            return pd.DataFrame(columns=columns, index=index, dtype=float)
+        raw = pd.DataFrame.from_records(rows)
+        index = pd.DatetimeIndex(pd.to_datetime(raw["openTime"], utc=True, format="ISO8601"), name="Open time")
+        df = pd.DataFrame(
+            {
+                "Open": raw["openPrice"].astype(float).values,
+                "High": raw["highPrice"].astype(float).values,
+                "Low": raw["lowPrice"].astype(float).values,
+                "Close": raw["closePrice"].astype(float).values,
+                "Volume": raw["volume"].astype(float).values if "volume" in raw.columns else np.nan,
+            },
+            index=index,
+        )
+        df = df[~df.index.duplicated(keep="last")]
+        return df.sort_index()
+
+    @classmethod
+    def download_symbol(
+        cls,
+        symbol: str,
+        timeframe: str = "1d",
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.DatetimeLike = "now UTC",
+        api_key: tp.Optional[str] = None,
+        base_url: str = "https://api.realmarketapi.com",
+        page_size: int = 1000,
+        delay: tp.Optional[float] = None,
+        timeout: tp.Optional[float] = 30,
+        show_progress: bool = True,
+        tqdm_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
+        """Download the symbol.
+
+        Args:
+            symbol (str): Symbol, such as `XAUUSD`, `EURUSD` or `BTCUSD`.
+            timeframe (str): Timeframe of data.
+
+                One of '1m', '5m', '15m', '1h', '4h' and '1d'. Native codes such as 'M1' and 'H1'
+                are accepted too. Which timeframes are available depends on the plan of the API key.
+            start (any): Start datetime (inclusive).
+
+                If None, returns the most recent window of candles at `timeframe` from `/api/v1/candle`.
+
+                For '1h', '4h' and '1d', fetches 1-hour candles from `/api/v1/history` page by page
+                and resamples them to `timeframe`. For '1m', '5m' and '15m', filters the recent window
+                from `/api/v1/candle` and raises an error if `start` is older than that window.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): End datetime (exclusive).
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            api_key (str): RealMarketAPI key, sent as the `apiKey` query parameter.
+            base_url (str): Base URL of the API.
+            page_size (int): Number of 1-hour candles per history page (at most 1000).
+            delay (float): Time to sleep between requests (in milliseconds).
+            timeout (float): Request timeout (in seconds).
+            show_progress (bool): Whether to show the progress bar.
+            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
+
+        Raises `RealMarketAPIError` with the API error code (such as `ERR_0005_INVALID_API_KEY`,
+        `ERR_0008_SYMBOL_NOT_SUPPORTED` or `ERR_0017_REQUEST_QUOTA_EXCEEDED`) if the API returns an error.
+
+        For defaults, see `data.realmarketapi` in `vectorbt._settings.settings`.
+        """
+        from vectorbt._settings import settings
+        from vectorbt.utils.requests_ import requests_retry_session
+
+        realmarketapi_cfg = settings["data"]["realmarketapi"]
+
+        if api_key is None:
+            api_key = realmarketapi_cfg["api_key"]
+        if api_key is None:
+            raise ValueError("api_key must be provided or set under data.realmarketapi in settings")
+        if tqdm_kwargs is None:
+            tqdm_kwargs = {}
+        api_timeframe, freq = cls._resolve_timeframe(timeframe)
+        base_url = base_url.rstrip("/")
+        end_ts = pd.Timestamp(to_tzaware_datetime(end, tz=get_utc_tz())).tz_convert("UTC")
+        session = requests_retry_session()
+
+        if start is not None:
+            start_ts = pd.Timestamp(to_tzaware_datetime(start, tz=get_utc_tz())).tz_convert("UTC")
+            if start_ts >= end_ts:
+                raise ValueError("start must be before end")
+        else:
+            start_ts = None
+
+        if start_ts is None or api_timeframe in ("M1", "M5", "M15"):
+            # The candle endpoint returns a recent window and takes no date parameters
+            payload = cls._request_json(
+                session,
+                base_url + "/api/v1/candle",
+                dict(apiKey=api_key, symbolCode=symbol, timeFrame=api_timeframe),
+                timeout=timeout,
+            )
+            df = cls._rows_to_frame(payload.get("data") or [])
+            if start_ts is not None:
+                if len(df) == 0 or start_ts < df.index[0]:
+                    raise ValueError(
+                        "start {} is older than the recent window available for timeframe '{}' (earliest: {}). "
+                        "History is only available for timeframes '1h', '4h' and '1d'.".format(
+                            start_ts,
+                            timeframe,
+                            df.index[0] if len(df) > 0 else None,
+                        )
+                    )
+                df = df[df.index >= start_ts]
+            return df[df.index < end_ts]
+
+        params = dict(
+            apiKey=api_key,
+            symbolCode=symbol,
+            startTime=start_ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            endTime=end_ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            pageSize=min(int(page_size), 1000),
+        )
+
+        # Iteratively collect the pages of 1-hour candles (rows come newest first)
+        rows: tp.List[dict] = []
+        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
+            pbar.set_description("{} - {}".format(start_ts, end_ts))
+            page_number = 1
+            total_pages = 1
+            while page_number <= total_pages:
+                payload = cls._request_json(
+                    session,
+                    base_url + "/api/v1/history",
+                    dict(params, pageNumber=page_number),
+                    timeout=timeout,
+                )
+                next_rows = payload.get("data") or []
+                total_pages = int(payload.get("totalPages") or 0)
+                if page_number == 1:
+                    pbar.total = total_pages
+                    pbar.refresh()
+                if len(next_rows) == 0:
+                    break
+                rows.extend(next_rows)
+                pbar.update(1)
+                page_number += 1
+                if delay is not None and page_number <= total_pages:
+                    time.sleep(delay / 1000)  # be kind to api
+
+        df = cls._rows_to_frame(rows)
+        df = df[(df.index >= start_ts) & (df.index < end_ts)]
+        if api_timeframe != "H1" and len(df) > 0:
+            df = (
+                df.resample(freq, label="left", closed="left")
+                .agg(dict(Open="first", High="max", Low="min", Close="last", Volume="sum"))
+                .dropna(subset=["Open"])
+            )
+        return df
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        """Update the symbol.
+
+        `**kwargs` will override keyword arguments passed to `RealMarketAPIData.download_symbol`.
+
+        Returns an empty DataFrame if there is no new data yet (`ERR_0001_DATA_NOT_FOUND`)."""
+        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
+        download_kwargs["start"] = self.data[symbol].index[-1]
+        download_kwargs["show_progress"] = False
+        kwargs = merge_dicts(download_kwargs, kwargs)
+        try:
+            return self.download_symbol(symbol, **kwargs)
+        except RealMarketAPIError as e:
+            if "ERR_0001_DATA_NOT_FOUND" in e.error_codes:
+                return self._rows_to_frame([])
+            raise

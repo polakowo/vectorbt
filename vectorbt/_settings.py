@@ -147,6 +147,7 @@ settings = SettingsConfig(
             missing_index="nan",
             missing_columns="raise",
             alpaca=Config(dict(api_key=None, secret_key=None)),
+            realmarketapi=Config(dict(api_key=None)),
             binance=Config(dict(api_key=None, api_secret=None)),  # flex
             ccxt=Config(dict(enableRateLimit=True)),  # flex
             stats=Config(),  # flex
