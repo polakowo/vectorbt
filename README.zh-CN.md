@@ -232,7 +232,7 @@ fig.show()
 
 输出：
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-scatter.gif" alt="悬停查看随机策略结果并缩放图表" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg" alt="随机策略的平均交易期望收益" />
 
 ### 测试 10,000 种双 SMA 窗口组合
 
@@ -256,7 +256,7 @@ fig.show()
 
 输出：
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-heatmap.gif" alt="切换资产并查看双 SMA 参数组合的收益" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif" alt="不同资产的双 SMA 窗口组合" />
 
 > [!TIP]
 > **VectorBT PRO**
@@ -352,7 +352,7 @@ vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, s
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-bbands.gif" alt="查看布林带并播放滚动窗口动画" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif" alt="布林带百分比位置和带宽的滚动热力图" />
 
 访问[网站](https://vectorbt.dev/)，获取更多示例、文档和指南。
 
