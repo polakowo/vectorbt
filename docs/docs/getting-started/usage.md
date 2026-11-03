@@ -210,7 +210,9 @@ def plot(index, bbands):
             y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
         )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
     return fig
-vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
+vbt.save_animation(
+    "bbands.gif", bbands.wrapper.index, plot, bbands,
+    delta=90, step=3, fps=3, writer_kwargs=dict(loop=0))
 ```
 
 Output:
