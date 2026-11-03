@@ -377,7 +377,12 @@ def diff_1d_nb(a: tp.Array1d, n: int = 1) -> tp.Array1d:
     Numba equivalent to `pd.Series(a).diff()`."""
     out = np.empty_like(a, dtype=np.float64)
     out[:n] = np.nan
-    out[n:] = a[n:] - a[:-n]
+    if n > 0 and (a.dtype == np.dtype("int8") or a.dtype == np.dtype("int16")):
+        # Promote narrow signed operands before subtraction can overflow.
+        for i in range(n, a.shape[0]):
+            out[i] = np.float64(a[i]) - np.float64(a[i - n])
+    else:
+        out[n:] = a[n:] - a[:-n]
     return out
 
 
