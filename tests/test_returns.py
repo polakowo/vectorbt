@@ -470,6 +470,22 @@ class TestAccessors:
                 pd.Series([np.nan, np.inf, -np.sqrt(365)], index=zero_std_rets.columns, name="sortino_ratio"),
             )
 
+    def test_sharpe_ratio_constant_returns(self):
+        # The mean of a constant series is not always exactly that constant, which used to
+        # leave a tiny non-zero std and a Sharpe ratio around 1e16 instead of signed infinity
+        const_rets = pd.DataFrame(
+            {"pos": [0.001] * 252, "neg": [-0.001] * 252, "pos_nan": [0.001] * 251 + [np.nan]},
+            index=pd.date_range("2024-01-01", periods=252, freq="D"),
+        )
+        for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
+            pd.testing.assert_series_equal(
+                const_rets.vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=engine),
+                pd.Series([np.inf, -np.inf, np.inf], index=const_rets.columns, name="sharpe_ratio"),
+            )
+            assert const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=engine) == np.inf
+            # Equal values after subtracting the risk-free rate also count as zero volatility
+            assert np.isnan(const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.001, engine=engine))
+
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
             rets.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),
