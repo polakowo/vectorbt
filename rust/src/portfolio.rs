@@ -96,11 +96,20 @@ fn add(a: f64, b: f64) -> f64 {
     }
 }
 
+// Relative tolerance of `floor_to_granularity`, about 8.9e-16. Covers floating-point rounding of the
+// size, the granularity and their quotient (4.3 / 0.1 == 42.99999999999999), not a fraction of a lot.
+// Same value as `size_granularity_rel_tol` in vectorbt/portfolio/nb.py.
+const SIZE_GRANULARITY_REL_TOL: f64 = 4.0 * f64::EPSILON;
+
 #[inline(always)]
 fn floor_to_granularity(size: f64, size_granularity: f64) -> f64 {
     let lots = size / size_granularity;
     let nearest = (lots + 0.5).floor();
-    let lots = if is_close(lots, nearest) { nearest } else { lots.floor() };
+    let lots = if (lots - nearest).abs() <= SIZE_GRANULARITY_REL_TOL * nearest.abs() {
+        nearest
+    } else {
+        lots.floor()
+    };
     (lots * size_granularity).min(size)
 }
 

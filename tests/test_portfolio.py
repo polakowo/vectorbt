@@ -893,6 +893,34 @@ class TestFromOrders:
             np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
         )
 
+    def test_size_granularity_rounding_bound(self):
+        close = pd.Series([10.0, 10.0])
+
+        def filled(size, size_granularity):
+            pf = vbt.Portfolio.from_orders(
+                close, pd.Series([size, np.nan]), size_granularity=size_granularity, init_cash=1e6
+            )
+            return pf.order_records["size"].tolist()
+
+        # Large lot counts: a fraction of a lot is floored
+        assert filled(1.0000000006, 1e-9) == [1.0]
+        assert filled(0.9999999996, 1e-9) == [0.999999999]
+        assert filled(1 - 2e-13, 1e-12) == [0.999999999999]
+        # Short of one lot by more than rounding error: no trade
+        assert filled(0.1 * (1 - 1e-10), 0.1) == []
+        assert filled(1000 * (1 - 1e-10), 1000.0) == []
+        # Short of one lot by one ulp: fills the requested size
+        assert filled(np.nextafter(0.1, 0), 0.1) == [np.nextafter(0.1, 0)]
+        # A position summed from a few fills of one lot closes flat
+        for size_granularity in (0.1, 0.01, 0.001):
+            pf = vbt.Portfolio.from_orders(
+                pd.Series(np.full(11, 10.0)),
+                pd.Series([size_granularity] * 10 + [-np.inf]),
+                size_granularity=size_granularity,
+                direction="longonly",
+            )
+            assert pf.assets().iloc[-1] == 0
+
     def test_price(self):
         record_arrays_close(
             from_orders_both(price=price * 1.01).order_records,
