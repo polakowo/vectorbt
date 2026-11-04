@@ -542,13 +542,30 @@ fn zero_std_ratio(mean: f64) -> f64 {
     }
 }
 
+/// Whether all non-NaN values of `values - shift` are equal.
+fn is_constant_shifted(values: &[f64], shift: f64) -> bool {
+    let mut first = f64::NAN;
+    for &value in values {
+        let adj_value = value - shift;
+        if adj_value.is_nan() {
+            continue;
+        }
+        if first.is_nan() {
+            first = adj_value;
+        } else if adj_value != first {
+            return false;
+        }
+    }
+    true
+}
+
 pub(crate) fn sharpe_ratio_1d(returns: &[f64], ann_factor: f64, risk_free: f64, ddof: usize) -> f64 {
     if returns.len() < 2 {
         return f64::NAN;
     }
     let mean = nanmean_shifted(returns, risk_free);
     let std = nanstd_shifted(returns, risk_free, ddof);
-    if std == 0.0 {
+    if std == 0.0 || (!std.is_nan() && is_constant_shifted(returns, risk_free)) {
         return zero_std_ratio(mean);
     }
     mean / std * ann_factor.sqrt()
@@ -559,11 +576,18 @@ pub(crate) fn sharpe_ratio_2d(returns: ArrayView2<'_, f64>, ann_factor: f64, ris
     if let Some(src) = returns.as_slice() {
         let mut sums = vec![0.0f64; ncols];
         let mut counts = vec![0usize; ncols];
+        let mut firsts = vec![f64::NAN; ncols];
+        let mut constant = vec![true; ncols];
         for row in src.chunks_exact(ncols) {
             for (col, &ret) in row.iter().enumerate() {
                 let adj_ret = ret - risk_free;
                 if !adj_ret.is_nan() {
                     sums[col] += adj_ret;
+                    if counts[col] == 0 {
+                        firsts[col] = adj_ret;
+                    } else if adj_ret != firsts[col] {
+                        constant[col] = false;
+                    }
                     counts[col] += 1;
                 }
             }
@@ -584,7 +608,7 @@ pub(crate) fn sharpe_ratio_2d(returns: ArrayView2<'_, f64>, ann_factor: f64, ris
             if nrows >= 2 && counts[col] > ddof {
                 let mean = sums[col] / counts[col] as f64;
                 let std = (sq[col] / (counts[col] - ddof) as f64).sqrt();
-                out[col] = if std == 0.0 {
+                out[col] = if std == 0.0 || constant[col] {
                     zero_std_ratio(mean)
                 } else {
                     mean / std * ann_sqrt

@@ -408,15 +408,33 @@ def rolling_omega_ratio_nb(
 
 
 @njit(cache=True)
+def _is_constant_1d_nb(a: tp.Array1d) -> bool:
+    """Whether all non-NaN values of `a` are equal."""
+    first = np.nan
+    for i in range(a.shape[0]):
+        if np.isnan(a[i]):
+            continue
+        if np.isnan(first):
+            first = a[i]
+        elif a[i] != first:
+            return False
+    return True
+
+
+@njit(cache=True)
 def sharpe_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0.0, ddof: int = 1) -> float:
-    """Sharpe ratio of a strategy."""
+    """Sharpe ratio of a strategy.
+
+    Returns NaN if the mean and the standard deviation are both zero, and signed infinity
+    if only the standard deviation is zero. Constant returns are treated as having zero
+    standard deviation, even if rounding in the mean leaves a tiny non-zero value."""
     if returns.shape[0] < 2:
         return np.nan
 
     returns_risk_adj = returns - risk_free
     mean = np.nanmean(returns_risk_adj)
     std = generic_nb.nanstd_1d_nb(returns_risk_adj, ddof)
-    if std == 0.0:
+    if std == 0.0 or (not np.isnan(std) and _is_constant_1d_nb(returns_risk_adj)):
         if mean == 0.0:
             return np.nan
         return np.inf * np.sign(mean)
