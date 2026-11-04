@@ -2383,8 +2383,9 @@ class TestDatetime:
         assert isinstance(datetime_.to_timezone(pytz.timezone("Europe/Berlin")), _timezone)
         assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
         assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
+        # Bare offsets such as "+05" are valid in dateparser 1.5 and later.
         with pytest.raises(Exception):
-            datetime_.to_timezone("+05")
+            datetime_.to_timezone("not-a-timezone")
 
     def test_to_tzaware_datetime(self):
         assert datetime_.to_tzaware_datetime(0.5) == _datetime(
