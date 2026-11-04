@@ -5850,17 +5850,17 @@ pub fn total_benchmark_return_py<'py>(
 pub fn gross_exposure_py<'py>(
     py: Python<'py>,
     asset_value: PyReadonlyArray2<'py, f64>,
-    cash: PyReadonlyArray2<'py, f64>,
+    value: PyReadonlyArray2<'py, f64>,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
     let nrows = asset_value.shape()[0];
     let ncols = asset_value.shape()[1];
     let av_cow = array2_as_slice_cow(&asset_value);
-    let c_cow = array2_as_slice_cow(&cash);
+    let v_cow = array2_as_slice_cow(&value);
 
     let result = py.detach(|| {
         let mut out = Vec::with_capacity(nrows * ncols);
         for idx in 0..nrows * ncols {
-            let denom = add(av_cow[idx], c_cow[idx]);
+            let denom = v_cow[idx];
             out.push(if denom == 0.0 { 0.0 } else { av_cow[idx] / denom });
         }
         out
