@@ -49,20 +49,54 @@ class TestEngineResolution:
             indicator_dispatch.true_range(prices, prices, prices, engine="rust")
 
     @pytest.mark.parametrize("dtype", [np.int8, np.int16])
-    @pytest.mark.parametrize("n", [1, 2])
+    @pytest.mark.parametrize("n", [-3, -1, 0, 1, 2])
     def test_diff_narrow_integer_fallback(self, dtype, n):
         limits = np.iinfo(dtype)
         values = np.array([[limits.max, limits.min], [0, 1], [limits.min, limits.max]], dtype=dtype)
         expected = np.full(values.shape, np.nan)
-        for row in range(n, len(values)):
-            for col in range(values.shape[1]):
-                expected[row, col] = int(values[row, col]) - int(values[row - n, col])
+        for row in range(len(values)):
+            if 0 <= row - n < len(values):
+                for col in range(values.shape[1]):
+                    expected[row, col] = int(values[row, col]) - int(values[row - n, col])
 
         # Integers remain unsupported by Rust: auto must reach the corrected Numba path.
         assert not _engine.array_compatible_with_rust(values).supported
         for engine in ("auto", "numba"):
             np.testing.assert_array_equal(dispatch.diff(values, n=n, engine=engine), expected)
             np.testing.assert_array_equal(dispatch.diff_1d(values[:, 0], n=n, engine=engine), expected[:, 0])
+
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("n", [-4, -3, -1, 0, 1, 3, 4])
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    def test_difference_periods_fallback(self, method, n, dtype):
+        frame = pd.DataFrame({"a": [1.0, 2.0, 4.0], "b": [0.0, np.nan, -2.0]}, dtype=dtype)
+        kwargs = {"fill_method": None} if method == "pct_change" else {}
+        expected = getattr(frame, method)(periods=n, **kwargs).astype(np.float64)
+        # Negative periods remain outside Rust's contract and auto must use corrected Numba.
+        if n < 0:
+            assert not _engine.array_and_non_neg_int_compatible_with_rust(frame.to_numpy(), "n", n).supported
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(
+                getattr(dispatch, method)(frame.to_numpy(), n=n, engine=engine), expected.to_numpy()
+            )
+            np.testing.assert_array_equal(
+                getattr(dispatch, method + "_1d")(frame["a"].to_numpy(), n=n, engine=engine), expected["a"].to_numpy()
+            )
+            pd.testing.assert_frame_equal(getattr(frame.vbt, method)(n=n, engine=engine), expected)
+
+    @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    def test_difference_periods_rust_boundary(self, method):
+        values = np.array([[1.0, 0.0], [np.nan, np.inf]])
+        kwargs = {"fill_method": None} if method == "pct_change" else {}
+        expected = getattr(pd.DataFrame(values), method)(periods=0, **kwargs).to_numpy()
+        np.testing.assert_array_equal(getattr(dispatch, method)(values, n=0, engine="rust"), expected)
+        np.testing.assert_array_equal(
+            getattr(dispatch, method + "_1d")(values[:, 0], n=0, engine="rust"), expected[:, 0]
+        )
+        for function, array in ((getattr(dispatch, method), values), (getattr(dispatch, method + "_1d"), values[:, 0])):
+            with pytest.raises(ValueError, match="non-negative"):
+                function(array, n=-1, engine="rust")
 
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported

@@ -373,17 +373,35 @@ def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
 
 @njit(cache=True)
 def diff_1d_nb(a: tp.Array1d, n: int = 1) -> tp.Array1d:
-    """Return the 1-th discrete difference.
+    """Return the discrete difference over `n` positions.
 
-    Numba equivalent to `pd.Series(a).diff()`."""
+    Numba equivalent to `pd.Series(a).diff(n)`.
+
+    !!! warning
+        Negative `n` compares with future rows."""
     out = np.empty_like(a, dtype=np.float64)
-    out[:n] = np.nan
-    if n > 0 and (a.dtype == np.dtype("int8") or a.dtype == np.dtype("int16")):
-        # Promote narrow signed operands before subtraction can overflow.
-        for i in range(n, a.shape[0]):
-            out[i] = np.float64(a[i]) - np.float64(a[i - n])
+    if n <= -a.shape[0]:
+        # No valid pair; avoid negating a potentially minimum signed integer.
+        out[:] = np.nan
+    elif n < 0:
+        out[n:] = np.nan
+        if a.dtype == np.dtype("int8") or a.dtype == np.dtype("int16"):
+            # The same promotion is needed when subtracting a future observation.
+            for i in range(a.shape[0] + n):
+                out[i] = np.float64(a[i]) - np.float64(a[i - n])
+        else:
+            out[:n] = a[:n] - a[-n:]
+    elif n == 0:
+        # Self-subtraction retains NaN/inf semantics, unlike filling with zeros.
+        out[:] = a - a
     else:
-        out[n:] = a[n:] - a[:-n]
+        out[:n] = np.nan
+        if a.dtype == np.dtype("int8") or a.dtype == np.dtype("int16"):
+            # Promote narrow signed operands before subtraction can overflow.
+            for i in range(n, a.shape[0]):
+                out[i] = np.float64(a[i]) - np.float64(a[i - n])
+        else:
+            out[n:] = a[n:] - a[:-n]
     return out
 
 
@@ -398,12 +416,25 @@ def diff_nb(a: tp.Array2d, n: int = 1) -> tp.Array2d:
 
 @njit(cache=True)
 def pct_change_1d_nb(a: tp.Array1d, n: int = 1) -> tp.Array1d:
-    """Return the percentage change.
+    """Return the fractional change over `n` positions.
 
-    Numba equivalent to `pd.Series(a).pct_change()`."""
+    Numba equivalent to `pd.Series(a).pct_change(n, fill_method=None)`.
+
+    !!! warning
+        Negative `n` compares with future rows."""
     out = np.empty_like(a, dtype=np.float64)
-    out[:n] = np.nan
-    out[n:] = a[n:] / a[:-n] - 1
+    if n <= -a.shape[0]:
+        # No valid pair; avoid negating a potentially minimum signed integer.
+        out[:] = np.nan
+    elif n < 0:
+        out[n:] = np.nan
+        out[:n] = a[:n] / a[-n:] - 1
+    elif n == 0:
+        # Self-division must still produce NaN for zero, NaN, and infinite values.
+        out[:] = a / a - 1
+    else:
+        out[:n] = np.nan
+        out[n:] = a[n:] / a[:-n] - 1
     return out
 
 
