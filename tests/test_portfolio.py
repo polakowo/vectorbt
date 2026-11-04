@@ -9,6 +9,7 @@ from numba.typed import List
 
 import vectorbt as vbt
 from tests.utils import record_arrays_close
+from vectorbt.base import reshape_fns
 from vectorbt.generic.enums import drawdown_dt
 from vectorbt.portfolio import dispatch, nb
 from vectorbt.portfolio.enums import *
@@ -699,6 +700,78 @@ def from_orders_shortonly(close=price, size=order_size, **kwargs):
 
 
 class TestFromOrders:
+    @pytest.mark.parametrize("kind", ["string", "datetime", "timedelta"])
+    @pytest.mark.parametrize("wrapped_first", [False, True])
+    @pytest.mark.parametrize("representation", ["categorical", "one_level"])
+    @pytest.mark.parametrize("cash_sharing", [False, True])
+    def test_equal_length_representation_column_alignment(self, kind, wrapped_first, representation, cash_sharing):
+        if kind == "string":
+            keys = pd.Index(["A", "B", "C"], name="asset")
+        elif kind == "datetime":
+            keys = pd.date_range("2020", periods=3, name="asset")
+        else:
+            keys = pd.timedelta_range("0D", periods=3, name="asset")
+        if representation == "categorical":
+            wrapped = pd.CategoricalIndex(keys, name="asset")
+        else:
+            wrapped = pd.MultiIndex.from_arrays([keys])
+        size_columns, price_columns = (wrapped, keys) if wrapped_first else (keys, wrapped)
+        size = pd.DataFrame([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], columns=size_columns)
+        close = pd.DataFrame(
+            [[10.0, 100.0, 1000.0], [20.0, 120.0, 1100.0], [30.0, 140.0, 1200.0]], columns=price_columns
+        ).iloc[:, [2, 0, 1]]
+        # Native metadata is selected only after an independent explicit reorder; accounting is hand-derived.
+        expected_columns = reshape_fns.broadcast_index(
+            [size, close.iloc[:, [1, 2, 0]]], close.shape, index_from="stack", axis=1
+        )
+        pf = vbt.Portfolio.from_orders(
+            close, size=size, init_cash=1000.0, cash_sharing=cash_sharing, freq="1D", engine="numba"
+        )
+        pd.testing.assert_index_equal(pf.wrapper.columns, expected_columns)
+        # One unit of the first timestamp/tenor buys at 10, leaving cash 990 and assets 10/20/30.
+        record_arrays_close(pf.order_records, np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt))
+        pd.testing.assert_frame_equal(
+            pf.asset_value(group_by=False),
+            pd.DataFrame([[10.0, 0.0, 0.0], [20.0, 0.0, 0.0], [30.0, 0.0, 0.0]], columns=expected_columns),
+        )
+        if cash_sharing:
+            pd.testing.assert_series_equal(pf.value(), pd.Series([1000.0, 1010.0, 1020.0], name="group"))
+        else:
+            pd.testing.assert_frame_equal(
+                pf.value(),
+                pd.DataFrame(
+                    [[1000.0, 1000.0, 1000.0], [1010.0, 1000.0, 1000.0], [1020.0, 1000.0, 1000.0]],
+                    columns=expected_columns,
+                ),
+            )
+
+    @pytest.mark.parametrize("cash_sharing", [False, True])
+    def test_equal_length_column_alignment(self, cash_sharing):
+        close = pd.DataFrame(
+            [[10.0, 100.0], [20.0, 120.0], [30.0, 140.0]], columns=pd.Index(["A", "B"], name="asset")
+        )
+        size = pd.DataFrame([[0.0, 1.0], [0.0, 0.0], [0.0, 0.0]], columns=pd.Index(["B", "A"], name="asset"))
+        pf = vbt.Portfolio.from_orders(
+            close, size=size, init_cash=1000.0, cash_sharing=cash_sharing, freq="1D", engine="numba"
+        )
+
+        # Size is the first labeled input: preserve its column order, but buy A at A's price.
+        pd.testing.assert_index_equal(pf.wrapper.columns, size.columns)
+        record_arrays_close(pf.order_records, np.array([(0, 1, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt))
+        pd.testing.assert_frame_equal(
+            pf.asset_value(group_by=False),
+            pd.DataFrame([[0.0, 10.0], [0.0, 20.0], [0.0, 30.0]], columns=size.columns),
+        )
+        # One unit of A earns 20; B never trades, with individual or shared cash.
+        if cash_sharing:
+            expected = pd.Series([1000.0, 1010.0, 1020.0], name="group")
+            pd.testing.assert_series_equal(pf.value(), expected)
+        else:
+            expected = pd.DataFrame(
+                [[1000.0, 1000.0], [1000.0, 1010.0], [1000.0, 1020.0]], columns=size.columns
+            )
+            pd.testing.assert_frame_equal(pf.value(), expected)
+
     def test_one_column(self):
         record_arrays_close(
             from_orders_both().order_records,
