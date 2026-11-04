@@ -2519,7 +2519,7 @@ class TestPortfolioRustParity:
         av = portfolio_nb.asset_value_nb(self.close, assets)
         tp_ = portfolio_nb.total_profit_nb(self.target_shape, self.close, or_nb, col_map)
         random_av = np.random.rand(5, 3).astype(np.float64) * 10
-        random_cash = np.random.rand(5, 3).astype(np.float64) * 100
+        random_value = np.random.rand(5, 3).astype(np.float64) * 100
         random_cf = np.random.randn(5, 3).astype(np.float64)
 
         cases = [
@@ -2548,8 +2548,8 @@ class TestPortfolioRustParity:
                 "benchmark_value",
             ),
             (
-                portfolio_dispatch.gross_exposure(random_av, random_cash, engine="rust"),
-                portfolio_nb.gross_exposure_nb(random_av, random_cash),
+                portfolio_dispatch.gross_exposure(random_av, random_value, engine="rust"),
+                portfolio_nb.gross_exposure_nb(random_av, random_value),
                 "gross_exposure",
             ),
             (
@@ -2560,6 +2560,14 @@ class TestPortfolioRustParity:
         ]
         for rust, numba, label in cases:
             np.testing.assert_allclose(rust, numba, err_msg=label)
+
+    def test_gross_exposure_zero_and_negative_value_parity(self):
+        asset_value = np.array([[0.0, 100.0, 150.0], [50.0, np.nan, 10.0]])
+        value = np.array([[0.0, 0.0, -50.0], [np.nan, 20.0, 40.0]])
+        rust = portfolio_dispatch.gross_exposure(asset_value, value, engine="rust")
+        numba = portfolio_nb.gross_exposure_nb(asset_value, value)
+        np.testing.assert_array_equal(rust, numba)
+        np.testing.assert_array_equal(numba, np.array([[0.0, 0.0, -3.0], [np.nan, np.nan, 0.25]]))
 
     def test_get_entry_trades_parity(self):
         or_nb, _ = self._run_sim("numba")

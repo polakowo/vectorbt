@@ -7000,14 +7000,16 @@ def total_benchmark_return_nb(benchmark_value: tp.Array2d) -> tp.Array1d:
 
 
 @njit(cache=True)
-def gross_exposure_nb(asset_value: tp.Array2d, cash: tp.Array2d) -> tp.Array2d:
-    """Get gross exposure per column/group."""
+def gross_exposure_nb(asset_value: tp.Array2d, value: tp.Array2d) -> tp.Array2d:
+    """Get gross exposure per column/group.
+
+    `asset_value` is the absolute asset value and `value` is the portfolio value.
+    Where the portfolio value is zero, the exposure is zero."""
     out = np.empty(asset_value.shape, dtype=np.float64)
     for col in range(out.shape[1]):
         for i in range(out.shape[0]):
-            denom = add_nb(asset_value[i, col], cash[i, col])
-            if denom == 0:
+            if value[i, col] == 0:
                 out[i, col] = 0.0
             else:
-                out[i, col] = asset_value[i, col] / denom
+                out[i, col] = asset_value[i, col] / value[i, col]
     return out

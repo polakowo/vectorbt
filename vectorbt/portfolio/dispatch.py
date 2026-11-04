@@ -1908,7 +1908,7 @@ def total_benchmark_return(
 
 def gross_exposure(
     asset_value: tp.Array2d,
-    cash: tp.Array2d,
+    value: tp.Array2d,
     engine: tp.Optional[str] = None,
 ) -> tp.Array2d:
     """Engine-neutral `vectorbt.portfolio.nb.gross_exposure_nb`."""
@@ -1916,15 +1916,15 @@ def gross_exposure(
         engine,
         supports_rust=combine_rust_support(
             array_compatible_with_rust(asset_value),
-            array_compatible_with_rust(cash),
+            array_compatible_with_rust(value),
         ),
     )
     if eng == "rust":
         from vectorbt_rust.portfolio import gross_exposure_rs
 
         asset_value = prepare_array_for_rust(asset_value, dtype=np.float64)
-        cash = prepare_array_for_rust(cash, dtype=np.float64)
-        return gross_exposure_rs(asset_value, cash)
+        value = prepare_array_for_rust(value, dtype=np.float64)
+        return gross_exposure_rs(asset_value, value)
     from vectorbt.portfolio.nb import gross_exposure_nb
 
-    return gross_exposure_nb(asset_value, cash)
+    return gross_exposure_nb(asset_value, value)
