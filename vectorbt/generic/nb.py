@@ -2037,3 +2037,18 @@ def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Ar
     for col in range(arr1.shape[1]):
         out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait)
     return out
+
+
+@njit(cache=True)
+def crossed_below_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp.Array1d:
+    """Get the crossover of the first array going below the second array."""
+    return crossed_above_1d_nb(arr2, arr1, wait=wait)
+
+
+@njit(cache=True)
+def crossed_below_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Array2d:
+    """2-dim version of `crossed_below_1d_nb`."""
+    out = np.empty(arr1.shape, dtype=np.bool_)
+    for col in range(arr1.shape[1]):
+        out[:, col] = crossed_below_1d_nb(arr1[:, col], arr2[:, col], wait=wait)
+    return out

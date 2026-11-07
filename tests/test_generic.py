@@ -1596,6 +1596,31 @@ class TestAccessors:
             sr3.vbt.crossed_above(sr4, wait=1), pd.Series([False, False, False, False, False, False, False])
         )
 
+    def test_crossed_below_nb(self):
+        sr1 = np.array([np.nan, 3, 2, 1, 2, 3, 4])
+        sr2 = np.array([1, 2, 3, 4, 3, 2, 1])
+        np.testing.assert_array_equal(
+            nb.crossed_below_1d_nb(sr1, sr2), np.array([False, False, True, False, False, False, False])
+        )
+        np.testing.assert_array_equal(
+            nb.crossed_below_1d_nb(sr1, sr2, wait=1), np.array([False, False, False, True, False, False, False])
+        )
+        np.testing.assert_array_equal(nb.crossed_below_1d_nb(sr1, sr2), nb.crossed_above_1d_nb(sr2, sr1))
+        sr3 = np.array([1, 2, 3, np.nan, 5, 1, 5])
+        sr4 = np.array([3, 2, 1, 1, 1, 5, 1])
+        np.testing.assert_array_equal(
+            nb.crossed_below_1d_nb(sr3, sr4), np.array([False, False, False, False, False, True, False])
+        )
+        arr1 = np.vstack([sr1, sr3]).T
+        arr2 = np.vstack([sr2, sr4]).T
+        np.testing.assert_array_equal(
+            nb.crossed_below_nb(arr1, arr2),
+            np.vstack([nb.crossed_below_1d_nb(sr1, sr2), nb.crossed_below_1d_nb(sr3, sr4)]).T,
+        )
+        np.testing.assert_array_equal(
+            pd.Series(sr1).vbt.crossed_below(pd.Series(sr2)).values, nb.crossed_below_1d_nb(sr1, sr2)
+        )
+
     def test_stats(self):
         stats_index = pd.Index(
             ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max", "Min Index", "Max Index"],
