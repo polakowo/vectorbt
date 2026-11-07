@@ -501,7 +501,10 @@ timestamp      Open    High    Low    Close    Volume
 [BinanceData](../api/data/custom.md#vectorbt.data.custom.BinanceData),
 [CCXTData](../api/data/custom.md#vectorbt.data.custom.CCXTData), and
 [AlpacaData](../api/data/custom.md#vectorbt.data.custom.AlpacaData) have their own
-client dependencies and credential requirements. Keep credentials outside notebooks.
+client dependencies and credential requirements.
+[RealMarketAPIData](../api/data/custom.md#vectorbt.data.custom.RealMarketAPIData)
+(forex, metals, and crypto) needs no extra package but requires an API key.
+Keep credentials outside notebooks.
 For downloaded data, `data.update()` returns an updated data object; assign its
 result to retain changes. A plain local `Data` snapshot has no provider implementation
 to call when updating.
