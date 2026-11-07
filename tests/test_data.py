@@ -1126,12 +1126,25 @@ def make_rows(start, periods, freq="1h", symbol="XAUUSD"):
 class FakeAPI:
     """Serve history pages and candle windows, and record requests."""
 
-    def __init__(self, rows=None, page_size=1000, candle_rows=None, error=None):
+    def __init__(self, rows=None, page_size=1000, candle_rows=None, error=None, casing="camel", server_filter=True):
         self.rows = rows or []
         self.page_size = page_size
         self.candle_rows = candle_rows or []
         self.error = error
+        self.casing = casing
+        self.server_filter = server_filter
         self.calls = []
+
+    def _case(self, payload):
+        # The API serializes camelCase; the documentation shows PascalCase
+        if self.casing == "pascal":
+
+            def _pascal(d):
+                return {k[0].upper() + k[1:]: v for k, v in d.items()}
+
+            payload = _pascal(payload)
+            payload["Data"] = [_pascal(row) for row in payload["Data"]]
+        return payload
 
     def get(self, url, params=None, timeout=None):
         path = urlparse(url).path
@@ -1139,18 +1152,26 @@ class FakeAPI:
         if self.error is not None:
             return self.error
         if path == "/api/v1/candle":
-            return FakeResponse(dict(data=self.candle_rows, totalCount=len(self.candle_rows)))
+            return FakeResponse(self._case(dict(data=self.candle_rows, totalCount=len(self.candle_rows))))
         page_number = params["pageNumber"]
         page_size = min(params["pageSize"], self.page_size)
-        total_pages = (len(self.rows) + page_size - 1) // page_size
-        page = self.rows[(page_number - 1) * page_size : page_number * page_size]
+        start = pd.Timestamp(params["startTime"])
+        end = pd.Timestamp(params["endTime"])
+        # Like the API: startTime <= openTime <= endTime, newest first
+        rows = self.rows
+        if self.server_filter:
+            rows = [r for r in rows if start <= pd.Timestamp(r["openTime"]) <= end]
+        total_pages = (len(rows) + page_size - 1) // page_size
+        page = rows[(page_number - 1) * page_size : page_number * page_size]
         return FakeResponse(
-            dict(
-                data=page,
-                totalCount=len(self.rows),
-                currentPage=page_number,
-                totalPages=total_pages,
-                pageSize=page_size,
+            self._case(
+                dict(
+                    data=page,
+                    totalCount=len(rows),
+                    currentPage=page_number,
+                    totalPages=total_pages,
+                    pageSize=page_size,
+                )
             )
         )
 
@@ -1201,7 +1222,7 @@ class TestRealMarketAPIData:
 
     def test_duplicates_and_out_of_range_rows(self, fake_api):
         rows = make_rows("2024-01-01 22:00", 10)
-        fake_api(rows=rows + rows[:3], page_size=4)
+        fake_api(rows=rows + rows[:3], page_size=4, server_filter=False)
         df = vbt.RealMarketAPIData.download(
             "XAUUSD",
             start=RMA_START,
@@ -1392,3 +1413,228 @@ class TestRealMarketAPIData:
         )
         new_data = data.update(end="2024-01-02 12:00:00 UTC")
         pd.testing.assert_frame_equal(new_data.get(), data.get(), check_freq=False)
+
+    # Regression tests for review on #902
+
+    def test_history_fixture_camel_case(self, fake_api, monkeypatch):
+        # Representative /api/v1/history response, as serialized by the API (camelCase, newest first)
+        payload = {
+            "data": [
+                {
+                    "bid": 2063.41,
+                    "ask": 2063.69,
+                    "symbolCode": "XAUUSD",
+                    "openPrice": 2061.12,
+                    "closePrice": 2063.55,
+                    "highPrice": 2064.80,
+                    "lowPrice": 2060.37,
+                    "volume": 5321.0,
+                    "openTime": "2024-01-02T01:00:00+00:00",
+                },
+                {
+                    "bid": 2061.02,
+                    "ask": 2061.30,
+                    "symbolCode": "XAUUSD",
+                    "openPrice": 2062.95,
+                    "closePrice": 2061.10,
+                    "highPrice": 2063.40,
+                    "lowPrice": 2059.88,
+                    "volume": 4870.0,
+                    "openTime": "2024-01-02T00:00:00+00:00",
+                },
+            ],
+            "totalCount": 2,
+            "currentPage": 1,
+            "totalPages": 1,
+            "pageSize": 1000,
+        }
+        monkeypatch.setattr(requests.Session, "get", lambda self, url, **kw: FakeResponse(payload))
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start=RMA_START,
+            end="2024-01-02 02:00:00 UTC",
+            timeframe="1h",
+            api_key="k",
+            show_progress=False,
+        ).get()
+        assert list(df.index) == list(pd.date_range("2024-01-02 00:00", periods=2, freq="1h", tz="UTC"))
+        np.testing.assert_array_equal(df["Open"].values, [2062.95, 2061.12])
+        np.testing.assert_array_equal(df["High"].values, [2063.40, 2064.80])
+        np.testing.assert_array_equal(df["Low"].values, [2059.88, 2060.37])
+        np.testing.assert_array_equal(df["Close"].values, [2061.10, 2063.55])
+        np.testing.assert_array_equal(df["Volume"].values, [4870.0, 5321.0])
+
+    def test_history_fixture_pascal_case(self, fake_api, monkeypatch):
+        # Representative /api/v1/history response, as shown in the documentation (PascalCase)
+        payload = {
+            "Data": [
+                {
+                    "SymbolCode": "XAUUSD",
+                    "OpenPrice": 3120.22,
+                    "HighPrice": 3124.10,
+                    "LowPrice": 3118.40,
+                    "ClosePrice": 3122.75,
+                    "Volume": 432.58,
+                    "OpenTime": "2026-03-08T08:00:00Z",
+                }
+            ],
+            "TotalCount": 1,
+            "CurrentPage": 1,
+            "TotalPages": 1,
+            "PageSize": 1000,
+        }
+        monkeypatch.setattr(requests.Session, "get", lambda self, url, **kw: FakeResponse(payload))
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start="2026-03-08 08:00:00 UTC",
+            end="2026-03-08 09:00:00 UTC",
+            timeframe="1h",
+            api_key="k",
+            show_progress=False,
+        ).get()
+        assert list(df.index) == [pd.Timestamp("2026-03-08 08:00", tz="UTC")]
+        np.testing.assert_array_equal(df.iloc[0].values, [3120.22, 3124.10, 3118.40, 3122.75, 432.58])
+
+    @pytest.mark.parametrize("casing", ["camel", "pascal"])
+    def test_casing_history_pagination(self, fake_api, casing):
+        api = fake_api(rows=make_rows("2024-01-02 00:00", 180), page_size=50, casing=casing)
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD", start=RMA_START, end=RMA_END, timeframe="4h", api_key="k", show_progress=False
+        ).get()
+        assert len(api.calls) == 4
+        assert len(df) == 45
+        assert df["Volume"].iloc[0] == 1 + 2 + 3 + 4
+
+    @pytest.mark.parametrize("casing", ["camel", "pascal"])
+    def test_casing_candle(self, fake_api, casing):
+        fake_api(candle_rows=make_rows("2024-01-02 00:00", 3, freq="15min"), casing=casing)
+        df = vbt.RealMarketAPIData.download("EURUSD", timeframe="15m", api_key="k").get()
+        assert len(df) == 3
+        assert df["Open"].iloc[0] == 100.0
+
+    @pytest.mark.parametrize(
+        "payload,match",
+        [
+            (dict(items=[], total=0), "expected a 'data' array"),
+            (dict(data=None, totalPages=0), "expected a 'data' array"),
+            (dict(data=make_rows("2024-01-02 00:00", 2)), "expected 'totalPages'"),
+            (
+                dict(data=[dict(open=1.0, high=1.0, low=1.0, close=1.0, time="2024-01-02T00:00:00Z")], totalPages=1),
+                "without the 'openTime' field",
+            ),
+        ],
+    )
+    def test_unexpected_response_shape_raises(self, monkeypatch, payload, match):
+        monkeypatch.setattr(requests.Session, "get", lambda self, url, **kw: FakeResponse(payload))
+        with pytest.raises(RealMarketAPIError, match=match):
+            vbt.RealMarketAPIData.download(
+                "XAUUSD", start=RMA_START, end=RMA_END, timeframe="1h", api_key="k", show_progress=False
+            )
+
+    def test_4h_unaligned_start(self, fake_api):
+        api = fake_api(rows=make_rows("2024-01-02 00:00", 180))
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start="2024-01-02 01:00:00 UTC",
+            end="2024-01-02 12:00:00 UTC",
+            timeframe="4h",
+            api_key="k",
+            show_progress=False,
+        ).get()
+        # Whole bars are fetched, and the bar opening before start is dropped instead of being partial
+        assert api.calls[0][1]["startTime"] == "2024-01-02T00:00:00Z"
+        assert list(df.index) == [
+            pd.Timestamp("2024-01-02 04:00", tz="UTC"),
+            pd.Timestamp("2024-01-02 08:00", tz="UTC"),
+        ]
+        assert (df.index >= pd.Timestamp("2024-01-02 01:00", tz="UTC")).all()
+        assert df["Open"].iloc[0] == 104.0
+        assert df["Volume"].iloc[0] == 5 + 6 + 7 + 8
+
+    def test_4h_unaligned_end_keeps_whole_bar(self, fake_api):
+        api = fake_api(rows=make_rows("2024-01-02 00:00", 180))
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start=RMA_START,
+            end="2024-01-02 05:00:00 UTC",
+            timeframe="4h",
+            api_key="k",
+            show_progress=False,
+        ).get()
+        assert api.calls[0][1]["endTime"] == "2024-01-02T08:00:00Z"
+        assert list(df.index) == [
+            pd.Timestamp("2024-01-02 00:00", tz="UTC"),
+            pd.Timestamp("2024-01-02 04:00", tz="UTC"),
+        ]
+        # The 04:00 bar opens before end and is built from all of 04:00-07:59
+        assert df["Close"].iloc[1] == 100.25 + 7
+        assert df["Volume"].iloc[1] == 5 + 6 + 7 + 8
+
+    def test_1d_unaligned_start(self, fake_api):
+        fake_api(rows=make_rows("2024-01-02 00:00", 180))
+        df = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start="2024-01-02 13:00:00 UTC",
+            end=RMA_END,
+            timeframe="1d",
+            api_key="k",
+            show_progress=False,
+        ).get()
+        assert df.index[0] == pd.Timestamp("2024-01-03 00:00", tz="UTC")
+        assert df["Open"].iloc[0] == 124.0
+        assert df["Volume"].iloc[0] == sum(range(25, 49))
+
+    def test_update_daily_from_candle_keeps_server_midnight(self, fake_api):
+        # Daily candles from /candle open at the broker's server midnight (22:00 UTC here)
+        api = fake_api(
+            rows=make_rows("2024-01-01 00:00", 24 * 10),
+            candle_rows=make_rows("2024-01-01 22:00", 5, freq="1D"),
+        )
+        data = vbt.RealMarketAPIData.download("XAUUSD", timeframe="1d", api_key="k")
+        api.candle_rows = make_rows("2024-01-01 22:00", 7, freq="1D")
+        df = data.update(end="2024-01-09 00:00:00 UTC").get()
+        assert [c[0] for c in api.calls] == ["/api/v1/candle", "/api/v1/candle"]
+        assert list(df.index) == list(pd.date_range("2024-01-01 22:00", periods=7, freq="1D", tz="UTC"))
+        assert df.index.is_monotonic_increasing
+        assert df.index.is_unique
+        assert (df.index.hour == 22).all()
+
+    def test_update_daily_from_history_stays_utc(self, fake_api):
+        api = fake_api(rows=make_rows("2024-01-02 00:00", 24 * 3))
+        data = vbt.RealMarketAPIData.download(
+            "XAUUSD",
+            start=RMA_START,
+            end="2024-01-04 00:00:00 UTC",
+            timeframe="1d",
+            api_key="k",
+            show_progress=False,
+        )
+        api.rows = make_rows("2024-01-02 00:00", 24 * 6)
+        df = data.update(end="2024-01-08 00:00:00 UTC").get()
+        assert api.calls[-1][0] == "/api/v1/history"
+        assert list(df.index) == list(pd.date_range("2024-01-02", periods=6, freq="1D", tz="UTC"))
+        assert df.index.is_monotonic_increasing
+
+    def test_update_respects_explicit_source(self, fake_api):
+        api = fake_api(
+            rows=make_rows("2024-01-01 00:00", 24 * 10),
+            candle_rows=make_rows("2024-01-01 22:00", 5, freq="1D"),
+        )
+        data = vbt.RealMarketAPIData.download("XAUUSD", timeframe="1d", api_key="k")
+        with pytest.raises(ValueError, match="start is required"):
+            vbt.RealMarketAPIData.download("XAUUSD", timeframe="1d", source="history", api_key="k")
+        data.update(source="candle")
+        assert api.calls[-1][0] == "/api/v1/candle"
+
+    @pytest.mark.parametrize(
+        "kwargs,match",
+        [
+            (dict(timeframe="1h", source="ws"), "Invalid source"),
+            (dict(timeframe="1m", source="history"), "History is only available"),
+        ],
+    )
+    def test_invalid_source(self, fake_api, kwargs, match):
+        api = fake_api()
+        with pytest.raises(ValueError, match=match):
+            vbt.RealMarketAPIData.download("XAUUSD", start=RMA_START, end=RMA_END, api_key="k", **kwargs)
+        assert api.calls == []
