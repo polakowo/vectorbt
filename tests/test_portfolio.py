@@ -9979,12 +9979,16 @@ class TestPortfolio:
         pd.testing.assert_frame_equal(pf_grouped.gross_exposure(), result)
         pd.testing.assert_frame_equal(pf_shared.gross_exposure(), result)
 
-    def test_gross_exposure_short_and_mixed_group(self):
+    def test_gross_exposure_long_short_and_mixed_group(self):
         close = pd.Series([100.0, 50.0, 150.0, 100.0])
         size = pd.Series([-1.0, np.nan, np.nan, np.nan])
         close_mixed = pd.DataFrame({"a": [100.0, 120.0, 80.0], "b": [100.0, 50.0, 150.0]})
         size_mixed = pd.DataFrame({"a": [1.0, np.nan, np.nan], "b": [-1.0, np.nan, np.nan]})
         for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
+            # Long only: 100 in assets with a portfolio value of 200 is 0.5
+            pf_long = vbt.Portfolio.from_orders(close, -size, init_cash=200, freq="1D", engine=engine)
+            np.testing.assert_allclose(pf_long.value().values, [200.0, 150.0, 250.0, 200.0])
+            np.testing.assert_allclose(pf_long.gross_exposure().values, [0.5, 50 / 150, 150 / 250, 0.5])
             # Short only: abs(asset value) over portfolio value, which moves against the price
             pf_short = vbt.Portfolio.from_orders(close, size, init_cash=100, freq="1D", engine=engine)
             np.testing.assert_allclose(pf_short.gross_exposure().values, [1.0, 50 / 150, 3.0, 1.0])

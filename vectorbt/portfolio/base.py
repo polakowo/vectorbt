@@ -4532,7 +4532,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         else:
             abs_asset_value = np.abs(to_2d_array(self.asset_value(group_by=group_by, direction=direction)))
         value = to_2d_array(self.value(group_by=group_by))
-        gross_exposure = dispatch.gross_exposure(abs_asset_value, value, engine=engine)
+        # The kernels divide by asset value + cash, so pass the rest of the value as cash
+        gross_exposure = dispatch.gross_exposure(abs_asset_value, value - abs_asset_value, engine=engine)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
