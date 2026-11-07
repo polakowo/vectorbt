@@ -651,6 +651,36 @@ class Trades(Ranges):
         return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
 
     @cached_method
+    def barwise_profit_factor(
+        self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.MaybeSeries:
+        """Profit factor computed on PnL accrued bar by bar.
+
+        While `profit_factor` relates the total profits and losses of discrete trades,
+        this metric marks trades to market bar by bar using the reference close price
+        (see `close`) and relates the gross gains to the absolute gross losses accrued
+        across bars, per `vectorbt.portfolio.nb.barwise_trade_pnl_nb`. It is more
+        sensitive to intra-trade volatility and to the path a trade takes."""
+        if self.close is None:
+            raise ValueError("Bar-wise PnL requires a reference close price passed to the accessor")
+        close = to_2d_array(self.close)
+        barwise_pnl = nb.barwise_trade_pnl_nb(self.values, close)
+
+        # Column-level PnL offsets within the same bar matter, so aggregate
+        # columns into groups first and split into gains/losses afterwards
+        group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+        if len(group_lens) != barwise_pnl.shape[1]:
+            start_idxs = self.wrapper.grouper.get_group_start_idxs(group_by=group_by)
+            barwise_pnl = np.add.reduceat(barwise_pnl, start_idxs, axis=1)
+
+        gross_profit = np.where(barwise_pnl > 0, barwise_pnl, 0.0).sum(axis=0)
+        gross_loss = np.where(barwise_pnl < 0, barwise_pnl, 0.0).sum(axis=0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            barwise_profit_factor = gross_profit / np.abs(gross_loss)
+        wrap_kwargs = merge_dicts(dict(name_or_index="barwise_profit_factor"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(barwise_profit_factor, group_by=group_by, **wrap_kwargs)
+
+    @cached_method
     def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability.
 

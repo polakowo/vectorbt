@@ -10105,6 +10105,49 @@ class TestPortfolio:
         pd.testing.assert_series_equal(pf_grouped.total_profit(), result)
         pd.testing.assert_series_equal(pf_shared.total_profit(), result)
 
+    def test_barwise_profit_factor(self):
+        # Long 10 units entered at bar 0 and exited at bar 3: bar-wise PnL
+        # is [20, -10, 20], so gross profit is 40 and gross loss is 10,
+        # while the discrete trade itself only wins
+        close = pd.Series([10.0, 12.0, 11.0, 13.0])
+        pf = vbt.Portfolio.from_signals(
+            close,
+            pd.Series([True, False, False, False]),
+            pd.Series([False, False, False, True]),
+            init_cash=100,
+            freq="1D",
+        )
+        np.testing.assert_allclose(pf.trades.barwise_profit_factor(), 4.0)
+        np.testing.assert_allclose(pf.trades.profit_factor(), np.inf)
+
+        # Open trade accrues until the last bar
+        pf = vbt.Portfolio.from_signals(
+            close,
+            pd.Series([True, False, False, False]),
+            init_cash=100,
+            freq="1D",
+        )
+        np.testing.assert_allclose(pf.trades.barwise_profit_factor(), 4.0)
+
+        # Short 10 units: bar-wise PnL is [-20, 10, -20]
+        pf = vbt.Portfolio.from_signals(
+            close,
+            short_entries=pd.Series([True, False, False, False]),
+            short_exits=pd.Series([False, False, False, True]),
+            init_cash=100,
+            freq="1D",
+        )
+        np.testing.assert_allclose(pf.trades.barwise_profit_factor(), 0.25)
+
+        # Grouping offsets column-level PnL within a bar before splitting
+        # into gains and losses, unlike per-column aggregation
+        close2 = pd.DataFrame({"a": [10.0, 12.0, 11.0, 13.0], "b": [10.0, 9.0, 10.5, 9.0]})
+        entries2 = pd.DataFrame(True, index=close2.index, columns=close2.columns)
+        pf2 = vbt.Portfolio.from_signals(close2, entries2, init_cash=100, freq="1D")
+        result = pd.Series(np.array([4.0, 0.6]), index=close2.columns).rename("barwise_profit_factor")
+        pd.testing.assert_series_equal(pf2.trades.barwise_profit_factor(), result)
+        np.testing.assert_allclose(pf2.trades.barwise_profit_factor(group_by=np.array(["g", "g"])), np.inf)
+
     def test_final_value(self):
         result = pd.Series(np.array([99.68951, 95.26858, 101.70822]), index=price_na.columns).rename("final_value")
         pd.testing.assert_series_equal(pf.final_value(), result)
