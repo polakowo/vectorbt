@@ -1236,6 +1236,50 @@ class TestIndexFns:
         np.testing.assert_array_equal(indices2, np.array([0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]))
         assert indices3 == pd.IndexSlice[:]
 
+    @pytest.mark.parametrize("multi_index", [False, True])
+    def test_align_indexes_equal_length(self, multi_index):
+        index = pd.Index(["a", "b", "c"], name="asset")
+        if multi_index:
+            index = pd.MultiIndex.from_arrays([[0, 0, 1], index], names=["window", "asset"])
+        reordered = index.take([2, 0, 1])
+
+        first, second = index_fns.align_indexes([index, reordered])
+        assert first == pd.IndexSlice[:]
+        np.testing.assert_array_equal(second, [1, 2, 0])
+
+    @pytest.mark.parametrize("kind", ["string", "datetime", "timedelta"])
+    @pytest.mark.parametrize("wrapped_first", [False, True])
+    @pytest.mark.parametrize("representation", ["categorical", "one_level"])
+    def test_align_indexes_equal_length_representations(self, kind, wrapped_first, representation):
+        if kind == "string":
+            keys = pd.Index(["A", "B", "C"], name="key")
+        elif kind == "datetime":
+            keys = pd.date_range("2020", periods=3, name="key")
+        else:
+            keys = pd.timedelta_range("0D", periods=3, name="key")
+        if representation == "categorical":
+            wrapped = pd.CategoricalIndex(keys, name="key")
+        else:
+            wrapped = pd.MultiIndex.from_arrays([keys])
+        first, second = (wrapped, keys) if wrapped_first else (keys, wrapped)
+        # Equivalent full keys must align in both caller orders without converting either axis.
+        first_slice, second_slice = index_fns.align_indexes([first, second.take([2, 0, 1])])
+        assert first_slice == pd.IndexSlice[:]
+        np.testing.assert_array_equal(second_slice, [1, 2, 0])
+
+    def test_align_indexes_equal_length_with_tiling(self):
+        # Reorder both longest groups before expanding shorter inputs into their chosen group.
+        short = pd.Index(["a", "b", "c"], name="asset")
+        long = pd.MultiIndex.from_product([[0, 1], short], names=["window", "asset"])
+        other = pd.Index(np.arange(6), name="parameter")
+        indices = index_fns.align_indexes([short, long, long[::-1], other, other[::-1]])
+
+        np.testing.assert_array_equal(indices[0], [0, 1, 2, 0, 1, 2])
+        assert indices[1] == pd.IndexSlice[:]
+        np.testing.assert_array_equal(indices[2], [5, 4, 3, 2, 1, 0])
+        assert indices[3] == pd.IndexSlice[:]
+        np.testing.assert_array_equal(indices[4], [5, 4, 3, 2, 1, 0])
+
     def test_pick_levels(self):
         index = index_fns.stack_indexes([multi_i, multi_c])
         assert index_fns.pick_levels(index, required_levels=[], optional_levels=[]) == ([], [])
@@ -1770,6 +1814,188 @@ class TestReshapeFns:
         assert new_shape == test_shape
         pd.testing.assert_index_equal(new_index, test_index)
         pd.testing.assert_index_equal(new_columns, test_columns)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("multi_index", [False, True])
+    @pytest.mark.parametrize("axis_from", ["strict", "stack", "keep", 0])
+    def test_broadcast_align_equal_length(self, axis, multi_index, axis_from):
+        labels = pd.Index(["a", "b", "c"], name="asset")
+        if multi_index:
+            labels = pd.MultiIndex.from_arrays([[0, 0, 1], labels], names=["window", "asset"])
+        first = pd.DataFrame(np.arange(9).reshape(3, 3)).set_axis(labels, axis=axis)
+        expected = first * 10 + 100
+        second = expected.take([2, 0, 1], axis=axis)
+        before = second.copy(deep=True)
+        kwargs = dict(align_index=axis == 0, align_columns=axis == 1)
+        kwargs["index_from" if axis == 0 else "columns_from"] = axis_from
+
+        result = reshape_fns.broadcast(first, second, **kwargs)
+        pd.testing.assert_frame_equal(result[0], first)
+        pd.testing.assert_frame_equal(result[1], expected)
+        pd.testing.assert_frame_equal(second, before)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("kind", ["string", "datetime", "timedelta"])
+    @pytest.mark.parametrize("wrapped_first", [False, True])
+    @pytest.mark.parametrize("representation", ["categorical", "one_level"])
+    @pytest.mark.parametrize("axis_from", ["keep", "stack", 0])
+    def test_broadcast_align_equal_length_representations(self, axis, kind, wrapped_first, representation, axis_from):
+        if kind == "string":
+            keys = pd.Index(["A", "B", "C"], name="key")
+        elif kind == "datetime":
+            keys = pd.date_range("2020", periods=3, name="key")
+        else:
+            keys = pd.timedelta_range("0D", periods=3, name="key")
+        if representation == "categorical":
+            wrapped = pd.CategoricalIndex(keys, name="key")
+        else:
+            wrapped = pd.MultiIndex.from_arrays([keys])
+        left, right = (wrapped, keys) if wrapped_first else (keys, wrapped)
+        first = pd.DataFrame(np.arange(9).reshape(3, 3)).set_axis(left, axis=axis)
+        second = pd.DataFrame(np.arange(9, 18).reshape(3, 3)).set_axis(right, axis=axis).take([2, 0, 1], axis=axis)
+        # Reorder explicitly for the oracle, then apply only unchanged native output-metadata rules.
+        expected = [first, second.take([1, 2, 0], axis=axis)]
+        new_axis = reshape_fns.broadcast_index(expected, first.shape, index_from=axis_from, axis=axis)
+        if new_axis is not None:
+            expected = [arg.set_axis(new_axis, axis=axis) for arg in expected]
+        before = (first.copy(deep=True), second.copy(deep=True))
+        kwargs = dict(align_index=axis == 0, align_columns=axis == 1, index_from="keep", columns_from="keep")
+        kwargs["index_from" if axis == 0 else "columns_from"] = axis_from
+        actual = reshape_fns.broadcast(first, second, **kwargs)
+        for result, frame in zip(actual, expected):
+            pd.testing.assert_frame_equal(result, frame)
+        pd.testing.assert_frame_equal(first, before[0])
+        pd.testing.assert_frame_equal(second, before[1])
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    def test_broadcast_align_equal_length_disabled(self, axis):
+        labels = pd.Index(["a", "b", "c"], name="asset")
+        first = pd.DataFrame(np.arange(9).reshape(3, 3)).set_axis(labels, axis=axis)
+        second = (first + 100).take([2, 0, 1], axis=axis)
+        result = reshape_fns.broadcast(
+            first, second, align_index=False, align_columns=False, index_from="keep", columns_from="keep"
+        )
+        pd.testing.assert_frame_equal(result[0], first)
+        pd.testing.assert_frame_equal(result[1], second)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            (["a", "b", "c"], ["a", "a", "c"]),
+            (["a", "a", "c"], ["a", "b", "c"]),
+            (["a", "b", "c"], ["d", "e", "f"]),
+        ],
+    )
+    def test_broadcast_align_equal_length_unmatched(self, axis, left, right):
+        # A repeated or unrelated longest axis is not a one-to-one reordering.
+        first = pd.DataFrame(np.arange(9).reshape(3, 3)).set_axis(pd.Index(left, name="asset"), axis=axis)
+        second = pd.DataFrame(np.arange(9, 18).reshape(3, 3)).set_axis(pd.Index(right, name="asset"), axis=axis)
+        kwargs = dict(align_index=axis == 0, align_columns=axis == 1, index_from="keep", columns_from="keep")
+        result = reshape_fns.broadcast(first, second, **kwargs)
+        pd.testing.assert_frame_equal(result[0], first)
+        pd.testing.assert_frame_equal(result[1], second)
+
+        # Strict output metadata must continue to reject axes that were not aligned.
+        kwargs["index_from" if axis == 0 else "columns_from"] = "strict"
+        with pytest.raises(ValueError):
+            reshape_fns.broadcast(first, second, **kwargs)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("different_levels", [False, True])
+    def test_broadcast_align_equal_length_independent_multiindex(self, axis, different_levels):
+        left = pd.MultiIndex.from_tuples([("a", 0), ("b", 1)], names=["asset", "window"])
+        right = pd.MultiIndex.from_tuples([("a", 1), ("b", 0)], names=["asset", "window"])
+        if different_levels:
+            right = right.swaplevel()
+        first = pd.DataFrame([[1, 2], [3, 4]]).set_axis(left, axis=axis)
+        second = pd.DataFrame([[10, 20], [30, 40]]).set_axis(right, axis=axis)
+        # Shared individual level values do not establish a permutation of complete keys.
+        actual = reshape_fns.broadcast(
+            first, second, align_index=axis == 0, align_columns=axis == 1, index_from="keep", columns_from="keep"
+        )
+        pd.testing.assert_frame_equal(actual[0], first)
+        pd.testing.assert_frame_equal(actual[1], second)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("level_name", [None, "key"])
+    def test_broadcast_align_equal_length_ambiguous_levels(self, axis, level_name):
+        labels = pd.MultiIndex.from_tuples([(0, 1), (1, 0)], names=[level_name, level_name])
+        first = pd.DataFrame([[1, 2], [3, 4]]).set_axis(labels, axis=axis)
+        second = (first + 100).take([1, 0], axis=axis)
+        # Complete tuple keys do not remove ambiguity in the native level-name mapping.
+        with pytest.raises(ValueError, match="multiple candidate levels"):
+            index_fns.align_index_to(index_fns.get_index(second, axis), labels)
+        kwargs = dict(align_index=axis == 0, align_columns=axis == 1, index_from="keep", columns_from="keep")
+        actual = reshape_fns.broadcast(first, second, **kwargs)
+        pd.testing.assert_frame_equal(actual[0], first)
+        pd.testing.assert_frame_equal(actual[1], second)
+        kwargs["index_from" if axis == 0 else "columns_from"] = "strict"
+        with pytest.raises(ValueError):
+            reshape_fns.broadcast(first, second, **kwargs)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("kind", ["datetime", "timedelta"])
+    @pytest.mark.parametrize("reference_freq", [False, True])
+    @pytest.mark.parametrize("axis_from", ["keep", "strict", "stack", 0, 2])
+    @pytest.mark.parametrize("reordered_position", [1, 2])
+    def test_broadcast_align_equal_length_frequency(self, axis, kind, reference_freq, axis_from, reordered_position):
+        if kind == "datetime":
+            labels = pd.date_range("2020-01-01", periods=3, freq="D", tz="UTC", name="time")
+        else:
+            labels = pd.timedelta_range("0D", periods=3, freq="D", name="time")
+        reference = labels.copy(deep=True)
+        if not reference_freq:
+            reference.freq = None
+        first = pd.DataFrame(np.arange(9.0).reshape(3, 3)).set_axis(reference, axis=axis)
+        middle = (first + 50).set_axis(labels, axis=axis)
+        last = (first + 100).set_axis(labels, axis=axis)
+        assert index_fns.get_index(middle, axis).freq == labels.freq
+        args = [first, middle, last]
+        args[reordered_position] = args[reordered_position].take([2, 0, 1], axis=axis)
+        input_freqs = [index_fns.get_index(arg, axis).freq for arg in args]
+        # The first matching axis owns the metadata, even when a later one has a known frequency.
+        kwargs = dict(align_index=axis == 0, align_columns=axis == 1, index_from="strict", columns_from="strict")
+        kwargs["index_from" if axis == 0 else "columns_from"] = axis_from
+        actual = reshape_fns.broadcast(*args, **kwargs)
+        for result, expected in zip(actual, (first, first + 50, first + 100)):
+            pd.testing.assert_frame_equal(result, expected)
+            assert index_fns.get_index(result, axis).freq == reference.freq
+        # Changing the returned frequency must not mutate any caller-owned axis.
+        for result in actual:
+            index_fns.get_index(result, axis).freq = None if reference_freq else labels.freq
+            assert [index_fns.get_index(arg, axis).freq for arg in args] == input_freqs
+
+    @pytest.mark.parametrize("axis_from", ["strict", 0])
+    def test_broadcast_align_equal_length_frequency_both_axes(self, axis_from):
+        rows = pd.date_range("2020-01-01", periods=3, freq="D", tz="UTC", name="time")
+        columns = pd.timedelta_range("0D", periods=3, freq="D", name="tenor")
+        first = pd.DataFrame(np.arange(9.0).reshape(3, 3), index=rows.copy(deep=True), columns=columns.copy(deep=True))
+        first.index.freq = None
+        middle = (first + 50).iloc[[2, 0, 1], [1, 2, 0]]
+        last = pd.DataFrame(first.to_numpy() + 100, index=rows.copy(deep=True), columns=columns.copy(deep=True))
+        last.columns.freq = None
+        args = (first, middle, last)
+        input_freqs = [(arg.index.freq, arg.columns.freq) for arg in args]
+        # Later metadata selection must preserve both reference frequencies and caller axes.
+        actual = reshape_fns.broadcast(
+            *args, align_index=True, align_columns=True, index_from=axis_from, columns_from=axis_from
+        )
+        for result, expected in zip(actual, (first, first + 50, first + 100)):
+            pd.testing.assert_frame_equal(result, expected)
+            assert result.index.freq is None
+            assert result.columns.freq == columns.freq
+        for result in actual:
+            result.index.freq = rows.freq
+            result.columns.freq = None
+            assert [(arg.index.freq, arg.columns.freq) for arg in args] == input_freqs
+
+    def test_broadcast_align_equal_length_accessor(self):
+        first = pd.Series([10.0, np.nan, 30.0], index=pd.date_range("2020-01-01", periods=3, freq="D"))
+        second = (first + 100).iloc[::-1]
+        actual = first.vbt.broadcast(second, align_index=True, index_from="strict")
+        pd.testing.assert_series_equal(actual[0], first)
+        pd.testing.assert_series_equal(actual[1], second.reindex(first.index))
 
     def test_broadcast_align(self):
         index1 = pd.Index(["a", "b", "c"])

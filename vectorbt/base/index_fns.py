@@ -319,24 +319,60 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
 
 
 def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
-    """Align multiple indexes to each other."""
+    """Align multiple indexes to the first compatible longest index.
+
+    Equal-length indexes require matching level names in the same order and complete
+    keys that correspond one-to-one under `align_index_to`. MultiIndex levels must have an
+    unambiguous name/value mapping; matching tuple keys alone is insufficient.
+    Flat indexes can align to equivalent one-level MultiIndexes.
+    Incompatible longest indexes retain their original positional order; shorter
+    indexes are aligned afterward."""
     max_len = max(map(len, indexes))
-    indices = []
+    indices = [pd.IndexSlice[:]] * len(indexes)
+    aligned_indexes = list(indexes)
+
+    # Establish the order of each compatible longest group before expanding shorter inputs.
+    for i in range(len(indexes)):
+        if len(indexes[i]) != max_len:
+            continue
+        for j in range(i):
+            if len(indexes[j]) != max_len:
+                continue
+            # Match level names/count, independently of the raw Index/MultiIndex container class.
+            if indexes[i].names != aligned_indexes[j].names:
+                continue
+            # Normalize each side as native alignment does, leaving actual caller axes untouched.
+            source_keys, target_keys = indexes[i], aligned_indexes[j]
+            if not isinstance(source_keys, pd.MultiIndex):
+                source_keys = pd.MultiIndex.from_arrays([source_keys])
+            if not isinstance(target_keys, pd.MultiIndex):
+                target_keys = pd.MultiIndex.from_arrays([target_keys])
+            if not source_keys.isin(target_keys).all():
+                continue
+            try:
+                index_slice = align_index_to(indexes[i], aligned_indexes[j])
+            except ValueError:
+                continue
+            # Repeated target keys can otherwise drop values despite preserving the length.
+            if not isinstance(index_slice, slice) and len(np.unique(index_slice)) != max_len:
+                continue
+            indices[i] = index_slice
+            aligned_indexes[i] = indexes[i][index_slice]
+            break
+
     for i in range(len(indexes)):
         index_i = indexes[i]
         if len(index_i) == max_len:
-            indices.append(pd.IndexSlice[:])
+            continue
+        for index_j in aligned_indexes:
+            if len(index_j) == max_len:
+                try:
+                    indices[i] = align_index_to(index_i, index_j)
+                    break
+                except ValueError:
+                    pass
         else:
-            for j in range(len(indexes)):
-                index_j = indexes[j]
-                if len(index_j) == max_len:
-                    try:
-                        indices.append(align_index_to(index_i, index_j))
-                        break
-                    except ValueError:
-                        pass
-            if len(indices) < i + 1:
-                raise ValueError(f"Index at position {i} could not be aligned")
+            raise ValueError(f"Index at position {i} could not be aligned")
     return indices
 
 
