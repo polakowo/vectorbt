@@ -1,3 +1,5 @@
+import os
+import subprocess
 import sys
 from collections import namedtuple
 from datetime import datetime
@@ -1517,6 +1519,87 @@ class TestFactory:
             ),
         )
 
+    @pytest.mark.parametrize("multiindex", [False, True])
+    @pytest.mark.parametrize("col_idxs", [1, [2, 0], [1, 1, 0], slice(None, None, -1)])
+    def test_indexing_no_params(self, multiindex, col_idxs):
+        # Unmapped inputs must follow the same mixed row/column selection as every output.
+        left = ts.copy()
+        left.index = left.index.tz_localize("UTC").rename("time")
+        left.columns = pd.Index(["a", "b", "c"], name="asset")
+        if multiindex:
+            left.columns = pd.MultiIndex.from_tuples(
+                [("prices", "a"), ("prices", "b"), ("prices", "c")], names=["kind", "asset"]
+            )
+        right = left * 2 + 10
+
+        def apply_func(left, right, in_out):
+            in_out[:] = left - right
+            return left + right
+
+        obj = (
+            vbt.IndicatorFactory(
+                input_names=["left", "right"],
+                in_output_names=["in_out"],
+                output_names=["out"],
+                custom_output_props={"derived": lambda self: self.left + self.right},
+            )
+            .from_apply_func(apply_func)
+            .run(left, right)
+        )
+        expected = dict(
+            left=left.copy(), right=right.copy(), in_out=left - right, out=left + right, derived=left + right
+        )
+        selected = obj.iloc[[3, 1], col_idxs]
+        for attr, original in expected.items():
+            target = original.iloc[[3, 1], col_idxs]
+            assert_equal = (
+                pd.testing.assert_series_equal if isinstance(target, pd.Series) else pd.testing.assert_frame_equal
+            )
+            assert_equal(getattr(selected, attr), target)
+            # A second selection must use the already selected inputs, including derived properties.
+            assert_equal(getattr(selected.iloc[::-1], attr), target.iloc[::-1])
+
+        # Selection must not mutate the original indicator or caller-owned input values.
+        pd.testing.assert_frame_equal(left, expected["left"])
+        pd.testing.assert_frame_equal(right, expected["right"])
+        pd.testing.assert_frame_equal(obj.left, expected["left"])
+        pd.testing.assert_frame_equal(obj.right, expected["right"])
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_indexing_no_params_one_column(self, as_frame):
+        # Series inputs are stored as 1D arrays; column selection must still preserve their public shape.
+        source = ts[["a"]] if as_frame else ts["a"]
+        obj = vbt.IndicatorFactory(input_names=["x"], output_names=["out"]).from_apply_func(lambda x: x * 2).run(source)
+        selected = obj.iloc[[3, 1]]
+        assert_equal = pd.testing.assert_frame_equal if as_frame else pd.testing.assert_series_equal
+        assert_equal(selected.x, source.iloc[[3, 1]])
+        assert_equal(selected.out, source.iloc[[3, 1]] * 2)
+        if as_frame:
+            # A materialized single column must still expand when selected more than once.
+            pd.testing.assert_frame_equal(obj.iloc[:, [0, 0]].x, pd.concat([source, source], axis=1))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize("keep_raw", [False, True])
+    def test_indexing_no_params_compact_input(self, as_frame, keep_raw):
+        # keep_raw may retain one input column while another input determines two output columns.
+        x = pd.Series([1.0, 2.0, 3.0], index=ts.index[:3])
+        y = pd.DataFrame({"A": [10.0, 11.0, 12.0], "B": [20.0, 21.0, 22.0]}, index=x.index)
+        obj = (
+            vbt.IndicatorFactory(input_names=["x", "y"], output_names=["out"])
+            .from_apply_func(lambda x, y: x + y)
+            .run(x.to_frame() if as_frame else x, y, broadcast_kwargs=dict(keep_raw=[keep_raw, False], columns_from=1))
+        )
+        expected_out = pd.DataFrame({"A": [11.0, 13.0, 15.0], "B": [21.0, 23.0, 25.0]}, index=x.index)
+        reordered = obj.iloc[[2, 0], [1, 0, 1]]
+        pd.testing.assert_frame_equal(reordered.out, expected_out.iloc[[2, 0], [1, 0, 1]])
+        assert reordered._x.shape[1] == (1 if keep_raw else 3)
+
+        # Both direct scalar selection and reselection from a reordered object must preserve B's values.
+        expected = dict(x=x.rename("B"), y=y["B"], out=expected_out["B"])
+        for selected, rows in [(obj.iloc[:, 1], slice(None)), (reordered.iloc[:, 0], [2, 0])]:
+            for attr, original in expected.items():
+                pd.testing.assert_series_equal(getattr(selected, attr), original.iloc[rows])
+
     def test_numeric_attr(self):
         obj = (
             vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -1990,6 +2073,25 @@ class TestFactory:
                     columns=pd.Index([2, 3, 4], dtype="int64", name="sma_length"),
                 ),
             )
+
+    @pytest.mark.skipif(not pandas_ta_available, reason="pandas-ta is not installed")
+    @pytest.mark.parametrize("multi_columns", [False, True])
+    def test_from_pandas_ta_single_output_frame(self, multi_columns):
+        close = ts if multi_columns else ts["a"]
+        result = vbt.pandas_ta("TTM_TREND").run(close, close, close, length=[2, 3]).ttm_trnd
+        columns = ts.columns if multi_columns else ["a"]
+        expected = np.column_stack(
+            [
+                pandas_ta.ttm_trend(ts[col], ts[col], ts[col], length=length).iloc[:, 0]
+                for length in [2, 3]
+                for col in columns
+            ]
+        )
+        if multi_columns:
+            expected_columns = pd.MultiIndex.from_product([[2, 3], columns], names=["ttm_trend_length", None])
+        else:
+            expected_columns = pd.Index([2, 3], name="ttm_trend_length")
+        pd.testing.assert_frame_equal(result, pd.DataFrame(expected, index=ts.index, columns=expected_columns))
 
     def test_get_ta_indicators(self):
         if ta_available:
@@ -3122,11 +3224,158 @@ class TestBasic:
             ),
         )
 
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    @pytest.mark.parametrize("order", ["C", "F"])
+    def test_ATR_unsigned(self, dtype, order):
+        # Distinct columns include falling prices and gaps in both directions.
+        high = np.array([[105, 95], [95, 105], [109, 99], [100, 100]], dtype=dtype, order=order)
+        low = np.array([[95, 90], [90, 95], [100, 90], [98, 98]], dtype=dtype, order=order)
+        close = np.array([[100, 92], [92, 100], [105, 94], [99, 99]], dtype=dtype, order=order)
+        before = [a.copy() for a in (high, low, close)]
+        # For example, the falling first column has max(5, abs(95-100), abs(90-100)) = 10.
+        expected = np.array([[10.0, 5.0], [10.0, 13.0], [17.0, 10.0], [7.0, 6.0]])
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(high, low, close), expected)
+
+        index = pd.date_range("2024-01-01", periods=4, tz="UTC", name="date")
+        columns = pd.Index(["A", "B"], name="asset")
+        frames = [pd.DataFrame(a, index=index, columns=columns) for a in (high, low, close)]
+        result = vbt.ATR.run(*frames, window=1, ewm=False, engine="numba")
+        expected_columns = pd.MultiIndex.from_tuples(
+            [(1, False, "A"), (1, False, "B")], names=["atr_window", "atr_ewm", "asset"]
+        )
+        expected_frame = pd.DataFrame(expected, index=index, columns=expected_columns)
+        pd.testing.assert_frame_equal(result.tr, expected_frame)
+        pd.testing.assert_frame_equal(result.atr, expected_frame)
+        for original, snapshot in zip((high, low, close), before):
+            np.testing.assert_array_equal(original, snapshot)
+
+    @pytest.mark.parametrize("dtype", [np.uint64, np.int64])
+    def test_ATR_large_integer_precision(self, dtype):
+        # Converting prices to float first would erase these one-unit movements.
+        top = int(np.iinfo(dtype).max)
+        prices = np.array([top - 3, top - 2, top - 3], dtype=dtype)
+        expected = np.array([0.0, 1.0, 1.0])
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.true_range_nb(prices[:, None], prices[:, None], prices[:, None])[:, 0], expected
+        )
+        series = pd.Series(prices, index=pd.date_range("2024-01-01", periods=3), name="price")
+        result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine="numba")
+        expected_series = pd.Series(expected, index=series.index, name=(1, False, "price"))
+        pd.testing.assert_series_equal(result.tr, expected_series)
+        pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("start", [-(2**63), -(2**63) + 1, -1])
+    @pytest.mark.parametrize("reverse", [False, True])
+    def test_ATR_signed_boundary(self, start, reverse):
+        # Equal OHLC prices isolate an exact 2**63 gap, where signed abs can overflow.
+        prices = np.array([start, start + 2**63], dtype=np.int64)
+        if reverse:
+            prices = prices[::-1]
+        expected = np.array([0.0, float(2**63)])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+
+        # Integer auto fallback and the public indicator must retain the corrected distance.
+        series = pd.Series(prices, index=pd.date_range("2024-01-01", periods=2), name="price")
+        expected_series = pd.Series(expected, index=series.index, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(vbt.indicators.dispatch.true_range(*arrays, engine=engine)[:, 0], expected)
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int32, np.int64])
+    def test_ATR_signed_full_span(self, dtype):
+        # The previous-close distance can exceed the largest signed value in either direction.
+        bottom, top = int(np.iinfo(dtype).min), int(np.iinfo(dtype).max)
+        prices = np.array([bottom, top, bottom], dtype=dtype)
+        expected = np.array([0.0, float(top - bottom), float(top - bottom)])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+        series = pd.Series(prices, name="price")
+        expected_series = pd.Series(expected, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint32])
+    def test_true_range_integer_distance_mixed(self, dtype):
+        # These mixed operands still need a signed-int64-sized distance before output conversion.
+        a, b = np.int64(np.iinfo(np.int64).min), dtype(np.iinfo(dtype).max)
+        expected = float(int(b) - int(a))
+        assert vbt.indicators.nb._true_range_distance_nb(a, b) == expected
+        assert vbt.indicators.nb._true_range_distance_nb(b, a) == expected
+
+    def test_ATR_signed_boundary_unoptimized(self, tmp_path):
+        # A fresh cache and subprocess prevent default-optimized code from masking signed overflow.
+        script = """
+import numpy as np
+import pandas as pd
+import vectorbt as vbt
+from numba import config
+
+assert config.OPT == 0
+for endpoints in ((-(2**63), 0), (-(2**63) + 1, 1), (-1, 2**63 - 1), (-(2**63), 2**63 - 1, -(2**63))):
+    for reverse in (False, True):
+        prices = np.array(endpoints, dtype=np.int64)
+        if reverse:
+            prices = prices[::-1]
+        expected = np.array([0.0] + [float(abs(int(b) - int(a))) for a, b in zip(prices[:-1], prices[1:])])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+        series = pd.Series(prices, name="price")
+        expected_series = pd.Series(expected, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(vbt.indicators.dispatch.true_range(*arrays, engine=engine)[:, 0], expected)
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "NUMBA_OPT": "0", "NUMBA_CACHE_DIR": str(tmp_path)},
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    def test_true_range_floating_controls(self, dtype):
+        # A missing previous close leaves the finite high-low range usable, as before.
+        high = np.array([np.nan, 11, 12, 13, np.inf], dtype=dtype)[:, None]
+        low = np.array([0, 9, 10, 11, 11], dtype=dtype)[:, None]
+        close = np.array([5, np.nan, 11, 12, 12], dtype=dtype)[:, None]
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.true_range_nb(high, low, close)[:, 0], [np.nan, 6.0, 2.0, 2.0, np.inf]
+        )
+        # Retain subtraction in the input floating dtype, including float32 rounding.
+        prices = np.array([1e8, 1.0], dtype=dtype)[:, None]
+        expected = 1e8 if dtype == np.float32 else 99999999.0
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(prices, prices, prices)[:, 0], [0.0, expected])
+
+    @pytest.mark.parametrize("dtype", [np.uint64, np.float64])
+    @pytest.mark.parametrize("length", [0, 1])
+    def test_true_range_short(self, dtype, length):
+        prices = np.zeros((length, 2), dtype=dtype)
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(prices, prices, prices), np.zeros(prices.shape))
+
     def test_OBV(self):
         pd.testing.assert_series_equal(
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
         )
+
+    def test_OBV_indexing_inputs(self):
+        close = pd.DataFrame({"A": [10.0, 11.0, 12.0], "B": [20.0, 19.0, 21.0]})
+        volume = pd.DataFrame({"A": [1.0, 2.0, 3.0], "B": [4.0, 5.0, 6.0]})
+        # Add volume on rises and subtract it on falls: A = 1,3,6; B = 4,-1,5.
+        expected_obv = pd.DataFrame({"A": [1.0, 3.0, 6.0], "B": [4.0, -1.0, 5.0]})
+        obj = vbt.OBV.run(close, volume, engine="numba")
+        for attr, expected in dict(close=close, volume=volume, obv=expected_obv).items():
+            # Reordering previously relabeled the inputs without moving their values; scalar access raised.
+            pd.testing.assert_frame_equal(getattr(obj.iloc[:, [1, 0]], attr), expected.iloc[:, [1, 0]])
+            pd.testing.assert_series_equal(getattr(obj["B"], attr), expected["B"])
 
     @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.int64, np.uint64])
     def test_OBV_flat_close(self, dtype):

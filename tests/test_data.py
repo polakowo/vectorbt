@@ -75,6 +75,202 @@ class MyData(vbt.Data):
 
 
 class TestData:
+    @pytest.mark.parametrize("name", ["foo", None])
+    @pytest.mark.parametrize("missing", ["nan", "drop", "raise"])
+    @pytest.mark.parametrize("from_data", [False, True])
+    def test_align_columns_named_series(self, name, missing, from_data):
+        index = pd.Index(["x", "y"], name="time")
+        source = {
+            "A": pd.Series([10.0, 20.0], index=index, name=name),
+            "B": pd.Series([30.0, 40.0], index=index, name="bar"),
+        }
+        # An unnamed Series has column 0 in its native frame representation.
+        a_column = 0 if name is None else name
+        columns = pd.Index(["bar", "foo"]) if name == "foo" else pd.Index([0, "bar"])
+        expected = {
+            "A": pd.DataFrame({a_column: [10.0, 20.0]}, index=index).reindex(columns=columns),
+            "B": pd.DataFrame({"bar": [30.0, 40.0]}, index=index).reindex(columns=columns),
+        }
+        if missing == "drop":
+            expected = {symbol: frame.iloc[:, :0] for symbol, frame in expected.items()}
+
+        # Exercise both the alignment owner and construction's subsequent metadata handling.
+        if missing == "raise":
+            with pytest.raises(ValueError, match="Symbols have mismatching columns"):
+                if from_data:
+                    vbt.Data.from_data(source, missing_columns=missing)
+                else:
+                    vbt.Data.align_columns(source, missing=missing)
+        else:
+            with pytest.warns(UserWarning, match="Symbols have mismatching columns"):
+                if from_data:
+                    data = vbt.Data.from_data(source, missing_columns=missing)
+                    aligned = data.data
+                else:
+                    aligned = vbt.Data.align_columns(source, missing=missing)
+            assert list(aligned) == ["A", "B"]
+            for symbol in source:
+                pd.testing.assert_frame_equal(aligned[symbol], expected[symbol])
+            if from_data:
+                assert data.wrapper.ndim == 2
+                pd.testing.assert_index_equal(data.wrapper.columns, expected["A"].columns)
+                if missing == "nan":
+                    # Literal public results prevent a correct shape from hiding lost values.
+                    pd.testing.assert_frame_equal(
+                        data.get(a_column),
+                        pd.DataFrame(
+                            {"A": [10.0, 20.0], "B": [np.nan, np.nan]},
+                            index=index,
+                            columns=pd.Index(["A", "B"], name="symbol"),
+                        ),
+                    )
+                else:
+                    assert data.get() == ()
+
+        # Reconstruct expectations independently of the source's values and index object.
+        for symbol, values, original_name in [("A", [10.0, 20.0], name), ("B", [30.0, 40.0], "bar")]:
+            pd.testing.assert_series_equal(
+                source[symbol], pd.Series(values, index=pd.Index(["x", "y"], name="time"), name=original_name)
+            )
+
+    @pytest.mark.parametrize("name", ["foo", None, 0])
+    def test_align_columns_series_shape_controls(self, name):
+        source = {"A": pd.Series([1.0, 2.0], name=name), "B": pd.Series([3.0, 4.0], name=name)}
+        # One common feature remains a Series, and the single-symbol shortcut retains identity.
+        for missing in ["nan", "drop", "raise"]:
+            aligned = vbt.Data.align_columns(source, missing=missing)
+            for symbol in source:
+                pd.testing.assert_series_equal(aligned[symbol], source[symbol])
+            assert vbt.Data.align_columns({"A": source["A"]}, missing=missing)["A"] is source["A"]
+
+    @pytest.mark.parametrize("missing", ["nan", "drop"])
+    def test_align_columns_mixed_series_frame(self, missing):
+        source = {
+            "A": pd.Series([10.0, 20.0], name="foo"),
+            "B": pd.DataFrame({"bar": [30.0, 40.0], "foo": [50.0, 60.0]}),
+        }
+        with pytest.warns(UserWarning, match="Symbols have mismatching columns"):
+            data = vbt.Data.from_data(source, missing_columns=missing)
+        columns = ["bar", "foo"] if missing == "nan" else ["foo"]
+        # A DataFrame input keeps both symbols two-dimensional, even after a one-column intersection.
+        assert data.wrapper.ndim == 2
+        pd.testing.assert_frame_equal(
+            data.data["A"], pd.DataFrame({"bar": [np.nan, np.nan], "foo": [10.0, 20.0]})[columns]
+        )
+        pd.testing.assert_frame_equal(
+            data.data["B"], pd.DataFrame({"bar": [30.0, 40.0], "foo": [50.0, 60.0]})[columns]
+        )
+
+    @pytest.mark.parametrize("name", ["foo", None])
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_update_named_series_column_alignment(self, name, as_frame):
+        updates = {
+            "A": pd.Series([10.0, 20.0], index=[1, 2], name=name),
+            "B": pd.Series([30.0, 40.0], index=[1, 2], name="bar"),
+        }
+        if as_frame:
+            # An explicit None frame column differs from the native unnamed-Series column 0.
+            updates = {symbol: pd.DataFrame({v.name: v.to_numpy()}, index=v.index) for symbol, v in updates.items()}
+
+        class UpdatingData(vbt.Data):
+            def update_symbol(self, symbol, **kwargs):
+                return updates[symbol]
+
+        data = UpdatingData.from_data(
+            {"A": pd.Series([1.0, 2.0], name=name), "B": pd.Series([3.0, 4.0], name=name)},
+            missing_columns="nan",
+        )
+        with pytest.warns(UserWarning, match="Symbols have mismatching columns"):
+            updated = data.update()
+        # Updates retain the original feature schema: A's feature survives and B's absent feature becomes NaN.
+        pd.testing.assert_series_equal(updated.data["A"], pd.Series([1.0, 10.0, 20.0], name=name))
+        pd.testing.assert_series_equal(updated.data["B"], pd.Series([3.0, np.nan, np.nan], name=name))
+        assert updated.wrapper.ndim == 1
+
+    @pytest.mark.parametrize(
+        "columns, expected",
+        [
+            (pd.Index([None, 0], dtype=object), 10.0),
+            (pd.Index([0]), 99.0),
+            (pd.MultiIndex.from_tuples([(0, "feature")]), None),
+        ],
+    )
+    def test_update_unnamed_series_frame_columns(self, columns, expected):
+        class UpdatingData(vbt.Data):
+            def update_symbol(self, symbol, **kwargs):
+                values = [[10.0, 99.0]] if len(columns) == 2 else [[99.0]]
+                return pd.DataFrame(values, index=[1], columns=columns)
+
+        data = UpdatingData.from_data({"A": pd.Series([1.0, 2.0])})
+        # Prefer an actual None label, otherwise use exact column 0 rather than a MultiIndex prefix.
+        if expected is None:
+            with pytest.raises(KeyError):
+                data.update()
+        else:
+            pd.testing.assert_series_equal(data.update().data["A"], pd.Series([1.0, expected]))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_from_data(self, as_frame):
+        source = pd.Series([1.0, 2.0], index=pd.Index(["x", "y"], name="time"), name="close")
+        if as_frame:
+            source = source.to_frame()
+
+        # In-memory construction needs no provider request arguments and preserves the public data.
+        data = vbt.Data.from_data({"A": source})
+        assert data.download_kwargs == {}
+        assert data.config["download_kwargs"] == {}
+        assert data.symbols == ["A"]
+        assert data.wrapper.ndim == source.ndim
+        pd.testing.assert_index_equal(data.wrapper.index, source.index)
+        if as_frame:
+            pd.testing.assert_frame_equal(data.get(), source)
+            pd.testing.assert_index_equal(data.wrapper.columns, source.columns)
+        else:
+            pd.testing.assert_series_equal(data.get(), source)
+            pd.testing.assert_index_equal(data.wrapper.columns, pd.Index(["close"]))
+
+    def test_from_data_fresh_download_kwargs(self):
+        first = vbt.Data.from_data({"A": pd.Series([1.0])})
+        second = vbt.Data.from_data({"A": pd.Series([2.0])})
+        # A later edit to one object's request state must not affect another default-constructed object.
+        first.download_kwargs["period"] = "1d"
+        assert second.download_kwargs == {}
+
+    @pytest.mark.parametrize("download_kwargs", [{}, {"period": "1d"}, None])
+    def test_from_data_explicit_download_kwargs(self, download_kwargs):
+        source = pd.Series([1.0], name="close")
+        data = vbt.Data.from_data({"A": source}, download_kwargs=download_kwargs)
+        # Keep explicit values, including None, exactly as the existing constructor forwards them.
+        assert data.download_kwargs is download_kwargs
+        pd.testing.assert_series_equal(data.get(), source)
+
+    def test_from_data_configured_defaults(self, monkeypatch):
+        monkeypatch.setitem(vbt.settings.data, "tz_localize", "UTC")
+        monkeypatch.setitem(vbt.settings.data, "tz_convert", "Europe/Berlin")
+        monkeypatch.setitem(vbt.settings.data, "missing_index", "drop")
+        monkeypatch.setitem(vbt.settings.data, "missing_columns", "drop")
+        index = pd.date_range("2020-01-01", periods=3, name="time")
+        source = {
+            "A": pd.DataFrame({"open": [1.0, 2.0], "close": [10.0, 20.0]}, index=index[:2]),
+            "B": pd.DataFrame({"close": [21.0, 31.0], "volume": [200.0, 300.0]}, index=index[1:]),
+        }
+
+        # Both axes intersect at one timestamp/column; timezone conversion must still use settings.
+        with pytest.warns(UserWarning, match="mismatching"):
+            data = vbt.Data.from_data(source)
+        expected_index = pd.DatetimeIndex(["2020-01-02"], tz="UTC", name="time").tz_convert(
+            to_timezone("Europe/Berlin")
+        )
+        expected = pd.DataFrame(
+            {"A": [20.0], "B": [21.0]}, index=expected_index, columns=pd.Index(["A", "B"], name="symbol")
+        )
+        pd.testing.assert_frame_equal(data.get("close"), expected)
+        assert data.get("close").index.tz == expected_index.tz
+        assert data.missing_index == data.missing_columns == "drop"
+        assert data.tz_localize == "UTC"
+        assert data.tz_convert == "Europe/Berlin"
+        assert data.download_kwargs == {}
+
     def test_config(self, tmp_path):
         data = MyData.download([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert MyData.loads(data.dumps()) == data

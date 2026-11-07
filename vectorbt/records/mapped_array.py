@@ -653,14 +653,14 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         return dispatch.bottom_n_mapped_mask(self.values, col_map, n, engine=engine)
 
     @cached_method
-    def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
+    def top_n(self: MappedArrayT, n: int, group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
         """Filter top N elements from each column/group."""
-        return self.apply_mask(self.top_n_mask(n), **kwargs)
+        return self.apply_mask(self.top_n_mask(n, group_by=group_by), group_by=group_by, **kwargs)
 
     @cached_method
-    def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
+    def bottom_n(self: MappedArrayT, n: int, group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
-        return self.apply_mask(self.bottom_n_mask(n), **kwargs)
+        return self.apply_mask(self.bottom_n_mask(n, group_by=group_by), group_by=group_by, **kwargs)
 
     @cached_method
     def is_expandable(

@@ -103,7 +103,7 @@ fig.show()
 
 Output:
 
-![Hovering and zooming into random-strategy results](../assets/images/readme-scatter.gif){ width="750" }
+![Random-strategy mean trade expectancy](../assets/images/usage_rand_scatter.svg){ width="750" }
 
 ### Test 10,000 dual-SMA window combinations
 
@@ -124,7 +124,7 @@ fig.show()
 
 Output:
 
-![Switching assets and inspecting dual-SMA parameter returns](../assets/images/readme-heatmap.gif){ width="750" }
+![Dual-SMA window combinations across assets](../assets/images/usage_dmac_heatmap.gif){ width="750" }
 
 !!! tip "VectorBT PRO"
 
@@ -210,7 +210,9 @@ def plot(index, bbands):
             y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
         )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
     return fig
-vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
+vbt.save_animation(
+    "bbands.gif", bbands.wrapper.index, plot, bbands,
+    delta=90, step=3, fps=3, writer_kwargs=dict(loop=0))
 ```
 
 Output:
@@ -219,7 +221,7 @@ Output:
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-![Inspecting Bollinger Bands and playing the rolling-window animation](../assets/images/readme-bbands.gif){ width="750" }
+![Rolling Bollinger Bands percent-B and bandwidth heatmaps](../assets/images/usage_bbands.gif){ width="750" }
 
 ## Example apps
 

@@ -355,6 +355,18 @@ BCRT = tp.Union[
 ]
 
 
+def _restore_index_freq(index: tp.Index, references: tp.Sequence[tp.Index]) -> tp.Index:
+    """Recover time-axis frequency from the first matching reference index.
+
+    Its frequency is authoritative even when None. Deep copying prevents later
+    output-frequency changes from mutating the caller's reference index."""
+    if isinstance(index, (pd.DatetimeIndex, pd.TimedeltaIndex)):
+        for reference in references:
+            if checks.is_index_equal(index, reference):
+                return reference.copy(deep=True)
+    return index
+
+
 def broadcast(
     *args: tp.ArrayLike,
     to_shape: tp.Optional[tp.RelaxedShape] = None,
@@ -579,10 +591,13 @@ def broadcast(
                 index_to_align.append(i)
         if len(index_to_align) > 1:
             indexes = [arr_args[i].index for i in index_to_align]
-            if len(set(map(len, indexes))) > 1:
+            if any(not index.equals(indexes[0]) for index in indexes[1:]):
                 index_indices = index_fns.align_indexes(indexes)
                 for i in index_to_align:
-                    arr_args[i] = arr_args[i].iloc[index_indices[index_to_align.index(i)]]
+                    index_slice = index_indices[index_to_align.index(i)]
+                    arr_args[i] = arr_args[i].iloc[index_slice]
+                    # Final metadata selection may use any input, including an unchanged one.
+                    arr_args[i].index = _restore_index_freq(arr_args[i].index, indexes)
     if align_columns:
         cols_to_align = []
         for i in range(len(arr_args)):
@@ -590,10 +605,12 @@ def broadcast(
                 cols_to_align.append(i)
         if len(cols_to_align) > 1:
             indexes = [arr_args[i].columns for i in cols_to_align]
-            if len(set(map(len, indexes))) > 1:
+            if any(not index.equals(indexes[0]) for index in indexes[1:]):
                 col_indices = index_fns.align_indexes(indexes)
                 for i in cols_to_align:
-                    arr_args[i] = arr_args[i].iloc[:, col_indices[cols_to_align.index(i)]]
+                    col_slice = col_indices[cols_to_align.index(i)]
+                    arr_args[i] = arr_args[i].iloc[:, col_slice]
+                    arr_args[i].columns = _restore_index_freq(arr_args[i].columns, indexes)
 
     # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
     arr_args_2d = [arg.to_frame() if is_2d and checks.is_series(arg) else arg for arg in arr_args]
