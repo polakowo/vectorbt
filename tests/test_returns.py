@@ -486,6 +486,17 @@ class TestAccessors:
             # Equal values after subtracting the risk-free rate also count as zero volatility
             assert np.isnan(const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.001, engine=engine))
 
+        # Constant +/-inf columns have NaN std; all engines/layouts must return NaN, not signed inf
+        # (the contiguous Rust path used to treat them as zero-volatility via the constant shortcut).
+        inf_arr = np.column_stack([np.full(32, np.inf), np.full(32, -np.inf)])
+        for order in ("C", "F"):
+            arr = np.array(inf_arr, order=order, copy=True)
+            assert arr.flags["C_CONTIGUOUS"] == (order == "C")
+            assert arr.flags["F_CONTIGUOUS"] == (order == "F")
+            for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
+                out = vbt.returns.dispatch.sharpe_ratio(arr, 252.0, 0.0, 1, engine=engine)
+                assert np.isnan(out).all(), (order, engine, out)
+
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
             rets.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),

@@ -608,7 +608,7 @@ pub(crate) fn sharpe_ratio_2d(returns: ArrayView2<'_, f64>, ann_factor: f64, ris
             if nrows >= 2 && counts[col] > ddof {
                 let mean = sums[col] / counts[col] as f64;
                 let std = (sq[col] / (counts[col] - ddof) as f64).sqrt();
-                out[col] = if std == 0.0 || constant[col] {
+                out[col] = if std == 0.0 || (!std.is_nan() && constant[col]) {
                     zero_std_ratio(mean)
                 } else {
                     mean / std * ann_sqrt
