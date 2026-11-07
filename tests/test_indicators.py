@@ -1,3 +1,5 @@
+import os
+import subprocess
 import sys
 from collections import namedtuple
 from datetime import datetime
@@ -3221,6 +3223,142 @@ class TestBasic:
                 columns=columns,
             ),
         )
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    @pytest.mark.parametrize("order", ["C", "F"])
+    def test_ATR_unsigned(self, dtype, order):
+        # Distinct columns include falling prices and gaps in both directions.
+        high = np.array([[105, 95], [95, 105], [109, 99], [100, 100]], dtype=dtype, order=order)
+        low = np.array([[95, 90], [90, 95], [100, 90], [98, 98]], dtype=dtype, order=order)
+        close = np.array([[100, 92], [92, 100], [105, 94], [99, 99]], dtype=dtype, order=order)
+        before = [a.copy() for a in (high, low, close)]
+        # For example, the falling first column has max(5, abs(95-100), abs(90-100)) = 10.
+        expected = np.array([[10.0, 5.0], [10.0, 13.0], [17.0, 10.0], [7.0, 6.0]])
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(high, low, close), expected)
+
+        index = pd.date_range("2024-01-01", periods=4, tz="UTC", name="date")
+        columns = pd.Index(["A", "B"], name="asset")
+        frames = [pd.DataFrame(a, index=index, columns=columns) for a in (high, low, close)]
+        result = vbt.ATR.run(*frames, window=1, ewm=False, engine="numba")
+        expected_columns = pd.MultiIndex.from_tuples(
+            [(1, False, "A"), (1, False, "B")], names=["atr_window", "atr_ewm", "asset"]
+        )
+        expected_frame = pd.DataFrame(expected, index=index, columns=expected_columns)
+        pd.testing.assert_frame_equal(result.tr, expected_frame)
+        pd.testing.assert_frame_equal(result.atr, expected_frame)
+        for original, snapshot in zip((high, low, close), before):
+            np.testing.assert_array_equal(original, snapshot)
+
+    @pytest.mark.parametrize("dtype", [np.uint64, np.int64])
+    def test_ATR_large_integer_precision(self, dtype):
+        # Converting prices to float first would erase these one-unit movements.
+        top = int(np.iinfo(dtype).max)
+        prices = np.array([top - 3, top - 2, top - 3], dtype=dtype)
+        expected = np.array([0.0, 1.0, 1.0])
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.true_range_nb(prices[:, None], prices[:, None], prices[:, None])[:, 0], expected
+        )
+        series = pd.Series(prices, index=pd.date_range("2024-01-01", periods=3), name="price")
+        result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine="numba")
+        expected_series = pd.Series(expected, index=series.index, name=(1, False, "price"))
+        pd.testing.assert_series_equal(result.tr, expected_series)
+        pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("start", [-(2**63), -(2**63) + 1, -1])
+    @pytest.mark.parametrize("reverse", [False, True])
+    def test_ATR_signed_boundary(self, start, reverse):
+        # Equal OHLC prices isolate an exact 2**63 gap, where signed abs can overflow.
+        prices = np.array([start, start + 2**63], dtype=np.int64)
+        if reverse:
+            prices = prices[::-1]
+        expected = np.array([0.0, float(2**63)])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+
+        # Integer auto fallback and the public indicator must retain the corrected distance.
+        series = pd.Series(prices, index=pd.date_range("2024-01-01", periods=2), name="price")
+        expected_series = pd.Series(expected, index=series.index, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(vbt.indicators.dispatch.true_range(*arrays, engine=engine)[:, 0], expected)
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int32, np.int64])
+    def test_ATR_signed_full_span(self, dtype):
+        # The previous-close distance can exceed the largest signed value in either direction.
+        bottom, top = int(np.iinfo(dtype).min), int(np.iinfo(dtype).max)
+        prices = np.array([bottom, top, bottom], dtype=dtype)
+        expected = np.array([0.0, float(top - bottom), float(top - bottom)])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+        series = pd.Series(prices, name="price")
+        expected_series = pd.Series(expected, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint32])
+    def test_true_range_integer_distance_mixed(self, dtype):
+        # These mixed operands still need a signed-int64-sized distance before output conversion.
+        a, b = np.int64(np.iinfo(np.int64).min), dtype(np.iinfo(dtype).max)
+        expected = float(int(b) - int(a))
+        assert vbt.indicators.nb._true_range_distance_nb(a, b) == expected
+        assert vbt.indicators.nb._true_range_distance_nb(b, a) == expected
+
+    def test_ATR_signed_boundary_unoptimized(self, tmp_path):
+        # A fresh cache and subprocess prevent default-optimized code from masking signed overflow.
+        script = """
+import numpy as np
+import pandas as pd
+import vectorbt as vbt
+from numba import config
+
+assert config.OPT == 0
+for endpoints in ((-(2**63), 0), (-(2**63) + 1, 1), (-1, 2**63 - 1), (-(2**63), 2**63 - 1, -(2**63))):
+    for reverse in (False, True):
+        prices = np.array(endpoints, dtype=np.int64)
+        if reverse:
+            prices = prices[::-1]
+        expected = np.array([0.0] + [float(abs(int(b) - int(a))) for a, b in zip(prices[:-1], prices[1:])])
+        arrays = (prices[:, None],) * 3
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(*arrays)[:, 0], expected)
+        series = pd.Series(prices, name="price")
+        expected_series = pd.Series(expected, name=(1, False, "price"))
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(vbt.indicators.dispatch.true_range(*arrays, engine=engine)[:, 0], expected)
+            result = vbt.ATR.run(series, series, series, window=1, ewm=False, engine=engine)
+            pd.testing.assert_series_equal(result.tr, expected_series)
+            pd.testing.assert_series_equal(result.atr, expected_series)
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "NUMBA_OPT": "0", "NUMBA_CACHE_DIR": str(tmp_path)},
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    def test_true_range_floating_controls(self, dtype):
+        # A missing previous close leaves the finite high-low range usable, as before.
+        high = np.array([np.nan, 11, 12, 13, np.inf], dtype=dtype)[:, None]
+        low = np.array([0, 9, 10, 11, 11], dtype=dtype)[:, None]
+        close = np.array([5, np.nan, 11, 12, 12], dtype=dtype)[:, None]
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.true_range_nb(high, low, close)[:, 0], [np.nan, 6.0, 2.0, 2.0, np.inf]
+        )
+        # Retain subtraction in the input floating dtype, including float32 rounding.
+        prices = np.array([1e8, 1.0], dtype=dtype)[:, None]
+        expected = 1e8 if dtype == np.float32 else 99999999.0
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(prices, prices, prices)[:, 0], [0.0, expected])
+
+    @pytest.mark.parametrize("dtype", [np.uint64, np.float64])
+    @pytest.mark.parametrize("length", [0, 1])
+    def test_true_range_short(self, dtype, length):
+        prices = np.zeros((length, 2), dtype=dtype)
+        np.testing.assert_array_equal(vbt.indicators.nb.true_range_nb(prices, prices, prices), np.zeros(prices.shape))
 
     def test_OBV(self):
         pd.testing.assert_series_equal(

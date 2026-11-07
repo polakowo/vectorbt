@@ -199,6 +199,112 @@ class TestAccessors:
         np.testing.assert_array_equal(df["a"].vbt.diff().values, nb.diff_1d_nb(df["a"].values))
         pd.testing.assert_frame_equal(df.vbt.diff(), df.diff())
 
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("n", [-6, -5, -2, -1, 0, 1, 2, 5, 6])
+    def test_difference_periods(self, method, n):
+        # Mixed values distinguish zero-lag arithmetic from simply filling with zeros.
+        frame = pd.DataFrame(
+            [[1.0, np.inf], [2.0, 0.0], [4.0, -2.0], [np.nan, 4.0], [8.0, np.nan]],
+            index=pd.date_range("2024-01-01", periods=5, tz="UTC", name="date"),
+            columns=pd.Index(["a", "b"], name="asset"),
+        )
+        before = frame.copy(deep=True)
+        values = frame.to_numpy()
+        expected_values = np.full(values.shape, np.nan)
+        # Derive each pair by its row positions, independently of the kernel's slicing.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            for row in range(len(frame)):
+                previous = row - n
+                if 0 <= previous < len(frame):
+                    for col in range(values.shape[1]):
+                        current, reference = values[row, col], values[previous, col]
+                        expected_values[row, col] = (
+                            current - reference if method == "diff" else current / reference - 1
+                        )
+        expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
+        pandas_kwargs = {"fill_method": None} if method == "pct_change" else {}
+        pd.testing.assert_frame_equal(getattr(frame, method)(periods=n, **pandas_kwargs), expected)
+
+        # Both dimensional kernels and labeled accessors must preserve the same pairs and metadata.
+        np.testing.assert_array_equal(getattr(nb, method + "_nb")(values, n), expected_values)
+        np.testing.assert_array_equal(getattr(nb, method + "_1d_nb")(values[:, 0], n), expected_values[:, 0])
+        pd.testing.assert_frame_equal(getattr(frame.vbt, method)(n=n, engine="numba"), expected)
+        pd.testing.assert_series_equal(
+            getattr(frame.iloc[:, 0].vbt, method)(n=n, engine="numba"), expected.iloc[:, 0]
+        )
+        pd.testing.assert_frame_equal(frame, before)
+
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("length", [0, 1])
+    @pytest.mark.parametrize("n", [np.iinfo(np.int64).min, -2, -1, 0, 1, 2, np.iinfo(np.int64).max])
+    def test_difference_periods_short(self, method, length, n):
+        values = np.array([[1.0, 0.0]])[:length]
+        expected = np.full(values.shape, np.nan)
+        if n == 0:
+            expected[:] = 0.0
+            if method == "pct_change":
+                expected[:, 1] = np.nan
+        # Extreme signed lags have no valid pair and must not overflow when direction is reversed.
+        np.testing.assert_array_equal(getattr(nb, method + "_nb")(values, n), expected)
+        np.testing.assert_array_equal(getattr(nb, method + "_1d_nb")(values[:, 0], n), expected[:, 0])
+
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16])
+    @pytest.mark.parametrize("n", [-6, -5, -2, -1, 0, 1, 2, 5, 6])
+    def test_diff_narrow_integer(self, dtype, n):
+        limits = np.iinfo(dtype)
+        # Opposite column directions expose overflow of both signs and accidental column mixing.
+        frame = pd.DataFrame(
+            np.array(
+                [
+                    [limits.max, limits.min],
+                    [limits.min, limits.max],
+                    [0, 1],
+                    [limits.max, limits.min],
+                    [limits.min, limits.max],
+                ],
+                dtype=dtype,
+            ),
+            index=pd.date_range("2024-01-01", periods=5, tz="UTC", name="date"),
+            columns=pd.MultiIndex.from_tuples([("a", "x"), ("b", "y")], names=["asset", "field"]),
+        )
+        before = frame.copy(deep=True)
+        values = frame.to_numpy()
+        expected_values = np.full(values.shape, np.nan)
+        # Python integers determine the result independently of fixed-width NumPy subtraction.
+        for row in range(len(frame)):
+            if 0 <= row - n < len(frame):
+                for col in range(values.shape[1]):
+                    expected_values[row, col] = int(values[row, col]) - int(values[row - n, col])
+        expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
+
+        np.testing.assert_array_equal(nb.diff_nb(values, n), expected_values)
+        np.testing.assert_array_equal(nb.diff_1d_nb(values[:, 0], n), expected_values[:, 0])
+        pd.testing.assert_frame_equal(frame.vbt.diff(n=n, engine="numba"), expected)
+        pd.testing.assert_series_equal(frame.iloc[:, 0].vbt.diff(n=n, engine="numba"), expected.iloc[:, 0])
+        pd.testing.assert_frame_equal(frame.diff(n).astype(np.float64), expected)
+        pd.testing.assert_frame_equal(frame, before)
+
+    @pytest.mark.parametrize("dtype", [np.int8, np.int16])
+    @pytest.mark.parametrize("length", [0, 1])
+    def test_diff_narrow_integer_short(self, dtype, length):
+        values = np.zeros((length, 2), dtype=dtype)
+        np.testing.assert_array_equal(nb.diff_nb(values), np.full(values.shape, np.nan))
+        np.testing.assert_array_equal(nb.diff_1d_nb(values[:, 0]), np.full(length, np.nan))
+
+    @pytest.mark.parametrize(
+        "values,expected",
+        [
+            (np.array([2**31 - 1, -(2**31), 2**31 - 1], dtype=np.int32), [np.nan, 1.0, -1.0]),
+            (np.array([2**63 - 2, 2**63 - 1, -(2**63)], dtype=np.int64), [np.nan, 1.0, 1.0]),
+            (np.array([255, 0, 255], dtype=np.uint8), [np.nan, 1.0, 255.0]),
+            (np.array([1e8, 1], dtype=np.float32), [np.nan, -1e8]),
+            (np.array([np.nan, 1, np.inf, 3], dtype=np.float64), [np.nan, np.nan, np.inf, -np.inf]),
+        ],
+    )
+    def test_diff_other_dtypes(self, values, expected):
+        # Narrow-integer promotion must preserve wider-integer precision and other arithmetic rules.
+        np.testing.assert_array_equal(nb.diff_1d_nb(values), expected)
+
     def test_pct_change(self):
         pd.testing.assert_series_equal(df["a"].vbt.pct_change(), df["a"].pct_change(fill_method=None))
         np.testing.assert_array_equal(df["a"].vbt.pct_change().values, nb.pct_change_1d_nb(df["a"].values))
@@ -249,6 +355,53 @@ class TestAccessors:
             df.vbt.rolling_max(test_window, minp=test_minp), df.rolling(test_window, min_periods=test_minp).max()
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_max(test_window), df.rolling(test_window).max())
+
+    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
+    @pytest.mark.parametrize("test_window", [3, 10, 11, 25, 120, 250])
+    @pytest.mark.parametrize("test_minp", [None, 0, 1, 2])
+    def test_rolling_min_max_long(self, test_engine, test_window, test_minp):
+        if test_engine == "rust" and not _engine.is_rust_available():
+            pytest.skip("vectorbt-rust is not installed or version-compatible")
+        # Long input covering both the direct-scan (small window) and deque (large window) paths,
+        # with NaN gaps longer than the window, repeated values, and monotonic runs
+        rng = np.random.default_rng(42)
+        values = rng.integers(-5, 5, size=(200, 3)).astype(np.float64)
+        values[rng.random(values.shape) < 0.2] = np.nan
+        values[50:80, 0] = np.nan
+        values[100:150, 1] = np.arange(50)
+        values[100:150, 2] = -np.arange(50)
+        long_df = pd.DataFrame(values, columns=["a", "b", "c"])
+        pd_minp = test_window if test_minp is None else test_minp
+        pd.testing.assert_frame_equal(
+            long_df.vbt.rolling_min(test_window, minp=test_minp, engine=test_engine),
+            long_df.rolling(test_window, min_periods=pd_minp).min(),
+        )
+        pd.testing.assert_frame_equal(
+            long_df.vbt.rolling_max(test_window, minp=test_minp, engine=test_engine),
+            long_df.rolling(test_window, min_periods=pd_minp).max(),
+        )
+
+    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
+    def test_rolling_min_max_ties(self, test_engine):
+        if test_engine == "rust" and not _engine.is_rust_available():
+            pytest.skip("vectorbt-rust is not installed or version-compatible")
+        # Expected values are from the previous naive scan. Not compared against pandas,
+        # which resolves signed-zero ties differently and mishandles windows of -inf.
+        sr = pd.Series([0.0, -0.0, 0.0, 1.0, -0.0, np.nan, 0.0, -np.inf, -np.inf, 2.0, np.inf, 0.0, -0.0, 0.0])
+        inf = np.inf
+        expected = {
+            # window 3 takes the direct-scan path, window 12 the deque path
+            (3, "min"): [0.0, -0.0, 0.0, -0.0, -0.0, -0.0, 0.0, -inf, -inf, -inf, -inf, 0.0, -0.0, 0.0],
+            (3, "max"): [0.0, -0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 2.0, inf, inf, inf, 0.0],
+            (12, "min"): [0.0, -0.0, 0.0, 0.0, -0.0, 0.0, 0.0, -inf, -inf, -inf, -inf, -inf, -inf, -inf],
+            (12, "max"): [0.0, -0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, inf, inf, inf, inf],
+        }
+        for (window, func), exp in expected.items():
+            out = getattr(sr.vbt, "rolling_" + func)(window, minp=1, engine=test_engine).values
+            exp = np.array(exp)
+            np.testing.assert_array_equal(out, exp)
+            # assert_array_equal treats 0.0 == -0.0, so check the sign separately
+            np.testing.assert_array_equal(np.signbit(out), np.signbit(exp))
 
     @pytest.mark.parametrize("test_window,test_minp", list(product([1, 2, 3, 4, 5], [1, None])))
     def test_rolling_mean(self, test_window, test_minp):

@@ -454,7 +454,8 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             if isinstance(v, pd.Series):
                 v = v.to_frame()
             v = v.reindex(columns=columns)
-            if not multiple_columns:
+            # A Series can represent the aligned columns only when exactly one remains.
+            if not multiple_columns and len(columns) == 1:
                 v = v[columns[0]]
                 if name_is_none:
                     v = v.rename(None)
@@ -660,7 +661,16 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         for k, v in new_data.items():
             if isinstance(self.data[k], pd.Series):
                 if isinstance(v, pd.DataFrame):
-                    v = v[self.data[k].name]
+                    column = self.data[k].name
+                    # An unnamed Series becomes column 0, not an explicit None label or MultiIndex prefix.
+                    if (
+                        column is None
+                        and not isinstance(v.columns, pd.MultiIndex)
+                        and column not in v.columns
+                        and 0 in v.columns
+                    ):
+                        column = 0
+                    v = v[column]
             else:
                 v = v[self.data[k].columns]
             v = pd.concat((self.data[k], v), axis=0)

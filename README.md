@@ -233,7 +233,7 @@ fig.show()
 
 Output:
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-scatter.gif" alt="Hovering and zooming into random-strategy results" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_rand_scatter.svg" alt="Random-strategy mean trade expectancy" />
 
 ### Test 10,000 dual-SMA window combinations
 
@@ -257,7 +257,7 @@ fig.show()
 
 Output:
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-heatmap.gif" alt="Switching assets and inspecting dual-SMA parameter returns" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_dmac_heatmap.gif" alt="Dual-SMA window combinations across assets" />
 
 > [!TIP]
 > **VectorBT PRO**
@@ -344,7 +344,9 @@ def plot(index, bbands):
         )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
     return fig
 
-vbt.save_animation("bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
+vbt.save_animation(
+    "bbands.gif", bbands.wrapper.index, plot, bbands,
+    delta=90, step=3, fps=3, writer_kwargs=dict(loop=0))
 ```
 
 Output:
@@ -353,7 +355,7 @@ Output:
 100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
 ```
 
-<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/readme-bbands.gif" alt="Inspecting Bollinger Bands and playing the rolling-window animation" />
+<img width="750" src="https://raw.githubusercontent.com/polakowo/vectorbt/master/docs/docs/assets/images/usage_bbands.gif" alt="Rolling Bollinger Bands percent-B and bandwidth heatmaps" />
 
 Visit the [website](https://vectorbt.dev/) for more examples, documentation, and guides.
 
