@@ -199,8 +199,57 @@ class TestAccessors:
         np.testing.assert_array_equal(df["a"].vbt.diff().values, nb.diff_1d_nb(df["a"].values))
         pd.testing.assert_frame_equal(df.vbt.diff(), df.diff())
 
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("n", [-6, -5, -2, -1, 0, 1, 2, 5, 6])
+    def test_difference_periods(self, method, n):
+        # Mixed values distinguish zero-lag arithmetic from simply filling with zeros.
+        frame = pd.DataFrame(
+            [[1.0, np.inf], [2.0, 0.0], [4.0, -2.0], [np.nan, 4.0], [8.0, np.nan]],
+            index=pd.date_range("2024-01-01", periods=5, tz="UTC", name="date"),
+            columns=pd.Index(["a", "b"], name="asset"),
+        )
+        before = frame.copy(deep=True)
+        values = frame.to_numpy()
+        expected_values = np.full(values.shape, np.nan)
+        # Derive each pair by its row positions, independently of the kernel's slicing.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            for row in range(len(frame)):
+                previous = row - n
+                if 0 <= previous < len(frame):
+                    for col in range(values.shape[1]):
+                        current, reference = values[row, col], values[previous, col]
+                        expected_values[row, col] = (
+                            current - reference if method == "diff" else current / reference - 1
+                        )
+        expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
+        pandas_kwargs = {"fill_method": None} if method == "pct_change" else {}
+        pd.testing.assert_frame_equal(getattr(frame, method)(periods=n, **pandas_kwargs), expected)
+
+        # Both dimensional kernels and labeled accessors must preserve the same pairs and metadata.
+        np.testing.assert_array_equal(getattr(nb, method + "_nb")(values, n), expected_values)
+        np.testing.assert_array_equal(getattr(nb, method + "_1d_nb")(values[:, 0], n), expected_values[:, 0])
+        pd.testing.assert_frame_equal(getattr(frame.vbt, method)(n=n, engine="numba"), expected)
+        pd.testing.assert_series_equal(
+            getattr(frame.iloc[:, 0].vbt, method)(n=n, engine="numba"), expected.iloc[:, 0]
+        )
+        pd.testing.assert_frame_equal(frame, before)
+
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("length", [0, 1])
+    @pytest.mark.parametrize("n", [np.iinfo(np.int64).min, -2, -1, 0, 1, 2, np.iinfo(np.int64).max])
+    def test_difference_periods_short(self, method, length, n):
+        values = np.array([[1.0, 0.0]])[:length]
+        expected = np.full(values.shape, np.nan)
+        if n == 0:
+            expected[:] = 0.0
+            if method == "pct_change":
+                expected[:, 1] = np.nan
+        # Extreme signed lags have no valid pair and must not overflow when direction is reversed.
+        np.testing.assert_array_equal(getattr(nb, method + "_nb")(values, n), expected)
+        np.testing.assert_array_equal(getattr(nb, method + "_1d_nb")(values[:, 0], n), expected[:, 0])
+
     @pytest.mark.parametrize("dtype", [np.int8, np.int16])
-    @pytest.mark.parametrize("n", [1, 2, 5, 6])
+    @pytest.mark.parametrize("n", [-6, -5, -2, -1, 0, 1, 2, 5, 6])
     def test_diff_narrow_integer(self, dtype, n):
         limits = np.iinfo(dtype)
         # Opposite column directions expose overflow of both signs and accidental column mixing.
@@ -222,9 +271,10 @@ class TestAccessors:
         values = frame.to_numpy()
         expected_values = np.full(values.shape, np.nan)
         # Python integers determine the result independently of fixed-width NumPy subtraction.
-        for row in range(n, len(frame)):
-            for col in range(values.shape[1]):
-                expected_values[row, col] = int(values[row, col]) - int(values[row - n, col])
+        for row in range(len(frame)):
+            if 0 <= row - n < len(frame):
+                for col in range(values.shape[1]):
+                    expected_values[row, col] = int(values[row, col]) - int(values[row - n, col])
         expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
 
         np.testing.assert_array_equal(nb.diff_nb(values, n), expected_values)
