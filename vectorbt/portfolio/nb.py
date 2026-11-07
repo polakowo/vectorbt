@@ -62,6 +62,28 @@ from vectorbt.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, a
 # ############# Order processing ############# #
 
 
+size_granularity_rel_tol = 4 * np.finfo(np.float64).eps
+"""Relative tolerance of `floor_to_granularity_nb`, about 8.9e-16.
+
+Covers floating-point rounding of the size, the granularity and their quotient
+(`4.3 / 0.1 == 42.99999999999999`), not a fraction of a lot."""
+
+
+@njit(cache=True)
+def floor_to_granularity_nb(size: float, size_granularity: float) -> float:
+    """Floor `size` to a multiple of `size_granularity`.
+
+    A number of lots within `size_granularity_rel_tol` of a whole number counts as that number.
+    The result never exceeds `size`."""
+    lots = size / size_granularity
+    nearest = np.floor(lots + 0.5)
+    if abs(lots - nearest) <= size_granularity_rel_tol * abs(nearest):
+        lots = nearest
+    else:
+        lots = np.floor(lots)
+    return min(lots * size_granularity, size)
+
+
 @njit(cache=True)
 def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
     """Return `OrderResult` for order that hasn't been filled."""
@@ -142,7 +164,7 @@ def buy_nb(
 
     # Adjust granularity
     if not np.isnan(size_granularity):
-        adj_size = adj_size // size_granularity * size_granularity
+        adj_size = floor_to_granularity_nb(adj_size, size_granularity)
 
     # Get cash required to complete this order
     req_cash = adj_size * adj_price
@@ -167,7 +189,7 @@ def buy_nb(
 
         if not np.isnan(size_granularity):
             # Adjust granularity
-            final_size = max_acq_size // size_granularity * size_granularity
+            final_size = floor_to_granularity_nb(max_acq_size, size_granularity)
             new_req_cash = final_size * adj_price
             fees_paid = new_req_cash * fees + fixed_fees
             final_req_cash = new_req_cash + fees_paid
@@ -291,7 +313,7 @@ def sell_nb(
 
     # Adjust granularity
     if not np.isnan(size_granularity):
-        size_limit = size_limit // size_granularity * size_granularity
+        size_limit = floor_to_granularity_nb(size_limit, size_granularity)
 
     if is_close_nb(size_limit, 0):
         return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
