@@ -979,7 +979,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             and wrap_kwargs is None
             and ddof == 1
         ):
-            return self.to_pd().describe(percentiles=percentiles)
+            return self.to_pd(ignore_index=True, group_by=group_by).describe(percentiles=percentiles)
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
         else:
