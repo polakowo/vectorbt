@@ -905,6 +905,95 @@ class TestFromOrders:
             np.array([(0, 0, 0, 90.0, 1.0, 9.1, 1), (1, 0, 1, 82.0, 2.0, 16.5, 0)], dtype=order_dt),
         )
 
+    def test_size_granularity_fractional(self):
+        close = pd.Series([10.0, 10.0])
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([1.0, -1.0]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0), (1, 0, 1, 1.0, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([0.9, -0.9]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 0.9, 10.0, 0.0, 0), (1, 0, 1, 0.9, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([np.inf, np.nan]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 10.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([1.0, np.nan]), size_granularity=0.001, allow_partial=False
+            ).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+
+    def test_size_granularity_lot_boundary(self):
+        close = pd.Series([10.0, 10.0])
+        for size, size_granularity in ((4.3, 0.1), (8.1, 0.1), (0.29, 0.01), (0.58, 0.01)):
+            record_arrays_close(
+                vbt.Portfolio.from_orders(
+                    close, pd.Series([size, np.nan]), size_granularity=size_granularity
+                ).order_records,
+                np.array([(0, 0, 0, size, 10.0, 0.0, 0)], dtype=order_dt),
+            )
+        pf = vbt.Portfolio.from_orders(close, pd.Series([4.3, -4.3]), size_granularity=pd.Series([np.nan, 0.1]))
+        record_arrays_close(
+            pf.order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert pf.assets().iloc[-1] == 0
+        pf = vbt.Portfolio.from_orders(
+            close, pd.Series([4.3, -np.inf]), size_granularity=pd.Series([np.nan, 0.1]), direction="longonly"
+        )
+        record_arrays_close(
+            pf.order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert pf.assets().iloc[-1] == 0
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([4.3, -4.3]), size_granularity=0.1, allow_partial=False
+            ).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([np.inf, np.nan]), size_granularity=0.1, init_cash=43.0
+            ).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([4.35, np.nan]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+
+    def test_size_granularity_rounding_bound(self):
+        close = pd.Series([10.0, 10.0])
+
+        def filled(size, size_granularity):
+            pf = vbt.Portfolio.from_orders(
+                close, pd.Series([size, np.nan]), size_granularity=size_granularity, init_cash=1e6
+            )
+            return pf.order_records["size"].tolist()
+
+        # Large lot counts: a fraction of a lot is floored
+        assert filled(1.0000000006, 1e-9) == [1.0]
+        assert filled(0.9999999996, 1e-9) == [0.999999999]
+        assert filled(1 - 2e-13, 1e-12) == [0.999999999999]
+        # Short of one lot by more than rounding error: no trade
+        assert filled(0.1 * (1 - 1e-10), 0.1) == []
+        assert filled(1000 * (1 - 1e-10), 1000.0) == []
+        # Short of one lot by one ulp: fills the requested size
+        assert filled(np.nextafter(0.1, 0), 0.1) == [np.nextafter(0.1, 0)]
+        # A position summed from a few fills of one lot closes flat
+        for size_granularity in (0.1, 0.01, 0.001):
+            pf = vbt.Portfolio.from_orders(
+                pd.Series(np.full(11, 10.0)),
+                pd.Series([size_granularity] * 10 + [-np.inf]),
+                size_granularity=size_granularity,
+                direction="longonly",
+            )
+            assert pf.assets().iloc[-1] == 0
+
     def test_price(self):
         record_arrays_close(
             from_orders_both(price=price * 1.01).order_records,
