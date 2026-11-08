@@ -575,6 +575,7 @@ class TestMappedArray:
             mapped_array.describe(percentiles=np.arange(0, 1, 0.1)),
             mapped_array.to_pd().describe(percentiles=np.arange(0, 1, 0.1)),
         )
+        pd.testing.assert_frame_equal(mapped_array_grouped.describe(group_by=False), mapped_array.describe())
         pd.testing.assert_frame_equal(
             mapped_array_grouped.describe(),
             pd.DataFrame(

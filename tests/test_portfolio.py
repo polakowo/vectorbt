@@ -9,6 +9,7 @@ from numba.typed import List
 
 import vectorbt as vbt
 from tests.utils import record_arrays_close
+from vectorbt.base import reshape_fns
 from vectorbt.generic.enums import drawdown_dt
 from vectorbt.portfolio import dispatch, nb
 from vectorbt.portfolio.enums import *
@@ -699,6 +700,78 @@ def from_orders_shortonly(close=price, size=order_size, **kwargs):
 
 
 class TestFromOrders:
+    @pytest.mark.parametrize("kind", ["string", "datetime", "timedelta"])
+    @pytest.mark.parametrize("wrapped_first", [False, True])
+    @pytest.mark.parametrize("representation", ["categorical", "one_level"])
+    @pytest.mark.parametrize("cash_sharing", [False, True])
+    def test_equal_length_representation_column_alignment(self, kind, wrapped_first, representation, cash_sharing):
+        if kind == "string":
+            keys = pd.Index(["A", "B", "C"], name="asset")
+        elif kind == "datetime":
+            keys = pd.date_range("2020", periods=3, name="asset")
+        else:
+            keys = pd.timedelta_range("0D", periods=3, name="asset")
+        if representation == "categorical":
+            wrapped = pd.CategoricalIndex(keys, name="asset")
+        else:
+            wrapped = pd.MultiIndex.from_arrays([keys])
+        size_columns, price_columns = (wrapped, keys) if wrapped_first else (keys, wrapped)
+        size = pd.DataFrame([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], columns=size_columns)
+        close = pd.DataFrame(
+            [[10.0, 100.0, 1000.0], [20.0, 120.0, 1100.0], [30.0, 140.0, 1200.0]], columns=price_columns
+        ).iloc[:, [2, 0, 1]]
+        # Native metadata is selected only after an independent explicit reorder; accounting is hand-derived.
+        expected_columns = reshape_fns.broadcast_index(
+            [size, close.iloc[:, [1, 2, 0]]], close.shape, index_from="stack", axis=1
+        )
+        pf = vbt.Portfolio.from_orders(
+            close, size=size, init_cash=1000.0, cash_sharing=cash_sharing, freq="1D", engine="numba"
+        )
+        pd.testing.assert_index_equal(pf.wrapper.columns, expected_columns)
+        # One unit of the first timestamp/tenor buys at 10, leaving cash 990 and assets 10/20/30.
+        record_arrays_close(pf.order_records, np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt))
+        pd.testing.assert_frame_equal(
+            pf.asset_value(group_by=False),
+            pd.DataFrame([[10.0, 0.0, 0.0], [20.0, 0.0, 0.0], [30.0, 0.0, 0.0]], columns=expected_columns),
+        )
+        if cash_sharing:
+            pd.testing.assert_series_equal(pf.value(), pd.Series([1000.0, 1010.0, 1020.0], name="group"))
+        else:
+            pd.testing.assert_frame_equal(
+                pf.value(),
+                pd.DataFrame(
+                    [[1000.0, 1000.0, 1000.0], [1010.0, 1000.0, 1000.0], [1020.0, 1000.0, 1000.0]],
+                    columns=expected_columns,
+                ),
+            )
+
+    @pytest.mark.parametrize("cash_sharing", [False, True])
+    def test_equal_length_column_alignment(self, cash_sharing):
+        close = pd.DataFrame(
+            [[10.0, 100.0], [20.0, 120.0], [30.0, 140.0]], columns=pd.Index(["A", "B"], name="asset")
+        )
+        size = pd.DataFrame([[0.0, 1.0], [0.0, 0.0], [0.0, 0.0]], columns=pd.Index(["B", "A"], name="asset"))
+        pf = vbt.Portfolio.from_orders(
+            close, size=size, init_cash=1000.0, cash_sharing=cash_sharing, freq="1D", engine="numba"
+        )
+
+        # Size is the first labeled input: preserve its column order, but buy A at A's price.
+        pd.testing.assert_index_equal(pf.wrapper.columns, size.columns)
+        record_arrays_close(pf.order_records, np.array([(0, 1, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt))
+        pd.testing.assert_frame_equal(
+            pf.asset_value(group_by=False),
+            pd.DataFrame([[0.0, 10.0], [0.0, 20.0], [0.0, 30.0]], columns=size.columns),
+        )
+        # One unit of A earns 20; B never trades, with individual or shared cash.
+        if cash_sharing:
+            expected = pd.Series([1000.0, 1010.0, 1020.0], name="group")
+            pd.testing.assert_series_equal(pf.value(), expected)
+        else:
+            expected = pd.DataFrame(
+                [[1000.0, 1000.0], [1000.0, 1010.0], [1000.0, 1020.0]], columns=size.columns
+            )
+            pd.testing.assert_frame_equal(pf.value(), expected)
+
     def test_one_column(self):
         record_arrays_close(
             from_orders_both().order_records,
@@ -831,6 +904,95 @@ class TestFromOrders:
             from_orders_shortonly(fees=0.1, fixed_fees=0.1, size_granularity=1).order_records,
             np.array([(0, 0, 0, 90.0, 1.0, 9.1, 1), (1, 0, 1, 82.0, 2.0, 16.5, 0)], dtype=order_dt),
         )
+
+    def test_size_granularity_fractional(self):
+        close = pd.Series([10.0, 10.0])
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([1.0, -1.0]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0), (1, 0, 1, 1.0, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([0.9, -0.9]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 0.9, 10.0, 0.0, 0), (1, 0, 1, 0.9, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([np.inf, np.nan]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 10.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([1.0, np.nan]), size_granularity=0.001, allow_partial=False
+            ).order_records,
+            np.array([(0, 0, 0, 1.0, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+
+    def test_size_granularity_lot_boundary(self):
+        close = pd.Series([10.0, 10.0])
+        for size, size_granularity in ((4.3, 0.1), (8.1, 0.1), (0.29, 0.01), (0.58, 0.01)):
+            record_arrays_close(
+                vbt.Portfolio.from_orders(
+                    close, pd.Series([size, np.nan]), size_granularity=size_granularity
+                ).order_records,
+                np.array([(0, 0, 0, size, 10.0, 0.0, 0)], dtype=order_dt),
+            )
+        pf = vbt.Portfolio.from_orders(close, pd.Series([4.3, -4.3]), size_granularity=pd.Series([np.nan, 0.1]))
+        record_arrays_close(
+            pf.order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert pf.assets().iloc[-1] == 0
+        pf = vbt.Portfolio.from_orders(
+            close, pd.Series([4.3, -np.inf]), size_granularity=pd.Series([np.nan, 0.1]), direction="longonly"
+        )
+        record_arrays_close(
+            pf.order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert pf.assets().iloc[-1] == 0
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([4.3, -4.3]), size_granularity=0.1, allow_partial=False
+            ).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0), (1, 0, 1, 4.3, 10.0, 0.0, 1)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(
+                close, pd.Series([np.inf, np.nan]), size_granularity=0.1, init_cash=43.0
+            ).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+        record_arrays_close(
+            vbt.Portfolio.from_orders(close, pd.Series([4.35, np.nan]), size_granularity=0.1).order_records,
+            np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
+        )
+
+    def test_size_granularity_rounding_bound(self):
+        close = pd.Series([10.0, 10.0])
+
+        def filled(size, size_granularity):
+            pf = vbt.Portfolio.from_orders(
+                close, pd.Series([size, np.nan]), size_granularity=size_granularity, init_cash=1e6
+            )
+            return pf.order_records["size"].tolist()
+
+        # Large lot counts: a fraction of a lot is floored
+        assert filled(1.0000000006, 1e-9) == [1.0]
+        assert filled(0.9999999996, 1e-9) == [0.999999999]
+        assert filled(1 - 2e-13, 1e-12) == [0.999999999999]
+        # Short of one lot by more than rounding error: no trade
+        assert filled(0.1 * (1 - 1e-10), 0.1) == []
+        assert filled(1000 * (1 - 1e-10), 1000.0) == []
+        # Short of one lot by one ulp: fills the requested size
+        assert filled(np.nextafter(0.1, 0), 0.1) == [np.nextafter(0.1, 0)]
+        # A position summed from a few fills of one lot closes flat
+        for size_granularity in (0.1, 0.01, 0.001):
+            pf = vbt.Portfolio.from_orders(
+                pd.Series(np.full(11, 10.0)),
+                pd.Series([size_granularity] * 10 + [-np.inf]),
+                size_granularity=size_granularity,
+                direction="longonly",
+            )
+            assert pf.assets().iloc[-1] == 0
 
     def test_price(self):
         record_arrays_close(

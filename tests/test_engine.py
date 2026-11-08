@@ -49,20 +49,54 @@ class TestEngineResolution:
             indicator_dispatch.true_range(prices, prices, prices, engine="rust")
 
     @pytest.mark.parametrize("dtype", [np.int8, np.int16])
-    @pytest.mark.parametrize("n", [1, 2])
+    @pytest.mark.parametrize("n", [-3, -1, 0, 1, 2])
     def test_diff_narrow_integer_fallback(self, dtype, n):
         limits = np.iinfo(dtype)
         values = np.array([[limits.max, limits.min], [0, 1], [limits.min, limits.max]], dtype=dtype)
         expected = np.full(values.shape, np.nan)
-        for row in range(n, len(values)):
-            for col in range(values.shape[1]):
-                expected[row, col] = int(values[row, col]) - int(values[row - n, col])
+        for row in range(len(values)):
+            if 0 <= row - n < len(values):
+                for col in range(values.shape[1]):
+                    expected[row, col] = int(values[row, col]) - int(values[row - n, col])
 
         # Integers remain unsupported by Rust: auto must reach the corrected Numba path.
         assert not _engine.array_compatible_with_rust(values).supported
         for engine in ("auto", "numba"):
             np.testing.assert_array_equal(dispatch.diff(values, n=n, engine=engine), expected)
             np.testing.assert_array_equal(dispatch.diff_1d(values[:, 0], n=n, engine=engine), expected[:, 0])
+
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    @pytest.mark.parametrize("n", [-4, -3, -1, 0, 1, 3, 4])
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+    def test_difference_periods_fallback(self, method, n, dtype):
+        frame = pd.DataFrame({"a": [1.0, 2.0, 4.0], "b": [0.0, np.nan, -2.0]}, dtype=dtype)
+        kwargs = {"fill_method": None} if method == "pct_change" else {}
+        expected = getattr(frame, method)(periods=n, **kwargs).astype(np.float64)
+        # Negative periods remain outside Rust's contract and auto must use corrected Numba.
+        if n < 0:
+            assert not _engine.array_and_non_neg_int_compatible_with_rust(frame.to_numpy(), "n", n).supported
+        for engine in ("numba", "auto"):
+            np.testing.assert_array_equal(
+                getattr(dispatch, method)(frame.to_numpy(), n=n, engine=engine), expected.to_numpy()
+            )
+            np.testing.assert_array_equal(
+                getattr(dispatch, method + "_1d")(frame["a"].to_numpy(), n=n, engine=engine), expected["a"].to_numpy()
+            )
+            pd.testing.assert_frame_equal(getattr(frame.vbt, method)(n=n, engine=engine), expected)
+
+    @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
+    @pytest.mark.parametrize("method", ["diff", "pct_change"])
+    def test_difference_periods_rust_boundary(self, method):
+        values = np.array([[1.0, 0.0], [np.nan, np.inf]])
+        kwargs = {"fill_method": None} if method == "pct_change" else {}
+        expected = getattr(pd.DataFrame(values), method)(periods=0, **kwargs).to_numpy()
+        np.testing.assert_array_equal(getattr(dispatch, method)(values, n=0, engine="rust"), expected)
+        np.testing.assert_array_equal(
+            getattr(dispatch, method + "_1d")(values[:, 0], n=0, engine="rust"), expected[:, 0]
+        )
+        for function, array in ((getattr(dispatch, method), values), (getattr(dispatch, method + "_1d"), values[:, 0])):
+            with pytest.raises(ValueError, match="non-negative"):
+                function(array, n=-1, engine="rust")
 
     def test_array_compatible_with_rust(self):
         assert _engine.array_compatible_with_rust(np.array([1.0, 2.0], dtype=np.float64)).supported
@@ -2123,6 +2157,60 @@ class TestPortfolioRustParity:
         record_arrays_close(pf_rust.order_records, pf_numba.order_records)
         record_arrays_close(pf_rust.log_records, pf_numba.log_records)
         pd.testing.assert_series_equal(pf_rust.init_cash, pf_numba.init_cash)
+
+    def test_from_orders_fractional_size_granularity_parity(self):
+        price = pd.Series([10.0, 10.0, 10.0, 10.0, 10.0])
+        size = pd.Series([1.0, -1.0, 0.9, -0.9, np.inf])
+        for size_granularity in (0.1, 0.01, 0.001):
+            kwargs = dict(close=price, size=size, direction="both", size_granularity=size_granularity)
+            pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+            pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+            record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+
+    def test_from_orders_size_granularity_lot_boundary_parity(self):
+        price = pd.Series([10.0, 10.0])
+        for size_granularity in (0.1, 0.01, 0.001):
+            lots = np.arange(1, 1001) * size_granularity
+            size = pd.DataFrame([lots, np.full(lots.shape, -np.inf)])
+            kwargs = dict(
+                close=price, size=size, direction="longonly", size_granularity=size_granularity, init_cash=1e6
+            )
+            pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+            pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+            record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+            for pf in (pf_numba, pf_rust):
+                records = pf.order_records
+                np.testing.assert_allclose(records["size"][records["side"] == 0], lots)
+                np.testing.assert_allclose(records["size"][records["side"] == 1], lots)
+                np.testing.assert_array_equal(pf.assets().iloc[-1].values, 0.0)
+
+    def test_from_orders_size_granularity_rounding_bound_parity(self):
+        # Only floating-point rounding reaches the next lot, at any lot count; a real shortfall is floored
+        cases = [
+            (1.0000000006, 1e-9, 1.0),  # 1e9 lots + 0.6 lot
+            (0.9999999996, 1e-9, 0.999999999),  # 0.4 lot short of 1e9 lots
+            (1 + 6e-13, 1e-12, 1.0),  # 1e12 lots + 0.6 lot
+            (1 - 2e-13, 1e-12, 0.999999999999),  # 0.2 lot short of 1e12 lots
+            (0.001 * (1 - 1e-10), 0.001, np.nan),  # 1e-10 lot short of one lot: no trade
+            (0.1 * (1 - 1e-10), 0.1, np.nan),
+            (1000 * (1 - 1e-10), 1000.0, np.nan),
+            (0.0999, 0.1, np.nan),
+            (np.nextafter(0.001, 0), 0.001, np.nextafter(0.001, 0)),  # one ulp short: fills the requested size
+            (np.nextafter(0.1, 0), 0.1, np.nextafter(0.1, 0)),
+            (np.nextafter(1000.0, 0), 1000.0, np.nextafter(1000.0, 0)),
+        ]
+        price = pd.Series([10.0, 10.0])
+        size = pd.DataFrame([[c[0] for c in cases], [np.nan] * len(cases)])
+        size_granularity = np.array([[c[1] for c in cases]])
+        expected = np.array([c[2] for c in cases])
+        kwargs = dict(close=price, size=size, size_granularity=size_granularity, init_cash=1e6)
+        pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+        pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+        for pf in (pf_numba, pf_rust):
+            records = pf.order_records
+            filled = np.full(len(cases), np.nan)
+            filled[records["col"]] = records["size"]
+            np.testing.assert_array_equal(filled, expected)
 
     def test_from_orders_error_parity(self):
         price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
