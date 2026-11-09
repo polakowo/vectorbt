@@ -251,6 +251,7 @@ class StopEntryPriceT(tp.NamedTuple):
     Price: int = 1
     FillPrice: int = 2
     Close: int = 3
+    AvgEntryPrice: int = 4
 
 
 StopEntryPrice = StopEntryPriceT()
@@ -271,6 +272,7 @@ Attributes:
     Price: Default price.
     FillPrice: Fill price (that is, slippage is already applied).
     Close: Closing price.
+    AvgEntryPrice: Average entry price of the current position.
 """
 
 
@@ -1550,7 +1552,7 @@ __pdoc__[
 
 Final price will depend upon slippage.
 
-* If `-np.inf`, replaced by the current open (if available) or the previous close (≈ the current open in crypto).
+* If `-np.inf`, replaced by the current open (if available) or the previous close (â the current open in crypto).
 * If `np.inf`, replaced by the current close.
 
 !!! note
