@@ -654,7 +654,7 @@ fn trade_record_offsets(records: &Bound<'_, pyo3::PyAny>) -> PyResult<TradeField
     })
 }
 
-/// Log record field offsets â extracted at runtime because log_dt has bool fields
+/// Log record field offsets — extracted at runtime because log_dt has bool fields
 /// whose alignment depends on the platform.
 struct LogFieldOffsets {
     id: usize,
