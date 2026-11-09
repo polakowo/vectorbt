@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
-from numba import njit
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
@@ -248,21 +247,19 @@ def drop_duplicate_levels(index: tp.Index, keep: tp.Optional[str] = None) -> tp.
     return index.droplevel(levels_to_drop)
 
 
-@njit(cache=True)
-def _align_index_to_nb(a: tp.Array1d, b: tp.Array1d) -> tp.Array1d:
-    """Return indices required to align `a` to `b`."""
-    idxs = np.empty(b.shape[0], dtype=np.int64)
-    g = 0
-    for i in range(b.shape[0]):
-        for j in range(a.shape[0]):
-            if b[i] == a[j]:
-                idxs[g] = j
-                g += 1
-                break
+def _align_index_to(a: tp.Array1d, b: tp.Array1d) -> tp.Array1d:
+    """Return first matching positions using a stable sorted index."""
+    sorter = np.argsort(a, kind="stable")
+    positions = np.searchsorted(a, b, sorter=sorter)
+    if np.any(positions >= len(a)):
+        raise ValueError("Values in second index are not in first index")
+    idxs = sorter[positions]
+    if not np.array_equal(a[idxs], b):
+        raise ValueError("Values in second index are not in first index")
     return idxs
 
 
-def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
+def align_index_to(index1: tp.Index, index2: tp.Index) -> tp.Union[slice, tp.Array1d]:
     """Align `index1` to have the same shape as `index2` if they have any levels in common.
 
     Returns index slice for the aligning."""
@@ -290,7 +287,7 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
     if len(mapper) == 0:
         raise ValueError("Can't find common levels to align both indexes")
 
-    # Factorize first to be accepted by Numba
+    # Factorize common levels, including missing values, into comparable integer keys.
     factorized = []
     for k, v in mapper.items():
         factorized.append(
@@ -311,14 +308,14 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> pd.IndexSlice:
         if np.array_equal(index1_tiled, indices2):
             return pd.IndexSlice[np.tile(np.arange(len(index1)), tile_times)]
 
-    # Do element-wise comparison
+    # Map complete keys back to source positions.
     unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
     unique1 = unique_indices[: len(index1)]
     unique2 = unique_indices[len(index1) :]
-    return pd.IndexSlice[_align_index_to_nb(unique1, unique2)]
+    return pd.IndexSlice[_align_index_to(unique1, unique2)]
 
 
-def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
+def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Union[slice, tp.Array1d]]:
     """Align multiple indexes to the first compatible longest index.
 
     Equal-length indexes require matching level names in the same order and complete
@@ -326,7 +323,9 @@ def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
     unambiguous name/value mapping; matching tuple keys alone is insufficient.
     Flat indexes can align to equivalent one-level MultiIndexes.
     Incompatible longest indexes retain their original positional order; shorter
-    indexes are aligned afterward."""
+    indexes are aligned afterward.
+
+    Returns one positional indexer per input index."""
     max_len = max(map(len, indexes))
     indices = [pd.IndexSlice[:]] * len(indexes)
     aligned_indexes = list(indexes)
@@ -339,23 +338,42 @@ def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
             if len(indexes[j]) != max_len:
                 continue
             # Match level names/count, independently of the raw Index/MultiIndex container class.
-            if indexes[i].names != aligned_indexes[j].names:
+            source_index, target_index = indexes[i], aligned_indexes[j]
+            if source_index.names != target_index.names:
                 continue
-            # Normalize each side as native alignment does, leaving actual caller axes untouched.
-            source_keys, target_keys = indexes[i], aligned_indexes[j]
-            if not isinstance(source_keys, pd.MultiIndex):
-                source_keys = pd.MultiIndex.from_arrays([source_keys])
-            if not isinstance(target_keys, pd.MultiIndex):
-                target_keys = pd.MultiIndex.from_arrays([target_keys])
-            if not source_keys.isin(target_keys).all():
-                continue
-            try:
-                index_slice = align_index_to(indexes[i], aligned_indexes[j])
-            except ValueError:
-                continue
-            # Repeated target keys can otherwise drop values despite preserving the length.
-            if not isinstance(index_slice, slice) and len(np.unique(index_slice)) != max_len:
-                continue
+            if source_index is target_index:
+                break
+            if (
+                not isinstance(source_index, (pd.MultiIndex, pd.IntervalIndex))
+                and not isinstance(target_index, (pd.MultiIndex, pd.IntervalIndex))
+                and source_index.dtype == target_index.dtype
+                and not source_index.hasnans
+                and not target_index.hasnans
+            ):
+                # Pandas flat indexers avoid building and factorizing one-tuple keys.
+                if source_index.equals(target_index):
+                    break
+                if not source_index.is_unique or not target_index.is_unique:
+                    continue
+                index_slice = source_index.get_indexer(target_index)
+                if np.any(index_slice < 0):
+                    continue
+            else:
+                # Preserve native level-name validation and missing-value normalization.
+                source_keys, target_keys = source_index, target_index
+                if not isinstance(source_keys, pd.MultiIndex):
+                    source_keys = pd.MultiIndex.from_arrays([source_keys])
+                if not isinstance(target_keys, pd.MultiIndex):
+                    target_keys = pd.MultiIndex.from_arrays([target_keys])
+                if not source_keys.isin(target_keys).all():
+                    continue
+                try:
+                    index_slice = align_index_to(source_index, target_index)
+                except ValueError:
+                    continue
+                # Repeated target keys can otherwise drop values despite preserving the length.
+                if not isinstance(index_slice, slice) and len(np.unique(index_slice)) != max_len:
+                    continue
             indices[i] = index_slice
             aligned_indexes[i] = indexes[i][index_slice]
             break

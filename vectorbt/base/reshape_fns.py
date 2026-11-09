@@ -593,8 +593,7 @@ def broadcast(
             indexes = [arr_args[i].index for i in index_to_align]
             if any(not index.equals(indexes[0]) for index in indexes[1:]):
                 index_indices = index_fns.align_indexes(indexes)
-                for i in index_to_align:
-                    index_slice = index_indices[index_to_align.index(i)]
+                for i, index_slice in zip(index_to_align, index_indices):
                     arr_args[i] = arr_args[i].iloc[index_slice]
                     # Final metadata selection may use any input, including an unchanged one.
                     arr_args[i].index = _restore_index_freq(arr_args[i].index, indexes)
@@ -607,8 +606,7 @@ def broadcast(
             indexes = [arr_args[i].columns for i in cols_to_align]
             if any(not index.equals(indexes[0]) for index in indexes[1:]):
                 col_indices = index_fns.align_indexes(indexes)
-                for i in cols_to_align:
-                    col_slice = col_indices[cols_to_align.index(i)]
+                for i, col_slice in zip(cols_to_align, col_indices):
                     arr_args[i] = arr_args[i].iloc[:, col_slice]
                     arr_args[i].columns = _restore_index_freq(arr_args[i].columns, indexes)
 

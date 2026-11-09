@@ -6,6 +6,7 @@ import pytest
 from numba import njit
 
 import vectorbt as vbt
+from tests.utils import make_index_representations
 from vectorbt.base import array_wrapper, column_grouper, combine_fns, index_fns, indexing, reshape_fns
 
 ray_available = True
@@ -1192,6 +1193,27 @@ class TestIndexFns:
             pd.MultiIndex.from_tuples([(0, 1, 2), ("a", "b", "c")], names=["x", "y", "z"]),
         )
 
+    @pytest.mark.parametrize(
+        "source,target,expected",
+        [
+            ([3, 1, 2], [2, 3, 2, 1], [2, 0, 2, 1]),
+            ([7, 7, 2**62], [2**62, 7], [2, 0]),
+            ([], [], []),
+        ],
+    )
+    def test_align_factorized_codes(self, source, target, expected):
+        np.testing.assert_array_equal(
+            index_fns._align_index_to(np.array(source, dtype=np.int64), np.array(target, dtype=np.int64)),
+            expected,
+        )
+
+    def test_align_index_to_missing_combination(self):
+        source = pd.MultiIndex.from_tuples([("a", 0), ("b", 1)], names=["asset", "window"])
+        target = pd.MultiIndex.from_tuples([("a", 1), ("b", 0)], names=source.names)
+        # Individual levels overlap, but neither complete key has a source position.
+        with pytest.raises(ValueError, match="Values in second index"):
+            index_fns.align_index_to(source, target)
+
     def test_align_index_to(self):
         index1 = pd.Index(["c", "b", "a"], name="name1")
         assert index_fns.align_index_to(index1, index1) == pd.IndexSlice[:]
@@ -1251,16 +1273,7 @@ class TestIndexFns:
     @pytest.mark.parametrize("wrapped_first", [False, True])
     @pytest.mark.parametrize("representation", ["categorical", "one_level"])
     def test_align_indexes_equal_length_representations(self, kind, wrapped_first, representation):
-        if kind == "string":
-            keys = pd.Index(["A", "B", "C"], name="key")
-        elif kind == "datetime":
-            keys = pd.date_range("2020", periods=3, name="key")
-        else:
-            keys = pd.timedelta_range("0D", periods=3, name="key")
-        if representation == "categorical":
-            wrapped = pd.CategoricalIndex(keys, name="key")
-        else:
-            wrapped = pd.MultiIndex.from_arrays([keys])
+        keys, wrapped = make_index_representations(kind, representation)
         first, second = (wrapped, keys) if wrapped_first else (keys, wrapped)
         # Equivalent full keys must align in both caller orders without converting either axis.
         first_slice, second_slice = index_fns.align_indexes([first, second.take([2, 0, 1])])
@@ -1279,6 +1292,36 @@ class TestIndexFns:
         np.testing.assert_array_equal(indices[2], [5, 4, 3, 2, 1, 0])
         assert indices[3] == pd.IndexSlice[:]
         np.testing.assert_array_equal(indices[4], [5, 4, 3, 2, 1, 0])
+
+    @pytest.mark.parametrize("closed", ["left", "right", "both", "neither"])
+    @pytest.mark.parametrize("overlapping", [False, True])
+    def test_align_indexes_equal_length_intervals(self, closed, overlapping):
+        pairs = [(0, 2), (1, 3), (3, 5)] if overlapping else [(0, 1), (2, 3), (4, 5)]
+        first = pd.IntervalIndex.from_tuples(pairs, closed=closed, name="asset")
+        first_slice, second_slice = index_fns.align_indexes([first, first.take([2, 0, 1])])
+        assert first_slice == pd.IndexSlice[:]
+        # Interval indexers use containment rules; alignment must match complete interval keys.
+        np.testing.assert_array_equal(second_slice, [1, 2, 0])
+
+    def test_align_indexes_equal_length_missing_values(self):
+        first = pd.Index([None, "a", "b"], dtype=object, name="asset")
+        second = pd.Index(["b", np.nan, "a"], dtype=object, name="asset")
+        first_slice, second_slice = index_fns.align_indexes([first, second])
+        assert first_slice == pd.IndexSlice[:]
+        np.testing.assert_array_equal(second_slice, [1, 2, 0])
+
+        # Native normalization treats None and NaN as one key, making this source ambiguous.
+        first = pd.Index([None, np.nan, "a"], dtype=object, name="asset")
+        first_slice, second_slice = index_fns.align_indexes([first, first.take([2, 0, 1])])
+        assert first_slice == pd.IndexSlice[:]
+        assert second_slice == pd.IndexSlice[:]
+
+    def test_align_indexes_equal_length_mixed_dtypes(self):
+        first = pd.Index([0.0, 1.0, 2.0], name="asset")
+        second = pd.Index([2, 0, 1], name="asset")
+        first_slice, second_slice = index_fns.align_indexes([first, second])
+        assert first_slice == pd.IndexSlice[:]
+        np.testing.assert_array_equal(second_slice, [1, 2, 0])
 
     def test_pick_levels(self):
         index = index_fns.stack_indexes([multi_i, multi_c])
@@ -1840,16 +1883,7 @@ class TestReshapeFns:
     @pytest.mark.parametrize("representation", ["categorical", "one_level"])
     @pytest.mark.parametrize("axis_from", ["keep", "stack", 0])
     def test_broadcast_align_equal_length_representations(self, axis, kind, wrapped_first, representation, axis_from):
-        if kind == "string":
-            keys = pd.Index(["A", "B", "C"], name="key")
-        elif kind == "datetime":
-            keys = pd.date_range("2020", periods=3, name="key")
-        else:
-            keys = pd.timedelta_range("0D", periods=3, name="key")
-        if representation == "categorical":
-            wrapped = pd.CategoricalIndex(keys, name="key")
-        else:
-            wrapped = pd.MultiIndex.from_arrays([keys])
+        keys, wrapped = make_index_representations(kind, representation)
         left, right = (wrapped, keys) if wrapped_first else (keys, wrapped)
         first = pd.DataFrame(np.arange(9).reshape(3, 3)).set_axis(left, axis=axis)
         second = pd.DataFrame(np.arange(9, 18).reshape(3, 3)).set_axis(right, axis=axis).take([2, 0, 1], axis=axis)

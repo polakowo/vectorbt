@@ -32,14 +32,14 @@ close = pd.DataFrame(
     index=pd.date_range("2024-01-01", periods=180, freq="D"),
     columns=pd.Index(["Asset A", "Asset B"], name="asset"),
 )
-fast, slow = vbt.MA.run_combs(
-    close, window=[3, 5, 10, 20], r=2, short_names=["fast", "slow"]
-)
+fast, slow = vbt.MA.run_combs(close, window=[3, 5, 10, 20], r=2, short_names=["fast", "slow"])
 portfolio = vbt.Portfolio.from_signals(
     close,
     fast.ma_crossed_above(slow).shift(1, fill_value=False),
     fast.ma_crossed_below(slow).shift(1, fill_value=False),
-    init_cash=1000, fees=0.001, freq="1D",
+    init_cash=1000,
+    fees=0.001,
+    freq="1D",
 )
 returns = (portfolio.total_return().unstack("asset") * 100).round(2)
 print(returns)
@@ -84,8 +84,8 @@ import pandas as pd
 import vectorbt as vbt
 
 index = pd.date_range("2024-01-01", periods=5, freq="D")
-asset_a = pd.Series([100., 102., 101., 104., 106.], index=index)
-asset_b = pd.Series([50., 51., 53., 54.], index=index.delete(2))
+asset_a = pd.Series([100.0, 102.0, 101.0, 104.0, 106.0], index=index)
+asset_b = pd.Series([50.0, 51.0, 53.0, 54.0], index=index.delete(2))
 close = pd.concat({"A": asset_a, "B": asset_b}, axis=1)
 
 mean = close.vbt.rolling_mean(window=3, minp=3, engine="numba")
@@ -119,14 +119,16 @@ import pandas as pd
 import vectorbt as vbt
 from numba import njit
 
+
 @njit
 def zscore_nb(i, col, window):
     std = np.std(window)
-    if std == 0.:
-        return 0.
+    if std == 0.0:
+        return 0.0
     return (window[-1] - np.mean(window)) / std
 
-price = pd.Series([10., 10., 10., 12., 14.], name="price")
+
+price = pd.Series([10.0, 10.0, 10.0, 12.0, 14.0], name="price")
 zscore = price.vbt.rolling_apply(3, zscore_nb, engine="numba")
 print(zscore.round(4))
 ```
@@ -155,25 +157,31 @@ import pandas as pd
 from numba import njit
 import vectorbt as vbt
 
+
 @njit
 def window_zscore_nb(window):
     std = np.std(window)
-    if std == 0.:
-        return 0.
+    if std == 0.0:
+        return 0.0
     return (window[-1] - np.mean(window)) / std
+
 
 @njit
 def rolling_zscore_nb(i, col, window):
     return window_zscore_nb(window)
 
+
 rng = np.random.default_rng(42)
 values = pd.DataFrame(rng.uniform(size=(1000, 10)))
+
 
 def pandas_zscore():
     return values.rolling(2).apply(window_zscore_nb, raw=True)
 
+
 def vectorbt_zscore():
     return values.vbt.rolling_apply(2, rolling_zscore_nb, engine="numba")
+
 
 pd.testing.assert_frame_equal(pandas_zscore(), vectorbt_zscore())
 for name, calculate in [("pandas", pandas_zscore), ("vectorbt", vectorbt_zscore)]:
@@ -227,8 +235,8 @@ import pandas as pd
 import vectorbt as vbt
 
 index = pd.date_range("2024-01-01", periods=3, freq="D")
-close = pd.DataFrame({"A": [100., 101., 102.], "B": [50., 51., 52.]}, index=index)
-adjustment = pd.Series([1., 2., 3.], index=index)
+close = pd.DataFrame({"A": [100.0, 101.0, 102.0], "B": [50.0, 51.0, 52.0]}, index=index)
+adjustment = pd.Series([1.0, 2.0, 3.0], index=index)
 adjusted = adjustment.vbt + close
 print(adjusted)
 
@@ -277,7 +285,7 @@ pandas alignment and output wrapping still happen in Python.
 import pandas as pd
 import vectorbt as vbt
 
-price = pd.Series([100., 101., 103., 102.])
+price = pd.Series([100.0, 101.0, 103.0, 102.0])
 numba_mean = price.vbt.rolling_mean(2, engine="numba")
 auto_mean = price.vbt.rolling_mean(2, engine="auto")
 pd.testing.assert_series_equal(auto_mean, numba_mean)
@@ -320,7 +328,7 @@ import vectorbt as vbt
 
 n_bars, n_columns = 1000, 1000
 rng = np.random.default_rng(42)
-close = pd.DataFrame(100. + rng.uniform(size=(n_bars, n_columns)))
+close = pd.DataFrame(100.0 + rng.uniform(size=(n_bars, n_columns)))
 entries = pd.DataFrame(False, index=close.index, columns=close.columns)
 exits = entries.copy()
 entries.iloc[::2] = True
@@ -329,9 +337,15 @@ exits.iloc[1::2] = True
 engines = ["numba"]
 # After installing a matching vectorbt[rust] extension, add "rust" to engines.
 for engine in engines:
+
     def simulate():
         return vbt.Portfolio.from_signals(
-            close, entries, exits, size=1., init_cash=1000., fees=0.,
+            close,
+            entries,
+            exits,
+            size=1.0,
+            init_cash=1000.0,
+            fees=0.0,
             engine=engine,
         )
 
@@ -410,7 +424,9 @@ import pandas as pd
 import vectorbt as vbt
 
 kwargs = dict(
-    start="2024-01-01 UTC", end="2024-01-10 UTC", freq="D",
+    start="2024-01-01 UTC",
+    end="2024-01-10 UTC",
+    freq="D",
     seed=vbt.symbol_dict({"A": 42, "B": 43}),
 )
 gbm_data = vbt.GBMData.download(["A", "B"], **kwargs)
@@ -451,8 +467,12 @@ import vectorbt as vbt
 
 # Requires yfinance and network access.
 market = vbt.YFData.download(
-    ["AAPL", "MSFT"], start="2024-01-01", end="2024-02-01",
-    interval="1d", auto_adjust=True, missing_index="nan",
+    ["AAPL", "MSFT"],
+    start="2024-01-01",
+    end="2024-02-01",
+    interval="1d",
+    auto_adjust=True,
+    missing_index="nan",
 )
 close = market.get("Close")
 print(close.head())
@@ -517,10 +537,12 @@ updater counts completed updates and raises `vbt.CancelledError` at its limit.
 import pandas as pd
 import vectorbt as vbt
 
+
 class FiveSecondGBM(vbt.GBMData):
     def update_symbol(self, symbol, **kwargs):
         end = self.data[symbol].index[-1] + pd.Timedelta(seconds=5)
         return super().update_symbol(symbol, end=end, **kwargs)
+
 
 class MyDataUpdater(vbt.DataUpdater):
     def __init__(self, *args, **kwargs):
@@ -536,9 +558,13 @@ class MyDataUpdater(vbt.DataUpdater):
         if count_limit is not None and self.update_count >= count_limit:
             raise vbt.CancelledError
 
+
 data = FiveSecondGBM.download(
-    "SYMBOL", start="2024-01-01 00:00:00 UTC",
-    end="2024-01-01 00:00:04 UTC", freq="1s", seed=42,
+    "SYMBOL",
+    start="2024-01-01 00:00:00 UTC",
+    end="2024-01-01 00:00:04 UTC",
+    freq="1s",
+    seed=42,
 )
 my_updater = MyDataUpdater(data)
 try:
@@ -592,21 +618,28 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
-price = pd.Series(np.arange(10.), index=pd.date_range("2024-01-01", periods=10))
+price = pd.Series(np.arange(10.0), index=pd.date_range("2024-01-01", periods=10))
 train, valid, test = price.vbt.rolling_split(
-    window_len=5, set_lens=(1, 1), left_to_right=False,
+    window_len=5,
+    set_lens=(1, 1),
+    left_to_right=False,
 )
 print(train[0].iloc[:, :2])
-first_split = pd.DataFrame({
-    "set": ["train", "valid", "test"],
-    "start": [train[1][0][0], valid[1][0][0], test[1][0][0]],
-    "end": [train[1][0][-1], valid[1][0][-1], test[1][0][-1]],
-})
+first_split = pd.DataFrame(
+    {
+        "set": ["train", "valid", "test"],
+        "start": [train[1][0][0], valid[1][0][0], test[1][0][0]],
+        "end": [train[1][0][-1], valid[1][0][-1], test[1][0][-1]],
+    }
+)
 print(first_split.to_string(index=False))
 assert train[1][0][-1] < valid[1][0][0] < test[1][0][0]
 fig = price.vbt.rolling_split(
-    window_len=5, set_lens=(1, 1), left_to_right=False,
-    plot=True, trace_names=["train", "valid", "test"],
+    window_len=5,
+    set_lens=(1, 1),
+    left_to_right=False,
+    plot=True,
+    trace_names=["train", "valid", "test"],
 )
 ```
 
@@ -647,7 +680,7 @@ import vectorbt as vbt
 
 rng = np.random.default_rng(42)
 close = pd.Series(
-    100. * np.exp(np.cumsum(rng.normal(0.001, 0.01, 160))),
+    100.0 * np.exp(np.cumsum(rng.normal(0.001, 0.01, 160))),
     index=pd.date_range("2024-01-01", periods=160, freq="D"),
 )
 windows = [5, 10, 20]
@@ -664,14 +697,16 @@ for test_start in range(80, len(close), 20):
     def simulate(window, start, end):
         held = positions[window].iloc[start:end]
         return vbt.Portfolio.from_signals(
-            close.iloc[start:end], entries=held, exits=~held,
-            init_cash=1000., fees=0.001, freq="D", engine="numba",
+            close.iloc[start:end],
+            entries=held,
+            exits=~held,
+            init_cash=1000.0,
+            fees=0.001,
+            freq="D",
+            engine="numba",
         )
 
-    train_returns = {
-        window: simulate(window, train_start, test_start).total_return()
-        for window in windows
-    }
+    train_returns = {window: simulate(window, train_start, test_start).total_return() for window in windows}
     best_window = max(train_returns, key=train_returns.get)
     test_return = simulate(best_window, test_start, test_end).total_return()
     rows.append((close.index[test_start], best_window, test_return))
@@ -710,13 +745,15 @@ import pandas as pd
 import vectorbt as vbt
 
 rng = np.random.default_rng(42)
-price = np.cumprod(1. + rng.uniform(-0.1, 0.1, size=100))
+price = np.cumprod(1.0 + rng.uniform(-0.1, 0.1, size=100))
 labels = vbt.LEXLB.run(price, 0.2, 0.2)
 fig = labels.plot()
-summary = pd.Series({
-    "Local maxima": int((labels.labels == 1).sum()),
-    "Local minima": int((labels.labels == -1).sum()),
-})
+summary = pd.Series(
+    {
+        "Local maxima": int((labels.labels == 1).sum()),
+        "Local minima": int((labels.labels == -1).sum()),
+    }
+)
 print(summary)
 ```
 
@@ -759,13 +796,11 @@ import pandas as pd
 import vectorbt as vbt
 
 close = pd.Series(
-    [100., 102., 101., 104., 103., 106., 105., 108.],
+    [100.0, 102.0, 101.0, 104.0, 103.0, 106.0, 105.0, 108.0],
     index=pd.date_range("2024-01-01", periods=8, freq="D"),
     name="DEMO",
 )
-ma = vbt.MA.run(
-    close, window=[2, 3], ewm=[False, True], param_product=True
-)
+ma = vbt.MA.run(close, window=[2, 3], ewm=[False, True], param_product=True)
 print(ma.ma.round(2).to_string())
 print("Three-bar SMA on the final day:", round(ma.ma[(3, False)].iloc[-1], 2))
 ```
@@ -810,7 +845,7 @@ from importlib.util import find_spec
 import pandas as pd
 import vectorbt as vbt
 
-price = pd.Series([1., 2., 3., 4., 5.])
+price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
 print("Built-in MA:")
 print(vbt.MA.run(price, [2, 3]).ma.to_string())
 
@@ -877,7 +912,7 @@ Deviation = vbt.IndicatorFactory(
     output_names=["pct"],
 ).from_apply_func(deviation)
 
-close = pd.Series([100., 102., 101., 104., 103., 106.], name="DEMO")
+close = pd.Series([100.0, 102.0, 101.0, 104.0, 103.0, 106.0], name="DEMO")
 result = Deviation.run(close, window=[2, 3])
 print(result.pct.round(3).to_string())
 ```
@@ -1009,10 +1044,14 @@ signals = vbt.RPROBNX.run(
     param_product=True,
     seed=42,
 )
-print(pd.DataFrame({
-    "Entries": signals.entries.sum(),
-    "Exits": signals.exits.sum(),
-}).to_string())
+print(
+    pd.DataFrame(
+        {
+            "Entries": signals.entries.sum(),
+            "Exits": signals.exits.sum(),
+        }
+    ).to_string()
+)
 ```
 
 Output:
@@ -1110,9 +1149,7 @@ t = np.arange(len(index))
 close = pd.Series(100 + 0.05 * t + 5 * np.sin(t / 4), index=index, name="DEMO")
 open_price = close.shift(1).fillna(close.iloc[0]) * (1 + 0.001 * np.cos(t / 3))
 
-fast, slow = vbt.MA.run_combs(
-    close, window=[5, 10, 20], r=2, short_names=["fast", "slow"]
-)
+fast, slow = vbt.MA.run_combs(close, window=[5, 10, 20], r=2, short_names=["fast", "slow"])
 entries = fast.ma_crossed_above(slow).shift(1, fill_value=False)
 exits = fast.ma_crossed_below(slow).shift(1, fill_value=False)
 
@@ -1129,17 +1166,22 @@ pf = vbt.Portfolio.from_signals(
     freq="1D",
     log=True,
 )
-summary = pd.DataFrame({
-    "Total return [%]": pf.total_return() * 100,
-    "Profit [cash]": pf.total_profit(),
-    "Filled orders": pf.orders.count(),
-})
+summary = pd.DataFrame(
+    {
+        "Total return [%]": pf.total_return() * 100,
+        "Profit [cash]": pf.total_profit(),
+        "Filled orders": pf.orders.count(),
+    }
+)
 print(summary.round(3).to_string())
 selected = pf[(5, 20)]  # Select by (fast_window, slow_window), not position
 print("First three fills for (5, 20):")
-print(selected.orders.records_readable[
-    ["Timestamp", "Size", "Price", "Fees", "Side"]
-].head(3).round(3).to_string(index=False))
+print(
+    selected.orders.records_readable[["Timestamp", "Size", "Price", "Fees", "Side"]]
+    .head(3)
+    .round(3)
+    .to_string(index=False)
+)
 ```
 
 Output:
@@ -1212,21 +1254,20 @@ offline synthetic fixture, not a fresh Yahoo download; live results will differ.
 ```python title="Optional: backtest the Golden Cross with market data"
 import vectorbt as vbt
 
-btc = vbt.YFData.download(
-    "BTC-USD", start="2018-01-01", end="2024-01-01"
-)
+btc = vbt.YFData.download("BTC-USD", start="2018-01-01", end="2024-01-01")
 price = btc.get("Close")
 open_price = btc.get("Open")
 fast_ma = vbt.MA.run(price, 50, short_name="fast_ma")
 slow_ma = vbt.MA.run(price, 200, short_name="slow_ma")
 entries = fast_ma.ma_crossed_above(slow_ma).shift(1, fill_value=False)
 exits = fast_ma.ma_crossed_below(slow_ma).shift(1, fill_value=False)
-golden_pf = vbt.Portfolio.from_signals(
-    price, entries, exits, price=open_price, fees=0.005, freq="1D"
+golden_pf = vbt.Portfolio.from_signals(price, entries, exits, price=open_price, fees=0.005, freq="1D")
+print(
+    golden_pf.orders.records_readable[["Timestamp", "Size", "Price", "Fees", "Side"]]
+    .head(3)
+    .round(3)
+    .to_string(index=False)
 )
-print(golden_pf.orders.records_readable[
-    ["Timestamp", "Size", "Price", "Fees", "Side"]
-].head(3).round(3).to_string(index=False))
 fig = price.vbt.plot(trace_kwargs=dict(name="Close"))
 fast_ma.ma.vbt.plot(trace_kwargs=dict(name="Fast MA"), fig=fig)
 slow_ma.ma.vbt.plot(trace_kwargs=dict(name="Slow MA"), fig=fig)
@@ -1277,22 +1318,21 @@ not be confused with completed round trips.
 ```python title="Inspect metrics, completed trades, and drawdowns"
 # Continue the modeling example: selected is pf[(5, 20)].
 stats = selected.stats()
-print(stats.loc[[
-    "Total Return [%]", "Max Drawdown [%]", "Total Closed Trades", "Total Open Trades"
-]].to_string())
+print(stats.loc[["Total Return [%]", "Max Drawdown [%]", "Total Closed Trades", "Total Open Trades"]].to_string())
 print("First two completed trades:")
-print(selected.trades.closed.records_readable[
-    ["Entry Timestamp", "Exit Timestamp", "Return", "Status"]
-].head(2).round(4).to_string(index=False))
+print(
+    selected.trades.closed.records_readable[["Entry Timestamp", "Exit Timestamp", "Return", "Status"]]
+    .head(2)
+    .round(4)
+    .to_string(index=False)
+)
 print("Open trades:", selected.trades.open.count())
 print("First two positions:")
-print(selected.positions.records_readable[
-    ["Size", "PnL", "Return", "Status"]
-].head(2).round(4).to_string(index=False))
+print(selected.positions.records_readable[["Size", "PnL", "Return", "Status"]].head(2).round(4).to_string(index=False))
 print("Drawdown records:")
-print(selected.drawdowns.records_readable[
-    ["Peak Timestamp", "Valley Timestamp", "Status"]
-].head(2).to_string(index=False))
+print(
+    selected.drawdowns.records_readable[["Peak Timestamp", "Valley Timestamp", "Status"]].head(2).to_string(index=False)
+)
 print("Annualized Sharpe:", round(selected.get_returns_acc(year_freq="365D").sharpe_ratio(), 4))
 figure = selected.plot(subplots=["value", "trades", "drawdowns"])
 ```
@@ -1342,10 +1382,9 @@ mask = pd.Series(
     index=pd.date_range("2020-01-01", periods=7, freq="D"),
 )
 stats = mask.vbt.signals(freq="1D").stats()
-print(stats.loc[[
-    "Total", "Rate [%]", "Total Partitions",
-    "Partition Length: Min", "Partition Length: Max"
-]].to_string())
+print(
+    stats.loc[["Total", "Rate [%]", "Total Partitions", "Partition Length: Min", "Partition Length: Max"]].to_string()
+)
 ```
 
 Output:
@@ -1412,9 +1451,12 @@ and find the largest charged fees with:
 
 ```python title="Inspect logged order fees"
 # Continue the modeling example; logging was explicitly enabled there.
-print(selected.logs.records_readable[
-    ["Timestamp", "Request Price", "Result Price", "Result Fees", "Result Status"]
-].head(3).round(4).to_string(index=False))
+print(
+    selected.logs.records_readable[["Timestamp", "Request Price", "Result Price", "Result Fees", "Result Status"]]
+    .head(3)
+    .round(4)
+    .to_string(index=False)
+)
 fees = selected.logs.map_field("res_fees")
 print("Largest fees [cash]:")
 print(fees.top_n(3).to_pd().dropna().round(4).to_string())
@@ -1457,8 +1499,14 @@ price = pd.Series(
 )
 slippage = np.random.default_rng(42).uniform(0, 0.005, size=len(price))
 logs = vbt.Portfolio.from_random_signals(
-    price, n=5, seed=42, size=1, init_cash=1_000,
-    slippage=slippage, log=True, freq="1D",
+    price,
+    n=5,
+    seed=42,
+    size=1,
+    init_cash=1_000,
+    slippage=slippage,
+    log=True,
+    freq="1D",
 ).logs
 requested = logs.map_field("req_price")
 executed = logs.map_field("res_price")
@@ -1493,16 +1541,17 @@ price = pd.Series(
     100 + 0.05 * t + 5 * np.sin(t / 4),
     index=pd.date_range("2024-01-01", periods=len(t), freq="D"),
 )
-entry_trades = vbt.Portfolio.from_random_signals(
-    price, n=5, seed=42, size=1, init_cash=1_000, freq="1D"
-).entry_trades
+entry_trades = vbt.Portfolio.from_random_signals(price, n=5, seed=42, size=1, init_cash=1_000, freq="1D").entry_trades
 returns_by_entry = entry_trades.returns.to_pd()
 print("Return attributed to each entry [fraction]:")
 print(returns_by_entry.dropna().round(4).to_string())
 print("First two entry trades:")
-print(entry_trades.records_readable[
-    ["Entry Timestamp", "Exit Timestamp", "Return", "Status"]
-].head(2).round(4).to_string(index=False))
+print(
+    entry_trades.records_readable[["Entry Timestamp", "Exit Timestamp", "Return", "Status"]]
+    .head(2)
+    .round(4)
+    .to_string(index=False)
+)
 ```
 
 Output:
@@ -1674,7 +1723,9 @@ portfolio = vbt.Portfolio.from_signals(
     close,
     ma.close_crossed_above(ma.ma).shift(1, fill_value=False),
     ma.close_crossed_below(ma.ma).shift(1, fill_value=False),
-    init_cash=1000, fees=0.001, freq="1D",
+    init_cash=1000,
+    fees=0.001,
+    freq="1D",
 )
 selected = portfolio[5]
 summary = selected.stats()
@@ -1720,20 +1771,24 @@ fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
 fig.add_trace(go.Scatter(x=close.index, y=close, name="Close"), row=1, col=1)
 fig.add_trace(
     go.Scatter(x=close.index, y=portfolio.value(), name="Portfolio value"),
-    row=2, col=1,
+    row=2,
+    col=1,
 )
 fig.add_trace(
     go.Scatter(x=close.index, y=1000 * close / close.iloc[0], name="Buy and hold (no fees)"),
-    row=2, col=1,
+    row=2,
+    col=1,
 )
 fig.update_yaxes(title_text="Price", row=1, col=1)
 fig.update_yaxes(title_text="Account value", row=2, col=1)
 fig.update_layout(template="plotly", height=600)
 # fig.show()
-comparison = pd.DataFrame({
-    "Portfolio value": portfolio.value(),
-    "Buy and hold (no fees)": 1000 * close / close.iloc[0],
-})
+comparison = pd.DataFrame(
+    {
+        "Portfolio value": portfolio.value(),
+        "Buy and hold (no fees)": 1000 * close / close.iloc[0],
+    }
+)
 print(comparison.iloc[[0, -1]].round(2).to_string())
 ```
 
@@ -1774,12 +1829,14 @@ close = pd.Series([100.0, 101.0], index=pd.date_range("2024-01-01", periods=2, f
 incoming_prices = iter([102.0, 103.0])
 snapshots = []
 
+
 def refresh():
     global close
     next_date = close.index[-1] + pd.Timedelta(days=1)
     close = pd.concat([close, pd.Series([next(incoming_prices)], index=[next_date])])
     portfolio = vbt.Portfolio.from_holding(close, init_cash=1000, freq="1D")
     snapshots.append({"as_of": next_date, "total_return": float(portfolio.total_return())})
+
 
 manager = vbt.ScheduleManager()
 manager.every(10, "seconds").do(refresh)
@@ -1811,6 +1868,7 @@ from vectorbt.utils.datetime_ import datetime_to_ms
 
 exchange = ccxt.binance({"enableRateLimit": True})
 
+
 def display_recent_trades():
     since = datetime_to_ms((pd.Timestamp.now(tz="UTC") - pd.Timedelta(seconds=10)).to_pydatetime())
     trades = exchange.fetch_trades("BTC/USDT", since=since)
@@ -1825,6 +1883,7 @@ def display_recent_trades():
     svg = price.vbt.plot().to_image(format="svg")
     clear_output(wait=True)
     display(SVG(svg))
+
 
 scheduler = vbt.ScheduleManager()
 scheduler.every(10, "seconds").do(display_recent_trades)
@@ -1879,6 +1938,7 @@ import ccxt.async_support as ccxt
 from telegram.ext import CommandHandler
 import vectorbt as vbt
 
+
 class BinanceTickerBot(vbt.TelegramBot):
     @property
     def custom_handlers(self):
@@ -1905,6 +1965,7 @@ class BinanceTickerBot(vbt.TelegramBot):
         finally:
             await exchange.close()
         await context.bot.send_message(chat_id=chat_id, text=text)
+
 
 bot = BinanceTickerBot(token=os.environ["TELEGRAM_BOT_TOKEN"])
 try:
@@ -1934,6 +1995,7 @@ custom handlers, authorization, and message delivery.
 ```python title="Cache a deterministic calculation"
 import vectorbt as vbt
 
+
 class Research:
     def __init__(self):
         self.calls = 0
@@ -1942,6 +2004,7 @@ class Research:
     def square(self, value):
         self.calls += 1
         return value * value
+
 
 research = Research()
 print(research.square(3), research.square(3))  # 9 9
@@ -2024,6 +2087,7 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
+
 def research_windows(close, windows=(3, 5, 10), fees=0.001):
     if not isinstance(close, pd.Series) or close.empty or close.isna().any():
         raise ValueError("Pass a nonempty price Series without missing values")
@@ -2038,7 +2102,9 @@ def research_windows(close, windows=(3, 5, 10), fees=0.001):
             close,
             ma.close_crossed_above(ma.ma).shift(1, fill_value=False),
             ma.close_crossed_below(ma.ma).shift(1, fill_value=False),
-            init_cash=1000, fees=fees, freq="1D",
+            init_cash=1000,
+            fees=fees,
+            freq="1D",
         )
         curves[window] = portfolio.value()
         rows[window] = {
@@ -2049,6 +2115,7 @@ def research_windows(close, windows=(3, 5, 10), fees=0.001):
     metrics = pd.DataFrame.from_dict(rows, orient="index").rename_axis("window")
     equity = pd.DataFrame(curves).rename_axis(columns="window")
     return {"metrics": metrics, "equity": equity}
+
 
 close = pd.Series(
     100 + np.arange(100) * 0.1 + 3 * np.sin(np.arange(100) / 3),

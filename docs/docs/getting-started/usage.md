@@ -17,14 +17,13 @@ or installing a market-data integration:
 ```python
 import pandas as pd
 import vectorbt as vbt
+
 close = pd.Series(
     [100.0, 102.0, 101.0, 104.0, 103.0, 107.0],
     index=pd.date_range("2024-01-01", periods=6, freq="D"),
     name="Close",
 )
-pf = vbt.Portfolio.from_holding(
-    close, init_cash=1000, fees=0.001, freq="1D"
-)
+pf = vbt.Portfolio.from_holding(close, init_cash=1000, fees=0.001, freq="1D")
 print(round(float(pf.total_return()) * 100, 2))
 ```
 
@@ -52,6 +51,7 @@ change as providers update their history.
 
 ```python
 import vectorbt as vbt
+
 data = vbt.YFData.download("BTC-USD")
 price = data.get("Close")
 pf = vbt.Portfolio.from_holding(price, init_cash=100)
@@ -91,6 +91,7 @@ Output:
 
 ```python
 import numpy as np
+
 symbols = ["BTC-USD", "ETH-USD"]
 data = vbt.YFData.download(symbols, missing_index="drop")
 price = data.get("Close")
@@ -117,8 +118,12 @@ entries = fast_ma.ma_crossed_above(slow_ma)
 exits = fast_ma.ma_crossed_below(slow_ma)
 pf = vbt.Portfolio.from_signals(price, entries, exits, size=np.inf, fees=0.001, freq="1D")
 fig = pf.total_return().vbt.heatmap(
-    x_level="fast_window", y_level="slow_window", slider_level="symbol", symmetric=True,
-    trace_kwargs=dict(colorbar=dict(title="Total return", tickformat="%")))
+    x_level="fast_window",
+    y_level="slow_window",
+    slider_level="symbol",
+    symmetric=True,
+    trace_kwargs=dict(colorbar=dict(title="Total return", tickformat="%")),
+)
 fig.show()
 ```
 
@@ -195,24 +200,36 @@ symbols = ["BTC-USD", "ETH-USD", "XRP-USD"]
 data = vbt.YFData.download(symbols, period="6mo", missing_index="drop")
 price = data.get("Close")
 bbands = vbt.BBANDS.run(price)
+
+
 def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15,
-        subplot_titles=("%B", "Bandwidth"))
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.15, subplot_titles=("%B", "Bandwidth")
+    )
     fig.update_layout(showlegend=False, width=750, height=400)
     bbands.percent_b.vbt.ts_heatmap(
-        trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale="Spectral", colorbar=dict(
-            y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5
-        )), add_trace_kwargs=dict(row=1, col=1), fig=fig)
+        trace_kwargs=dict(
+            zmin=0,
+            zmid=0.5,
+            zmax=1,
+            colorscale="Spectral",
+            colorbar=dict(y=(fig.layout.yaxis.domain[0] + fig.layout.yaxis.domain[1]) / 2, len=0.5),
+        ),
+        add_trace_kwargs=dict(row=1, col=1),
+        fig=fig,
+    )
     bbands.bandwidth.vbt.ts_heatmap(
-        trace_kwargs=dict(colorbar=dict(
-            y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5
-        )), add_trace_kwargs=dict(row=2, col=1), fig=fig)
+        trace_kwargs=dict(colorbar=dict(y=(fig.layout.yaxis2.domain[0] + fig.layout.yaxis2.domain[1]) / 2, len=0.5)),
+        add_trace_kwargs=dict(row=2, col=1),
+        fig=fig,
+    )
     return fig
+
+
 vbt.save_animation(
-    "bbands.gif", bbands.wrapper.index, plot, bbands,
-    delta=90, step=3, fps=3, writer_kwargs=dict(loop=0))
+    "bbands.gif", bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3, writer_kwargs=dict(loop=0)
+)
 ```
 
 Output:

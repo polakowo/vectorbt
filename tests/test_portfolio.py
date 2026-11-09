@@ -8,7 +8,7 @@ from numba import njit, typeof
 from numba.typed import List
 
 import vectorbt as vbt
-from tests.utils import record_arrays_close
+from tests.utils import SIZE_GRANULARITY_CASES, make_index_representations, record_arrays_close
 from vectorbt.base import reshape_fns
 from vectorbt.generic.enums import drawdown_dt
 from vectorbt.portfolio import dispatch, nb
@@ -705,16 +705,7 @@ class TestFromOrders:
     @pytest.mark.parametrize("representation", ["categorical", "one_level"])
     @pytest.mark.parametrize("cash_sharing", [False, True])
     def test_equal_length_representation_column_alignment(self, kind, wrapped_first, representation, cash_sharing):
-        if kind == "string":
-            keys = pd.Index(["A", "B", "C"], name="asset")
-        elif kind == "datetime":
-            keys = pd.date_range("2020", periods=3, name="asset")
-        else:
-            keys = pd.timedelta_range("0D", periods=3, name="asset")
-        if representation == "categorical":
-            wrapped = pd.CategoricalIndex(keys, name="asset")
-        else:
-            wrapped = pd.MultiIndex.from_arrays([keys])
+        keys, wrapped = make_index_representations(kind, representation, name="asset")
         size_columns, price_columns = (wrapped, keys) if wrapped_first else (keys, wrapped)
         size = pd.DataFrame([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], columns=size_columns)
         close = pd.DataFrame(
@@ -747,9 +738,7 @@ class TestFromOrders:
 
     @pytest.mark.parametrize("cash_sharing", [False, True])
     def test_equal_length_column_alignment(self, cash_sharing):
-        close = pd.DataFrame(
-            [[10.0, 100.0], [20.0, 120.0], [30.0, 140.0]], columns=pd.Index(["A", "B"], name="asset")
-        )
+        close = pd.DataFrame([[10.0, 100.0], [20.0, 120.0], [30.0, 140.0]], columns=pd.Index(["A", "B"], name="asset"))
         size = pd.DataFrame([[0.0, 1.0], [0.0, 0.0], [0.0, 0.0]], columns=pd.Index(["B", "A"], name="asset"))
         pf = vbt.Portfolio.from_orders(
             close, size=size, init_cash=1000.0, cash_sharing=cash_sharing, freq="1D", engine="numba"
@@ -767,9 +756,7 @@ class TestFromOrders:
             expected = pd.Series([1000.0, 1010.0, 1020.0], name="group")
             pd.testing.assert_series_equal(pf.value(), expected)
         else:
-            expected = pd.DataFrame(
-                [[1000.0, 1000.0], [1000.0, 1010.0], [1000.0, 1020.0]], columns=size.columns
-            )
+            expected = pd.DataFrame([[1000.0, 1000.0], [1000.0, 1010.0], [1000.0, 1020.0]], columns=size.columns)
             pd.testing.assert_frame_equal(pf.value(), expected)
 
     def test_one_column(self):
@@ -966,33 +953,28 @@ class TestFromOrders:
             np.array([(0, 0, 0, 4.3, 10.0, 0.0, 0)], dtype=order_dt),
         )
 
-    def test_size_granularity_rounding_bound(self):
-        close = pd.Series([10.0, 10.0])
+    @pytest.mark.parametrize("size,size_granularity,expected", SIZE_GRANULARITY_CASES)
+    def test_size_granularity_rounding_bound(self, size, size_granularity, expected, test_engine):
+        pf = vbt.Portfolio.from_orders(
+            pd.Series([10.0, 10.0]),
+            pd.Series([size, np.nan]),
+            size_granularity=size_granularity,
+            init_cash=1e6,
+            engine=test_engine,
+        )
+        assert pf.order_records["size"].tolist() == ([] if np.isnan(expected) else [expected])
 
-        def filled(size, size_granularity):
-            pf = vbt.Portfolio.from_orders(
-                close, pd.Series([size, np.nan]), size_granularity=size_granularity, init_cash=1e6
-            )
-            return pf.order_records["size"].tolist()
-
-        # Large lot counts: a fraction of a lot is floored
-        assert filled(1.0000000006, 1e-9) == [1.0]
-        assert filled(0.9999999996, 1e-9) == [0.999999999]
-        assert filled(1 - 2e-13, 1e-12) == [0.999999999999]
-        # Short of one lot by more than rounding error: no trade
-        assert filled(0.1 * (1 - 1e-10), 0.1) == []
-        assert filled(1000 * (1 - 1e-10), 1000.0) == []
-        # Short of one lot by one ulp: fills the requested size
-        assert filled(np.nextafter(0.1, 0), 0.1) == [np.nextafter(0.1, 0)]
+    @pytest.mark.parametrize("size_granularity", [0.1, 0.01, 0.001])
+    def test_size_granularity_accumulated_close(self, size_granularity, test_engine):
         # A position summed from a few fills of one lot closes flat
-        for size_granularity in (0.1, 0.01, 0.001):
-            pf = vbt.Portfolio.from_orders(
-                pd.Series(np.full(11, 10.0)),
-                pd.Series([size_granularity] * 10 + [-np.inf]),
-                size_granularity=size_granularity,
-                direction="longonly",
-            )
-            assert pf.assets().iloc[-1] == 0
+        pf = vbt.Portfolio.from_orders(
+            pd.Series(np.full(11, 10.0)),
+            pd.Series([size_granularity] * 10 + [-np.inf]),
+            size_granularity=size_granularity,
+            direction="longonly",
+            engine=test_engine,
+        )
+        assert pf.assets().iloc[-1] == 0
 
     def test_price(self):
         record_arrays_close(

@@ -8,7 +8,7 @@ from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
 
 import vectorbt as vbt
-from vectorbt import _engine
+from tests.utils import integer_diff
 from vectorbt.generic import dispatch, nb
 
 seed = 42
@@ -218,9 +218,7 @@ class TestAccessors:
                 if 0 <= previous < len(frame):
                     for col in range(values.shape[1]):
                         current, reference = values[row, col], values[previous, col]
-                        expected_values[row, col] = (
-                            current - reference if method == "diff" else current / reference - 1
-                        )
+                        expected_values[row, col] = current - reference if method == "diff" else current / reference - 1
         expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
         pandas_kwargs = {"fill_method": None} if method == "pct_change" else {}
         pd.testing.assert_frame_equal(getattr(frame, method)(periods=n, **pandas_kwargs), expected)
@@ -229,9 +227,7 @@ class TestAccessors:
         np.testing.assert_array_equal(getattr(nb, method + "_nb")(values, n), expected_values)
         np.testing.assert_array_equal(getattr(nb, method + "_1d_nb")(values[:, 0], n), expected_values[:, 0])
         pd.testing.assert_frame_equal(getattr(frame.vbt, method)(n=n, engine="numba"), expected)
-        pd.testing.assert_series_equal(
-            getattr(frame.iloc[:, 0].vbt, method)(n=n, engine="numba"), expected.iloc[:, 0]
-        )
+        pd.testing.assert_series_equal(getattr(frame.iloc[:, 0].vbt, method)(n=n, engine="numba"), expected.iloc[:, 0])
         pd.testing.assert_frame_equal(frame, before)
 
     @pytest.mark.parametrize("method", ["diff", "pct_change"])
@@ -269,12 +265,7 @@ class TestAccessors:
         )
         before = frame.copy(deep=True)
         values = frame.to_numpy()
-        expected_values = np.full(values.shape, np.nan)
-        # Python integers determine the result independently of fixed-width NumPy subtraction.
-        for row in range(len(frame)):
-            if 0 <= row - n < len(frame):
-                for col in range(values.shape[1]):
-                    expected_values[row, col] = int(values[row, col]) - int(values[row - n, col])
+        expected_values = integer_diff(values, n)
         expected = pd.DataFrame(expected_values, index=frame.index, columns=frame.columns)
 
         np.testing.assert_array_equal(nb.diff_nb(values, n), expected_values)
@@ -356,12 +347,9 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.rolling_max(test_window), df.rolling(test_window).max())
 
-    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
     @pytest.mark.parametrize("test_window", [3, 10, 11, 25, 120, 250])
     @pytest.mark.parametrize("test_minp", [None, 0, 1, 2])
     def test_rolling_min_max_long(self, test_engine, test_window, test_minp):
-        if test_engine == "rust" and not _engine.is_rust_available():
-            pytest.skip("vectorbt-rust is not installed or version-compatible")
         # Long input covering both the direct-scan (small window) and deque (large window) paths,
         # with NaN gaps longer than the window, repeated values, and monotonic runs
         rng = np.random.default_rng(42)
@@ -381,10 +369,7 @@ class TestAccessors:
             long_df.rolling(test_window, min_periods=pd_minp).max(),
         )
 
-    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
     def test_rolling_min_max_ties(self, test_engine):
-        if test_engine == "rust" and not _engine.is_rust_available():
-            pytest.skip("vectorbt-rust is not installed or version-compatible")
         # Expected values are from the previous naive scan. Not compared against pandas,
         # which resolves signed-zero ties differently and mishandles windows of -inf.
         sr = pd.Series([0.0, -0.0, 0.0, 1.0, -0.0, np.nan, 0.0, -np.inf, -np.inf, 2.0, np.inf, 0.0, -0.0, 0.0])
@@ -550,10 +535,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(df.vbt.expanding_std(), df.expanding().std())
 
-    @pytest.mark.parametrize("test_engine", ["numba", "rust"])
     def test_expanding_minp_above_length(self, test_engine):
-        if test_engine == "rust" and not _engine.is_rust_available():
-            pytest.skip("vectorbt-rust is not installed or version-compatible")
         minp = len(df.index) + 1
         pd.testing.assert_frame_equal(
             df.vbt.expanding_mean(minp=minp, engine=test_engine), df.expanding(min_periods=minp).mean()

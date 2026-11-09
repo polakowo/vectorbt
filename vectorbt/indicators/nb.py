@@ -253,7 +253,7 @@ def macd_apply_nb(
 
 
 @njit(cache=True)
-def _true_range_distance_nb(a, b):
+def _true_range_distance_nb(a: tp.Scalar, b: tp.Scalar) -> tp.Scalar:
     """Calculate a price distance without overflowing integer subtraction."""
     integer_types = (np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32)
     if isinstance(a, integer_types) and isinstance(b, integer_types):
@@ -261,24 +261,47 @@ def _true_range_distance_nb(a, b):
         unsigned_a = np.uint64(a) ^ np.uint64(1 << 63)
         unsigned_b = np.uint64(b) ^ np.uint64(1 << 63)
         return float(unsigned_a - unsigned_b) if unsigned_a >= unsigned_b else float(unsigned_b - unsigned_a)
-    return abs(a - b) if a >= b else abs(b - a)
+    if isinstance(a, np.uint64) or isinstance(b, np.uint64):
+        return abs(a - b) if a >= b else abs(b - a)
+    return abs(a - b)
+
+
+@njit(cache=True, inline="always")
+def _true_range_from_close_nb(high: tp.Scalar, low: tp.Scalar, prev_close: tp.Scalar) -> tp.Scalar:
+    """Calculate one true range while retaining integer distance precision."""
+    return max(high - low, _true_range_distance_nb(high, prev_close), _true_range_distance_nb(low, prev_close))
 
 
 @njit(cache=True)
 def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
     """Calculate true range."""
     tr = np.empty(high.shape, dtype=np.float64)
+    if tr.shape[0] == 0:
+        return tr
     for col in range(tr.shape[1]):
-        for i in range(tr.shape[0]):
-            tr1 = high[i, col] - low[i, col]
-            if i == 0:
-                tr[i, col] = tr1
-            else:
-                # Keep integer distances exact until the existing floating output conversion.
-                prev_close = close[i - 1, col]
-                tr2 = _true_range_distance_nb(high[i, col], prev_close)
-                tr3 = _true_range_distance_nb(low[i, col], prev_close)
-                tr[i, col] = max(tr1, tr2, tr3)
+        tr[0, col] = high[0, col] - low[0, col]
+    if tr.shape[1] == 1:
+        for i in range(1, tr.shape[0]):
+            tr[i, 0] = _true_range_from_close_nb(high[i, 0], low[i, 0], close[i - 1, 0])
+        return tr
+    if high.flags.c_contiguous and low.flags.c_contiguous and close.flags.c_contiguous:
+        # Traverse row-major prices across columns rather than rereading strided columns.
+        for i in range(1, tr.shape[0]):
+            for col in range(tr.shape[1]):
+                tr[i, col] = _true_range_from_close_nb(high[i, col], low[i, col], close[i - 1, col])
+        return tr
+    if tr.shape[1] < 8:
+        # Narrow output rows share cache lines, so a simple column traversal suffices.
+        for col in range(tr.shape[1]):
+            for i in range(1, tr.shape[0]):
+                tr[i, col] = _true_range_from_close_nb(high[i, col], low[i, col], close[i - 1, col])
+        return tr
+    # Keep column-major reads contiguous while reusing nearby output cache lines.
+    for row_start in range(1, tr.shape[0], 256):
+        row_end = min(row_start + 256, tr.shape[0])
+        for col in range(tr.shape[1]):
+            for i in range(row_start, row_end):
+                tr[i, col] = _true_range_from_close_nb(high[i, col], low[i, col], close[i - 1, col])
     return tr
 
 

@@ -8,13 +8,28 @@ from pandas.api.types import is_datetime64_any_dtype, is_object_dtype, is_string
 
 from vectorbt import _engine
 
-
 RUST_ENGINE_EXPR_RE = re.compile(r"engine\s*=\s*['\"]rust['\"]")
 RUST_UNAVAILABLE_SKIP = pytest.mark.skip(reason="vectorbt-rust is not installed or version-compatible")
 
 ORIGINAL_ASSERT_INDEX_EQUAL = pd.testing.assert_index_equal
 ORIGINAL_ASSERT_SERIES_EQUAL = pd.testing.assert_series_equal
 ORIGINAL_ASSERT_FRAME_EQUAL = pd.testing.assert_frame_equal
+
+
+@pytest.fixture(
+    params=[
+        "numba",
+        pytest.param(
+            "rust",
+            marks=pytest.mark.skipif(
+                not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible"
+            ),
+        ),
+    ]
+)
+def test_engine(request):
+    """Run shared behavior checks with each available engine."""
+    return request.param
 
 
 def normalize_test_index(index):
@@ -26,8 +41,7 @@ def normalize_test_index(index):
     if is_timedelta64_dtype(index.dtype):
         return pd.TimedeltaIndex(index.to_numpy(dtype="timedelta64[ns]"), name=index.name, freq=None)
     if is_string_dtype(index.dtype) or (
-        is_object_dtype(index.dtype)
-        and all(isinstance(value, str) for value in index.dropna().to_numpy(dtype=object))
+        is_object_dtype(index.dtype) and all(isinstance(value, str) for value in index.dropna().to_numpy(dtype=object))
     ):
         values = [None if pd.isna(value) else value for value in index.astype(object)]
         return pd.Index(values, dtype=object, name=index.name)
@@ -39,7 +53,9 @@ def normalize_test_pandas(obj):
         if is_datetime64_any_dtype(obj.dtype):
             obj = pd.Series(pd.DatetimeIndex(obj).as_unit("ns"), index=obj.index, name=obj.name, dtype="datetime64[ns]")
         elif is_timedelta64_dtype(obj.dtype):
-            obj = pd.Series(pd.TimedeltaIndex(obj).as_unit("ns"), index=obj.index, name=obj.name, dtype="timedelta64[ns]")
+            obj = pd.Series(
+                pd.TimedeltaIndex(obj).as_unit("ns"), index=obj.index, name=obj.name, dtype="timedelta64[ns]"
+            )
         elif is_string_dtype(obj.dtype) or is_object_dtype(obj.dtype):
             obj = pd.Series(
                 [np.nan if pd.isna(value) else value for value in obj.to_numpy(dtype=object)],
@@ -51,7 +67,10 @@ def normalize_test_pandas(obj):
         obj.index = normalize_test_index(obj.index)
         return obj
     elif isinstance(obj, pd.DataFrame) and any(
-        is_datetime64_any_dtype(dtype) or is_timedelta64_dtype(dtype) or is_string_dtype(dtype) or is_object_dtype(dtype)
+        is_datetime64_any_dtype(dtype)
+        or is_timedelta64_dtype(dtype)
+        or is_string_dtype(dtype)
+        or is_object_dtype(dtype)
         for dtype in obj.dtypes
     ):
         columns = []

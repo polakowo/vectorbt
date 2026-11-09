@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 import vectorbt as vbt
-from tests.utils import record_arrays_close
+from tests.utils import SIZE_GRANULARITY_CASES, integer_diff, record_arrays_close
 from vectorbt import _engine
 from vectorbt.generic.enums import drawdown_dt, range_dt
 from vectorbt.generic import dispatch, nb
@@ -53,11 +53,7 @@ class TestEngineResolution:
     def test_diff_narrow_integer_fallback(self, dtype, n):
         limits = np.iinfo(dtype)
         values = np.array([[limits.max, limits.min], [0, 1], [limits.min, limits.max]], dtype=dtype)
-        expected = np.full(values.shape, np.nan)
-        for row in range(len(values)):
-            if 0 <= row - n < len(values):
-                for col in range(values.shape[1]):
-                    expected[row, col] = int(values[row, col]) - int(values[row - n, col])
+        expected = integer_diff(values, n)
 
         # Integers remain unsupported by Rust: auto must reach the corrected Numba path.
         assert not _engine.array_compatible_with_rust(values).supported
@@ -2186,19 +2182,7 @@ class TestPortfolioRustParity:
 
     def test_from_orders_size_granularity_rounding_bound_parity(self):
         # Only floating-point rounding reaches the next lot, at any lot count; a real shortfall is floored
-        cases = [
-            (1.0000000006, 1e-9, 1.0),  # 1e9 lots + 0.6 lot
-            (0.9999999996, 1e-9, 0.999999999),  # 0.4 lot short of 1e9 lots
-            (1 + 6e-13, 1e-12, 1.0),  # 1e12 lots + 0.6 lot
-            (1 - 2e-13, 1e-12, 0.999999999999),  # 0.2 lot short of 1e12 lots
-            (0.001 * (1 - 1e-10), 0.001, np.nan),  # 1e-10 lot short of one lot: no trade
-            (0.1 * (1 - 1e-10), 0.1, np.nan),
-            (1000 * (1 - 1e-10), 1000.0, np.nan),
-            (0.0999, 0.1, np.nan),
-            (np.nextafter(0.001, 0), 0.001, np.nextafter(0.001, 0)),  # one ulp short: fills the requested size
-            (np.nextafter(0.1, 0), 0.1, np.nextafter(0.1, 0)),
-            (np.nextafter(1000.0, 0), 1000.0, np.nextafter(1000.0, 0)),
-        ]
+        cases = SIZE_GRANULARITY_CASES
         price = pd.Series([10.0, 10.0])
         size = pd.DataFrame([[c[0] for c in cases], [np.nan] * len(cases)])
         size_granularity = np.array([[c[1] for c in cases]])
