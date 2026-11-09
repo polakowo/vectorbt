@@ -1552,7 +1552,7 @@ __pdoc__[
 
 Final price will depend upon slippage.
 
-* If `-np.inf`, replaced by the current open (if available) or the previous close (â the current open in crypto).
+* If `-np.inf`, replaced by the current open (if available) or the previous close (≈ the current open in crypto).
 * If `np.inf`, replaced by the current close.
 
 !!! note
