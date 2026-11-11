@@ -1,1 +1,2 @@
 prune docs
+recursive-include tests *.py

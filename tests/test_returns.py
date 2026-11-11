@@ -469,21 +469,20 @@ class TestAccessors:
             pd.Series([np.nan, np.inf, -np.sqrt(365)], index=zero_std_rets.columns, name="sortino_ratio"),
         )
 
-    def test_sharpe_ratio_constant_returns(self):
+    def test_sharpe_ratio_constant_returns(self, test_engine):
         # The mean of a constant series is not always exactly that constant, which used to
         # leave a tiny non-zero std and a Sharpe ratio around 1e16 instead of signed infinity
         const_rets = pd.DataFrame(
             {"pos": [0.001] * 252, "neg": [-0.001] * 252, "pos_nan": [0.001] * 251 + [np.nan]},
             index=pd.date_range("2024-01-01", periods=252, freq="D"),
         )
-        for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
-            pd.testing.assert_series_equal(
-                const_rets.vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=engine),
-                pd.Series([np.inf, -np.inf, np.inf], index=const_rets.columns, name="sharpe_ratio"),
-            )
-            assert const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=engine) == np.inf
-            # Equal values after subtracting the risk-free rate also count as zero volatility
-            assert np.isnan(const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.001, engine=engine))
+        pd.testing.assert_series_equal(
+            const_rets.vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=test_engine),
+            pd.Series([np.inf, -np.inf, np.inf], index=const_rets.columns, name="sharpe_ratio"),
+        )
+        assert const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.0, engine=test_engine) == np.inf
+        # Equal values after subtracting the risk-free rate also count as zero volatility
+        assert np.isnan(const_rets["pos"].vbt.returns(freq="1D").sharpe_ratio(risk_free=0.001, engine=test_engine))
 
         # Constant +/-inf columns have NaN std; all engines/layouts must return NaN, not signed inf
         # (the contiguous Rust path used to treat them as zero-volatility via the constant shortcut).
@@ -492,9 +491,8 @@ class TestAccessors:
             arr = np.array(inf_arr, order=order, copy=True)
             assert arr.flags["C_CONTIGUOUS"] == (order == "C")
             assert arr.flags["F_CONTIGUOUS"] == (order == "F")
-            for engine in ["numba", "rust"] if vbt._engine.is_rust_available() else ["numba"]:
-                out = vbt.returns.dispatch.sharpe_ratio(arr, 252.0, 0.0, 1, engine=engine)
-                assert np.isnan(out).all(), (order, engine, out)
+            out = vbt.returns.dispatch.sharpe_ratio(arr, 252.0, 0.0, 1, engine=test_engine)
+            assert np.isnan(out).all(), (order, test_engine, out)
 
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
