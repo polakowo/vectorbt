@@ -2649,6 +2649,14 @@ class TestPortfolioRustParity:
         for rust, numba, label in cases:
             np.testing.assert_allclose(rust, numba, err_msg=label)
 
+    def test_gross_exposure_cash_contract_parity(self):
+        # The second argument is cash: asset_value / (asset_value + cash), 0 where the sum is 0
+        asset_value = np.array([[100.0, 0.0, 100.0, 150.0], [50.0, np.nan, 10.0, 100.0]])
+        cash = np.array([[100.0, 0.0, -100.0, -200.0], [np.nan, -10.0, 30.0, 300.0]])
+        expected = np.array([[0.5, 0.0, 0.0, -3.0], [np.nan, np.nan, 0.25, 0.25]])
+        np.testing.assert_array_equal(portfolio_dispatch.gross_exposure(asset_value, cash, engine="rust"), expected)
+        np.testing.assert_array_equal(portfolio_nb.gross_exposure_nb(asset_value, cash), expected)
+
     def test_get_entry_trades_parity(self):
         or_nb, _ = self._run_sim("numba")
         col_map = records_nb.col_map_nb(or_nb["col"], self.target_shape[1])

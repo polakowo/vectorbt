@@ -4519,9 +4519,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     ) -> tp.SeriesFrame:
         """Get gross exposure.
 
-        Gross exposure is the sum of absolute position values divided by portfolio value.
-        For grouped portfolios with mixed long/short positions, per-column absolute values
-        are summed before dividing by group portfolio value."""
+        Gross exposure is the sum of absolute position values divided by portfolio value
+        (see `Portfolio.value`). For grouped portfolios with mixed long/short positions,
+        per-column absolute values are summed before dividing by group portfolio value."""
         engine = engine if engine is not None else self.engine
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             # For grouped portfolios, we need sum(abs(per_column)) per group,
@@ -4531,8 +4531,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             abs_asset_value = dispatch.asset_value_grouped(np.abs(asset_value_ungrouped), group_lens, engine=engine)
         else:
             abs_asset_value = np.abs(to_2d_array(self.asset_value(group_by=group_by, direction=direction)))
-        cash = to_2d_array(self.cash(group_by=group_by, free=True))
-        gross_exposure = dispatch.gross_exposure(abs_asset_value, cash, engine=engine)
+        value = to_2d_array(self.value(group_by=group_by))
+        # The kernels divide by asset value + cash, so pass the rest of the value as cash
+        gross_exposure = dispatch.gross_exposure(abs_asset_value, value - abs_asset_value, engine=engine)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
