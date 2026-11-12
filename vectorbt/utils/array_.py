@@ -50,7 +50,7 @@ def get_ranges_arr(starts: tp.ArrayLike, ends: tp.ArrayLike) -> tp.Array1d:
     ends_arr = np.asarray(ends)
     if ends_arr.ndim == 0:
         ends_arr = np.array([ends_arr])
-    starts_arr, end = np.broadcast_arrays(starts_arr, ends_arr)
+    starts_arr, ends_arr = np.broadcast_arrays(starts_arr, ends_arr)
     counts = ends_arr - starts_arr
     counts_csum = counts.cumsum()
     id_arr = np.ones(counts_csum[-1], dtype=int)
