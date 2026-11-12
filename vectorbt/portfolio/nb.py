@@ -2037,6 +2037,7 @@ def simulate_from_signals_nb(
         tp_init_i = np.full(target_shape[1], -1, dtype=np.int64)
         tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float64)
         tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float64)
+        avg_entry_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     else:
         sl_init_i = np.empty(0, dtype=np.int64)
         sl_init_price = np.empty(0, dtype=np.float64)
@@ -2047,6 +2048,7 @@ def simulate_from_signals_nb(
         tp_init_i = np.empty(0, dtype=np.int64)
         tp_init_price = np.empty(0, dtype=np.float64)
         tp_curr_stop = np.empty(0, dtype=np.float64)
+        avg_entry_price = np.empty(0, dtype=np.float64)
     price_arr = np.full(target_shape[1], np.nan, dtype=np.float64)
     size_arr = np.empty(target_shape[1], dtype=np.float64)
     size_type_arr = np.empty(target_shape[1], dtype=np.float64)
@@ -2382,6 +2384,7 @@ def simulate_from_signals_nb(
                         if order_result.status == OrderStatus.Filled:
                             if position_now == 0:
                                 # Position closed -> clear stops
+                                avg_entry_price[col] = np.nan
                                 sl_curr_i[col] = sl_init_i[col] = -1
                                 sl_curr_price[col] = sl_init_price[col] = np.nan
                                 sl_curr_stop[col] = np.nan
@@ -2390,6 +2393,15 @@ def simulate_from_signals_nb(
                                 tp_init_price[col] = np.nan
                                 tp_curr_stop[col] = np.nan
                             else:
+                                if state.position == 0 or np.sign(position_now) != np.sign(state.position):
+                                    # Position opened/reversed -> reset average entry price
+                                    avg_entry_price[col] = order_result.price
+                                elif abs(position_now) > abs(state.position):
+                                    # Position increased -> update average entry price
+                                    avg_entry_price[col] = (
+                                        abs(state.position) * avg_entry_price[col]
+                                        + abs(order_result.size) * order_result.price
+                                    ) / abs(position_now)
                                 _stop_entry_price = flex_select_auto_nb(stop_entry_price, i, col, flex_2d)
                                 if _stop_entry_price == StopEntryPrice.ValPrice:
                                     new_init_price = val_price_now
@@ -2397,6 +2409,8 @@ def simulate_from_signals_nb(
                                     new_init_price = order.price
                                 elif _stop_entry_price == StopEntryPrice.FillPrice:
                                     new_init_price = order_result.price
+                                elif _stop_entry_price == StopEntryPrice.AvgEntryPrice:
+                                    new_init_price = avg_entry_price[col]
                                 else:
                                     new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
@@ -2556,6 +2570,7 @@ def simulate_from_signal_func_nb(
         tp_init_i = np.full(target_shape[1], -1, dtype=np.int64)
         tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float64)
         tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float64)
+        avg_entry_price = np.full(target_shape[1], np.nan, dtype=np.float64)
     else:
         sl_init_i = np.empty(0, dtype=np.int64)
         sl_init_price = np.empty(0, dtype=np.float64)
@@ -2566,6 +2581,7 @@ def simulate_from_signal_func_nb(
         tp_init_i = np.empty(0, dtype=np.int64)
         tp_init_price = np.empty(0, dtype=np.float64)
         tp_curr_stop = np.empty(0, dtype=np.float64)
+        avg_entry_price = np.empty(0, dtype=np.float64)
     price_arr = np.full(target_shape[1], np.nan, dtype=np.float64)
     size_arr = np.empty(target_shape[1], dtype=np.float64)
     size_type_arr = np.empty(target_shape[1], dtype=np.float64)
@@ -2907,6 +2923,7 @@ def simulate_from_signal_func_nb(
                         if order_result.status == OrderStatus.Filled:
                             if position_now == 0:
                                 # Position closed -> clear stops
+                                avg_entry_price[col] = np.nan
                                 sl_curr_i[col] = sl_init_i[col] = -1
                                 sl_curr_price[col] = sl_init_price[col] = np.nan
                                 sl_curr_stop[col] = np.nan
@@ -2915,6 +2932,15 @@ def simulate_from_signal_func_nb(
                                 tp_init_price[col] = np.nan
                                 tp_curr_stop[col] = np.nan
                             else:
+                                if state.position == 0 or np.sign(position_now) != np.sign(state.position):
+                                    # Position opened/reversed -> reset average entry price
+                                    avg_entry_price[col] = order_result.price
+                                elif abs(position_now) > abs(state.position):
+                                    # Position increased -> update average entry price
+                                    avg_entry_price[col] = (
+                                        abs(state.position) * avg_entry_price[col]
+                                        + abs(order_result.size) * order_result.price
+                                    ) / abs(position_now)
                                 _stop_entry_price = flex_select_auto_nb(stop_entry_price, i, col, flex_2d)
                                 if _stop_entry_price == StopEntryPrice.ValPrice:
                                     new_init_price = val_price_now
@@ -2922,6 +2948,8 @@ def simulate_from_signal_func_nb(
                                     new_init_price = order.price
                                 elif _stop_entry_price == StopEntryPrice.FillPrice:
                                     new_init_price = order_result.price
+                                elif _stop_entry_price == StopEntryPrice.AvgEntryPrice:
+                                    new_init_price = avg_entry_price[col]
                                 else:
                                     new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)

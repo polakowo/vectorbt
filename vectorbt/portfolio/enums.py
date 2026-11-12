@@ -251,6 +251,7 @@ class StopEntryPriceT(tp.NamedTuple):
     Price: int = 1
     FillPrice: int = 2
     Close: int = 3
+    AvgEntryPrice: int = 4
 
 
 StopEntryPrice = StopEntryPriceT()
@@ -271,6 +272,7 @@ Attributes:
     Price: Default price.
     FillPrice: Fill price (that is, slippage is already applied).
     Close: Closing price.
+    AvgEntryPrice: Average entry price of the current position.
 """
 
 

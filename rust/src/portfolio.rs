@@ -218,6 +218,7 @@ const OPPOSITE_ENTRY_REVERSE: i64 = 3;
 const STOP_ENTRY_VAL_PRICE: i64 = 0;
 const STOP_ENTRY_PRICE: i64 = 1;
 const STOP_ENTRY_FILL_PRICE: i64 = 2;
+const STOP_ENTRY_AVG_ENTRY_PRICE: i64 = 4;
 
 // StopExitPrice
 const STOP_EXIT_STOP_LIMIT: i64 = 0;
@@ -4043,6 +4044,7 @@ fn simulate_from_signals_non_shared_inner(
         let mut sl_curr_stop = f64::NAN;
         let mut sl_curr_trail = false;
         let mut tp_init_price = f64::NAN;
+        let mut avg_entry_price = f64::NAN;
         let mut tp_curr_stop = f64::NAN;
 
         for i in 0..nrows {
@@ -4212,6 +4214,7 @@ fn simulate_from_signals_non_shared_inner(
                 // Update stop state after fill
                 if use_stops && order_result.status == ORDER_STATUS_FILLED {
                     if last_position == 0.0 {
+                        avg_entry_price = f64::NAN;
                         sl_curr_i = -1;
                         sl_curr_price = f64::NAN;
                         sl_curr_stop = f64::NAN;
@@ -4219,6 +4222,13 @@ fn simulate_from_signals_non_shared_inner(
                         tp_init_price = f64::NAN;
                         tp_curr_stop = f64::NAN;
                     } else {
+                        if state.position == 0.0 || last_position.signum() != state.position.signum() {
+                            avg_entry_price = order_result.price;
+                        } else if last_position.abs() > state.position.abs() {
+                            avg_entry_price = (state.position.abs() * avg_entry_price
+                                + order_result.size.abs() * order_result.price)
+                                / last_position.abs();
+                        }
                         let sep = stop_entry_price_s.get(i, col);
                         let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
                             new_state.val_price
@@ -4226,6 +4236,8 @@ fn simulate_from_signals_non_shared_inner(
                             order.price
                         } else if sep == STOP_ENTRY_FILL_PRICE {
                             order_result.price
+                        } else if sep == STOP_ENTRY_AVG_ENTRY_PRICE {
+                            avg_entry_price
                         } else {
                             close_s.get(i, col)
                         };
@@ -4339,6 +4351,7 @@ fn simulate_from_signals_inner(
     let mut sl_init_price_arr = vec![f64::NAN; ncols];
     let mut sl_curr_i_arr = vec![-1i64; ncols];
     let mut sl_curr_price_arr = vec![f64::NAN; ncols];
+    let mut avg_entry_price_arr = vec![f64::NAN; ncols];
     let mut sl_curr_stop_arr = vec![f64::NAN; ncols];
     let mut sl_curr_trail_arr = vec![false; ncols];
     let mut tp_init_i_arr = vec![-1i64; ncols];
@@ -4613,6 +4626,7 @@ fn simulate_from_signals_inner(
                     // Update stop state
                     if use_stops && order_result.status == ORDER_STATUS_FILLED {
                         if new_position == 0.0 {
+                            avg_entry_price_arr[col] = f64::NAN;
                             sl_curr_i_arr[col] = -1;
                             sl_init_i_arr[col] = -1;
                             sl_curr_price_arr[col] = f64::NAN;
@@ -4623,6 +4637,13 @@ fn simulate_from_signals_inner(
                             tp_init_price_arr[col] = f64::NAN;
                             tp_curr_stop_arr[col] = f64::NAN;
                         } else {
+                            if position_now == 0.0 || new_position.signum() != position_now.signum() {
+                                avg_entry_price_arr[col] = order_result.price;
+                            } else if new_position.abs() > position_now.abs() {
+                                avg_entry_price_arr[col] = (position_now.abs() * avg_entry_price_arr[col]
+                                    + order_result.size.abs() * order_result.price)
+                                    / new_position.abs();
+                            }
                             let sep = stop_entry_price_s.get(i, col);
                             let new_init_price = if sep == STOP_ENTRY_VAL_PRICE {
                                 new_state.val_price
@@ -4630,6 +4651,8 @@ fn simulate_from_signals_inner(
                                 order.price
                             } else if sep == STOP_ENTRY_FILL_PRICE {
                                 order_result.price
+                            } else if sep == STOP_ENTRY_AVG_ENTRY_PRICE {
+                                avg_entry_price_arr[col]
                             } else {
                                 close_s.get(i, col)
                             };

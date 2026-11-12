@@ -4667,6 +4667,107 @@ class TestFromSignals:
             ),
         )
 
+    def test_stop_entry_price_avg_entry(self):
+        entries = pd.Series([True, True, False, False])
+        exits = pd.Series([False, False, False, False])
+        kwargs = dict(
+            entries=entries,
+            exits=exits,
+            size=1.0,
+            size_type="amount",
+            init_cash=10000.0,
+            accumulate=True,
+        )
+
+        # Two entries at 100 and 50 -> average entry price is 75
+        record_arrays_close(
+            from_signals_longonly(
+                close=pd.Series([100.0, 50.0, 80.0, 90.0]),
+                tp_stop=0.1,
+                stop_entry_price="close",
+                **kwargs,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 100.0, 0.0, 0),
+                    (1, 0, 1, 1.0, 50.0, 0.0, 0),
+                    (2, 0, 2, 2.0, 80.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        # Same setup, but the stop is now based on the average entry price:
+        # 75 * 1.1 = 82.5 is hit one bar later than 50 * 1.1 = 55
+        record_arrays_close(
+            from_signals_longonly(
+                close=pd.Series([100.0, 50.0, 80.0, 90.0]),
+                tp_stop=0.1,
+                stop_entry_price="avgentryprice",
+                **kwargs,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 100.0, 0.0, 0),
+                    (1, 0, 1, 1.0, 50.0, 0.0, 0),
+                    (2, 0, 3, 2.0, 90.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        # Two entries at 100 and 95 -> average entry price is 97.5,
+        # so the stop-loss triggers at 97.5 * 0.9 = 87.75
+        record_arrays_close(
+            from_signals_longonly(
+                close=pd.Series([100.0, 95.0, 86.0, 80.0]),
+                sl_stop=0.1,
+                stop_entry_price="avgentryprice",
+                **kwargs,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 100.0, 0.0, 0),
+                    (1, 0, 1, 1.0, 95.0, 0.0, 0),
+                    (2, 0, 2, 2.0, 86.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        # Two shorts at 100 and 150 -> average entry price is 125,
+        # so the take-profit triggers at 125 * 0.9 = 112.5
+        record_arrays_close(
+            from_signals_shortonly(
+                close=pd.Series([100.0, 150.0, 130.0, 110.0]),
+                tp_stop=0.1,
+                stop_entry_price="avgentryprice",
+                **kwargs,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 100.0, 0.0, 1),
+                    (1, 0, 1, 1.0, 150.0, 0.0, 1),
+                    (2, 0, 3, 2.0, 110.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        # upon_stop_update="keep" keeps the stop based on the first entry
+        record_arrays_close(
+            from_signals_longonly(
+                close=pd.Series([100.0, 50.0, 80.0, 90.0]),
+                tp_stop=0.1,
+                stop_entry_price="avgentryprice",
+                upon_stop_update="keep",
+                **kwargs,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 100.0, 0.0, 0),
+                    (1, 0, 1, 1.0, 50.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
     def test_stop_exit_price(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
