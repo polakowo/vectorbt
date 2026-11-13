@@ -5750,6 +5750,27 @@ def get_trade_stats_nb(
 
 
 @njit(cache=True)
+def barwise_trade_pnl_nb(trade_records: tp.RecordArray, close: tp.Array2d) -> tp.Array2d:
+    """Accrue the PnL of each trade bar by bar, based on changes in `close`.
+
+    A trade entered at `entry_idx` and exited at `exit_idx` accrues
+    `size * (close[i] - close[i-1])` for every bar `entry_idx < i <= exit_idx`
+    (sign-flipped for shorts). Open trades accrue until the last bar.
+    """
+    out = np.zeros(close.shape, dtype=np.float64)
+    for r in range(trade_records.shape[0]):
+        record = trade_records[r]
+        col = record["col"]
+        if record["direction"] == TradeDirection.Short:
+            signed_size = -record["size"]
+        else:
+            signed_size = record["size"]
+        for i in range(record["entry_idx"] + 1, record["exit_idx"] + 1):
+            out[i, col] += signed_size * (close[i, col] - close[i - 1, col])
+    return out
+
+
+@njit(cache=True)
 def fill_trade_record_nb(
     record: tp.Record,
     id_: int,
