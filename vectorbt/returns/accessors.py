@@ -566,6 +566,93 @@ class ReturnsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts({}, wrap_kwargs)
         return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
 
+    def pain_index(self, engine: tp.Optional[str] = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Mean depth of drawdowns over all observations, expressed as a positive fraction.
+
+        Where `ReturnsAccessor.ulcer_index` squares the drawdowns, the pain index averages
+        their absolute values. Uses the same drawdown convention as `ReturnsAccessor.drawdown`.
+        NaN returns count as zero-return observations. Empty input returns NaN.
+
+        Uses Numba with `engine='auto'`; `engine='rust'` is not supported.
+
+        See `vectorbt.returns.dispatch.pain_index`."""
+        engine = engine if engine is not None else self.engine
+        result = dispatch.pain_index(self.to_2d_array(), engine=engine)
+        wrap_kwargs = merge_dicts(dict(name_or_index="pain_index"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_pain_index(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.pain_index`.
+
+        Recalculate drawdowns within each window. `minp` counts non-NaN returns;
+        NaN returns within an eligible window count as zero-return observations."""
+        engine = engine if engine is not None else self.engine
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        result = dispatch.rolling_pain_index(self.to_2d_array(), window, minp, engine=engine)
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
+    def pain_ratio(
+        self,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Pain ratio.
+
+        Subtract the annualized risk-free return from the annualized strategy return,
+        then divide by `ReturnsAccessor.pain_index`. Return NaN when the pain index
+        is zero or NaN.
+
+        `risk_free` is a constant per-observation rate, compounded over `ann_factor`
+        periods to annualize it, as in `ReturnsAccessor.martin_ratio`. Defaults to the
+        `risk_free` value in `ReturnsAccessor.defaults`.
+
+        Uses Numba with `engine='auto'`; `engine='rust'` is not supported.
+
+        See `vectorbt.returns.dispatch.pain_ratio`."""
+        engine = engine if engine is not None else self.engine
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.pain_ratio(self.to_2d_array(), self.ann_factor, risk_free, engine=engine)
+        wrap_kwargs = merge_dicts(dict(name_or_index="pain_ratio"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+
+    def rolling_pain_ratio(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        risk_free: tp.Optional[float] = None,
+        engine: tp.Optional[str] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.pain_ratio`.
+
+        Recalculate the annualized return and pain index within each window.
+        `minp` counts non-NaN returns; NaN returns within an eligible window count
+        as zero-return observations."""
+        engine = engine if engine is not None else self.engine
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        result = dispatch.rolling_pain_ratio(
+            self.to_2d_array(), window, minp, self.ann_factor, risk_free, engine=engine
+        )
+        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+
     def omega_ratio(
         self,
         risk_free: tp.Optional[float] = None,

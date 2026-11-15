@@ -79,6 +79,20 @@ def ref_martin_ratio(values, ann_factor, risk_free):
     return (strategy_ann - ((1 + risk_free) ** ann_factor - 1)) / ulcer
 
 
+def ref_pain_index(values):
+    cum = np.cumprod(1 + np.nan_to_num(np.asarray(values, dtype=float)))
+    return np.mean(np.abs(cum / np.maximum.accumulate(cum) - 1))
+
+
+def ref_pain_ratio(values, ann_factor, risk_free):
+    values = np.nan_to_num(np.asarray(values, dtype=float))
+    pain = ref_pain_index(values)
+    if pain == 0:
+        return np.nan
+    strategy_ann = np.prod(1 + values) ** (ann_factor / len(values)) - 1
+    return (strategy_ann - ((1 + risk_free) ** ann_factor - 1)) / pain
+
+
 class TestAccessors:
     def test_indexing(self):
         assert rets.vbt.returns["a"].total() == rets["a"].vbt.returns.total()
@@ -389,6 +403,118 @@ class TestAccessors:
         assert not res_rf.equals(res)
         pd.testing.assert_frame_equal(
             rets.vbt.returns(defaults=dict(risk_free=0.001)).rolling_martin_ratio(window=window, minp=window), res_rf
+        )
+
+    def test_pain_index(self):
+        # Worked by hand: equity 1.10, 0.88, 1.10, 0.99, 0.99 against a running peak of 1.10
+        # gives drawdowns 0, -20%, 0, -10%, -10%, so the pain index is 0.4 / 5 = 0.08
+        # (the ulcer index of the same path is sqrt(0.06 / 5)).
+        x = pd.Series([0.10, -0.20, 0.25, -0.10, 0.0], index=pd.date_range("2020", periods=5))
+        acc = x.vbt.returns(freq="1D")
+        assert isclose(acc.pain_index(), 0.08)
+        assert isclose(acc.pain_index(engine="numba"), 0.08)
+        assert isclose(acc.ulcer_index(), np.sqrt(0.012))
+        assert acc.pain_index() < acc.ulcer_index()
+
+        for col in rets.columns:
+            assert isclose(rets[col].vbt.returns.pain_index(), ref_pain_index(rets[col]))
+        res = rets.vbt.returns.pain_index()
+        assert res.name == "pain_index"
+        assert list(res.index) == list(rets.columns)
+        assert (res >= 0).all()
+        flat = pd.Series([0.0, 0.0, 0.0])
+        assert flat.vbt.returns(freq="1D").pain_index() == 0.0
+        assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").pain_index())
+
+    def test_pain_index_nan_returns(self):
+        # NaN returns count as zero-return observations, like in `max_drawdown` and `ulcer_index`
+        x = pd.Series([0.01, np.nan, -0.02, 0.015], index=pd.date_range("2020", periods=4))
+        acc = x.vbt.returns(freq="1D")
+        assert isclose(acc.pain_index(), x.fillna(0).vbt.returns(freq="1D").pain_index())
+        all_nan = pd.Series([np.nan] * 3, index=pd.date_range("2020", periods=3)).vbt.returns(freq="1D")
+        assert all_nan.pain_index() == 0.0
+        assert np.isnan(all_nan.pain_ratio())
+
+    def test_rolling_pain_index(self):
+        window = 3
+        res = rets.vbt.returns.rolling_pain_index(window=window, minp=window)
+        assert res.shape == rets.shape
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < window:
+                    assert np.isnan(res[col].iloc[i])
+                else:
+                    assert isclose(res[col].iloc[i], ref_pain_index(sub))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns.rolling_pain_index(window=window, minp=window, engine="numba"), res
+        )
+        res_minp = rets.vbt.returns.rolling_pain_index(window=window, minp=1)
+        for col in rets.columns:
+            for i in range(len(rets)):
+                sub = rets[col].iloc[max(0, i - window + 1) : i + 1]
+                if sub.notna().sum() < 1:
+                    assert np.isnan(res_minp[col].iloc[i])
+                else:
+                    assert isclose(res_minp[col].iloc[i], ref_pain_index(sub))
+
+    def test_pain_ratio(self):
+        # Same path as in test_pain_index: the equity ends at 0.99 after 5 periods. With 5 periods
+        # per year the annualized return is 0.99 ** (5 / 5) - 1 = -1%, so the pain ratio is
+        # -0.01 / 0.08 = -0.125. A 0.2% per-period risk-free rate annualizes to 1.002 ** 5 - 1.
+        x = pd.Series([0.10, -0.20, 0.25, -0.10, 0.0], index=pd.date_range("2020", periods=5))
+        acc = x.vbt.returns(freq="1D", year_freq="5D")
+        assert acc.ann_factor == 5
+        assert isclose(acc.pain_ratio(risk_free=0.0), -0.125)
+        assert isclose(acc.pain_ratio(risk_free=0.0, engine="numba"), -0.125)
+        assert isclose(acc.pain_ratio(risk_free=0.002), (-0.01 - 0.010040080160032) / 0.08)
+
+        r = rets["b"].vbt.returns
+        assert isclose(r.pain_ratio(risk_free=0.0), r.annualized() / r.pain_index())
+        assert rets.vbt.returns.pain_ratio().name == "pain_ratio"
+        acc = x.vbt.returns(freq="1D", year_freq="365D")
+        assert isclose(acc.pain_ratio(), acc.pain_ratio(risk_free=0.01))  # test module default
+        acc_rf = x.vbt.returns(freq="1D", year_freq="365D", defaults=dict(risk_free=0.001))
+        assert isclose(acc_rf.pain_ratio(), acc.pain_ratio(risk_free=0.001))
+
+        flat = pd.Series([0.01, 0.01, 0.01], index=pd.date_range("2020", periods=3))
+        assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").pain_ratio())
+        assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").pain_ratio())
+
+    def test_pain_ratio_references(self):
+        rng = np.random.default_rng(11)
+        x = pd.Series(rng.normal(0.0005, 0.01, 20), index=pd.date_range("2020", periods=20))
+        window = 5
+
+        for freq, year_freq, ann_factor in [("1D", "365D", 365.0), ("2D", "365D", 182.5), ("1D", "1D", 1.0)]:
+            acc = x.vbt.returns(freq=freq, year_freq=year_freq)
+            assert acc.ann_factor == ann_factor
+            for rf in [0.0, 0.0005, -0.0003]:
+                assert isclose(acc.pain_ratio(risk_free=rf), ref_pain_ratio(x.values, ann_factor, rf))
+                res = acc.rolling_pain_ratio(window=window, minp=window, risk_free=rf)
+                res_numba = acc.rolling_pain_ratio(window=window, minp=window, risk_free=rf, engine="numba")
+                pd.testing.assert_series_equal(res, res_numba)
+                assert res.iloc[: window - 1].isna().all()
+                for i in range(window - 1, len(x)):
+                    assert isclose(res.iloc[i], ref_pain_ratio(x.values[i - window + 1 : i + 1], ann_factor, rf))
+
+    def test_rolling_pain_ratio_interior_nan(self):
+        x = pd.Series(
+            [0.01, -0.02, np.nan, 0.015, -0.01, 0.02, np.nan, -0.005, 0.004, 0.01],
+            index=pd.date_range("2020", periods=10),
+        )
+        acc = x.vbt.returns(freq="1D", year_freq="365D")
+        window, rf = 4, 0.0004
+        res = acc.rolling_pain_ratio(window=window, minp=2, risk_free=rf)
+        for i in range(len(x)):
+            sub = x.values[max(0, i - window + 1) : i + 1]
+            if np.isfinite(sub).sum() < 2:
+                assert np.isnan(res.iloc[i])
+            else:
+                assert isclose(res.iloc[i], ref_pain_ratio(sub, 365.0, rf))
+        pd.testing.assert_frame_equal(
+            rets.vbt.returns(defaults=dict(risk_free=0.001)).rolling_pain_ratio(window=3, minp=3),
+            rets.vbt.returns.rolling_pain_ratio(window=3, minp=3, risk_free=0.001),
         )
 
     def test_calmar_ratio(self):

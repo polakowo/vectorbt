@@ -438,6 +438,55 @@ def rolling_martin_ratio(
     return rolling_martin_ratio_nb(returns, window, minp, ann_factor, risk_free)
 
 
+def pain_index(returns: tp.Array2d, engine: tp.Optional[str] = None) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.pain_index_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("pain_index"))
+    from vectorbt.returns.nb import pain_index_nb
+
+    return pain_index_nb(returns)
+
+
+def rolling_pain_index(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.rolling_pain_index_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("rolling_pain_index"))
+    from vectorbt.returns.nb import rolling_pain_index_nb
+
+    return rolling_pain_index_nb(returns, window, minp)
+
+
+def pain_ratio(
+    returns: tp.Array2d,
+    ann_factor: float,
+    risk_free: float = 0.0,
+    engine: tp.Optional[str] = None,
+) -> tp.Array1d:
+    """Engine-neutral `vectorbt.returns.nb.pain_ratio_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("pain_ratio"))
+    from vectorbt.returns.nb import pain_ratio_nb
+
+    return pain_ratio_nb(returns, ann_factor, risk_free)
+
+
+def rolling_pain_ratio(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    ann_factor: float,
+    risk_free: float = 0.0,
+    engine: tp.Optional[str] = None,
+) -> tp.Array2d:
+    """Engine-neutral `vectorbt.returns.nb.rolling_pain_ratio_nb`."""
+    resolve_engine(engine, supports_rust=_no_rust("rolling_pain_ratio"))
+    from vectorbt.returns.nb import rolling_pain_ratio_nb
+
+    return rolling_pain_ratio_nb(returns, window, minp, ann_factor, risk_free)
+
+
 def omega_ratio(
     returns: tp.Array2d,
     ann_factor: float,
