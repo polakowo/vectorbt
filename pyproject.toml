@@ -60,6 +60,7 @@ full = [
     "ray>=1.4.1",
     "ta",
     "pandas-ta-classic",
+    "fin-primitives>=3.2",
     "python-telegram-bot>=13.4",
     "quantstats>=0.0.37",
     "kaleido>=1",

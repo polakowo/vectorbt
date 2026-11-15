@@ -39,6 +39,12 @@ try:
 except:
     talib_available = False
 
+fin_primitives_available = True
+try:
+    import fin_primitives
+except:
+    fin_primitives_available = False
+
 seed = 42
 
 
@@ -2137,6 +2143,115 @@ class TestFactory:
             pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband, target)
             pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg, target - 1)
             pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband, target - 2)
+
+    def test_get_fin_primitives_indicators(self):
+        if fin_primitives_available:
+            assert {"sma", "ema", "rsi", "macd", "atr"} <= vbt.IndicatorFactory.get_fin_primitives_indicators()
+
+    def test_from_fin_primitives(self):
+        if fin_primitives_available:
+            pd.testing.assert_frame_equal(
+                vbt.fin_primitives("SMA").run(ts, 2).sma,
+                pd.DataFrame(
+                    ts.rolling(2).mean().values,
+                    index=ts.index,
+                    columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["sma_period", None]),
+                ),
+            )
+            pd.testing.assert_frame_equal(
+                vbt.fin_primitives("SMA").run(ts["a"], [2, 3, 4]).sma,
+                pd.DataFrame(
+                    np.column_stack(
+                        (
+                            ts["a"].rolling(2).mean().values,
+                            ts["a"].rolling(3).mean().values,
+                            ts["a"].rolling(4).mean().values,
+                        )
+                    ),
+                    index=ts.index,
+                    columns=pd.Index([2, 3, 4], dtype="int64", name="sma_period"),
+                ),
+            )
+            # inputs are the bar fields the indicator reads
+            assert vbt.fin_primitives("SMA").input_names == ("close",)
+            assert vbt.fin_primitives("ATR").input_names == ("high", "low", "close")
+            assert vbt.fin_primitives("MFI").input_names == ("high", "low", "close", "volume")
+            assert vbt.fin_primitives("OBV").input_names == ("close", "volume")
+            assert vbt.fin_primitives("ATR", input_names=["high", "low", "close"]).input_names == (
+                "high",
+                "low",
+                "close",
+            )
+            with pytest.raises(Exception):
+                vbt.fin_primitives("ATR", input_names=["high", "low"])
+            # rows with NaN are skipped
+            close = pd.Series([np.nan, 1.0, 2.0, np.nan, 3.0, 4.0])
+            np.testing.assert_array_equal(
+                vbt.fin_primitives("SMA").run(close, 2).sma.values,
+                np.array([np.nan, np.nan, 1.5, np.nan, 2.5, 3.5]),
+            )
+            # tuple parameters
+            kst = vbt.fin_primitives("KST").run(ts["a"], (1, 2, 3, 4), (1, 1, 1, 1)).kst
+            assert kst.shape == (5,)
+
+    @pytest.mark.skipif(not fin_primitives_available, reason="fin-primitives is not installed")
+    def test_from_fin_primitives_parity(self):
+        rng = np.random.default_rng(seed)
+        close = pd.Series(100 + np.cumsum(rng.normal(0, 1, 300)))
+        high = close + rng.uniform(0.1, 1, 300)
+        low = close - rng.uniform(0.1, 1, 300)
+
+        def ema(a, n):
+            out = np.full(len(a), np.nan)
+            start = np.argmax(~np.isnan(a))
+            out[start + n - 1] = np.mean(a[start : start + n])
+            for i in range(start + n, len(a)):
+                out[i] = a[i] * 2 / (n + 1) + out[i - 1] * (1 - 2 / (n + 1))
+            return out
+
+        # RSI with Wilder's smoothing, seeded with the simple average of the first 14 changes
+        diff = close.diff().values
+        gain = np.clip(diff, 0, None)
+        loss = np.clip(-diff, 0, None)
+        rsi = np.full(len(close), np.nan)
+        avg_gain, avg_loss = gain[1:15].mean(), loss[1:15].mean()
+        rsi[14] = 100 - 100 / (1 + avg_gain / avg_loss)
+        for i in range(15, len(close)):
+            avg_gain = (avg_gain * 13 + gain[i]) / 14
+            avg_loss = (avg_loss * 13 + loss[i]) / 14
+            rsi[i] = 100 - 100 / (1 + avg_gain / avg_loss)
+        np.testing.assert_allclose(vbt.fin_primitives("RSI").run(close, 14).rsi.values, rsi, rtol=1e-10)
+
+        # MACD histogram from EMAs seeded with their simple average
+        macd_line = ema(close.values, 12) - ema(close.values, 26)
+        np.testing.assert_allclose(
+            vbt.fin_primitives("MACD").run(close, 12, 26, 9).macd.values,
+            macd_line - ema(macd_line, 9),
+            rtol=1e-10,
+            atol=1e-10,
+        )
+
+        # ATR as the simple average of the true range
+        tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1)
+        atr = vbt.fin_primitives("ATR").run(high, low, close, 14).atr.values
+        np.testing.assert_allclose(atr, tr.max(axis=1, skipna=False).rolling(14).mean().values, rtol=1e-10)
+        np.testing.assert_allclose(
+            atr[14:], vbt.ATR.run(high, low, close, window=14, ewm=False).atr.values[14:], rtol=1e-10
+        )
+
+        if talib_available:
+            np.testing.assert_allclose(
+                vbt.fin_primitives("RSI").run(close, 14).rsi.values, talib.RSI(close.values, 14), rtol=1e-10
+            )
+            np.testing.assert_allclose(
+                atr, talib.SMA(talib.TRANGE(high.values, low.values, close.values), 14), rtol=1e-10
+            )
+            # TA-Lib seeds the fast EMA later, so the histograms converge after the warmup
+            np.testing.assert_allclose(
+                vbt.fin_primitives("MACD").run(close, 12, 26, 9).macd.values[100:],
+                talib.MACD(close.values, 12, 26, 9)[2][100:],
+                atol=1e-4,
+            )
 
 
 # ############# basic.py ############# #

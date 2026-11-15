@@ -828,11 +828,12 @@ not be treated as valid signals. Inspect each indicator's warmup requirements ra
 filling missing values with information from later bars.
 
 Optional integrations wrap installed [TA-Lib](https://github.com/mrjbq7/ta-lib),
-[Pandas TA](https://github.com/twopirllc/pandas-ta), and
-[Technical Analysis Library](https://github.com/bukosabino/ta) indicators with the same
+[Pandas TA](https://github.com/twopirllc/pandas-ta),
+[Technical Analysis Library](https://github.com/bukosabino/ta), and
+[fin-primitives](https://github.com/Mattbusel/fin-primitives) indicators with the same
 parameter and indexing machinery. For example, `vbt.talib("SMA")`,
-`vbt.pandas_ta("SMA")`, and `vbt.ta("SMAIndicator")` build wrappers for the corresponding
-installed libraries. Available names, outputs, and dependencies vary by library and version.
+`vbt.pandas_ta("SMA")`, `vbt.ta("SMAIndicator")`, and `vbt.fin_primitives("SMA")` build
+wrappers for the corresponding installed libraries. Available names, outputs, and dependencies vary by library and version.
 See the [indicator factory API](/api/indicators/factory/) for integration details.
 
 The three wrappers below expose the underlying libraries' moving averages through VectorBT.
