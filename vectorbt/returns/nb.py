@@ -355,6 +355,81 @@ def rolling_martin_ratio_nb(
 
 
 @njit(cache=True)
+def pain_index_1d_nb(returns: tp.Array1d) -> float:
+    """Pain index: the mean depth of the drawdowns over all observations.
+
+    Where the ulcer index is the root mean square of the drawdowns, the pain index is their
+    mean absolute value, so every period under water counts linearly (Becker, Zephyr
+    Associates; Bacon, "Practical Portfolio Performance Measurement and Attribution").
+    The result is a positive fraction, for example 0.05 means 5%.
+
+    Uses `drawdown_1d_nb`, treating NaN returns as zero-return observations.
+    Empty input returns NaN; a series without drawdowns returns zero."""
+    if returns.shape[0] == 0:
+        return np.nan
+    drawdown = drawdown_1d_nb(returns)
+    return -np.mean(drawdown)
+
+
+@njit(cache=True)
+def pain_index_nb(returns: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `pain_index_1d_nb`."""
+    out = np.empty(returns.shape[1], dtype=np.float64)
+    for col in range(returns.shape[1]):
+        out[col] = pain_index_1d_nb(returns[:, col])
+    return out
+
+
+@njit
+def rolling_pain_index_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int]) -> tp.Array2d:
+    """Rolling version of `pain_index_nb`."""
+
+    def _apply_func_nb(i, col, _returns):
+        return pain_index_1d_nb(_returns)
+
+    return generic_nb.rolling_apply_nb(returns, window, minp, _apply_func_nb)
+
+
+@njit(cache=True)
+def pain_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, risk_free: float = 0.0) -> float:
+    """Pain ratio: the annualized return minus the annualized risk-free return, divided by
+    the pain index.
+
+    `risk_free` is a constant per-period return and is compounded over `ann_factor` periods,
+    as in `martin_ratio_1d_nb`. Return NaN when the pain index is zero or NaN."""
+    pain_index = pain_index_1d_nb(returns)
+    if np.isnan(pain_index) or pain_index == 0.0:
+        return np.nan
+    annualized_risk_free = (1 + risk_free) ** ann_factor - 1
+    return (annualized_return_1d_nb(returns, ann_factor) - annualized_risk_free) / pain_index
+
+
+@njit(cache=True)
+def pain_ratio_nb(returns: tp.Array2d, ann_factor: float, risk_free: float = 0.0) -> tp.Array1d:
+    """2-dim version of `pain_ratio_1d_nb`."""
+    out = np.empty(returns.shape[1], dtype=np.float64)
+    for col in range(returns.shape[1]):
+        out[col] = pain_ratio_1d_nb(returns[:, col], ann_factor, risk_free)
+    return out
+
+
+@njit
+def rolling_pain_ratio_nb(
+    returns: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int],
+    ann_factor: float,
+    risk_free: float = 0.0,
+) -> tp.Array2d:
+    """Rolling version of `pain_ratio_nb`."""
+
+    def _apply_func_nb(i, col, _returns, _ann_factor, _risk_free):
+        return pain_ratio_1d_nb(_returns, _ann_factor, _risk_free)
+
+    return generic_nb.rolling_apply_nb(returns, window, minp, _apply_func_nb, ann_factor, risk_free)
+
+
+@njit(cache=True)
 def omega_ratio_1d_nb(
     returns: tp.Array1d,
     ann_factor: float,

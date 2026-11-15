@@ -285,6 +285,16 @@ class TestEngineResolution:
             returns_dispatch.rolling_martin_ratio(arr, 2, None, 365.0, 0.0, engine="rust")
         assert returns_dispatch.martin_ratio(arr, 365.0, 0.0, engine="auto").shape == (1,)
 
+    def test_pain_reject_explicit_rust(self, monkeypatch):
+        monkeypatch.setattr(_engine, "is_rust_available", lambda: True)
+        arr = np.array([[0.01], [-0.02], [0.03]])
+
+        with pytest.raises(ValueError, match="not implemented for `pain_index`"):
+            returns_dispatch.pain_index(arr, engine="rust")
+        with pytest.raises(ValueError, match="not implemented for `rolling_pain_ratio`"):
+            returns_dispatch.rolling_pain_ratio(arr, 2, None, 365.0, 0.0, engine="rust")
+        assert returns_dispatch.pain_ratio(arr, 365.0, 0.0, engine="auto").shape == (1,)
+
     @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
     def test_rust_accepts_safe_cast_arrays(self):
         f32_arr = np.array([[1.0, np.nan], [3.0, 4.0]], dtype=np.float32)
