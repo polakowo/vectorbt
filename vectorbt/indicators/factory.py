@@ -4094,9 +4094,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(
         """Build an indicator class around a fin-primitives indicator.
 
         Requires [fin-primitives](https://github.com/Mattbusel/fin-primitives) installed.
-        It ships prebuilt wheels (no C library to compile) with 743 indicators computed in exact
-        decimal arithmetic by a Rust core. `fin_primitives.catalogue()` lists every key with its
-        parameters and a one-line description.
+        It provides 743 indicators computed in exact decimal arithmetic by a Rust core.
+        `fin_primitives.catalogue()` lists every key with its parameters and a one-line description.
 
         Inputs are taken in the order `open`, `high`, `low`, `close`, `volume`, keeping only those
         the indicator reads (see `IndicatorFactory.parse_fin_primitives_config`), or as given in
