@@ -26,7 +26,26 @@ def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
     return IndicatorFactory.from_ta(*args, **kwargs)
 
 
-__all__ = ["IndicatorFactory", "talib", "pandas_ta", "ta", "MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV"]
-__whitelist__ = ["talib", "pandas_ta", "ta"]
+def fin_primitives(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_fin_primitives`."""
+    return IndicatorFactory.from_fin_primitives(*args, **kwargs)
+
+
+__all__ = [
+    "IndicatorFactory",
+    "talib",
+    "pandas_ta",
+    "ta",
+    "fin_primitives",
+    "MA",
+    "MSTD",
+    "BBANDS",
+    "RSI",
+    "STOCH",
+    "MACD",
+    "ATR",
+    "OBV",
+]
+__whitelist__ = ["talib", "pandas_ta", "ta", "fin_primitives"]
 
 __pdoc__ = {k: k in __whitelist__ for k in __all__}

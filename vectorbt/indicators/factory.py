@@ -3968,3 +3968,254 @@ Other keyword arguments are passed to `{0}.run`.""".format(
             **kwargs,
         )
         return TAIndicator
+
+    @classmethod
+    def get_fin_primitives_indicators(cls) -> tp.Set[str]:
+        """Get all fin-primitives indicators."""
+        import fin_primitives
+
+        return {entry["key"] for entry in fin_primitives.catalogue()}
+
+    @classmethod
+    def get_fin_primitives_entry(cls, func_name: str) -> tp.Kwargs:
+        """Get the catalogue entry of a fin-primitives indicator."""
+        import fin_primitives
+
+        key = fin_primitives.resolve(func_name.lower())
+        for entry in fin_primitives.catalogue():
+            if entry["key"] == key:
+                return entry
+        raise ValueError(f'Indicator "{func_name}" not found')
+
+    @classmethod
+    def parse_fin_primitives_config(
+        cls,
+        func_name: str,
+        test_params: tp.Optional[tp.Sequence] = None,
+        test_index_len: int = 200,
+        seed: int = 42,
+    ) -> tp.Kwargs:
+        """Get the config of a fin-primitives indicator.
+
+        Every fin-primitives indicator takes `close` and may also read `high`, `low`, `open`,
+        and `volume`. The catalogue does not say which, so each of them is detected by running
+        the indicator on random bars with and without it. The probe uses `test_params` if given,
+        otherwise the library defaults, otherwise a few small guesses."""
+        import fin_primitives
+
+        entry = cls.get_fin_primitives_entry(func_name)
+        key = entry["key"]
+        param_names = [name for name, _ in entry["params"]]
+        param_types = [_type for _, _type in entry["params"]]
+        defaults = dict(zip(param_names, fin_primitives.DEFAULTS.get(key, ())))
+
+        rng = np.random.default_rng(seed)
+        close = 100 + np.cumsum(rng.normal(0, 1, test_index_len))
+        bars = dict(
+            high=close + rng.uniform(0.1, 1, test_index_len),
+            low=close - rng.uniform(0.1, 1, test_index_len),
+            open=close + rng.normal(0, 0.3, test_index_len),
+            volume=rng.uniform(1_000, 10_000, test_index_len),
+        )
+
+        if test_params is not None:
+            param_candidates = [list(test_params)]
+        elif len(defaults) == len(param_names):
+            param_candidates = [list(defaults.values())]
+        else:
+            param_candidates = []
+            guesses = (
+                ((3, 5, 7, 9), ("2", "2", "2", "2"), 0.5),
+                ((3, 5, 7, 9), ("0.5", "0.5", "0.5", "0.5"), 0.5),
+                ((10, 20, 30, 40), ("0.2", "0.2", "0.2", "0.2"), 0.2),
+                ((20, 10, 5, 3), ("0.5", "0.05", "0.05", "0.05"), 0.5),
+            )
+            for ints, decimals, float_ in guesses:
+                candidate = []
+                for i, _type in enumerate(param_types):
+                    if _type == "int":
+                        candidate.append(ints[i])
+                    elif _type == "int[4]":
+                        candidate.append(list(ints))
+                    elif _type in ("decimal", "str"):
+                        candidate.append(decimals[i])
+                    elif _type == "float":
+                        candidate.append(float_)
+                    elif _type == "bool":
+                        candidate.append(False)
+                    else:
+                        candidate.append(None)
+                param_candidates.append(candidate)
+
+        def _run(params, **kwargs):
+            return fin_primitives.compute(key, close, *params, mode="float", **kwargs)
+
+        last_error = None
+        for params in param_candidates:
+            try:
+                base = _run(params, **bars)
+            except Exception as e:
+                last_error = e
+                continue
+            if np.isnan(base).all():
+                last_error = ValueError("all values are NaN")
+                continue
+            input_names = ["close"]
+            for name in bars:
+                try:
+                    out = _run(params, **{k: v for k, v in bars.items() if k != name})
+                except Exception:
+                    input_names.append(name)
+                    continue
+                if not np.array_equal(out, base, equal_nan=True):
+                    input_names.append(name)
+            break
+        else:
+            raise ValueError(f"Couldn't parse the indicator (pass input_names or test_params): {last_error}")
+
+        return dict(
+            class_name=entry["type"],
+            class_docstring=entry["doc"],
+            input_names=[name for name in ("open", "high", "low", "close", "volume") if name in input_names],
+            param_names=param_names,
+            output_names=[key],
+            defaults=defaults,
+        )
+
+    @classmethod
+    def from_fin_primitives(
+        cls,
+        func_name: str,
+        input_names: tp.Optional[tp.Sequence[str]] = None,
+        parse_kwargs: tp.KwargsLike = None,
+        init_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Type[IndicatorBase]:
+        """Build an indicator class around a fin-primitives indicator.
+
+        Requires [fin-primitives](https://github.com/Mattbusel/fin-primitives) installed.
+        It provides 743 indicators computed in exact decimal arithmetic by a Rust core.
+        `fin_primitives.catalogue()` lists every key with its parameters and a one-line description.
+
+        Inputs are taken in the order `open`, `high`, `low`, `close`, `volume`, keeping only those
+        the indicator reads (see `IndicatorFactory.parse_fin_primitives_config`), or as given in
+        `input_names`. Each indicator has one output named after its key.
+
+        Rows where any input is NaN are skipped: the indicator sees only the remaining bars,
+        and those rows come back as NaN.
+
+        Args:
+            func_name (str): Indicator key, such as "rsi" or "super_trend".
+
+                Case-insensitive. Aliases such as "bollinger" or "psar" are resolved.
+            input_names (list of str): Input names. Detected automatically if None.
+            parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_fin_primitives_config`.
+            init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+
+        Returns:
+            Indicator
+
+        Usage:
+            ```pycon
+            >>> SMA = vbt.IndicatorFactory.from_fin_primitives('SMA')
+
+            >>> sma = SMA.run(price, period=[2, 3])
+            >>> sma.sma
+            sma_period         2         3
+                          a    b    a    b
+            2020-01-01  NaN  NaN  NaN  NaN
+            2020-01-02  1.5  4.5  NaN  NaN
+            2020-01-03  2.5  3.5  2.0  4.0
+            2020-01-04  3.5  2.5  3.0  3.0
+            2020-01-05  4.5  1.5  4.0  2.0
+            ```
+
+            * To get help on running the indicator, use the `help` command:
+
+            ```pycon
+            >>> help(SMA.run)
+            Help on method run:
+
+            run(close, period=Default(20), short_name='sma', hide_params=None, hide_default=True, **kwargs) class method of vectorbt.indicators.factory.Sma
+                Run `Sma` indicator.
+
+                * Inputs: `close`
+                * Parameters: `period`
+                * Outputs: `sma`
+
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+            ```
+
+            * Indicators that read the whole bar take more inputs:
+
+            ```pycon
+            >>> vbt.fin_primitives('ATR').input_names
+            ('high', 'low', 'close')
+            ```
+        """
+        import fin_primitives
+
+        if input_names is None:
+            if parse_kwargs is None:
+                parse_kwargs = {}
+            config = cls.parse_fin_primitives_config(func_name, **parse_kwargs)
+        else:
+            entry = cls.get_fin_primitives_entry(func_name)
+            param_names = [name for name, _ in entry["params"]]
+            config = dict(
+                class_name=entry["type"],
+                class_docstring=entry["doc"],
+                input_names=list(input_names),
+                param_names=param_names,
+                output_names=[entry["key"]],
+                defaults=dict(zip(param_names, fin_primitives.DEFAULTS.get(entry["key"], ()))),
+            )
+        unknown = set(config["input_names"]) - {"open", "high", "low", "close", "volume"}
+        if "close" not in config["input_names"] or len(unknown) > 0:
+            raise ValueError("input_names must include 'close' and only 'open', 'high', 'low', 'close', 'volume'")
+        key = config["output_names"][0]
+        bar_names = list(config["input_names"])
+        param_types = [_type for _, _type in cls.get_fin_primitives_entry(key)["params"]]
+        defaults = config.pop("defaults")
+
+        def _to_param(value: tp.Any, _type: str) -> tp.Any:
+            if isinstance(value, np.generic):
+                value = value.item()
+            if _type == "int[4]" and value is not None:
+                return [int(v) for v in value]
+            return value
+
+        def apply_func(
+            input_list: tp.List[tp.AnyArray],
+            _in_output_tuple: tp.Tuple[tp.AnyArray, ...],
+            param_tuple: tp.Tuple[tp.Param, ...],
+        ) -> tp.Array2d:
+            params = [_to_param(p, param_types[i]) for i, p in enumerate(param_tuple)]
+            n_rows, n_cols = input_list[0].shape
+            output = np.full((n_rows, n_cols), np.nan, dtype=np.float64)
+            for col in range(n_cols):
+                bars = {name: np.asarray(input_list[i][:, col], dtype=np.float64) for i, name in enumerate(bar_names)}
+                valid = ~np.any([np.isnan(arr) for arr in bars.values()], axis=0)
+                if not valid.any():
+                    continue
+                bars = {name: arr[valid] for name, arr in bars.items()}
+                close = bars.pop("close")
+                output[valid, col] = fin_primitives.compute(key, close, *params, mode="float", **bars)
+            return output
+
+        param_settings = {
+            name: dict(is_tuple=True) for name, _type in zip(config["param_names"], param_types) if _type == "int[4]"
+        }
+        if len(param_settings) > 0:
+            kwargs = merge_dicts(dict(param_settings=param_settings), kwargs)
+        FPIndicator = cls(**merge_dicts(config, init_kwargs)).from_apply_func(
+            apply_func,
+            pass_packed=True,
+            **defaults,
+            **kwargs,
+        )
+        return FPIndicator
