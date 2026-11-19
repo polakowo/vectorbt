@@ -14,6 +14,7 @@
 
 import time
 import warnings
+from enum import Enum
 from functools import wraps
 
 import numpy as np
@@ -449,6 +450,7 @@ class BinanceData(Data):
         limit: int = 500,
         show_progress: bool = True,
         tqdm_kwargs: tp.KwargsLike = None,
+        klines_type: tp.Union[str, Enum] = "spot",
     ) -> tp.Frame:
         """Download the symbol.
 
@@ -468,18 +470,29 @@ class BinanceData(Data):
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
             tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
+            klines_type (str or binance.enums.HistoricalKlinesType): Market to fetch klines from.
+
+                Either 'spot' or 'futures' (USD-M futures), case-insensitive.
+                `binance.enums.HistoricalKlinesType.SPOT` and `binance.enums.HistoricalKlinesType.FUTURES`
+                are also accepted.
 
         For defaults, see `data.binance` in `vectorbt._settings.settings`.
         """
         if client is None:
             raise ValueError("client must be provided")
+        klines_methods = dict(spot="get_klines", futures="futures_klines")
+        if isinstance(klines_type, Enum):
+            klines_type = klines_type.name
+        if not isinstance(klines_type, str) or klines_type.lower() not in klines_methods:
+            raise ValueError(f"klines_type must be one of {list(klines_methods)}, not {klines_type!r}")
+        get_klines = getattr(client, klines_methods[klines_type.lower()])
 
         if tqdm_kwargs is None:
             tqdm_kwargs = {}
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
-            first_data = client.get_klines(symbol=symbol, interval=interval, limit=1, startTime=0, endTime=None)
+            first_data = get_klines(symbol=symbol, interval=interval, limit=1, startTime=0, endTime=None)
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
         except:
@@ -495,7 +508,7 @@ class BinanceData(Data):
             pbar.set_description(_ts_to_str(start_ts))
             while True:
                 # Fetch the klines for the next interval
-                next_data = client.get_klines(
+                next_data = get_klines(
                     symbol=symbol,
                     interval=interval,
                     limit=limit,

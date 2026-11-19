@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 
 import numpy as np
 import pandas as pd
@@ -1185,6 +1186,180 @@ class TestData:
         assert stats_df.shape == (3, 6)
         pd.testing.assert_index_equal(stats_df.index, data.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+
+# ############# custom.py ############# #
+
+binance_end = pd.Timestamp("2021-01-02", tz="UTC")
+binance_start_ms = 1609459200000  # 2021-01-01 00:00 UTC
+
+
+def binance_klines(n, start_ms=binance_start_ms, price=100.0):
+    """Build 1-minute kline rows shaped like python-binance responses."""
+    rows = []
+    for i in range(n):
+        open_time = start_ms + i * 60_000
+        p = price + i
+        rows.append(
+            [
+                open_time,
+                str(p),
+                str(p + 2),
+                str(p - 1),
+                str(p + 1),
+                "1.5",
+                open_time + 59_999,
+                str(p * 1.5),
+                10 + i,
+                "0.75",
+                str(p * 0.75),
+                "0",
+            ]
+        )
+    return rows
+
+
+class FakeBinanceClient:
+    """Serve in-memory klines per client method and record each request."""
+
+    def __init__(self, **rows_by_method):
+        self.rows_by_method = rows_by_method
+        self.calls = []
+
+    def _serve(self, method, symbol, interval, limit, startTime, endTime=None):
+        self.calls.append((method, dict(interval=interval, limit=limit, startTime=startTime, endTime=endTime)))
+        rows = [
+            row for row in self.rows_by_method[method] if row[0] >= startTime and (endTime is None or row[0] <= endTime)
+        ]
+        return [list(row) for row in rows[:limit]]
+
+    def get_klines(self, **params):
+        return self._serve("get_klines", **params)
+
+    def futures_klines(self, **params):
+        return self._serve("futures_klines", **params)
+
+
+class KlinesTypeStandIn(Enum):
+    """Same member names as `binance.enums.HistoricalKlinesType`, which is not a test dependency."""
+
+    SPOT = 1
+    FUTURES = 2
+    FUTURES_COIN = 3
+
+
+def download_binance_symbol(client, **kwargs):
+    kwargs = merge_dicts(dict(interval="1m", end=binance_end, limit=2, delay=None, show_progress=False), kwargs)
+    return vbt.BinanceData.download_symbol("BTCUSDT", client=client, **kwargs)
+
+
+class TestBinanceData:
+    def test_download_symbol_spot_default(self):
+        client = FakeBinanceClient(get_klines=binance_klines(3))
+        df = download_binance_symbol(client)
+        end_ms = int(binance_end.timestamp() * 1000)
+        # Without klines_type, requests stay on the spot endpoint with the same probe and pagination as before.
+        assert client.calls == [
+            ("get_klines", dict(interval="1m", limit=1, startTime=0, endTime=None)),
+            ("get_klines", dict(interval="1m", limit=2, startTime=binance_start_ms, endTime=end_ms)),
+            ("get_klines", dict(interval="1m", limit=2, startTime=binance_start_ms + 60_000, endTime=end_ms)),
+            ("get_klines", dict(interval="1m", limit=2, startTime=binance_start_ms + 120_000, endTime=end_ms)),
+        ]
+        assert list(df.columns) == [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume",
+            "Close time",
+            "Quote volume",
+            "Number of trades",
+            "Taker base volume",
+            "Taker quote volume",
+        ]
+        pd.testing.assert_index_equal(
+            df.index,
+            pd.to_datetime([binance_start_ms + i * 60_000 for i in range(3)], unit="ms", utc=True).rename("Open time"),
+        )
+        np.testing.assert_array_equal(df["Open"].values, np.array([100.0, 101.0, 102.0]))
+        np.testing.assert_array_equal(df["Number of trades"].values, np.array([10, 11, 12]))
+
+    @pytest.mark.parametrize(
+        "klines_type,method",
+        [
+            ("spot", "get_klines"),
+            ("futures", "futures_klines"),
+            ("FUTURES", "futures_klines"),
+            (KlinesTypeStandIn.SPOT, "get_klines"),
+            (KlinesTypeStandIn.FUTURES, "futures_klines"),
+        ],
+    )
+    def test_download_symbol_klines_type(self, klines_type, method):
+        rows = binance_klines(3)
+        spot_client = FakeBinanceClient(get_klines=rows)
+        spot_df = download_binance_symbol(spot_client)
+        client = FakeBinanceClient(get_klines=rows, futures_klines=rows)
+        df = download_binance_symbol(client, klines_type=klines_type)
+        # Every request, including the first-timestamp probe, goes to the selected market's endpoint.
+        assert [m for m, _ in client.calls] == [method] * len(spot_client.calls)
+        # Pagination and parsing are shared with the spot path.
+        assert [params for _, params in client.calls] == [params for _, params in spot_client.calls]
+        pd.testing.assert_frame_equal(df, spot_df)
+
+    def test_download_symbol_klines_type_probe(self):
+        # Futures history starting before the spot listing must not be cut at the spot listing date.
+        futures_rows = binance_klines(4, start_ms=binance_start_ms - 2 * 60_000, price=50.0)
+        client = FakeBinanceClient(get_klines=binance_klines(2), futures_klines=futures_rows)
+        df = download_binance_symbol(client, klines_type="futures")
+        assert df.index[0] == pd.Timestamp(futures_rows[0][0], unit="ms", tz="UTC")
+        np.testing.assert_array_equal(df["Open"].values, np.array([50.0, 51.0, 52.0, 53.0]))
+        assert {m for m, _ in client.calls} == {"futures_klines"}
+
+    @pytest.mark.parametrize("klines_type", ["margin", "futures_coin", KlinesTypeStandIn.FUTURES_COIN, 2])
+    def test_download_symbol_invalid_klines_type(self, klines_type):
+        client = FakeBinanceClient(get_klines=binance_klines(3))
+        with pytest.raises(ValueError, match="klines_type"):
+            download_binance_symbol(client, klines_type=klines_type)
+        assert client.calls == []
+
+    def test_update_keeps_klines_type(self):
+        rows = binance_klines(4)
+        client = FakeBinanceClient(futures_klines=rows[:3])
+        download_kwargs = dict(
+            client=client,
+            klines_type="futures",
+            interval="1m",
+            end=binance_end,
+            limit=2,
+            delay=None,
+            show_progress=False,
+        )
+        df = vbt.BinanceData.download_symbol("BTCUSDT", **download_kwargs)
+        data = vbt.BinanceData.from_data({"BTCUSDT": df}, download_kwargs=download_kwargs)
+        client.rows_by_method["futures_klines"] = rows
+        new_data = data.update()
+        # Updates reuse the stored klines_type instead of falling back to spot.
+        assert {m for m, _ in client.calls} == {"futures_klines"}
+        np.testing.assert_array_equal(new_data.get("Open").values, np.array([100.0, 101.0, 102.0, 103.0]))
+
+    def test_download_historical_klines_type(self):
+        enums = pytest.importorskip("binance.enums")
+        rows = binance_klines(4)
+        client = FakeBinanceClient(futures_klines=rows[:3])
+        data = vbt.BinanceData.download(
+            "BTCUSDT",
+            client=client,
+            klines_type=enums.HistoricalKlinesType.FUTURES,
+            interval="1m",
+            end=binance_end,
+            limit=2,
+            delay=None,
+            show_progress=False,
+        )
+        client.rows_by_method["futures_klines"] = rows
+        new_data = data.update()
+        assert {m for m, _ in client.calls} == {"futures_klines"}
+        np.testing.assert_array_equal(new_data.get("Open").values, np.array([100.0, 101.0, 102.0, 103.0]))
 
 
 # ############# updater.py ############# #
