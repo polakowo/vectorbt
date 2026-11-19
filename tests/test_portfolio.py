@@ -538,6 +538,50 @@ def test_execute_order_nb():
     assert exec_state == ExecuteOrderState(cash=200.0, position=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(size=10.0, price=10.0, fees=0.0, side=1, status=0, status_info=-1))
 
+    # Target percent with fees and slippage (#665): a net sell must land the
+    # position exactly at the target percentage of the post-trade value, so
+    # the short side is sized smaller than target * value / val_price.
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100.0, 0.0, 0.0, 100.0, 10.0, 100.0, 0, 0),
+        nb.order_nb(-1, 10, size_type=SizeType.TargetPercent, fees=0.002, slippage=0.05),
+    )
+    assert exec_state == ExecuteOrderState(
+        cash=190.1321418385778, position=-9.50660709192889, debt=90.31276737332446, free_cash=9.506607091928885
+    )
+    assert_same_tuple(
+        order_result, OrderResult(size=9.50660709192889, price=9.5, fees=0.18062553474664894, side=1, status=0, status_info=-1)
+    )
+    # Reversing a long position into a short one: the sell also pays the cost
+    # of closing the long leg, so the new short is smaller still.
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0.0, 9.5048, 0.0, 0.0, 10.0, 95.048, 0, 0),
+        nb.order_nb(-1, 10, size_type=SizeType.TargetPercent, fees=0.002, slippage=0.05),
+    )
+    assert exec_state == ExecuteOrderState(
+        cash=171.33759634946287, position=-8.566879817473144, debt=81.38535826599487, free_cash=8.566879817473136
+    )
+    assert_same_tuple(
+        order_result, OrderResult(size=18.071679817473143, price=9.5, fees=0.3433619165319897, side=1, status=0, status_info=-1)
+    )
+    # Partially reducing a long position to 50% of value.
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0.0, 9.5048, 0.0, 0.0, 10.0, 95.048, 0, 0),
+        nb.order_nb(0.5, 10, size_type=SizeType.TargetPercent, fees=0.002, slippage=0.05),
+    )
+    assert exec_state == ExecuteOrderState(
+        cash=46.25789682254504, position=4.625789682254505, debt=0.0, free_cash=46.25789682254504
+    )
+    assert_same_tuple(
+        order_result, OrderResult(size=4.879010317745495, price=9.5, fees=0.09270119603716441, side=1, status=0, status_info=-1)
+    )
+    # Fixed fees only.
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100.0, 0.0, 0.0, 100.0, 10.0, 100.0, 0, 0),
+        nb.order_nb(-1, 10, size_type=SizeType.TargetPercent, fixed_fees=1.0),
+    )
+    assert exec_state == ExecuteOrderState(cash=198.0, position=-9.9, debt=99.0, free_cash=0.0)
+    assert_same_tuple(order_result, OrderResult(size=9.9, price=10.0, fees=1.0, side=1, status=0, status_info=-1))
+
     exec_state, order_result = nb.execute_order_nb(
         ProcessOrderState(50.0, 5.0, 0.0, 50.0, 10.0, 100.0, 0, 0), nb.order_nb(1, 10, size_type=SizeType.Percent)
     )
@@ -2357,6 +2401,71 @@ class TestFromOrders:
             np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 1, 0, 50.0, 1.0, 0.0, 0)], dtype=order_dt),
         )
 
+    def test_target_percent_fees_slippage(self):
+        # https://github.com/polakowo/vectorbt/issues/665
+        # A long-only, a short-only and a combined portfolio running the same
+        # SMA crossover with target_percent sizing: the combined portfolio must
+        # behave as the sum of the two legs. With fees/slippage, translating a
+        # target percent into shares off the pre-trade value over-allocated the
+        # short side (the trade itself shrinks the portfolio value), so the
+        # legs no longer summed up to the combined portfolio. The fix sizes a
+        # net sell so the post-trade position equals the target percentage of
+        # the post-trade value. Synthetic prices are used instead of the
+        # Yahoo Finance download from the issue.
+        rng = np.random.default_rng(42)
+        close = pd.Series(
+            100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, size=300))),
+            index=pd.date_range("2020-12-30", periods=300, freq="D"),
+        )
+        directions = ["long_only", "short_only", "both"]
+        _close = close.vbt.tile(3)
+        _close.columns = directions
+        sma = close.rolling(10).mean()
+        signals_long = ((close > sma) & (close.shift(1) <= sma.shift(1))) * 1
+        signals_short = ((close < sma) & (close.shift(1) >= sma.shift(1))) * 1
+        size = np.full(shape=(len(close), 3), fill_value=np.nan)
+        size[signals_long == 1, 0] = 1
+        size[signals_short == 1, 0] = 0
+        size[signals_long == 1, 1] = 0
+        size[signals_short == 1, 1] = 1
+        size[:, 2] = size[:, 0] - size[:, 1]
+
+        for fee, slippage in [(0.0, 0.0), (0.0, 0.05), (0.002, 0.0), (0.002, 0.05)]:
+            pf = vbt.Portfolio.from_orders(
+                close=_close,
+                size=size,
+                size_type="target_percent",
+                price=_close,
+                direction=directions,
+                call_seq="auto",
+                cash_sharing=False,
+                fees=fee,
+                slippage=slippage,
+            )
+            # The combined allocation must equal the sum of the leg allocations
+            # on every bar (this is what the sizing fix establishes).
+            alloc = pf.asset_value() / pf.value()
+            np.testing.assert_allclose(
+                alloc["long_only"] + alloc["short_only"], alloc["both"], rtol=0, atol=1e-9
+            )
+            # ... and so must the periodic returns on every bar without a trade.
+            rets = pf.returns()
+            diff = (rets["long_only"] + rets["short_only"]) - rets["both"]
+            trade_bars = pd.Index(pf.orders.records_readable["Timestamp"].unique())
+            no_trade = diff.index.difference(trade_bars)
+            np.testing.assert_allclose(diff.loc[no_trade], 0.0, rtol=0, atol=1e-9)
+            # On trade bars the two constraints cannot both hold: the
+            # allocation-sum and the return-sum are two linear equations in
+            # the single unknown (the combined column's trade size) and are
+            # generically inconsistent — a sizing can satisfy either one on a
+            # trade bar, not both. Satisfying the return-sum there would force
+            # the allocation off target, which would then break every
+            # following non-trade bar. The combined portfolio pays the cost of
+            # closing one leg in the same order in which it opens the other,
+            # while each leg pays only its own cost, so the difference is a
+            # one-off cost drag, bounded here.
+            np.testing.assert_allclose(diff.loc[trade_bars], 0.0, rtol=0, atol=0.01)
+
     def test_update_value(self):
         record_arrays_close(
             from_orders_both(
@@ -2381,14 +2490,14 @@ class TestFromOrders:
                 [
                     (0, 0, 0, 50.0, 1.01, 0.505, 0),
                     (1, 1, 0, 48.02960494069208, 1.01, 0.485099009900992, 0),
-                    (2, 0, 1, 0.9851975296539592, 1.98, 0.019506911087148394, 1),
-                    (3, 1, 1, 0.9465661198057499, 2.02, 0.019120635620076154, 0),
-                    (4, 0, 2, 0.019315704924103727, 2.9699999999999998, 0.0005736764362458806, 1),
-                    (5, 1, 2, 0.018558300554959377, 3.0300000000000002, 0.0005623165068152705, 0),
-                    (6, 0, 3, 0.00037870218456959037, 3.96, 1.4996606508955778e-05, 1),
-                    (7, 1, 3, 0.0003638525743521767, 4.04, 1.4699644003827875e-05, 0),
-                    (8, 0, 4, 7.424805112066224e-06, 4.95, 3.675278530472781e-07, 1),
-                    (9, 1, 4, 7.133664827307231e-06, 5.05, 3.6025007377901643e-07, 0),
+                    (2, 0, 1, 0.9950987623392393, 1.98, 0.01970295549431694, 1),
+                    (3, 1, 1, 0.9560791069196044, 2.02, 0.01931279795977603, 0),
+                    (4, 0, 2, 0.009705161380274774, 2.9699999999999998, 0.00028824329299416076, 1),
+                    (5, 1, 2, 0.009324604125877172, 3.0300000000000002, 0.0002825355050140796, 0),
+                    (6, 0, 3, 9.46540795467854e-05, 3.96, 3.7483015500527016e-06, 1),
+                    (7, 1, 3, 9.094251873718691e-05, 4.04, 3.6740777569823366e-06, 0),
+                    (8, 0, 4, 9.231577422497139e-07, 4.95, 4.569630824136084e-08, 1),
+                    (9, 1, 4, 8.869590267414416e-07, 5.05, 4.47914308504427e-08, 0),
                 ],
                 dtype=order_dt,
             ),
@@ -2408,18 +2517,18 @@ class TestFromOrders:
                 [
                     (0, 0, 0, 50.0, 1.01, 0.505, 0),
                     (1, 1, 0, 48.02960494069208, 1.01, 0.485099009900992, 0),
-                    (2, 0, 1, 0.9851975296539592, 1.98, 0.019506911087148394, 1),
-                    (3, 1, 1, 0.7303208018821721, 2.02, 0.014752480198019875, 0),
-                    (4, 2, 1, 0.21624531792357785, 2.02, 0.0043681554220562635, 0),
-                    (5, 0, 2, 0.019315704924103727, 2.9699999999999998, 0.0005736764362458806, 1),
-                    (6, 1, 2, 0.009608602243410758, 2.9699999999999998, 0.00028537548662929945, 1),
-                    (7, 2, 2, 0.02779013180558861, 3.0300000000000002, 0.0008420409937093393, 0),
-                    (8, 0, 3, 0.0005670876809631409, 3.96, 2.2456672166140378e-05, 1),
-                    (9, 1, 3, 0.00037770350099464167, 3.96, 1.4957058639387809e-05, 1),
-                    (10, 2, 3, 0.0009077441794302741, 4.04, 3.6672864848982974e-05, 0),
-                    (11, 0, 4, 1.8523501267964093e-05, 4.95, 9.169133127642227e-07, 1),
-                    (12, 1, 4, 1.2972670177191503e-05, 4.95, 6.421471737709794e-07, 1),
-                    (13, 2, 4, 3.0261148547590434e-05, 5.05, 1.5281880016533242e-06, 0),
+                    (2, 0, 1, 0.9950987623392393, 1.98, 0.01970295549431694, 1),
+                    (3, 1, 1, 0.7302717907803782, 2.02, 0.01475149017376364, 0),
+                    (4, 2, 1, 0.22580731613922628, 2.02, 0.004561307786012381, 0),
+                    (5, 0, 2, 0.009705161380274774, 2.9699999999999998, 0.00028824329299416076, 1),
+                    (6, 1, 2, 0.009753684736502066, 2.9699999999999998, 0.0002896844366741113, 1),
+                    (7, 2, 2, 0.018695828917805093, 3.0300000000000002, 0.0005664836162094927, 0),
+                    (8, 0, 3, 0.00028780591257770993, 3.96, 1.1397114138077314e-05, 1),
+                    (9, 1, 3, 0.00019122036250251995, 3.96, 7.57232635509979e-06, 1),
+                    (10, 2, 3, 0.0004602427724792994, 4.04, 1.8593808008163758e-05, 0),
+                    (11, 0, 4, 6.593689690248539e-06, 4.95, 3.263876396673027e-07, 1),
+                    (12, 1, 4, 4.704892305085195e-06, 4.95, 2.328921691017172e-07, 1),
+                    (13, 2, 4, 1.08555437835767e-05, 5.05, 5.482049610706262e-07, 0),
                 ],
                 dtype=order_dt,
             ),

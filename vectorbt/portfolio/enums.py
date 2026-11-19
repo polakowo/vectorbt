@@ -430,6 +430,19 @@ Attributes:
 
         Uses `OrderContext.value_now` to get the current total value.
         Gets converted into `SizeType.TargetValue`.
+
+        !!! note
+            When the order nets to a sell, the translation takes fees and
+            slippage into account, so the resulting position equals the target
+            percentage of the post-trade value. A net buy is exact only when
+            it exhausts the cash limit (as full-size buys do via `buy_nb`);
+            partial buys still over-allocate and are not corrected here.
+            Exactness also assumes no binding size constraint (`max_size`,
+            `size_granularity`, `allow_partial`) and that the valuation price
+            is the execution price, as in the default flow. If the exact
+            solution would demand an extreme size (a near-zero denominator,
+            or more than double the plain target size), the correction is
+            skipped and the previous behavior applies.
 """
 
 
