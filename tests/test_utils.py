@@ -2092,6 +2092,7 @@ class TestArray:
     def test_get_ranges_arr(self):
         np.testing.assert_array_equal(array_.get_ranges_arr(0, 3), np.array([0, 1, 2]))
         np.testing.assert_array_equal(array_.get_ranges_arr(0, [1, 2, 3]), np.array([0, 0, 1, 0, 1, 2]))
+        np.testing.assert_array_equal(array_.get_ranges_arr([0, 1, 2], 3), np.array([0, 1, 2, 1, 2, 2]))
         np.testing.assert_array_equal(array_.get_ranges_arr([0, 3], [3, 6]), np.array([0, 1, 2, 3, 4, 5]))
 
     def test_uniform_summing_to_one_nb(self):
