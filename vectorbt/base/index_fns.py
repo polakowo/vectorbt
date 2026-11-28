@@ -277,7 +277,11 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> tp.Union[slice, tp.Arr
             name1 = index1.names[i]
             name2 = index2.names[j]
             if name1 == name2:
-                if set(index2.levels[j]).issubset(set(index1.levels[i])):
+                # Level pools can contain unused labels. Missing codes are matched by factorization below.
+                codes1, codes2 = index1.codes[i], index2.codes[j]
+                values1 = set(index1.levels[i].take(np.unique(codes1[codes1 >= 0])))
+                values2 = set(index2.levels[j].take(np.unique(codes2[codes2 >= 0])))
+                if values2.issubset(values1):
                     if i in mapper:
                         raise ValueError(f"There are multiple candidate levels with name {name1} in second index")
                     mapper[i] = j
@@ -301,8 +305,8 @@ def align_index_to(index1: tp.Index, index2: tp.Index) -> tp.Union[slice, tp.Arr
     if len(np.unique(indices1, axis=0)) != len(indices1):
         raise ValueError("Duplicated values in first index are not allowed")
 
-    # Try to tile
-    if len(index2) % len(index1) == 0:
+    # Tile only non-empty sources; the complete-key lookup rejects targets with no source position.
+    if len(index1) > 0 and len(index2) % len(index1) == 0:
         tile_times = len(index2) // len(index1)
         index1_tiled = np.tile(indices1, (tile_times, 1))
         if np.array_equal(index1_tiled, indices2):

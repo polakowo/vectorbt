@@ -1214,6 +1214,61 @@ class TestIndexFns:
         with pytest.raises(ValueError, match="Values in second index"):
             index_fns.align_index_to(source, target)
 
+    @pytest.mark.parametrize("categorical", [False, True])
+    @pytest.mark.parametrize("missing", [False, True])
+    @pytest.mark.parametrize("permuted", [False, True])
+    def test_align_index_to_unused_levels(self, categorical, missing, permuted):
+        assets = ["A", "B", None] if missing else ["A", "B"]
+        source = pd.Index(assets, name="asset")
+        labels = assets + ["C"]
+        if categorical:
+            labels = pd.CategoricalIndex(labels, categories=["C", "B", "A"], ordered=True)
+        full = pd.MultiIndex.from_product([[1, 2], labels], names=["parameter", "asset"])
+        target = full[full.get_level_values("asset") != "C"]
+        expected = [0, 1, 2, 0, 1, 2] if missing else [0, 1, 0, 1]
+        if permuted:
+            target = target[::-1]
+            expected = expected[::-1]
+
+        # Filtering keeps C in the level pool, but only observed A/B/missing keys need alignment.
+        levels_before = [level.copy(deep=True) for level in target.levels]
+        codes_before = [code.copy() for code in target.codes]
+        np.testing.assert_array_equal(index_fns.align_index_to(source, target), expected)
+        for level, before in zip(target.levels, levels_before):
+            pd.testing.assert_index_equal(level, before)
+        for code, before in zip(target.codes, codes_before):
+            np.testing.assert_array_equal(code, before)
+
+    def test_align_index_to_observed_source_keys(self):
+        # Unused source labels cannot provide a position for an observed target key.
+        source = pd.MultiIndex(levels=[["A", "B", "C"], [1, 2, 3]], codes=[[0, 1], [0, 1]], names=["asset", "window"])
+        valid = pd.MultiIndex.from_tuples([("B", 2), ("A", 1), ("B", 2)], names=source.names)
+        np.testing.assert_array_equal(index_fns.align_index_to(source, valid), [1, 0, 1])
+        for target in [
+            pd.MultiIndex.from_tuples([("C", 3)], names=source.names),
+            pd.MultiIndex.from_tuples([("A", 2), ("B", 2)], names=source.names),
+        ]:
+            with pytest.raises(ValueError):
+                index_fns.align_index_to(source, target)
+
+    @pytest.mark.parametrize("compact", [False, True])
+    @pytest.mark.parametrize("missing", [False, True])
+    def test_align_index_to_empty_source(self, compact, missing):
+        source = pd.MultiIndex(levels=[["A"]], codes=[[]], names=["asset"])
+        target = pd.MultiIndex(levels=[["B"]], codes=[[-1] if missing else [0]], names=["asset"])
+        if compact:
+            source, target = source.remove_unused_levels(), target.remove_unused_levels()
+        # Neither an ordinary nor a missing target key has a position in an empty source.
+        with pytest.raises(ValueError):
+            index_fns.align_index_to(source, target)
+
+    def test_align_index_to_empty_target(self):
+        source = pd.Index(["A", "B"], name="asset")
+        target = pd.MultiIndex.from_product([[1, 2], ["A", "B", "C"]], names=["parameter", "asset"])[:0]
+        # An empty filtered target requests no keys, even though its level pools remain populated.
+        indexer = index_fns.align_index_to(source, target)
+        np.testing.assert_array_equal(np.arange(len(source))[indexer], [])
+
     def test_align_index_to(self):
         index1 = pd.Index(["c", "b", "a"], name="name1")
         assert index_fns.align_index_to(index1, index1) == pd.IndexSlice[:]
@@ -2965,6 +3020,62 @@ class TestAccessors:
                 ),
             ),
         )
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("broadcast", [False, True])
+    @pytest.mark.parametrize("categorical_missing", [False, True])
+    def test_align_to_filtered_grid(self, axis, broadcast, categorical_missing):
+        source = pd.Index(["A", "B"], name="asset")
+        labels = ["A", "B", "C"]
+        if categorical_missing:
+            source = pd.Index(["A", "B", None], name="asset")
+            labels = pd.CategoricalIndex(["A", "B", None, "C"], categories=["C", "B", "A"], ordered=True)
+        full = pd.MultiIndex.from_product([[1, 2], labels], names=["parameter", "asset"])
+        target = full[[5, 2, 4, 1]] if categorical_missing else full[[4, 0, 3, 1]]
+        # Requests are B,missing,A,B or B,A,A,B, with unused C left behind by filtering.
+        values = [[10, 20, 30], [11, 22, 33]] if categorical_missing else [[10, 20], [11, 22]]
+        prices = pd.DataFrame(values, columns=source)
+        other = pd.DataFrame(np.zeros((2, 4), dtype=int), columns=target)
+        expected_values = (
+            [[20, 30, 10, 20], [22, 33, 11, 22]] if categorical_missing else [[20, 10, 10, 20], [22, 11, 11, 22]]
+        )
+        expected = pd.DataFrame(expected_values, columns=target)
+        if axis == 0:
+            prices, other, expected = prices.T, other.T, expected.T
+        prices_before, other_before = prices.copy(deep=True), other.copy(deep=True)
+
+        # Both public preparation paths must preserve the values and the complete target axes.
+        if broadcast:
+            kwargs = dict(align_index=axis == 0, align_columns=axis == 1)
+            kwargs["index_from" if axis == 0 else "columns_from"] = 1
+            result, aligned_other = reshape_fns.broadcast(prices, other, **kwargs)
+            pd.testing.assert_frame_equal(aligned_other, other_before)
+        else:
+            result = prices.vbt.align_to(other)
+        pd.testing.assert_frame_equal(result, expected)
+        pd.testing.assert_frame_equal(prices, prices_before)
+        pd.testing.assert_frame_equal(other, other_before)
+
+    @pytest.mark.parametrize("axis", [0, 1])
+    @pytest.mark.parametrize("empty", [False, True])
+    def test_align_to_missing_keys_from_empty_source(self, axis, empty):
+        source_axis = pd.MultiIndex(levels=[["A"]], codes=[[] if empty else [-1]], names=["asset"])
+        target_axis = pd.MultiIndex(levels=[["B"]], codes=[[-1, -1]], names=["asset"])
+        source = pd.DataFrame(np.empty((2, 0)) if empty else [[10], [20]], columns=source_axis)
+        target = pd.DataFrame([[7, 8], [9, 10]], columns=target_axis)
+        expected = pd.DataFrame([[10, 10], [20, 20]], columns=target_axis)
+        if axis == 0:
+            source, target, expected = source.T, target.T, expected.T
+        source_before, target_before = source.copy(deep=True), target.copy(deep=True)
+
+        # Missing keys can repeat a real source position; an empty source must reject them.
+        if empty:
+            with pytest.raises(ValueError):
+                source.vbt.align_to(target)
+        else:
+            pd.testing.assert_frame_equal(source.vbt.align_to(target), expected)
+        pd.testing.assert_frame_equal(source, source_before)
+        pd.testing.assert_frame_equal(target, target_before)
 
     def test_align_to(self):
         multi_c1 = pd.MultiIndex.from_arrays([["a8", "b8"]], names=["c8"])
