@@ -1124,6 +1124,7 @@ class TestIndexFns:
         pd.testing.assert_index_equal(
             index_fns.rename_levels(i, {"i": "f"}), pd.Index([1, 2, 3], dtype="int64", name="f")
         )
+        assert i.name == "i"
         pd.testing.assert_index_equal(index_fns.rename_levels(i, {"a": "b"}, strict=False), i)
         with pytest.raises(Exception):
             _ = index_fns.rename_levels(i, {"a": "b"}, strict=True)
@@ -2954,6 +2955,12 @@ class TestAccessors:
                 columns=pd.MultiIndex.from_tuples([("a7", "a8"), ("b7", "b8"), ("c7", "c8")], names=["c7", "c9"]),
             ),
         )
+        df = pd.DataFrame([[1, 2], [3, 4]], columns=pd.Index(["x", "y"], name="c"))
+        pd.testing.assert_frame_equal(
+            df.vbt.rename_levels({"c": "d"}),
+            pd.DataFrame([[1, 2], [3, 4]], columns=pd.Index(["x", "y"], name="d")),
+        )
+        assert df.columns.name == "c"
 
     def test_select_levels(self):
         pd.testing.assert_frame_equal(

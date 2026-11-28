@@ -183,7 +183,7 @@ def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any], strict: bool
                 raise KeyError(f"Level '{k}' not found")
         else:
             if index.name == k:
-                index.name = v
+                index = index.rename(v)
             elif strict:
                 raise KeyError(f"Level '{k}' not found")
     return index
