@@ -871,6 +871,93 @@ class TestData:
             ),
         )
 
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize(
+        "values,dtype,expected_dtype",
+        [
+            ([1704067200000000001, 1704067200000000003], "int64", "int64"),
+            ([2**64 - 3, 2**64 - 1], "uint64", "uint64"),
+            ([1, 2], "int16", "int16"),
+            ([1.5, np.nan], "float32", "float32"),
+            ([1.5, np.nan], "float64", "float64"),
+            ([np.nan, np.nan], "float64", "float64"),
+            ([True, False], "bool", "bool"),
+            ([2**53 + 1, 2**53 + 3], object, "int64"),
+            (["a", pd.NA], "string", "string"),
+            ([2**53 + 1, pd.NA], "Int64", "Int64"),
+            ([True, pd.NA], "boolean", "boolean"),
+            ([pd.Timestamp("2024-01-01"), pd.NaT], "datetime64[ns]", "datetime64[ns]"),
+            ([pd.Timestamp("2024-01-01", tz="UTC"), pd.NaT], "datetime64[ns, UTC]", "datetime64[ns, UTC]"),
+            ([pd.Timedelta(1, "ns"), pd.NaT], "timedelta64[ns]", "timedelta64[ns]"),
+            (["a", "b"], "category", "category"),
+            ([], "int64", "int64"),
+        ],
+    )
+    def test_concat_single_symbol_values(self, values, dtype, expected_dtype, as_frame):
+        # Derive the expected values independently, including the retained object inference.
+        index = pd.Index(["tick1", "tick2"][: len(values)], name="tick")
+        source = pd.Series(values, index=index, name="feature", dtype=dtype)
+        data = vbt.Data.from_data({"A": source.to_frame() if as_frame else source})
+        result = data.concat()["feature"]
+        expected = pd.Series(values, index=index, name="A", dtype=expected_dtype)
+        assert result.dtype == expected.dtype
+        pd.testing.assert_series_equal(result, expected, check_exact=True)
+        pd.testing.assert_series_equal(source, pd.Series(values, index=index, name="feature", dtype=dtype))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize("infer_string", [False, True])
+    def test_concat_single_symbol_inference(self, as_frame, infer_string):
+        # Preserve pandas' final object inference under either supported string-inference setting.
+        with pd.option_context("future.infer_string", infer_string):
+            source = pd.Series(["a", None], name="feature", dtype=object)
+            data = vbt.Data.from_data({"A": source.to_frame() if as_frame else source})
+            result = data.concat()["feature"]
+            expected = pd.Series(["a", None], name="A", dtype="str" if infer_string else object)
+            assert result.dtype == expected.dtype
+            pd.testing.assert_series_equal(result, expected)
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize("symbol,feature", [(None, "id"), (("venue", "A"), ("feed", "id")), ("A", None)])
+    def test_concat_single_symbol_labels(self, symbol, feature, as_frame):
+        # An explicit None symbol must replace the feature name, rather than inherit it.
+        index = pd.MultiIndex.from_tuples([("day1", 1), ("day1", 2)], names=["day", "tick"])
+        source = pd.Series([3, 4], index=index, name=feature)
+        data = vbt.Data.from_data({symbol: source.to_frame(name=feature) if as_frame else source})
+        result = data.concat(level_name="instrument")
+        assert list(result) == [feature]
+        pd.testing.assert_series_equal(result[feature], pd.Series([3, 4], index=index, name=symbol))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    @pytest.mark.parametrize("dtype", ["int64", "Int64"])
+    def test_concat_single_symbol_ownership(self, as_frame, dtype):
+        source = pd.Series([2**53 + 1, 2**53 + 3], name="id", dtype=dtype)
+        data = vbt.Data.from_data({"A": source.to_frame() if as_frame else source})
+        result = data.concat()["id"]
+        stored = data.data["A"]["id"] if as_frame else data.data["A"]
+
+        # Array-level writes also detect shared buffers that pandas copy-on-write could hide.
+        result.array[0] = 7
+        pd.testing.assert_series_equal(stored, pd.Series([2**53 + 1, 2**53 + 3], name="id", dtype=dtype))
+        stored.array[1] = 9
+        pd.testing.assert_series_equal(result, pd.Series([7, 2**53 + 3], name="A", dtype=dtype))
+
+    @pytest.mark.parametrize("as_frame", [False, True])
+    def test_concat_single_symbol_export(self, as_frame):
+        # Neighboring nanosecond timestamps must remain distinct in an actual CSV export.
+        index = pd.Index(["tick1", "tick2"], name="tick")
+        source = pd.Series([1704067200000000001, 1704067200000000003], index=index, name="EventTime")
+        payload = source.to_frame() if as_frame else source
+        data = vbt.Data.from_data({"A": payload})
+        result = data.concat()["EventTime"]
+        assert [int(value) for value in result] == [1704067200000000001, 1704067200000000003]
+        assert result.nunique() == 2
+        # Keep the exact CSV oracle independent of the platform's default line ending.
+        assert result.to_csv(lineterminator="\n") == "tick,A\ntick1,1704067200000000001\ntick2,1704067200000000003\n"
+        if as_frame:
+            pd.testing.assert_frame_equal(data.get(), payload)
+        else:
+            pd.testing.assert_series_equal(data.get(), payload)
+
     def test_concat(self):
         index = pd.DatetimeIndex(
             [
