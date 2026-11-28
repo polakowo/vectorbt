@@ -14,6 +14,7 @@
 
 import itertools
 from collections.abc import Callable
+from operator import itemgetter
 
 from numba.typed import List
 
@@ -34,9 +35,15 @@ def to_typed_list(lst: list) -> List:
 
 def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.List[tp.List]:
     """Flattens a nested list of iterables using unzipping."""
+    if (type(param_tuples) is list or type(param_tuples) is tuple) and all(type(row) is tuple for row in param_tuples):
+        # Index plain tuples to avoid creating an iterator for every row.
+        rows = tuple(param_tuples)
+        width = min(map(len, rows), default=0)
+        columns = (map(itemgetter(i), rows) for i in range(width))
+    else:
+        columns = zip(*param_tuples)
     param_list = []
-    unzipped_tuples = zip(*param_tuples)
-    for i, unzipped in enumerate(unzipped_tuples):
+    for unzipped in columns:
         unzipped = list(unzipped)
         if isinstance(unzipped[0], tuple):
             param_list.extend(flatten_param_tuples(unzipped))
