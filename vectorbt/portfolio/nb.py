@@ -209,6 +209,10 @@ def buy_nb(
     if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
         return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
 
+    # Check against size of zero (cash doesn't cover a single unit of size_granularity)
+    if final_size == 0:
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashLong)
+
     # Update current cash balance and position
     new_cash = add_nb(exec_state.cash, -final_req_cash)
     new_position = add_nb(exec_state.position, final_size)

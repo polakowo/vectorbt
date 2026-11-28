@@ -2249,6 +2249,22 @@ class TestPortfolioRustParity:
             filled[records["col"]] = records["size"]
             np.testing.assert_array_equal(filled, expected)
 
+    def test_from_orders_size_granularity_insufficient_cash_parity(self):
+        # Cash below one lot is rejected by both engines instead of filling a zero-size order
+        kwargs = dict(
+            close=pd.Series([30.0, 30.0, 30.0]),
+            size=np.inf,
+            init_cash=100.0,
+            fixed_fees=1.0,
+            size_granularity=1.0,
+            min_size=0.0,
+            log=True,
+        )
+        pf_numba = vbt.Portfolio.from_orders(engine="numba", **kwargs)
+        pf_rust = vbt.Portfolio.from_orders(engine="rust", **kwargs)
+        record_arrays_close(pf_rust.order_records, pf_numba.order_records)
+        record_arrays_close(pf_rust.log_records, pf_numba.log_records)
+
     def test_from_orders_error_parity(self):
         price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])
         size = pd.Series([1.0, -1.0, np.nan, 1.0, -1.0])
