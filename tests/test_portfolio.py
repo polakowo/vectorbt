@@ -449,6 +449,22 @@ def test_execute_order_nb():
     assert_same_tuple(
         order_result, OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=11)
     )
+    # Cash doesn't cover a single unit of size_granularity: no zero-size fill (min_size defaults to 0)
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(9.0, 0.0, 0.0, 9.0, 30.0, 9.0, 0, 0),
+        nb.order_nb(np.inf, 30, fixed_fees=1, size_granularity=1),
+    )
+    assert exec_state == ExecuteOrderState(cash=9.0, position=0.0, debt=0.0, free_cash=9.0)
+    assert_same_tuple(
+        order_result, OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7)
+    )
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(40.0, -1.0, 30.0, -20.0, 50.0, -10.0, 0, 0), nb.order_nb(1, 50, size_granularity=1)
+    )
+    assert exec_state == ExecuteOrderState(cash=40.0, position=-1.0, debt=30.0, free_cash=-20.0)
+    assert_same_tuple(
+        order_result, OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7)
+    )
 
     # Calculations
     exec_state, order_result = nb.execute_order_nb(
@@ -975,6 +991,20 @@ class TestFromOrders:
             engine=test_engine,
         )
         assert pf.assets().iloc[-1] == 0
+
+    def test_size_granularity_insufficient_cash(self, test_engine):
+        # 3 shares for 91 leave 9 cash, which buys no whole share: no zero-size orders, no fixed fees
+        pf = vbt.Portfolio.from_orders(
+            pd.Series([30.0, 30.0, 30.0]),
+            np.inf,
+            init_cash=100.0,
+            fixed_fees=1.0,
+            size_granularity=1.0,
+            min_size=0.0,
+            engine=test_engine,
+        )
+        record_arrays_close(pf.order_records, np.array([(0, 0, 0, 3.0, 30.0, 1.0, 0)], dtype=order_dt))
+        np.testing.assert_array_equal(pf.cash().values, np.array([9.0, 9.0, 9.0]))
 
     def test_price(self):
         record_arrays_close(
@@ -5065,7 +5095,22 @@ def log_flex_order_func_nb(c, size):
     return -1, nb.order_nothing_nb()
 
 
+@njit
+def lot_order_func_nb(c):
+    return nb.order_nb(np.inf, fixed_fees=1.0, size_granularity=1.0)
+
+
 class TestFromOrderFunc:
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    def test_size_granularity_insufficient_cash(self, test_row_wise):
+        # order_nb defaults to min_size=0: cash below one lot must not produce zero-size orders or fees
+        pf = vbt.Portfolio.from_order_func(
+            pd.Series([30.0, 30.0, 30.0]), lot_order_func_nb, init_cash=100.0, row_wise=test_row_wise
+        )
+        record_arrays_close(pf.order_records, np.array([(0, 0, 0, 3.0, 30.0, 1.0, 0)], dtype=order_dt))
+        np.testing.assert_array_equal(pf.cash().values, np.array([9.0, 9.0, 9.0]))
+        assert pf.trades.count() == 1
+
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
     def test_one_column(self, test_row_wise, test_flexible):

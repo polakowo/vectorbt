@@ -922,6 +922,14 @@ fn buy(
         ));
     }
 
+    // Cash doesn't cover a single unit of size_granularity
+    if final_size == 0.0 {
+        return Ok((
+            exec_state,
+            order_not_filled(ORDER_STATUS_REJECTED, ORDER_STATUS_INFO_NO_CASH_LONG),
+        ));
+    }
+
     // Update state
     let new_cash = add(exec_state.cash, -final_req_cash);
     let new_position = add(exec_state.position, final_size);
