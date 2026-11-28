@@ -345,7 +345,7 @@ def atr_apply_nb(
 
 
 def _prepare_obv_volume_nb(volume_ts):
-    """Copy volumes into a signed contribution dtype, retaining floating accumulation precision."""
+    """Copy volumes into the cumulative-sum dtype before applying contribution signs."""
     nb_enabled = isinstance(volume_ts, Type)
     dtype = as_dtype(volume_ts.dtype) if nb_enabled else volume_ts.dtype
     if dtype.kind in "biu":

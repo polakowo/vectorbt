@@ -34,8 +34,10 @@ def to_typed_list(lst: list) -> List:
 
 
 def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.List[tp.List]:
-    """Flattens a nested list of iterables using unzipping."""
-    if (type(param_tuples) is list or type(param_tuples) is tuple) and all(type(row) is tuple for row in param_tuples):
+    """Flatten nested parameter rows into columns.
+
+    Ragged rows are truncated to the shortest row, as with `zip`."""
+    if type(param_tuples) in (list, tuple) and all(type(row) is tuple for row in param_tuples):
         # Index plain tuples to avoid creating an iterator for every row.
         rows = tuple(param_tuples)
         width = min(map(len, rows), default=0)

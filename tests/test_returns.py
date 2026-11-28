@@ -481,22 +481,24 @@ class TestAccessors:
         assert np.isnan(flat.vbt.returns(freq="1D", year_freq="365D").pain_ratio())
         assert np.isnan(pd.Series([], dtype=float).vbt.returns(freq="1D").pain_ratio())
 
-    def test_pain_ratio_references(self):
+    @pytest.mark.parametrize(
+        "freq,year_freq,ann_factor", [("1D", "365D", 365.0), ("2D", "365D", 182.5), ("1D", "1D", 1.0)]
+    )
+    @pytest.mark.parametrize("risk_free", [0.0, 0.0005, -0.0003])
+    def test_pain_ratio_references(self, freq, year_freq, ann_factor, risk_free):
         rng = np.random.default_rng(11)
         x = pd.Series(rng.normal(0.0005, 0.01, 20), index=pd.date_range("2020", periods=20))
         window = 5
 
-        for freq, year_freq, ann_factor in [("1D", "365D", 365.0), ("2D", "365D", 182.5), ("1D", "1D", 1.0)]:
-            acc = x.vbt.returns(freq=freq, year_freq=year_freq)
-            assert acc.ann_factor == ann_factor
-            for rf in [0.0, 0.0005, -0.0003]:
-                assert isclose(acc.pain_ratio(risk_free=rf), ref_pain_ratio(x.values, ann_factor, rf))
-                res = acc.rolling_pain_ratio(window=window, minp=window, risk_free=rf)
-                res_numba = acc.rolling_pain_ratio(window=window, minp=window, risk_free=rf, engine="numba")
-                pd.testing.assert_series_equal(res, res_numba)
-                assert res.iloc[: window - 1].isna().all()
-                for i in range(window - 1, len(x)):
-                    assert isclose(res.iloc[i], ref_pain_ratio(x.values[i - window + 1 : i + 1], ann_factor, rf))
+        acc = x.vbt.returns(freq=freq, year_freq=year_freq)
+        assert acc.ann_factor == ann_factor
+        assert isclose(acc.pain_ratio(risk_free=risk_free), ref_pain_ratio(x.values, ann_factor, risk_free))
+        res = acc.rolling_pain_ratio(window=window, minp=window, risk_free=risk_free)
+        res_numba = acc.rolling_pain_ratio(window=window, minp=window, risk_free=risk_free, engine="numba")
+        pd.testing.assert_series_equal(res, res_numba)
+        assert res.iloc[: window - 1].isna().all()
+        for i in range(window - 1, len(x)):
+            assert isclose(res.iloc[i], ref_pain_ratio(x.values[i - window + 1 : i + 1], ann_factor, risk_free))
 
     def test_rolling_pain_ratio_interior_nan(self):
         x = pd.Series(

@@ -2333,27 +2333,37 @@ class TestParams:
             [4, 5, 5, 4, 5, 5, 4, 5, 5],
         ]
 
-    def test_flatten_param_tuples(self):
-        # nested tuples
-        assert params.flatten_param_tuples([((0, 1), 2), ((3, 4), 5)]) == [[0, 3], [1, 4], [2, 5]]
-        assert params.flatten_param_tuples((((0, (1, 2)), 3), ((4, (5, 6)), 7))) == [[0, 4], [1, 5], [2, 6], [3, 7]]
-        # ragged tuples are cut to the shortest row
-        assert params.flatten_param_tuples([(0, 1, 2), (3, 4)]) == [[0, 3], [1, 4]]
-        assert params.flatten_param_tuples([(0, 1), (2, 3, 4), (5,)]) == [[0, 2, 5]]
-        assert params.flatten_param_tuples([((0, 1, 2), 3), ((4, 5), 6)]) == [[0, 4], [1, 5], [3, 6]]
-        # empty tuples
-        assert params.flatten_param_tuples([]) == []
-        assert params.flatten_param_tuples(()) == []
-        assert params.flatten_param_tuples([(), ()]) == []
-        assert params.flatten_param_tuples([(0, 1), ()]) == []
-        # non-tuple rows and iterators
-        assert params.flatten_param_tuples([[0, 1], [2, 3]]) == [[0, 2], [1, 3]]
-        assert params.flatten_param_tuples([(0, 1), [2, 3]]) == [[0, 2], [1, 3]]
-        assert params.flatten_param_tuples(iter([(0, 1), (2, 3)])) == [[0, 2], [1, 3]]
-        assert params.flatten_param_tuples(iter([((0, 1), 2), ((3, 4), 5)])) == [[0, 3], [1, 4], [2, 5]]
-        assert params.flatten_param_tuples(((i, i + 1) for i in range(2))) == [[0, 1], [1, 2]]
-        assert params.flatten_param_tuples([iter((0, 1, 2)), iter((3, 4))]) == [[0, 3], [1, 4]]
-        assert params.flatten_param_tuples(iter([])) == []
+    @pytest.mark.parametrize(
+        "rows,expected",
+        [
+            pytest.param([((0, 1), 2), ((3, 4), 5)], [[0, 3], [1, 4], [2, 5]], id="nested-list"),
+            pytest.param((((0, (1, 2)), 3), ((4, (5, 6)), 7)), [[0, 4], [1, 5], [2, 6], [3, 7]], id="nested-tuple"),
+            pytest.param([(0, 1, 2), (3, 4)], [[0, 3], [1, 4]], id="ragged-last"),
+            pytest.param([(0, 1), (2, 3, 4), (5,)], [[0, 2, 5]], id="ragged-first"),
+            pytest.param([((0, 1, 2), 3), ((4, 5), 6)], [[0, 4], [1, 5], [3, 6]], id="ragged-nested"),
+            pytest.param([], [], id="empty-list"),
+            pytest.param((), [], id="empty-tuple"),
+            pytest.param([(), ()], [], id="empty-rows"),
+            pytest.param([(0, 1), ()], [], id="empty-row"),
+            pytest.param([[0, 1], [2, 3]], [[0, 2], [1, 3]], id="list-rows"),
+            pytest.param([(0, 1), [2, 3]], [[0, 2], [1, 3]], id="mixed-rows"),
+        ],
+    )
+    def test_flatten_param_tuples(self, rows, expected):
+        assert params.flatten_param_tuples(rows) == expected
+
+    @pytest.mark.parametrize(
+        "make_rows,expected",
+        [
+            pytest.param(lambda: iter([(0, 1), (2, 3)]), [[0, 2], [1, 3]], id="iterator"),
+            pytest.param(lambda: iter([((0, 1), 2), ((3, 4), 5)]), [[0, 3], [1, 4], [2, 5]], id="nested-iterator"),
+            pytest.param(lambda: ((i, i + 1) for i in range(2)), [[0, 1], [1, 2]], id="generator"),
+            pytest.param(lambda: [iter((0, 1, 2)), iter((3, 4))], [[0, 3], [1, 4]], id="iterator-rows"),
+            pytest.param(lambda: iter([]), [], id="empty-iterator"),
+        ],
+    )
+    def test_flatten_param_iterators(self, make_rows, expected):
+        assert params.flatten_param_tuples(make_rows()) == expected
 
 
 # ############# datetime_.py ############# #

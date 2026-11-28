@@ -474,7 +474,8 @@ class BinanceData(Data):
 
                 Either 'spot' or 'futures' (USD-M futures), case-insensitive.
                 `binance.enums.HistoricalKlinesType.SPOT` and `binance.enums.HistoricalKlinesType.FUTURES`
-                are also accepted.
+                are also accepted. COIN-M, mark-price, and index-price klines are not supported.
+                `Data.update` retains the selected market in the download arguments.
 
         For defaults, see `data.binance` in `vectorbt._settings.settings`.
         """

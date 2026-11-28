@@ -528,6 +528,11 @@ to call when updating.
 [DataUpdater](../api/data/updater.md) can schedule repeated updates, but does not
 turn a provider into a local streaming feed.
 
+`BinanceData` downloads spot klines by default. Pass `klines_type="futures"` to
+download USD-M futures klines; `data.update()` retains that market selection.
+The optional `python-binance` client is required for both markets. COIN-M,
+mark-price, and index-price klines are not supported by this adapter.
+
 Subclass `DataUpdater` to run validation or reporting after each update. Here a
 small GBM subclass advances its end timestamp by exactly five seconds on every
 call, so the demonstration does not depend on waiting for the wall clock. The
@@ -1368,6 +1373,23 @@ for example a win/loss statistic with no completed trades. The fixture uses cale
 annualization convention for your market; an index of business dates does not by itself
 specify a trading-year convention. Short synthetic histories are unsuitable for estimating
 stable risk-adjusted performance.
+
+For drawdown depth across the whole history, the
+[returns accessor](../api/returns/accessors.md) provides `ulcer_index()` and
+`pain_index()`, plus rolling variants. The ulcer index is the root mean square
+of drawdowns; the pain index is their mean absolute depth. Both return fractions,
+so a pain index of `0.08` means an average drawdown depth of 8%.
+For example, `selected.get_returns_acc().pain_index()` measures the selected
+portfolio's returns. These calculations use the same drawdown convention as
+`ReturnsAccessor.drawdown`; NaN returns count as flat observations, while rolling
+`minp` counts non-NaN returns.
+
+The corresponding `martin_ratio()` and `pain_ratio()` divide annualized excess
+return by the ulcer index and pain index, respectively. Their `risk_free` argument
+is a per-observation rate that is compounded when annualizing, and a zero or
+undefined denominator produces `NaN`. These metrics use Numba under `engine="auto"`;
+explicit `engine="rust"` calls are unsupported. Pain metrics are available directly
+on the returns accessor and are not added to the default `stats()` report.
 
 The stats builder also summarizes objects other than portfolios. This small mask makes its
 signal counts, run lengths, and spacing easy to inspect without a strategy simulation.

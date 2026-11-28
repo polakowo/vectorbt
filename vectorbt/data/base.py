@@ -685,7 +685,10 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
     @cached_method
     def concat(self, level_name: str = "symbol") -> tp.Data:
-        """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
+        """Return a dict of Series/DataFrames with symbols as columns, keyed by column name.
+
+        Single-symbol results copy each stored column before object inference, avoiding
+        conversion through a floating-point placeholder."""
         first_data = self.data[self.symbols[0]]
         index = first_data.index
         if isinstance(first_data, pd.Series):
