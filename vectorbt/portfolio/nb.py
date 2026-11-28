@@ -452,7 +452,61 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         if value <= 0:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
 
+        target_pct = order_size
         order_size *= value
+        if np.isfinite(val_price) and val_price > 0:
+            # A net sell (reducing a long position and/or opening a short one)
+            # pays slippage and fees on the whole sold amount, which shrinks
+            # the portfolio value itself. Translating the target percentage
+            # off the pre-trade value therefore over-allocates the short side:
+            # e.g. shorting 100% of value leaves a position worth more than
+            # 100% of the (now smaller) post-trade value (see #665). (The buy
+            # side is exact only when the buy exhausts the cash limit, as
+            # full-size buys do via buy_nb; partial buys still over-allocate
+            # the same way and are out of scope here.)
+            # Solve for the target value whose post-trade position equals the
+            # target percentage of the post-trade value instead. With q the
+            # net proceeds per $1 of sold value, q = (1 - slippage) * (1 - fees),
+            # selling (position - T) shares leaves
+            #   value_after = value + (position - T) * (price * q - val_price) - fixed_fees,
+            # and requiring T * val_price / value_after = target_pct gives
+            #   T = target_pct * (value - position * val_price + position * price * q - fixed_fees)
+            #       / (val_price * (1 - target_pct) + target_pct * price * q).
+            # With no fees, no slippage and no fixed fees (q = 1), this reduces
+            # to the plain translation target_pct * value / val_price.
+            # Note the value-based form: `value` is the group value when cash
+            # is shared, so `value - position * val_price` is the value
+            # excluding this column's position in both cases.
+            target_shares = order_size / val_price
+            if target_shares < position and (
+                order.fees != 0.0 or order.slippage != 0.0 or order.fixed_fees != 0.0
+            ):
+                q = (1.0 - order.slippage) * (1.0 - order.fees)
+                denom = val_price * (1.0 - target_pct) + target_pct * order.price * q
+                # Guard against a near-zero denominator when the execution price
+                # diverges far from the valuation price: the exact solution then
+                # demands an absurd number of shares (e.g. 5-10x leverage on a
+                # 2x price/val_price gap). In the standard flow price == val_price
+                # and denom is of order val_price, so this never binds there.
+                if np.isfinite(denom) and abs(denom) >= 0.5 * val_price:
+                    adj_target_value = (
+                        target_pct
+                        * val_price
+                        * (value - position * val_price + position * order.price * q - order.fixed_fees)
+                        / denom
+                    )
+                    if np.isfinite(adj_target_value):
+                        adj_target_shares = adj_target_value / val_price
+                        # Only accept the adjustment if it keeps the net sell
+                        # direction and the target sign, and does not more than
+                        # double the plain target size (otherwise the trade is
+                        # infeasible at these prices/costs: keep the old behavior)
+                        if (
+                            adj_target_shares < position
+                            and adj_target_shares * target_pct >= 0.0
+                            and abs(adj_target_shares) <= 2.0 * abs(target_shares)
+                        ):
+                            order_size = adj_target_value
         order_size_type = SizeType.TargetValue
 
     if order_size_type == SizeType.Value or order_size_type == SizeType.TargetValue:
