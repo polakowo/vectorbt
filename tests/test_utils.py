@@ -2392,6 +2392,12 @@ class TestDatetime:
             1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime_.get_utc_tz()
         )
         assert datetime_.to_tzaware_datetime(0) == _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(-86400) == _datetime(
+            1969, 12, 31, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz()
+        )
+        assert datetime_.to_tzaware_datetime(-0.5) == _datetime(
+            1969, 12, 31, 23, 59, 59, 500000, tzinfo=datetime_.get_utc_tz()
+        )
         assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value) == _datetime(2020, 1, 1).replace(
             tzinfo=datetime_.get_utc_tz()
         )

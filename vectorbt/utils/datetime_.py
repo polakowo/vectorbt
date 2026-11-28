@@ -116,6 +116,13 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     raise TypeError("Couldn't parse the timezone")
 
 
+def _fromtimestamp_utc(ts: float) -> datetime:
+    """Convert a Unix timestamp to a UTC datetime, also for negative values.
+
+    `datetime.fromtimestamp` raises `OSError` for negative timestamps on Windows."""
+    return datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=ts)
+
+
 def to_tzaware_datetime(
     dt_like: tp.DatetimeLike,
     naive_tz: tp.Optional[tp.TimezoneLike] = None,
@@ -137,12 +144,12 @@ def to_tzaware_datetime(
     if naive_tz is None:
         naive_tz = datetime_cfg["naive_tz"]
     if isinstance(dt_like, float):
-        dt = datetime.fromtimestamp(dt_like, timezone.utc)
+        dt = _fromtimestamp_utc(dt_like)
     elif isinstance(dt_like, int):
         if len(str(dt_like)) > 10:
-            dt = datetime.fromtimestamp(dt_like / 10 ** (len(str(dt_like)) - 10), timezone.utc)
+            dt = _fromtimestamp_utc(dt_like / 10 ** (len(str(dt_like)) - 10))
         else:
-            dt = datetime.fromtimestamp(dt_like, timezone.utc)
+            dt = _fromtimestamp_utc(dt_like)
     elif isinstance(dt_like, str):
         dt = dateparser.parse(dt_like, **kwargs)
     elif isinstance(dt_like, pd.Timestamp):
