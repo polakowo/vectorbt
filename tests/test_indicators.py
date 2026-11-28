@@ -3396,3 +3396,73 @@ raise SystemExit(pytest.main(sys.argv[1:]))
         np.testing.assert_array_equal(vbt.indicators.nb.obv_custom_nb(close, volume), expected)
         # Integers remain on Numba's precision-preserving path under automatic engine selection.
         np.testing.assert_array_equal(vbt.indicators.dispatch.obv_custom(close, volume, engine="auto"), expected)
+
+    @pytest.mark.parametrize(
+        "dtype", [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64]
+    )
+    def test_OBV_integer_volume(self, dtype):
+        # A decline must subtract unsigned counts, and a flat bar must contribute zero.
+        close = pd.Series([100, 90, 90, 110, 90], name="price")
+        volume = pd.Series([10, 20, 25, 30, 40], dtype=dtype, name="price")
+        expected_dtype = np.promote_types(np.dtype(dtype), np.dtype(int))
+        expected = pd.Series([10, -10, -10, 20, -20], dtype=expected_dtype, name="price")
+        close_before, volume_before = close.copy(), volume.copy()
+        actual = vbt.indicators.nb.obv_custom_nb(close.to_numpy()[:, None], volume.to_numpy()[:, None])
+        np.testing.assert_array_equal(actual[:, 0], expected.to_numpy())
+        assert actual.dtype == expected_dtype
+        obj = vbt.OBV.run(close, volume, engine="numba")
+        pd.testing.assert_series_equal(obj.obv, expected)
+        # Wrong signed contributions previously hid the first negative crossing.
+        pd.testing.assert_series_equal(
+            obj.obv_crossed_below(0.0), pd.Series([False, True, False, False, True], name="price")
+        )
+        pd.testing.assert_series_equal(close, close_before)
+        pd.testing.assert_series_equal(volume, volume_before)
+
+    @pytest.mark.parametrize(
+        "dtype,offset",
+        [
+            (np.int64, 2**53 - 1),
+            (np.int64, -(2**63)),
+            (np.int64, 2**63 - 4),
+            (np.uint64, 2**63),
+            (np.uint64, 2**64 - 4),
+        ],
+    )
+    def test_OBV_integer_price_direction(self, dtype, offset):
+        # Keep adjacent integer prices distinct before the down/flat comparison.
+        close = pd.Series([offset + 2, offset + 1, offset + 1, offset + 3], dtype=dtype, name="price")
+        volume = pd.Series([10, 20, 30, 40], name="price")
+        expected = pd.Series([10, -10, -10, 30], name="price")
+        np.testing.assert_array_equal(
+            vbt.indicators.nb.obv_custom_nb(close.to_numpy()[:, None], volume.to_numpy()[:, None])[:, 0], expected
+        )
+        pd.testing.assert_series_equal(vbt.OBV.run(close, volume, engine="numba").obv, expected)
+
+    @pytest.mark.parametrize(
+        "dtype", [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64]
+    )
+    def test_OBV_integer_volume_boundaries(self, dtype):
+        # Equal large contributions cancel before adding one; flat volume must still be ignored.
+        limit = int(np.iinfo(dtype).max)
+        close = np.array([2, 1, 2, 2])[:, None]
+        volume = np.array([limit, limit, 1, limit], dtype=dtype)[:, None]
+        expected_dtype = np.promote_types(np.dtype(dtype), np.dtype(int))
+        actual = vbt.indicators.nb.obv_custom_nb(close, volume)
+        assert actual.dtype == expected_dtype
+        np.testing.assert_array_equal(actual[:, 0], np.array([limit, 0, 1, 1], dtype=expected_dtype))
+
+    def test_OBV_float32_accumulation(self):
+        # Promoting integer contributions must not change native float32 accumulation.
+        close = np.array([1, 2, 3], dtype=np.float32)[:, None]
+        volume = np.array([2**24, 1, 1], dtype=np.float32)[:, None]
+        expected = vbt.generic.nb.nancumsum_nb(volume)
+        np.testing.assert_array_equal(vbt.indicators.nb.obv_custom_nb(close, volume), expected)
+
+    def test_OBV_boolean_volume(self):
+        # Boolean volumes already represent zero/one counts on the native path.
+        close = np.array([2, 1, 3])[:, None]
+        volume = np.ones(close.shape, dtype=bool)
+        actual = vbt.indicators.nb.obv_custom_nb(close, volume)
+        np.testing.assert_array_equal(actual[:, 0], [1, 0, 1])
+        assert actual.dtype == np.dtype(np.int64)

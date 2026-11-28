@@ -30,6 +30,34 @@ def teardown_module():
 
 class TestEngineResolution:
     @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    @pytest.mark.parametrize("close_dtype", [np.float64, np.uint64])
+    def test_obv_integer_fallback(self, dtype, close_dtype):
+        # The integer-price variant also challenges direction after float64 would erase unit gaps.
+        close = np.array([[2, 1], [1, 3], [3, 2]], dtype=close_dtype)
+        if close_dtype == np.uint64:
+            close += np.uint64(2**63)
+        volume = np.array([[10, 10], [20, 20], [30, 30]], dtype=dtype)
+        close_before, volume_before = close.copy(), volume.copy()
+        expected_dtype = np.promote_types(np.dtype(dtype), np.dtype(int))
+        expected = np.array([[10, 10], [-10, 30], [20, 0]], dtype=expected_dtype)
+        index = pd.date_range("2024-01-01", periods=3, tz="UTC", name="bar")
+        columns = pd.Index(["a", "b"], name="asset")
+        assert not _engine.array_compatible_with_rust(volume).supported
+        # Automatic selection must keep the exact integer path, including when Rust is installed.
+        for engine in ("numba", "auto"):
+            actual = indicator_dispatch.obv_custom(close, volume, engine=engine)
+            np.testing.assert_array_equal(actual, expected)
+            assert actual.dtype == expected_dtype
+            obj = vbt.OBV.run(
+                pd.DataFrame(close, index=index, columns=columns),
+                pd.DataFrame(volume, index=index, columns=columns),
+                engine=engine,
+            )
+            pd.testing.assert_frame_equal(obj.obv, pd.DataFrame(expected, index=index, columns=columns))
+        np.testing.assert_array_equal(close, close_before)
+        np.testing.assert_array_equal(volume, volume_before)
+
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
     def test_true_range_unsigned_fallback(self, dtype):
         high = np.array([105, 95, 109], dtype=dtype)[:, None]
         low = np.array([95, 90, 100], dtype=dtype)[:, None]
@@ -1410,6 +1438,14 @@ class TestSignalsRustParity:
 
 @pytest.mark.skipif(not _engine.is_rust_available(), reason="vectorbt-rust is not installed or version-compatible")
 class TestIndicatorRustParity:
+    @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
+    def test_obv_integer_rejected(self, dtype):
+        # Keep explicit Rust calls separate so conftest cannot skip the core fallback regressions.
+        close = np.array([2.0, 1.0, 3.0])[:, None]
+        volume = np.array([10, 20, 30], dtype=dtype)[:, None]
+        with pytest.raises(ValueError, match="cannot be safely cast"):
+            indicator_dispatch.obv_custom(close, volume, engine="rust")
+
     @pytest.mark.parametrize("dtype", [np.float32, np.float64])
     @pytest.mark.parametrize("layout", ["C", "F", "strided"])
     def test_obv_flat_close(self, dtype, layout):

@@ -15,6 +15,9 @@ classes. These only accept NumPy arrays and other Numba-compatible types.
 
 import numpy as np
 from numba import njit
+from numba.core.types import Type
+from numba.extending import overload
+from numba.np.numpy_support import as_dtype
 
 from vectorbt import _typing as tp
 from vectorbt.generic import nb as generic_nb
@@ -341,6 +344,25 @@ def atr_apply_nb(
     return tr, cache_dict[h]
 
 
+def _prepare_obv_volume_nb(volume_ts):
+    """Copy volumes into a signed contribution dtype, retaining floating accumulation precision."""
+    nb_enabled = isinstance(volume_ts, Type)
+    dtype = as_dtype(volume_ts.dtype) if nb_enabled else volume_ts.dtype
+    if dtype.kind in "biu":
+        # Match nancumsum's output promotion before negation, including unsigned and Boolean volumes.
+        dtype = np.promote_types(dtype, int)
+
+    def impl(volume_ts):
+        return volume_ts.astype(dtype)
+
+    if not nb_enabled:
+        return impl(volume_ts)
+    return impl
+
+
+ol_prepare_obv_volume_nb = overload(_prepare_obv_volume_nb)(_prepare_obv_volume_nb)
+
+
 @njit(cache=True)
 def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbt.indicators.basic.OBV`.
@@ -350,12 +372,14 @@ def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
 
     Compare each close with the immediately previous bar. A NaN close breaks
     the comparison chain, so the next finite close adds its full volume."""
-    obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
-    # Flat finite closes contribute no volume. Compare original prices to retain integer precision;
-    # leave first-bar and non-finite behavior to the existing signed-volume/cumulative-sum rules.
+    obv = _prepare_obv_volume_nb(volume_ts)
+    # Compare original prices before a floating shift can erase integer direction.
+    # Keep the first bar and non-finite comparison-chain behavior unchanged.
     for col in range(close.shape[1]):
         for i in range(1, close.shape[0]):
-            if np.isfinite(close[i, col]) and close[i, col] == close[i - 1, col]:
+            if close[i, col] < close[i - 1, col]:
+                obv[i, col] = -obv[i, col]
+            elif np.isfinite(close[i, col]) and close[i, col] == close[i - 1, col]:
                 obv[i, col] = 0
     obv = generic_nb.nancumsum_nb(obv)
     return obv
